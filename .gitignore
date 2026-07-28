@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+.DS_Store
+*.log
+*.settings-backup
+config/home-favorites.json
+backup-*/
+home-assistant-*-test.json
+scripts/test-home-assistant-devices.py

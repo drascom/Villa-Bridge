@@ -1,0 +1,11 @@
+[Unit]
+Description=Villa Bridge temporary migration panel proxy
+Requires=villa-bridge-proxy.socket
+After=network-online.target villa-bridge-proxy.socket
+
+[Service]
+ExecStart=/lib/systemd/systemd-socket-proxyd 192.168.0.91:8091
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true

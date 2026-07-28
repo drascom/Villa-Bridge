@@ -1,0 +1,17 @@
+mode: shadow
+pairingControl: true
+zigbee:
+  dataDir: /opt/zigbee2mqtt/data
+  configurationFile: /opt/zigbee2mqtt/data/configuration.yaml
+mqtt:
+  url: mqtt://127.0.0.1:1883
+  baseTopic: zigbee2mqtt
+  credentialsFile: /opt/zigbee2mqtt/data/configuration.yaml
+aliasesFile: /var/lib/matterbridge/.matterbridge/matterbridge-name-aliases.json
+matterbridge:
+  wsUrl: ws://127.0.0.1:8283
+homeAssistant:
+  discoveryEnabled: false
+http:
+  host: 0.0.0.0
+  port: 8091
