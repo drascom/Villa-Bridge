@@ -14,6 +14,21 @@ The project is designed for households that want the flexibility of an open
 smart-home stack without making every family member become a home-automation
 expert.
 
+## See Villa Bridge in action
+
+The same dashboard adapts from a full desktop control centre to a compact,
+touch-friendly mobile view.
+
+![Villa Bridge desktop dashboard](docs/images/villa-bridge-desktop.jpg)
+
+<p align="center">
+  <img
+    src="docs/images/villa-bridge-mobile-tr.jpg"
+    alt="Villa Bridge Turkish mobile dashboard"
+    width="390"
+  >
+</p>
+
 ## What makes it useful
 
 - **One name everywhere.** A device keeps its UID internally while its friendly
