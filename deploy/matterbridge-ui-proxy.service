@@ -1,0 +1,11 @@
+[Unit]
+Description=Matterbridge UI migration proxy
+Requires=matterbridge-ui-proxy.socket
+After=network-online.target matterbridge-ui-proxy.socket
+
+[Service]
+ExecStart=/lib/systemd/systemd-socket-proxyd 192.168.0.91:8283
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true

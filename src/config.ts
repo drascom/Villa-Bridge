@@ -1,0 +1,211 @@
+import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import YAML from "yaml";
+
+interface FileConfig {
+  mode?: string;
+  pairingControl?: boolean;
+  zigbee?: {
+    dataDir?: string;
+    configurationFile?: string;
+  };
+  mqtt?: {
+    url?: string;
+    baseTopic?: string;
+    credentialsFile?: string;
+    username?: string;
+    password?: string;
+  };
+  aliasesFile?: string;
+  matterbridge?: {
+    wsUrl?: string;
+  };
+  homeAssistant?: {
+    discoveryEnabled?: boolean;
+  };
+  http?: {
+    host?: string;
+    port?: number;
+  };
+}
+
+interface Z2mConfig {
+  mqtt?: {
+    server?: string;
+    base_topic?: string;
+    user?: string;
+    password?: string;
+  };
+  serial?: {
+    port?: string;
+    baudrate?: number;
+    rtscts?: boolean;
+    adapter?: string;
+    disable_led?: boolean;
+  };
+  advanced?: {
+    channel?: number;
+    pan_id?: number | "GENERATE";
+    ext_pan_id?: number[] | "GENERATE";
+    network_key?: number[] | "GENERATE";
+    adapter_concurrent?: number;
+    adapter_delay?: number;
+    transmit_power?: number;
+  };
+  devices?: Record<string, {
+    friendly_name?: string;
+    disabled?: boolean;
+    retention?: number;
+    debounce?: number;
+    throttle?: number;
+    debounce_ignore?: string[];
+    [key: string]: unknown;
+  }>;
+  groups?: Record<string, {
+    friendly_name?: string;
+    [key: string]: unknown;
+  }>;
+}
+
+export interface DirectZigbeeConfig {
+  dataDir: string;
+  configurationFile?: string;
+  serial: {
+    path: string;
+    baudRate: number;
+    rtscts?: boolean;
+    adapter: "deconz" | "ember" | "zstack" | "zboss" | "zigate" | "ezsp" | "zoh";
+  };
+  network: {
+    channel: number;
+    panId: number;
+    extendedPanId: number[];
+    networkKey: number[];
+  };
+  adapter: {
+    concurrent?: number;
+    delay?: number;
+    disableLed?: boolean;
+    transmitPower?: number;
+  };
+  devices: NonNullable<Z2mConfig["devices"]>;
+  groups: NonNullable<Z2mConfig["groups"]>;
+}
+
+export interface AppConfig {
+  mode: "shadow" | "direct";
+  pairingControl: boolean;
+  mqtt: {
+    url: string;
+    baseTopic: string;
+    username?: string;
+    password?: string;
+  };
+  zigbee?: DirectZigbeeConfig;
+  aliasesFile?: string;
+  matterbridge: {
+    wsUrl: string;
+  };
+  homeAssistant: {
+    discoveryEnabled: boolean;
+  };
+  http: {
+    host: string;
+    port: number;
+  };
+}
+
+async function readYaml<T>(path: string): Promise<T> {
+  return YAML.parse(await readFile(path, "utf8")) as T;
+}
+
+async function optionalZ2mCredentials(path?: string): Promise<Z2mConfig> {
+  if (!path) return {};
+  try {
+    return await readYaml<Z2mConfig>(path);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`MQTT kimlik dosyası okunamadı; anonim bağlantı denenecek: ${reason}`);
+    return {};
+  }
+}
+
+export async function loadConfig(): Promise<AppConfig> {
+  const configPath = resolve(process.env.VILLA_BRIDGE_CONFIG ?? "config/default.yaml");
+  const file = await readYaml<FileConfig>(configPath);
+  const requestedMode = process.env.VILLA_BRIDGE_MODE ?? file.mode ?? "shadow";
+  if (requestedMode !== "shadow" && requestedMode !== "direct") throw new Error("Geçersiz çalışma modu.");
+
+  const z2mPath = file.zigbee?.configurationFile ?? file.mqtt?.credentialsFile;
+  const z2m = await optionalZ2mCredentials(z2mPath);
+  const port = Number(process.env.VILLA_BRIDGE_PORT ?? file.http?.port ?? 8091);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("Geçersiz HTTP portu.");
+  }
+
+  const result: AppConfig = {
+    mode: requestedMode,
+    pairingControl: process.env.VILLA_BRIDGE_PAIRING_CONTROL
+      ? process.env.VILLA_BRIDGE_PAIRING_CONTROL === "true"
+      : file.pairingControl === true,
+    mqtt: {
+      url: process.env.VILLA_BRIDGE_MQTT_URL ?? file.mqtt?.url ?? z2m.mqtt?.server ?? "mqtt://127.0.0.1:1883",
+      baseTopic: process.env.VILLA_BRIDGE_MQTT_BASE_TOPIC ?? file.mqtt?.baseTopic ?? z2m.mqtt?.base_topic ?? "zigbee2mqtt",
+      username: process.env.VILLA_BRIDGE_MQTT_USERNAME ?? file.mqtt?.username ?? z2m.mqtt?.user,
+      password: process.env.VILLA_BRIDGE_MQTT_PASSWORD ?? file.mqtt?.password ?? z2m.mqtt?.password
+    },
+    aliasesFile: process.env.VILLA_BRIDGE_ALIASES_FILE ?? file.aliasesFile,
+    matterbridge: {
+      wsUrl: process.env.VILLA_BRIDGE_MATTERBRIDGE_WS_URL ?? file.matterbridge?.wsUrl ?? "ws://127.0.0.1:8283"
+    },
+    homeAssistant: {
+      discoveryEnabled: process.env.VILLA_BRIDGE_HOME_ASSISTANT_DISCOVERY
+        ? process.env.VILLA_BRIDGE_HOME_ASSISTANT_DISCOVERY === "true"
+        : file.homeAssistant?.discoveryEnabled === true
+    },
+    http: {
+      host: process.env.VILLA_BRIDGE_HOST ?? file.http?.host ?? "0.0.0.0",
+      port
+    }
+  };
+  if (requestedMode === "direct") {
+    const serial = z2m.serial;
+    const advanced = z2m.advanced;
+    const adapters = ["deconz", "ember", "zstack", "zboss", "zigate", "ezsp", "zoh"] as const;
+    if (
+      !serial?.port || !serial.adapter ||
+      !adapters.includes(serial.adapter as (typeof adapters)[number]) ||
+      typeof advanced?.channel !== "number" ||
+      typeof advanced.pan_id !== "number" ||
+      !Array.isArray(advanced.ext_pan_id) ||
+      !Array.isArray(advanced.network_key)
+    ) {
+      throw new Error("Doğrudan Zigbee modu için klonlanmış ağ ve SLZB ayarları eksik.");
+    }
+    result.zigbee = {
+      dataDir: file.zigbee?.dataDir ?? (z2mPath ? dirname(z2mPath) : "/opt/zigbee2mqtt/data"),
+      configurationFile: z2mPath,
+      serial: {
+        path: serial.port,
+        baudRate: serial.baudrate ?? 115200,
+        rtscts: serial.rtscts,
+        adapter: serial.adapter as (typeof adapters)[number]
+      },
+      network: {
+        channel: advanced.channel,
+        panId: advanced.pan_id,
+        extendedPanId: advanced.ext_pan_id,
+        networkKey: advanced.network_key
+      },
+      adapter: {
+        concurrent: advanced.adapter_concurrent,
+        delay: advanced.adapter_delay,
+        disableLed: serial.disable_led,
+        transmitPower: advanced.transmit_power
+      },
+      devices: z2m.devices ?? {},
+      groups: z2m.groups ?? {}
+    };
+  }
+  return result;
+}

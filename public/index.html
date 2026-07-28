@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f6f4ef">
+  <title>Villa</title>
+  <style>
+    :root{
+      color-scheme:light;
+      --paper:#f6f4ef;--surface:#fff;--ink:#16231d;--muted:#66736d;--line:#dfe4df;
+      --forest:#184d3b;--forest-soft:#e4eee9;--sun:#e9a23b;--danger:#b83a35;--shadow:0 18px 50px rgba(28,45,37,.08);
+    }
+    *{box-sizing:border-box}html{scroll-behavior:smooth}
+    body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input{font:inherit}button{cursor:pointer}.icon{width:21px;height:21px;display:block}
+    .shell{min-height:100vh;display:grid;grid-template-columns:238px 1fr}
+    aside{position:sticky;top:0;height:100vh;padding:30px 22px;border-right:1px solid var(--line);background:rgba(250,249,246,.92)}
+    .brand{display:flex;align-items:center;gap:12px;font:750 20px/1.1 Georgia,serif;letter-spacing:.02em}
+    .brand-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:white;background:var(--forest)}
+    nav{display:grid;gap:8px;margin-top:48px}.nav-button{display:flex;align-items:center;gap:13px;padding:12px 14px;border:0;border-radius:10px;color:var(--muted);background:transparent;text-align:left}.nav-gear{width:21px;height:21px;display:grid;place-items:center;font-size:19px;line-height:1}
+    .nav-button.active{color:var(--forest);background:var(--forest-soft);font-weight:700}.aside-state{position:absolute;left:22px;right:22px;bottom:28px;padding-top:18px;border-top:1px solid var(--line)}
+    .connection{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px}.status-dot{width:9px;height:9px;border-radius:50%;background:var(--sun)}.status-dot.ok{background:#2c9a68}.status-dot.bad{background:var(--danger)}
+    main{width:100%;max-width:1240px;margin:0 auto;padding:24px 42px 80px}.view{display:none}.view.active{display:block}.topbar{display:flex;justify-content:flex-end;margin-bottom:8px}.language-switch{display:flex;padding:3px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.language-switch button{min-width:38px;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:12px;font-weight:800}.language-switch button.active{color:white;background:var(--forest)}
+    .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:28px;margin-bottom:30px}.eyebrow{text-transform:uppercase;letter-spacing:.13em;font-size:11px;font-weight:800;color:var(--forest)}
+    h1{font:600 clamp(34px,5vw,56px)/1.02 Georgia,serif;letter-spacing:-.035em;margin:8px 0 10px}.lead{max-width:600px;margin:0;color:var(--muted);font-size:16px}
+    .primary,.secondary,.quiet,.danger-button{border:0;border-radius:10px;padding:12px 16px;font-weight:750;display:inline-flex;align-items:center;justify-content:center;gap:9px}
+    .primary{color:white;background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.16)}.secondary{color:var(--forest);background:var(--forest-soft)}.quiet{color:var(--ink);background:#f1f2ef}.danger-button{color:white;background:var(--danger)}
+    button:disabled{opacity:.5;cursor:not-allowed}.summary{display:grid;grid-template-columns:1.4fr repeat(3,1fr);border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);margin-bottom:30px}
+    .summary-item{min-height:120px;padding:22px;border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:space-between}.summary-item:first-child{border-left:0;background:var(--forest);color:white}
+    .summary-label{font-size:13px;color:var(--muted)}.summary-item:first-child .summary-label{color:#c8ddd5}.summary strong{font:600 31px/1 Georgia,serif}.summary-note{font-size:12px;color:var(--muted)}
+    .section-head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin:32px 0 14px}.section-head h2{margin:0;font:600 25px/1.1 Georgia,serif}.section-head p{margin:5px 0 0;color:var(--muted)}.view-toggle{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.view-toggle button{width:34px;height:32px;display:grid;place-items:center;border:0;border-radius:6px;color:var(--muted);background:transparent}.view-toggle button.active{color:white;background:var(--forest)}.layout-glyph.grid{width:4px;height:4px;background:currentColor;box-shadow:7px 0 currentColor,0 7px currentColor,7px 7px currentColor}.layout-glyph.list{width:14px;height:2px;background:currentColor;box-shadow:0 5px currentColor,0 10px currentColor}
+    .device-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.device-card{background:var(--surface);border:1px solid var(--line);padding:18px;transition:border-color .2s,transform .2s,box-shadow .2s}.device-card:hover{border-color:#b8c7bf;transform:translateY(-1px)}.device-card.focused{border-color:var(--forest);box-shadow:0 0 0 4px var(--forest-soft)}
+    details.device-card{margin-top:0;color:var(--ink)}.device-card-header{display:flex;align-items:center;justify-content:space-between;gap:16px;list-style:none;cursor:pointer}.device-card-header::-webkit-details-marker{display:none}.device-card-header::after{content:"";width:8px;height:8px;flex:none;margin-right:3px;border-right:2px solid var(--forest);border-bottom:2px solid var(--forest);transform:rotate(45deg);transition:transform .2s}.device-card[open]>.device-card-header::after{transform:rotate(225deg)}.device-card-body{padding-top:2px}
+    .device-top{display:flex;justify-content:space-between;gap:14px}.device-title{display:flex;align-items:flex-start;gap:13px}.device-icon{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:50%;background:#f0f3ef;color:var(--forest)}
+    .device-visual{width:54px;height:54px;flex:none;display:grid;place-items:center;border:1px solid #edf0ed;border-radius:12px;background:#fafbf9;overflow:hidden}.device-photo{grid-area:1/1;width:100%;height:100%;padding:5px;object-fit:contain;background:white}.device-fallback{grid-area:1/1;width:100%;height:100%;display:grid;place-items:center;color:var(--forest);font-size:19px;background:#f0f3ef}.device-fallback[hidden],.device-photo[hidden]{display:none}
+    .quick-grid.grid-view{grid-template-columns:repeat(4,minmax(0,1fr))}.quick-grid.list-view{grid-template-columns:1fr}.quick-grid>.empty{grid-column:1/-1}.quick-card{position:relative;min-width:0}.quick-grid.grid-view .quick-card{aspect-ratio:1;display:flex;align-items:stretch}.quick-grid.grid-view .device-title{width:100%;flex-direction:column;align-items:flex-start}.quick-grid.grid-view .device-title>div:last-child{padding-right:26px}.quick-grid.list-view .quick-card{min-height:92px;padding-right:62px}.quick-card .device-title{align-items:center}
+    .quick-toggle{position:relative;isolation:isolate;flex:none;padding:0;border:0;border-radius:12px;background:transparent}.quick-toggle::before{content:"";position:absolute;z-index:-1;inset:-17px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(242,178,75,.42) 0,rgba(242,178,75,.18) 43%,transparent 72%);opacity:0;transform:scale(.72);transition:opacity .28s,transform .28s}.quick-toggle .device-visual{position:relative;z-index:1;transition:border-color .25s,box-shadow .25s,transform .15s,filter .25s}.quick-toggle .device-visual::after{content:"";grid-area:1/1;align-self:stretch;justify-self:stretch;z-index:2;pointer-events:none;background:linear-gradient(180deg,rgba(20,31,26,.08),rgba(20,31,26,.3));transition:background .25s}.quick-toggle .device-photo,.quick-toggle .device-fallback{transition:filter .25s,opacity .25s}.quick-toggle:not(.on) .device-photo,.quick-toggle:not(.on) .device-fallback{filter:grayscale(.78) brightness(.78);opacity:.58}.quick-toggle:hover .device-visual{border-color:#9fb7aa}.quick-toggle:active .device-visual{transform:scale(.96)}.quick-toggle.on::before{opacity:1;transform:scale(1);animation:device-halo 2.8s ease-in-out infinite}.quick-toggle.on .device-visual{border-color:#e1a33f;box-shadow:0 0 0 3px rgba(241,181,84,.18),0 7px 22px rgba(225,153,46,.28);filter:saturate(1.08) brightness(1.05)}.quick-toggle.on .device-visual::after{background:radial-gradient(circle at 50% 34%,rgba(255,242,188,.06),rgba(235,164,55,.2))}.state-overlay{position:absolute;z-index:4;left:50%;bottom:5px;transform:translateX(-50%);min-width:31px;padding:2px 5px;border:1px solid rgba(255,255,255,.36);border-radius:99px;color:white;background:rgba(29,40,35,.78);font-size:8px;font-weight:850;line-height:1.2;letter-spacing:.08em;text-align:center;box-shadow:0 2px 7px rgba(0,0,0,.16);pointer-events:none}.quick-toggle.on .state-overlay{color:#173b2e;background:rgba(255,231,166,.9);border-color:rgba(255,255,255,.7)}.quick-toggle:focus-visible{outline:3px solid #90b8a7;outline-offset:3px}
+    @keyframes device-halo{0%,100%{opacity:.72;transform:scale(.92)}50%{opacity:1;transform:scale(1.08)}}@media(prefers-reduced-motion:reduce){.quick-toggle.on::before{animation:none}.quick-toggle::before,.quick-toggle .device-visual,.quick-toggle .device-photo,.quick-toggle .device-fallback{transition:none}}
+    .view-device,.light-controls-button{position:absolute;bottom:12px;width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:50%;color:var(--forest);background:var(--forest-soft)}.view-device{right:12px}.light-controls-button{left:12px}.view-device:hover,.light-controls-button:hover{background:#d6e6de}.view-device:focus-visible,.light-controls-button:focus-visible{outline:3px solid #90b8a7;outline-offset:2px}.eye-icon{position:relative;width:17px;height:17px;border:1.8px solid currentColor;border-radius:75% 15%;transform:rotate(45deg)}.eye-icon::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:currentColor;transform:translate(-50%,-50%)}.tune-icon{width:17px;height:14px;display:grid;align-content:space-between}.tune-icon::before,.tune-icon::after{content:"";display:block;height:2px;border-radius:2px;background:currentColor;box-shadow:0 6px currentColor}.tune-icon::before{width:17px}.tune-icon::after{display:none}
+    .device-name{font-weight:780;font-size:16px}.device-meta{color:var(--muted);font-size:12px;margin-top:3px}.online-text{color:#24805a}.offline-text{color:var(--danger)}.unknown-text{color:#927035}
+    .controls{display:grid;gap:9px;margin-top:16px}.control-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding-top:12px;border-top:1px solid #edf0ed}.control-name{font-weight:650}.control-value{color:var(--muted);font-size:12px}.control-actions{display:flex;align-items:center;gap:8px}.channel-rename{margin-left:7px;padding:2px 5px;border:0;background:transparent;color:var(--forest);font-size:11px;font-weight:750}.favorite-toggle{width:31px;height:31px;display:grid;place-items:center;border:0;border-radius:50%;color:#9a8260;background:#f3f0e9;font-size:17px;line-height:1}.favorite-toggle.active{color:#ad6d0d;background:#fff0cd}.card-actions .favorite-main{margin-right:auto;color:#79500f;background:#fff0cd}
+    .switch{width:50px;height:29px;border:0;border-radius:99px;padding:3px;background:#cfd6d1;transition:.2s}.switch span{display:block;width:23px;height:23px;border-radius:50%;background:white;box-shadow:0 2px 5px #0002;transition:.2s}.switch.on{background:var(--forest)}.switch.on span{transform:translateX(21px)}
+    input[type=range]{width:150px;accent-color:var(--forest)}.facts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.fact{padding:6px 9px;background:#f2f3f0;font-size:12px;color:#4e5b55}
+    details{margin-top:14px;color:var(--muted)}summary{cursor:pointer;font-size:12px}.technical-details{margin-top:12px}.technical{padding:12px 0 0;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
+    .card-actions{display:flex;gap:8px;margin-top:14px}.card-actions button{padding:8px 10px;border:0;border-radius:8px;font-size:12px;font-weight:700}.rename{background:var(--forest-soft);color:var(--forest)}.remove{background:#f8e9e7;color:var(--danger)}
+    .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:18px}.search{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:white;color:var(--ink);outline:0}.search:focus{border-color:var(--forest)}
+    .connection-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}.connection-card{background:white;border:1px solid var(--line);padding:24px;min-height:220px}.connection-card h2{font:600 25px/1.1 Georgia,serif;margin:16px 0 8px}.connection-card p{color:var(--muted);margin:0 0 20px}.fabric-list{display:grid;gap:8px;margin:18px 0}.fabric{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}.home-assistant-card{grid-column:1/-1;min-height:0}.ha-layout{display:grid;grid-template-columns:1fr 1fr;gap:28px}.ha-steps{margin:0;padding-left:20px;color:var(--muted)}.ha-steps li{margin:0 0 9px;padding-left:4px}.ha-values{display:grid;gap:9px}.ha-value{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 12px;background:#f4f5f2}.ha-value span{color:var(--muted);font-size:12px}.ha-value code{color:var(--ink);font:700 12px/1.3 ui-monospace,monospace;overflow-wrap:anywhere;text-align:right}.ha-actions{display:flex;justify-content:flex-end;margin-top:3px}.ha-actions button{min-width:180px}
+    .settings-form{display:grid;gap:16px}.settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.setting-card{background:white;border:1px solid var(--line);padding:22px}.setting-card h2{margin:0 0 7px;font:600 23px/1.1 Georgia,serif}.setting-card p{min-height:42px;margin:0 0 18px;color:var(--muted);font-size:13px}.setting-field{display:grid;gap:7px;margin-top:14px}.setting-field label{font-size:12px;font-weight:780}.setting-field input{width:100%;min-height:46px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;color:var(--ink);background:#fafbf9;outline:0}.setting-field input:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.settings-actions{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px;border:1px solid var(--line);background:white}.settings-note{max-width:680px;color:var(--muted);font-size:13px}
+    .empty{padding:50px 20px;text-align:center;color:var(--muted);border:1px dashed #cdd4cf;background:#fafaf7}.toast{position:fixed;right:24px;bottom:24px;z-index:20;max-width:380px;padding:13px 16px;color:white;background:#20362c;box-shadow:var(--shadow);transform:translateY(120px);opacity:0;transition:.25s}.toast.show{transform:none;opacity:1}.toast.error{background:var(--danger)}
+    dialog{width:min(92vw,560px);border:0;padding:0;background:white;color:var(--ink);box-shadow:0 30px 100px #0a201855}dialog::backdrop{background:rgba(15,30,23,.5);backdrop-filter:blur(4px)}.modal{padding:26px}.modal h2{font:600 28px/1.1 Georgia,serif;margin:0 0 8px}.modal p{color:var(--muted)}.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}.field{display:grid;gap:7px;margin:18px 0}.field label{font-size:12px;font-weight:750}.field input{border:1px solid var(--line);padding:12px;border-radius:8px}.qr{display:grid;place-items:center;margin:18px auto;width:290px;max-width:100%;background:white}.code{text-align:center;font:700 21px/1.2 ui-monospace,monospace;letter-spacing:.08em}
+    .light-modal{padding:24px}.light-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.light-modal-head h2{margin:0;font:600 30px/1.1 Georgia,serif}.light-modal-head button{width:38px;height:38px;border:0;border-radius:50%;background:#f1f2ef;color:var(--ink)}.light-hero{display:grid;place-items:center;padding:20px 0 24px}.light-power{width:112px;height:112px;display:grid;place-items:center;border:0;border-radius:50%;color:var(--muted);background:#edf0ed;box-shadow:inset 0 0 0 1px var(--line);transition:.25s}.light-power.on{color:var(--forest);background:#fff3c9;box-shadow:0 0 0 12px rgba(241,181,84,.12),0 14px 38px rgba(225,153,46,.25)}.power-glyph{width:34px;height:34px;border:3px solid currentColor;border-top-color:transparent;border-radius:50%;position:relative}.power-glyph::before{content:"";position:absolute;left:50%;top:-8px;width:3px;height:19px;border-radius:3px;background:currentColor;transform:translateX(-50%)}.light-controls{display:grid;gap:18px}.light-control{display:grid;gap:9px}.light-control-head{display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:750}.light-control output{color:var(--muted);font-weight:650}.light-control input[type=range]{width:100%;height:38px}.brightness-slider{accent-color:#e9a23b}.temperature-slider{appearance:none;height:12px!important;border-radius:99px;background:linear-gradient(90deg,#c5dcff,#fff3d2,#ffb45f)}.temperature-slider::-webkit-slider-thumb{appearance:none;width:28px;height:28px;border:3px solid white;border-radius:50%;background:var(--forest);box-shadow:0 2px 8px #0003}.color-picker{width:100%;height:52px;border:0;border-radius:12px;padding:0;background:transparent}.color-picker::-webkit-color-swatch-wrapper{padding:0}.color-picker::-webkit-color-swatch{border:0;border-radius:12px}
+    .pairing-banner{display:none;align-items:center;justify-content:space-between;gap:16px;background:#fff3d9;border-left:4px solid var(--sun);padding:15px 18px;margin-bottom:20px}.pairing-banner.show{display:flex}
+    @media(max-width:900px){.shell{grid-template-columns:1fr}aside{position:fixed;z-index:10;top:auto;bottom:0;width:100%;height:auto;padding:8px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));border:0;border-top:1px solid var(--line)}.brand,.aside-state{display:none}nav{margin:0;display:grid;grid-template-columns:repeat(4,1fr)}.nav-button{justify-content:center;flex-direction:column;gap:3px;padding:6px;font-size:11px}.nav-button .icon{width:20px;height:20px}main{padding:14px 18px 105px}.summary{grid-template-columns:repeat(3,1fr)}.summary-item:first-child{grid-column:1/-1}.summary-item:nth-child(2){border-left:0}.device-grid,.connection-grid,.settings-grid{grid-template-columns:1fr}.quick-grid.grid-view{grid-template-columns:repeat(3,minmax(0,1fr))}.setting-card p{min-height:0}.ha-layout{grid-template-columns:1fr}}
+    @media(max-width:560px){.page-head{display:block}.page-head>.primary{width:100%;margin-top:18px}.summary-item{min-height:96px;padding:15px}.summary strong{font-size:24px}.summary-note{display:none}.device-grid{gap:10px}.device-card{padding:15px}.quick-grid.grid-view{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-grid.grid-view .device-visual{width:50px;height:50px}.toolbar{grid-template-columns:1fr}.toolbar .secondary{display:none}.pairing-banner{align-items:flex-start;flex-direction:column}.pairing-banner button{width:100%}input[type=range]{width:125px}.settings-actions{align-items:stretch;flex-direction:column}.settings-actions button{width:100%}.light-dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:20px 20px 0 0}.light-modal{padding:22px 20px calc(22px + env(safe-area-inset-bottom))}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand"><span class="brand-mark">V</span> Villa</div>
+    <nav>
+      <button class="nav-button active" data-view="home"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg><span data-i18n="navHome">Home</span></button>
+      <button class="nav-button" data-view="devices"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h2"/></svg><span data-i18n="navDevices">Devices</span></button>
+      <button class="nav-button" data-view="connections"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 12a4 4 0 0 1 4-4h3a4 4 0 1 1 0 8h-2"/><path d="M16 12a4 4 0 0 1-4 4H9a4 4 0 1 1 0-8h2"/></svg><span data-i18n="navConnections">Connections</span></button>
+      <button class="nav-button" data-view="settings"><span class="nav-gear">⚙</span><span data-i18n="navSettings">Settings</span></button>
+    </nav>
+    <div class="aside-state"><div class="connection"><span id="sideDot" class="status-dot"></span><span id="sideStatus" data-i18n="connecting">Connecting to home control</span></div></div>
+  </aside>
+
+  <main>
+    <div class="topbar"><div class="language-switch" role="group" aria-label="Language"><button data-language="en" class="active">EN</button><button data-language="tr">TR</button></div></div>
+    <div id="pairingBanner" class="pairing-banner"><div><strong data-i18n="pairingTitle">Searching for new devices</strong><div id="pairingText" class="device-meta" data-i18n="pairingHint">Put the nearby device into pairing mode.</div></div><button id="stopPairing" class="quiet" data-i18n="stopSearch">Stop searching</button></div>
+
+    <section id="home" class="view active">
+      <header class="page-head"><div><div class="eyebrow" data-i18n="homeEyebrow">Home control</div><h1 data-i18n="greeting">Good morning.</h1><p class="lead" data-i18n="homeLead">Control lights, sensors and connections from one place.</p></div><button class="primary add-device" data-i18n="addDevice">＋ Add device</button></header>
+      <section class="summary">
+        <div class="summary-item"><span class="summary-label" data-i18n="homeStatus">Home status</span><strong id="homeState" data-i18n="preparing">Preparing</strong><span id="lastUpdate" class="summary-note" data-i18n="loadingData">Loading data</span></div>
+        <div class="summary-item"><span class="summary-label" data-i18n="device">Devices</span><strong id="deviceCount">—</strong><span class="summary-note" data-i18n="onePlace">In one place</span></div>
+        <div class="summary-item"><span class="summary-label" data-i18n="active">On</span><strong id="activeCount">—</strong><span class="summary-note" data-i18n="lightsSwitches">Lights and switches</span></div>
+        <div class="summary-item"><span class="summary-label" data-i18n="alerts">Alerts</span><strong id="alertCount">—</strong><span class="summary-note" data-i18n="batterySensors">Battery and sensors</span></div>
+      </section>
+      <div class="section-head"><div><h2 data-i18n="quickControl">Quick control</h2><p data-i18n="quickLead">Frequently used controls and current states.</p></div><div class="view-toggle" role="group" aria-label="Quick control layout"><button class="active" data-quick-layout="grid" aria-pressed="true"><span class="layout-glyph grid"></span></button><button data-quick-layout="list" aria-pressed="false"><span class="layout-glyph list"></span></button></div></div>
+      <section id="quickDevices" class="device-grid quick-grid grid-view"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></section>
+    </section>
+
+    <section id="devices" class="view">
+      <header class="page-head"><div><div class="eyebrow" data-i18n="allEquipment">All equipment</div><h1 data-i18n="navDevices">Devices</h1><p class="lead" data-i18n="devicesLead">See each device, its main control and subchannels together.</p></div><button class="primary add-device" data-i18n="addDevice">＋ Add device</button></header>
+      <div class="toolbar"><input id="search" class="search" type="search" placeholder="Search devices…" data-i18n-placeholder="searchDevices" autocomplete="off"><button class="secondary" id="refreshButton" data-i18n="refresh">Refresh</button></div>
+      <section id="allDevices" class="device-grid"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></section>
+    </section>
+
+    <section id="connections" class="view">
+      <header class="page-head"><div><div class="eyebrow" data-i18n="phonesAssistants">Matter controllers</div><h1 data-i18n="navConnections">Connections</h1><p class="lead" data-i18n="connectionsLead">Connect Matter-compatible systems such as Alexa and Apple Home.</p></div></header>
+      <div class="connection-grid">
+        <article class="connection-card"><div class="device-icon">⌁</div><h2 data-i18n="homePlatforms">Matter systems</h2><p data-i18n="platformsLead">Open Matter pairing and scan the code in a Matter-compatible controller.</p><button id="openMatter" class="primary" data-i18n="connectPlatform">Connect Matter system</button><div id="fabricList" class="fabric-list"></div></article>
+        <article class="connection-card"><div class="device-icon">✓</div><h2 data-i18n="oneNameSystem">One naming system</h2><p data-i18n="nameSystemLead">Device names are tied to their UID. Names changed here are shared with connected Matter systems.</p><div class="fact" data-i18n="uidStable">UID stays stable</div><div class="fact" data-i18n="channelsNamed">Subchannels are named separately</div></article>
+        <article class="connection-card home-assistant-card"><div class="device-icon">HA</div><h2>Home Assistant</h2><p data-i18n="haLead">Connect Home Assistant to the same MQTT broker, then enable discovery when you are ready to publish the devices.</p><div class="ha-layout"><ol class="ha-steps"><li data-i18n="haStepOne">In Home Assistant, open Settings → Devices & services → Add integration.</li><li data-i18n="haStepTwo">Select MQTT and enter the broker address shown here.</li><li data-i18n="haStepThree">Use your Mosquitto username and password. Credentials are never displayed in this panel.</li><li data-i18n="haStepFour">Keep the discovery prefix as “homeassistant”, then enable discovery below.</li></ol><div class="ha-values"><div class="ha-value"><span data-i18n="brokerAddress">Broker address</span><code id="haBroker">—</code></div><div class="ha-value"><span data-i18n="brokerPort">Port</span><code id="haPort">—</code></div><div class="ha-value"><span data-i18n="baseTopic">Base topic</span><code id="haBaseTopic">—</code></div><div class="ha-value"><span data-i18n="discoveryPrefix">Discovery prefix</span><code>homeassistant</code></div><div class="ha-value"><span data-i18n="discoveryStatus">Automatic discovery</span><code id="haDiscoveryStatus" class="unknown-text">Disabled</code></div><div class="ha-actions"><button id="toggleHaDiscovery" class="secondary" type="button">Enable discovery</button></div></div></div></article>
+      </div>
+    </section>
+
+    <section id="settings" class="view">
+      <header class="page-head"><div><div class="eyebrow" data-i18n="systemConnections">System connections</div><h1 data-i18n="navSettings">Settings</h1><p class="lead" data-i18n="settingsLead">Update the network endpoints used by Zigbee, MQTT and Matter.</p></div></header>
+      <form id="settingsForm" class="settings-form">
+        <div class="settings-grid">
+          <article class="setting-card"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div></article>
+          <article class="setting-card"><h2>MQTT</h2><p data-i18n="mqttSettingsLead">Broker and base topic shared by Villa Bridge and Zigbee2MQTT.</p><div class="setting-field"><label for="mqttUrl" data-i18n="mqttUrl">Broker URL</label><input id="mqttUrl" name="mqttUrl" type="url" placeholder="mqtt://127.0.0.1:1883" required></div><div class="setting-field"><label for="mqttBaseTopic" data-i18n="baseTopic">Base topic</label><input id="mqttBaseTopic" name="mqttBaseTopic" spellcheck="false" required></div></article>
+          <article class="setting-card"><h2>Matter</h2><p data-i18n="matterSettingsLead">WebSocket connection used to publish devices to Matterbridge.</p><div class="setting-field"><label for="matterWsUrl" data-i18n="matterUrl">Matterbridge URL</label><input id="matterWsUrl" name="matterWsUrl" type="url" placeholder="ws://127.0.0.1:8283" required></div></article>
+        </div>
+        <div class="settings-actions"><div><strong data-i18n="restartNoticeTitle">A restart is required</strong><div class="settings-note" data-i18n="restartNotice">Saving creates recoverable backups and restarts Villa Bridge. Device names and Zigbee network keys are not changed.</div></div><button id="saveSettings" class="primary" type="submit" data-i18n="saveAndRestart">Save and restart</button></div>
+      </form>
+    </section>
+  </main>
+</div>
+
+<dialog id="nameDialog"><form class="modal" method="dialog"><h2 data-i18n="changeDisplayName">Change display name</h2><p data-i18n="displayNameLead">This name will be shared across all home connections.</p><div class="field"><label for="nameInput" data-i18n="newName">New name</label><input id="nameInput" maxlength="32" autocomplete="off"></div><div class="modal-actions"><button class="quiet" value="cancel" data-i18n="cancel">Cancel</button><button id="saveName" class="primary" value="default" data-i18n="save">Save</button></div></form></dialog>
+<dialog id="matterDialog"><div class="modal"><h2 data-i18n="connectPlatform">Connect Matter system</h2><p data-i18n="matterLead">Choose “Add Matter device” in Alexa, Apple Home or a compatible Matter controller and scan this code.</p><div id="qr" class="qr"></div><div id="manualCode" class="code"></div><div class="modal-actions"><button id="closeMatter" class="quiet" data-i18n="close">Close</button></div></div></dialog>
+<dialog id="lightDialog" class="light-dialog"><div class="light-modal"><div class="light-modal-head"><div><div class="eyebrow" data-i18n="lightControl">Light control</div><h2 id="lightTitle">Light</h2></div><button id="closeLight" aria-label="Close">×</button></div><div class="light-hero"><button id="lightPower" class="light-power" aria-label="Power"><span class="power-glyph"></span></button></div><div id="lightControls" class="light-controls"></div></div></dialog>
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+  const translations={
+    en:{
+      navHome:"Home",navDevices:"Devices",navConnections:"Connections",navSettings:"Settings",connecting:"Connecting to home control",
+      pairingTitle:"Searching for new devices",pairingHint:"Put the nearby device into pairing mode.",stopSearch:"Stop searching",
+      homeEyebrow:"Home control",greeting:"Good morning.",homeLead:"Control lights, sensors and connections from one place.",addDevice:"＋ Add device",
+      homeStatus:"Home status",preparing:"Preparing",loadingData:"Loading data",device:"Devices",onePlace:"In one place",active:"On",
+      lightsSwitches:"Lights and switches",alerts:"Alerts",batterySensors:"Battery and sensors",quickControl:"Quick control",
+      quickLead:"Frequently used controls and current states.",gridView:"Grid view",listView:"List view",showInDevices:"Show in Devices",devicesPreparing:"Preparing devices…",allEquipment:"All equipment",
+      lightControl:"Light control",adjustLight:"Adjust light",brightness:"Brightness",colorTemperature:"Color temperature",color:"Color",
+      devicesLead:"See each device, its main control and subchannels together.",searchDevices:"Search devices…",refresh:"Refresh",
+      phonesAssistants:"Matter controllers",connectionsLead:"Connect Matter-compatible systems such as Alexa and Apple Home.",
+      homePlatforms:"Matter systems",platformsLead:"Open Matter pairing and scan the code in a Matter-compatible controller.",
+      connectPlatform:"Connect Matter system",oneNameSystem:"One naming system",nameSystemLead:"Device names are tied to their UID. Names changed here are shared with connected Matter systems.",
+      uidStable:"UID stays stable",channelsNamed:"Subchannels are named separately",changeDisplayName:"Change display name",
+      displayNameLead:"This name will be shared across all home connections.",newName:"New name",cancel:"Cancel",save:"Save",
+      matterLead:"Choose “Add Matter device” in Alexa, Apple Home or a compatible Matter controller and scan this code.",close:"Close",
+      showOnHome:"Show on Home",removeFromHome:"Remove from Home",
+      justNow:"just now",secondsAgo:"{count}s ago",minutesAgo:"{count}m ago",hoursAgo:"{count}h ago",noData:"no data yet",
+      control:"control",controls:"controls",status:"status",statuses:"statuses",controller:"Controller",doorSensor:"Door sensor",
+      motionSensor:"Motion sensor",smokeSensor:"Smoke sensor",coSensor:"CO sensor",sensor:"Sensor",battery:"Battery",
+      doorClosed:"Door closed",doorOpen:"Door open",motionDetected:"Motion detected",motionClear:"No motion",
+      smokeDetected:"Smoke detected",noSmoke:"No smoke",coDetected:"CO detected",coClear:"CO clear",signal:"Signal",
+      signalStrong:"Strong",signalGood:"Good",signalWeak:"Weak",signalVeryWeak:"Very weak",on:"On",off:"Off",
+      nameChannel:"Name",ready:"Ready",unreachable:"Unreachable",standby:"Standby",technicalDetails:"Technical details",
+      uid:"UID",source:"Source",model:"Model",rawSignal:"Raw signal",changeName:"Change name",removeDevice:"Remove device",
+      noQuickControls:"No quick controls found.",noSearchResults:"No devices match your search.",everythingGood:"Everything is good",
+      connectionWaiting:"Waiting for connection",lastUpdate:"Last update {time}",homeControlReady:"Home control ready",
+      pairingCountdown:"Put the nearby device into pairing mode · {count} seconds left",operationFailed:"Could not complete the operation.",
+      serverUnreachable:"Server unavailable",searchStarted:"Device search started.",searchStopped:"Device search stopped.",
+      nameSaved:"Name saved. Home platforms will receive it during the next sync.",confirmRemoval:"Type “{name}” exactly to permanently remove this device:",
+      nameMismatch:"The device name did not match; nothing was removed.",deviceRemoved:"Device removed.",connected:"Connected",
+      noPlatforms:"No Matter systems connected yet.",connectionServiceUnavailable:"Matter connection service unavailable."
+      ,systemConnections:"System connections",settingsLead:"Update the network endpoints used by Zigbee, MQTT and Matter.",
+      zigbeeSettingsLead:"Connection to the Zigbee coordinator used as the device source.",adapterUrl:"Coordinator URL",
+      mqttSettingsLead:"Broker and base topic shared by Villa Bridge and Zigbee2MQTT.",mqttUrl:"Broker URL",baseTopic:"Base topic",
+      matterSettingsLead:"WebSocket connection used to publish devices to Matterbridge.",matterUrl:"Matterbridge URL",
+      restartNoticeTitle:"A restart is required",restartNotice:"Saving creates recoverable backups and restarts Villa Bridge. Device names and Zigbee network keys are not changed.",
+      saveAndRestart:"Save and restart",restartConfirm:"Save these connection settings and restart Villa Bridge?",settingsSaved:"Settings saved. Villa Bridge is restarting…",
+      settingsUnavailable:"Connection settings could not be loaded."
+      ,haLead:"Connect Home Assistant to the same MQTT broker, then enable discovery when you are ready to publish the devices.",
+      haStepOne:"In Home Assistant, open Settings → Devices & services → Add integration.",
+      haStepTwo:"Select MQTT and enter the broker address shown here.",
+      haStepThree:"Use your Mosquitto username and password. Credentials are never displayed in this panel.",
+      haStepFour:"Keep the discovery prefix as “homeassistant”, then enable discovery below.",
+      brokerAddress:"Broker address",brokerPort:"Port",discoveryPrefix:"Discovery prefix",discoveryStatus:"Automatic discovery",enabled:"Enabled",disabled:"Disabled",
+      enableDiscovery:"Enable discovery",disableDiscovery:"Disable discovery",discoveryConfirm:"Change Home Assistant discovery and restart Villa Bridge?"
+    },
+    tr:{
+      navHome:"Ev",navDevices:"Cihazlar",navConnections:"Bağlantılar",navSettings:"Ayarlar",connecting:"Ev kontrolüne bağlanıyor",
+      pairingTitle:"Yeni cihazlar aranıyor",pairingHint:"Yakındaki cihazı eşleştirme moduna alın.",stopSearch:"Aramayı durdur",
+      homeEyebrow:"Ev kontrolü",greeting:"Günaydın.",homeLead:"Işıkları, sensörleri ve bağlantıları tek bir yerden yönetin.",addDevice:"＋ Yeni cihaz ekle",
+      homeStatus:"Ev durumu",preparing:"Hazırlanıyor",loadingData:"Veriler alınıyor",device:"Cihaz",onePlace:"Tek merkezde",active:"Açık",
+      lightsSwitches:"Işık ve anahtar",alerts:"Uyarı",batterySensors:"Pil ve sensörler",quickControl:"Hızlı kontrol",
+      quickLead:"Sık kullanılan kumandalar ve güncel durumlar.",gridView:"Kare görünüm",listView:"Liste görünümü",showInDevices:"Cihazlar bölümünde göster",devicesPreparing:"Cihazlar hazırlanıyor…",allEquipment:"Tüm ekipmanlar",
+      lightControl:"Işık kontrolü",adjustLight:"Işığı ayarla",brightness:"Parlaklık",colorTemperature:"Renk sıcaklığı",color:"Renk",
+      devicesLead:"Her cihazın ana kumandasını ve alt kanallarını birlikte görün.",searchDevices:"Cihaz ara…",refresh:"Yenile",
+      phonesAssistants:"Matter denetleyicileri",connectionsLead:"Alexa ve Apple Home gibi Matter uyumlu sistemleri bağlayın.",
+      homePlatforms:"Matter sistemleri",platformsLead:"Matter eşleştirmesini açın ve kodu Matter uyumlu denetleyicide okutun.",
+      connectPlatform:"Matter sistemi bağla",oneNameSystem:"Tek isim sistemi",nameSystemLead:"Cihaz adları UID’ye bağlı tutulur. Burada yaptığınız ad değişikliği bağlı Matter sistemlerine aynı adla sunulur.",
+      uidStable:"UID sabit kalır",channelsNamed:"Alt kanallar ayrı adlandırılır",changeDisplayName:"Görünen adı değiştir",
+      displayNameLead:"Bu ad tüm ev bağlantıları için ortak isim olarak kullanılacak.",newName:"Yeni ad",cancel:"Vazgeç",save:"Kaydet",
+      matterLead:"Alexa, Apple Home veya Matter uyumlu bir denetleyicide “Matter cihazı ekle” seçeneğini açıp bu kodu okutun.",close:"Kapat",
+      showOnHome:"Ana sayfada göster",removeFromHome:"Ana sayfadan kaldır",
+      justNow:"az önce",secondsAgo:"{count} sn önce",minutesAgo:"{count} dk önce",hoursAgo:"{count} sa önce",noData:"henüz veri yok",
+      control:"kumanda",controls:"kumanda",status:"durum",statuses:"durum",controller:"Kumanda",doorSensor:"Kapı sensörü",
+      motionSensor:"Hareket sensörü",smokeSensor:"Duman sensörü",coSensor:"CO sensörü",sensor:"Sensör",battery:"Pil",
+      doorClosed:"Kapı kapalı",doorOpen:"Kapı açık",motionDetected:"Hareket var",motionClear:"Hareket yok",
+      smokeDetected:"Duman algılandı",noSmoke:"Duman yok",coDetected:"CO algılandı",coClear:"CO temiz",signal:"Sinyal",
+      signalStrong:"Güçlü",signalGood:"İyi",signalWeak:"Zayıf",signalVeryWeak:"Çok zayıf",on:"Açık",off:"Kapalı",
+      nameChannel:"Adlandır",ready:"Hazır",unreachable:"Ulaşılamıyor",standby:"Beklemede",technicalDetails:"Teknik ayrıntılar",
+      uid:"UID",source:"Kaynak",model:"Model",rawSignal:"Ham sinyal",changeName:"Adını değiştir",removeDevice:"Cihazı kaldır",
+      noQuickControls:"Hızlı kumanda bulunmuyor.",noSearchResults:"Aramanıza uygun cihaz bulunamadı.",everythingGood:"Her şey yolunda",
+      connectionWaiting:"Bağlantı bekleniyor",lastUpdate:"Son güncelleme {time}",homeControlReady:"Ev kontrolü hazır",
+      pairingCountdown:"Yakındaki cihazı eşleştirme moduna alın · {count} saniye kaldı",operationFailed:"İşlem tamamlanamadı.",
+      serverUnreachable:"Sunucuya ulaşılamıyor",searchStarted:"Yeni cihaz araması başladı.",searchStopped:"Cihaz araması durduruldu.",
+      nameSaved:"İsim kaydedildi. Ev platformları bir sonraki eşitlemede bu adı alacak.",confirmRemoval:"“{name}” cihazını kalıcı olarak kaldırmak için cihaz adını aynen yazın:",
+      nameMismatch:"Cihaz adı eşleşmedi; hiçbir şey silinmedi.",deviceRemoved:"Cihaz kaldırıldı.",connected:"Bağlı",
+      noPlatforms:"Henüz bağlı Matter sistemi yok.",connectionServiceUnavailable:"Matter bağlantı hizmetine ulaşılamıyor."
+      ,systemConnections:"Sistem bağlantıları",settingsLead:"Zigbee, MQTT ve Matter tarafından kullanılan ağ adreslerini güncelleyin.",
+      zigbeeSettingsLead:"Cihaz kaynağı olarak kullanılan Zigbee koordinatörü bağlantısı.",adapterUrl:"Koordinatör adresi",
+      mqttSettingsLead:"Villa Bridge ve Zigbee2MQTT tarafından paylaşılan broker ve temel konu.",mqttUrl:"Broker adresi",baseTopic:"Temel konu",
+      matterSettingsLead:"Cihazları Matterbridge’e sunmak için kullanılan WebSocket bağlantısı.",matterUrl:"Matterbridge adresi",
+      restartNoticeTitle:"Yeniden başlatma gerekir",restartNotice:"Kaydetme işlemi geri alınabilir yedekler oluşturur ve Villa Bridge’i yeniden başlatır. Cihaz adları ve Zigbee ağ anahtarları değiştirilmez.",
+      saveAndRestart:"Kaydet ve yeniden başlat",restartConfirm:"Bu bağlantı ayarları kaydedilsin ve Villa Bridge yeniden başlatılsın mı?",settingsSaved:"Ayarlar kaydedildi. Villa Bridge yeniden başlatılıyor…",
+      settingsUnavailable:"Bağlantı ayarları yüklenemedi."
+      ,haLead:"Home Assistant’ı aynı MQTT broker’a bağlayın; cihazları yayımlamaya hazır olduğunuzda keşfi etkinleştirin.",
+      haStepOne:"Home Assistant’ta Ayarlar → Cihazlar ve hizmetler → Entegrasyon ekle bölümünü açın.",
+      haStepTwo:"MQTT’yi seçin ve burada gösterilen broker adresini girin.",
+      haStepThree:"Mosquitto kullanıcı adınızı ve parolanızı kullanın. Kimlik bilgileri bu panelde gösterilmez.",
+      haStepFour:"Keşif önekini “homeassistant” olarak bırakın, ardından aşağıdan keşfi etkinleştirin.",
+      brokerAddress:"Broker adresi",brokerPort:"Port",discoveryPrefix:"Keşif öneki",discoveryStatus:"Otomatik keşif",enabled:"Etkin",disabled:"Kapalı",
+      enableDiscovery:"Keşfi etkinleştir",disableDiscovery:"Keşfi kapat",discoveryConfirm:"Home Assistant keşfi değiştirilsin ve Villa Bridge yeniden başlatılsın mı?"
+    }
+  };
+  const savedLanguage=(()=>{try{return localStorage.getItem("villa-language")}catch{return null}})();
+  const savedUsage=(()=>{try{const value=JSON.parse(localStorage.getItem("villa-device-usage")||"{}");return value&&typeof value==="object"?value:{}}catch{return {}}})();
+  const savedQuickLayout=(()=>{try{return localStorage.getItem("villa-quick-layout")}catch{return null}})();
+  const state={devices:[],health:null,pairing:null,matter:null,settings:null,favorites:[],editing:null,lightDevice:null,imageFormats:{},openDevices:new Set(),usage:savedUsage,quickOrder:null,quickLayout:savedQuickLayout==="list"?"list":"grid",language:savedLanguage==="tr"?"tr":"en"};
+  const $=selector=>document.querySelector(selector);
+  const $$=selector=>[...document.querySelectorAll(selector)];
+  const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
+  const t=(key,values={})=>(translations[state.language][key]||translations.en[key]||key).replace(/\{(\w+)\}/g,(_,name)=>values[name]??"");
+  const ago=iso=>{if(!iso)return t("noData");const seconds=Math.max(0,Math.floor((Date.now()-new Date(iso))/1000));return seconds<8?t("justNow"):seconds<60?t("secondsAgo",{count:seconds}):seconds<3600?t("minutesAgo",{count:Math.floor(seconds/60)}):t("hoursAgo",{count:Math.floor(seconds/3600)})};
+  const showToast=(message,error=false)=>{const toast=$("#toast");toast.textContent=message;toast.className=`toast show${error?" error":""}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className="toast",3200)};
+  const api=async(url,options={})=>{const response=await fetch(url,{cache:"no-store",...options,headers:{"content-type":"application/json",...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||t("operationFailed"));return data};
+  const isAlert=device=>device.state.smoke===true||device.state.carbon_monoxide===true||device.state.battery_low===true||(typeof device.state.battery==="number"&&device.state.battery<15);
+  const deviceKind=device=>device.controls.some(control=>control.kind==="switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
+  const deviceGlyph=device=>device.controls.some(control=>control.kind==="switch")?"◉":device.features.includes("contact")?"⌑":device.features.some(x=>x==="presence"||x==="occupancy")?"⌁":device.features.includes("smoke")?"△":"•";
+  const deviceVisual=device=>{
+    const fallback=`<span class="device-fallback"${device.model?" hidden":""}>${deviceGlyph(device)}</span>`;
+    if(!device.model||state.imageFormats[device.model]==="none")return`<div class="device-visual">${fallback.replace(" hidden","")}</div>`;
+    const extension=state.imageFormats[device.model]||"jpg";
+    const source=`https://www.zigbee2mqtt.io/images/devices/${encodeURIComponent(device.model)}.${extension}`;
+    return`<div class="device-visual"><img class="device-photo" src="${esc(source)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-device-image data-model="${esc(device.model)}" data-extension="${extension}">${fallback}</div>`;
+  };
+  const facts=device=>{
+    const list=[];
+    if(typeof device.state.linkquality==="number"){
+      const percent=Math.round(Math.max(0,Math.min(255,device.state.linkquality))/255*100);
+      const quality=percent>=70?t("signalStrong"):percent>=45?t("signalGood"):percent>=20?t("signalWeak"):t("signalVeryWeak");
+      list.push(`${t("signal")} ${percent}% · ${quality}`);
+    }
+    if(typeof device.state.battery==="number")list.push(`${t("battery")} ${device.state.battery}%`);
+    if(device.state.contact!==undefined)list.push(device.state.contact?t("doorClosed"):t("doorOpen"));
+    if(device.state.presence!==undefined)list.push(device.state.presence?t("motionDetected"):t("motionClear"));
+    else if(device.state.occupancy!==undefined)list.push(device.state.occupancy?t("motionDetected"):t("motionClear"));
+    if(device.state.smoke!==undefined)list.push(device.state.smoke?t("smokeDetected"):t("noSmoke"));
+    if(device.state.carbon_monoxide!==undefined)list.push(device.state.carbon_monoxide?t("coDetected"):t("coClear"));
+    if(typeof device.state.illuminance==="number")list.push(`${device.state.illuminance} lux`);
+    if(typeof device.state.power==="number")list.push(`${device.state.power} W`);
+    return list.slice(0,5);
+  };
+  const isFavorite=(deviceId,controlId)=>state.favorites.some(item=>item.deviceId===deviceId&&item.controlId===controlId);
+  const favoriteButton=(device,control,main=false)=>{
+    const active=isFavorite(device.id,control.id);
+    const label=active?t("removeFromHome"):t("showOnHome");
+    return`<button class="${main?"favorite-main":"favorite-toggle"} ${active?"active":""}" data-favorite-device="${esc(device.id)}" data-favorite-control="${esc(control.id)}" aria-label="${label}: ${esc(control.name)}" title="${label}">${main?label:active?"★":"☆"}</button>`;
+  };
+  const controlHtml=(device,control)=>{
+    if(control.kind==="switch")return`<div class="control-row"><div><div class="control-name">${esc(control.name)}${control.id!=="main"?`<button class="channel-rename" data-rename-channel="${esc(device.id)}" data-channel="${esc(control.id)}">${t("nameChannel")}</button>`:""}</div><div class="control-value">${control.value?t("on"):t("off")}</div></div><div class="control-actions">${control.id!=="main"?favoriteButton(device,control):""}<button class="switch ${control.value?"on":""}" data-command="${esc(device.id)}" data-property="${esc(control.property)}" data-value="${control.value?"false":"true"}" aria-label="${esc(control.name)} ${control.value?t("off"):t("on")}"><span></span></button></div></div>`;
+    if(control.kind==="color")return`<div class="control-row"><div><div class="control-name">${t("color")}</div><div class="control-value">${esc(control.value)}</div></div><input type="color" value="${esc(control.value||"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("color")}"></div>`;
+    return`<div class="control-row"><div><div class="control-name">${esc(control.name)}</div><div class="control-value">${esc(control.value)}</div></div><input type="range" min="${control.min}" max="${control.max}" value="${control.value}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)}"></div>`;
+  };
+  const deviceCardHtml=device=>{
+    const deviceFacts=facts(device);
+    const mainControl=device.controls.find(control=>control.kind==="switch"&&control.id==="main")||device.controls.find(control=>control.kind==="switch");
+    return`<details class="device-card"${state.openDevices.has(device.id)?" open":""} data-device-card="${esc(device.id)}" data-name="${esc(device.name.toLowerCase())}">
+      <summary class="device-card-header"><div class="device-title">${deviceVisual(device)}<div><div class="device-name">${esc(device.name)}</div><div class="device-meta">${deviceKind(device)} · <span class="${device.availability==="online"?"online-text":device.availability==="offline"?"offline-text":"unknown-text"}">${device.availability==="online"?t("ready"):device.availability==="offline"?t("unreachable"):t("standby")}</span></div></div></div></summary>
+      <div class="device-card-body">
+        ${device.controls.length?`<div class="controls">${device.controls.map(control=>controlHtml(device,control)).join("")}</div>`:""}
+        ${deviceFacts.length?`<div class="facts">${deviceFacts.map(fact=>`<span class="fact">${esc(fact)}</span>`).join("")}</div>`:""}
+        <details class="technical-details"><summary>${t("technicalDetails")}</summary><div class="technical">${t("uid")}: ${esc(device.id)}<br>${t("source")}: ${esc(device.sourceName)}<br>${t("model")}: ${esc(device.model||"—")}<br>${t("rawSignal")}: ${typeof device.state.linkquality==="number"?esc(device.state.linkquality):"—"} LQI</div></details>
+        <div class="card-actions">${mainControl?favoriteButton(device,mainControl,true):""}<button class="rename" data-rename="${esc(device.id)}">${t("changeName")}</button><button class="remove" data-remove="${esc(device.id)}">${t("removeDevice")}</button></div>
+      </div>
+    </details>`;
+  };
+  const quickDeviceHtml=(device,selectedControl=null)=>{
+    const control=selectedControl||device.controls.find(item=>item.kind==="switch"&&item.id==="main")||device.controls.find(item=>item.kind==="switch");
+    if(!control)return"";
+    const mainControl=control.id==="main";
+    const displayName=mainControl?device.name:control.name;
+    const adjustable=mainControl&&device.controls.some(item=>item.id.startsWith("main:")&&["level","temperature","color"].includes(item.kind));
+    const availability=device.availability==="online"?t("ready"):device.availability==="offline"?t("unreachable"):t("standby");
+    return`<article class="device-card quick-card" data-name="${esc(displayName.toLowerCase())}">
+      <div class="device-title"><button class="quick-toggle ${control.value?"on":""}" data-command="${esc(device.id)}" data-property="${esc(control.property)}" data-value="${control.value?"false":"true"}" aria-label="${esc(displayName)} ${control.value?t("off"):t("on")}"${device.availability==="offline"?" disabled":""}>${deviceVisual(device)}<span class="state-overlay">${control.value?t("on"):t("off")}</span></button><div><div class="device-name">${esc(displayName)}</div><div class="device-meta">${esc(mainControl?control.name:device.name)} · <span class="${device.availability==="offline"?"offline-text":control.value?"online-text":"unknown-text"}">${device.availability==="offline"?availability:control.value?t("on"):t("off")}</span></div></div></div>
+      ${adjustable?`<button class="light-controls-button" data-light-controls="${esc(device.id)}" aria-label="${t("adjustLight")}: ${esc(device.name)}" title="${t("adjustLight")}"><span class="tune-icon"></span></button>`:""}
+      <button class="view-device" data-show-device="${esc(device.id)}" aria-label="${t("showInDevices")}: ${esc(device.name)}" title="${t("showInDevices")}"><span class="eye-icon"></span></button>
+    </article>`;
+  };
+  function bindCards(){
+    $$("[data-device-image]").forEach(image=>{
+      const fail=()=>{
+        if(image.dataset.extension==="jpg"){
+          image.dataset.extension="png";
+          state.imageFormats[image.dataset.model]="png";
+          image.src=`https://www.zigbee2mqtt.io/images/devices/${encodeURIComponent(image.dataset.model)}.png`;
+          return;
+        }
+        state.imageFormats[image.dataset.model]="none";
+        image.hidden=true;
+        image.nextElementSibling.hidden=false;
+      };
+      image.onload=()=>state.imageFormats[image.dataset.model]=image.dataset.extension;
+      image.onerror=fail;
+      if(image.complete&&image.naturalWidth===0)fail();
+    });
+    $$("[data-device-card]").forEach(details=>details.ontoggle=()=>{
+      if(details.open)state.openDevices.add(details.dataset.deviceCard);
+      else state.openDevices.delete(details.dataset.deviceCard);
+    });
+    $$("[data-command]").forEach(button=>button.onclick=()=>command(button.dataset.command,button.dataset.property,button.dataset.value==="true"));
+    $$("[data-level]").forEach(input=>input.onchange=()=>command(input.dataset.level,input.dataset.property,Number(input.value)));
+    $$("[data-color]").forEach(input=>input.onchange=()=>command(input.dataset.color,input.dataset.property,input.value));
+    $$("[data-light-controls]").forEach(button=>button.onclick=()=>openLightControls(button.dataset.lightControls));
+    $$("[data-favorite-device]").forEach(button=>button.onclick=()=>toggleFavorite(button.dataset.favoriteDevice,button.dataset.favoriteControl));
+    $$("[data-show-device]").forEach(button=>button.onclick=()=>showDevice(button.dataset.showDevice));
+    $$("[data-rename]").forEach(button=>button.onclick=()=>openRename(button.dataset.rename));
+    $$("[data-rename-channel]").forEach(button=>button.onclick=()=>openRename(button.dataset.renameChannel,button.dataset.channel));
+    $$("[data-remove]").forEach(button=>button.onclick=()=>removeDevice(button.dataset.remove));
+  }
+  function render(){
+    const devices=state.devices;
+    $("#deviceCount").textContent=devices.length;
+    const active=devices.flatMap(device=>device.controls.filter(control=>control.kind==="switch"&&control.value)).length;
+    $("#activeCount").textContent=active;
+    $("#alertCount").textContent=devices.filter(isAlert).length;
+    $("#homeState").textContent=state.health?.ok?t("everythingGood"):t("connectionWaiting");
+    $("#lastUpdate").textContent=t("lastUpdate",{time:ago(state.health?.lastMessageAt)});
+    const controllable=devices.filter(device=>device.controls.some(control=>control.kind==="switch"));
+    if(!state.quickOrder&&controllable.length)state.quickOrder=[...controllable].sort((a,b)=>(state.usage[b.id]||0)-(state.usage[a.id]||0)).map(device=>device.id);
+    const orderedIds=[...(state.quickOrder||[]),...controllable.map(device=>device.id).filter(id=>!state.quickOrder?.includes(id))];
+    const quick=[];
+    for(const favorite of state.favorites){
+      const device=controllable.find(item=>item.id===favorite.deviceId);
+      const control=device?.controls.find(item=>item.id===favorite.controlId&&item.kind==="switch");
+      if(device&&control)quick.push({device,control});
+    }
+    for(const id of orderedIds){
+      const device=controllable.find(item=>item.id===id);
+      const control=device?.controls.find(item=>item.kind==="switch"&&item.id==="main")||device?.controls.find(item=>item.kind==="switch");
+      if(!device||!control||quick.some(item=>item.device.id===device.id&&item.control.id===control.id))continue;
+      if(quick.length>=Math.max(8,state.favorites.length))break;
+      quick.push({device,control});
+    }
+    $("#quickDevices").innerHTML=quick.length?quick.map(item=>quickDeviceHtml(item.device,item.control)).join(""):`<div class="empty">${t("noQuickControls")}</div>`;
+    filterDevices();
+    const ok=state.health?.ok;$("#sideDot").className=`status-dot ${ok?"ok":"bad"}`;$("#sideStatus").textContent=ok?t("homeControlReady"):t("connectionWaiting");
+    const pairing=state.pairing?.open;$("#pairingBanner").classList.toggle("show",Boolean(pairing));
+    if(pairing){const left=Math.max(0,Math.ceil((new Date(state.pairing.until)-Date.now())/1000));$("#pairingText").textContent=t("pairingCountdown",{count:left});}
+    bindCards();
+    if($("#lightDialog").open)renderLightDialog();
+  }
+  function filterDevices(){
+    const query=$("#search").value.trim().toLowerCase();
+    const devices=state.devices.filter(device=>device.name.toLowerCase().includes(query));
+    $("#allDevices").innerHTML=devices.length?devices.map(deviceCardHtml).join(""):`<div class="empty">${t("noSearchResults")}</div>`;
+  }
+  async function refresh(){
+    try{const data=await api("/api/overview");state.devices=data.devices;state.health=data.health;state.pairing=data.pairing;render();}
+    catch(error){$("#sideDot").className="status-dot bad";$("#sideStatus").textContent=t("serverUnreachable");showToast(error.message,true)}
+  }
+  async function command(id,property,value){
+    try{await api(`/api/devices/${encodeURIComponent(id)}/command`,{method:"POST",body:JSON.stringify({property,value})});const device=state.devices.find(item=>item.id===id);const control=device?.controls.find(item=>item.property===property);if(control)control.value=value;state.usage[id]=(state.usage[id]||0)+1;try{localStorage.setItem("villa-device-usage",JSON.stringify(state.usage))}catch{}render();}
+    catch(error){showToast(error.message,true);await refresh()}
+  }
+  async function startPairing(open=true){
+    try{const data=await api(open?"/api/pairing/start":"/api/pairing/stop",{method:"POST",body:open?JSON.stringify({seconds:180}):undefined});state.pairing=open?data.pairing:{open:false};render();showToast(open?t("searchStarted"):t("searchStopped"));}
+    catch(error){showToast(error.message,true)}
+  }
+  function openRename(id,channel=null){const device=state.devices.find(item=>item.id===id);if(!device)return;const control=channel?device.controls.find(item=>item.id===channel):null;state.editing={id,channel};$("#nameInput").value=control?.name||device.name;$("#nameDialog").showModal();setTimeout(()=>$("#nameInput").select(),0)}
+  async function saveName(){
+    const name=$("#nameInput").value.trim();if(!state.editing||name.length<2)return;
+    try{await api(`/api/devices/${encodeURIComponent(state.editing.id)}/name`,{method:"PUT",body:JSON.stringify({name,channel:state.editing.channel})});$("#nameDialog").close();showToast(t("nameSaved"));await refresh();}
+    catch(error){showToast(error.message,true)}
+  }
+  async function removeDevice(id){
+    const device=state.devices.find(item=>item.id===id);if(!device)return;
+    const confirmation=prompt(t("confirmRemoval",{name:device.name}));
+    if(confirmation!==device.name){if(confirmation!==null)showToast(t("nameMismatch"),true);return;}
+    try{await api(`/api/devices/${encodeURIComponent(id)}`,{method:"DELETE",body:JSON.stringify({confirmation})});showToast(t("deviceRemoved"));await refresh();}
+    catch(error){showToast(error.message,true)}
+  }
+  function renderFabrics(){
+    if(!state.matter)return;
+    $("#fabricList").innerHTML=state.matter.fabrics.length?state.matter.fabrics.map(item=>`<div class="fabric"><strong>${esc(item.name)}</strong><span class="online-text">${t("connected")}</span></div>`).join(""):`<div class="device-meta">${t("noPlatforms")}</div>`;
+  }
+  async function loadMatter(openDialog=false){
+    try{state.matter=await api("/api/matter");renderFabrics();if(openDialog)showMatter();}
+    catch(error){$("#fabricList").innerHTML=`<div class="device-meta offline-text">${t("connectionServiceUnavailable")}</div>`;if(openDialog)showToast(error.message,true)}
+  }
+  async function showMatter(){
+    try{const result=await api("/api/matter/commissioning",{method:"POST",body:JSON.stringify({open:true})});state.matter=result.matter;$("#qr").innerHTML=state.matter.qrSvg;$("#manualCode").textContent=state.matter.manualPairingCode.replace(/(\d{4})(\d{3})(\d{4})/,"$1-$2-$3");$("#matterDialog").showModal();}
+    catch(error){showToast(error.message,true)}
+  }
+  const brightnessPercent=control=>Math.round((Number(control.value)-Number(control.min||1))/(Number(control.max||254)-Number(control.min||1))*100);
+  const temperatureKelvin=value=>Math.round(1_000_000/Math.max(1,Number(value)));
+  function renderLightDialog(){
+    const device=state.devices.find(item=>item.id===state.lightDevice);
+    if(!device)return;
+    const power=device.controls.find(item=>item.kind==="switch"&&item.id==="main")||device.controls.find(item=>item.kind==="switch");
+    const controls=device.controls.filter(item=>item.id.startsWith("main:")&&["level","temperature","color"].includes(item.kind));
+    $("#lightTitle").textContent=device.name;
+    $("#lightPower").classList.toggle("on",Boolean(power?.value));
+    $("#lightPower").disabled=device.availability==="offline"||!power;
+    $("#lightPower").setAttribute("aria-label",`${device.name} ${power?.value?t("off"):t("on")}`);
+    $("#lightPower").onclick=()=>power&&command(device.id,power.property,!power.value);
+    $("#lightControls").innerHTML=controls.map(control=>{
+      if(control.kind==="color")return`<label class="light-control"><span class="light-control-head"><span>${t("color")}</span><output>${esc(control.value)}</output></span><input class="color-picker" type="color" value="${esc(control.value||"#ffffff")}" data-light-color="${esc(device.id)}" data-property="${esc(control.property)}"></label>`;
+      const temperature=control.kind==="temperature";
+      const value=Math.min(Number(control.max),Math.max(Number(control.min),Number(control.value)));
+      const output=temperature?`${temperatureKelvin(value)} K`:`${brightnessPercent({...control,value})}%`;
+      return`<label class="light-control"><span class="light-control-head"><span>${temperature?t("colorTemperature"):t("brightness")}</span><output data-light-output>${output}</output></span><input class="${temperature?"temperature-slider":"brightness-slider"}" type="range" min="${control.min}" max="${control.max}" value="${value}" data-light-range="${esc(device.id)}" data-property="${esc(control.property)}" data-kind="${control.kind}"></label>`;
+    }).join("");
+    $$("[data-light-range]").forEach(input=>{
+      input.oninput=()=>input.previousElementSibling.querySelector("output").textContent=input.dataset.kind==="temperature"?`${temperatureKelvin(input.value)} K`:`${Math.round((Number(input.value)-Number(input.min))/(Number(input.max)-Number(input.min))*100)}%`;
+      input.onchange=()=>command(input.dataset.lightRange,input.dataset.property,Number(input.value));
+    });
+    $$("[data-light-color]").forEach(input=>input.onchange=()=>command(input.dataset.lightColor,input.dataset.property,input.value));
+  }
+  function openLightControls(id){
+    state.lightDevice=id;
+    renderLightDialog();
+    $("#lightDialog").showModal();
+  }
+  async function loadSettings(){
+    try{
+      const data=await api("/api/settings");
+      state.settings=data.settings;
+      $("#zigbeeAdapterUrl").value=state.settings.zigbee.adapterUrl;
+      $("#mqttUrl").value=state.settings.mqtt.url;
+      $("#mqttBaseTopic").value=state.settings.mqtt.baseTopic;
+      $("#matterWsUrl").value=state.settings.matter.wsUrl;
+      renderHomeAssistant();
+    }catch(error){showToast(t("settingsUnavailable"),true)}
+  }
+  function renderHomeAssistant(){
+    if(!state.settings)return;
+    const broker=new URL(state.settings.mqtt.url);
+    const localNames=["127.0.0.1","localhost","::1"];
+    $("#haBroker").textContent=localNames.includes(broker.hostname)?location.hostname:broker.hostname;
+    $("#haPort").textContent=broker.port||"1883";
+    $("#haBaseTopic").textContent=state.settings.mqtt.baseTopic;
+    const enabled=state.settings.homeAssistant?.discoveryEnabled===true;
+    const status=$("#haDiscoveryStatus");
+    status.textContent=t(enabled?"enabled":"disabled");
+    status.className=enabled?"online-text":"unknown-text";
+    $("#toggleHaDiscovery").textContent=t(enabled?"disableDiscovery":"enableDiscovery");
+  }
+  async function toggleHomeAssistantDiscovery(){
+    if(!state.settings||!confirm(t("discoveryConfirm")))return;
+    const button=$("#toggleHaDiscovery");
+    button.disabled=true;
+    try{
+      const settings={...state.settings,homeAssistant:{discoveryEnabled:state.settings.homeAssistant?.discoveryEnabled!==true}};
+      await api("/api/settings",{method:"PUT",body:JSON.stringify(settings)});
+      showToast(t("settingsSaved"));
+      await api("/api/settings/apply",{method:"POST",body:JSON.stringify({confirmation:"APPLY"})});
+      waitForRestart();
+    }catch(error){button.disabled=false;showToast(error.message,true)}
+  }
+  async function loadFavorites(){
+    try{const data=await api("/api/favorites");state.favorites=data.favorites;render();}
+    catch(error){showToast(error.message,true)}
+  }
+  async function toggleFavorite(deviceId,controlId){
+    const active=isFavorite(deviceId,controlId);
+    const favorites=active
+      ?state.favorites.filter(item=>!(item.deviceId===deviceId&&item.controlId===controlId))
+      :[...state.favorites,{deviceId,controlId}];
+    try{const data=await api("/api/favorites",{method:"PUT",body:JSON.stringify({favorites})});state.favorites=data.favorites;render();}
+    catch(error){showToast(error.message,true)}
+  }
+  function waitForRestart(){
+    let observedOffline=false;
+    let attempts=0;
+    const poll=async()=>{
+      attempts+=1;
+      try{
+        const response=await fetch("/api/health",{cache:"no-store"});
+        if(observedOffline&&response.ok){location.reload();return;}
+      }catch{observedOffline=true}
+      if(attempts<45)setTimeout(poll,1500);
+      else location.reload();
+    };
+    setTimeout(poll,5000);
+  }
+  async function saveSettings(event){
+    event.preventDefault();
+    if(!confirm(t("restartConfirm")))return;
+    const button=$("#saveSettings");
+    button.disabled=true;
+    try{
+      const settings={
+        zigbee:{adapterUrl:$("#zigbeeAdapterUrl").value.trim()},
+        mqtt:{url:$("#mqttUrl").value.trim(),baseTopic:$("#mqttBaseTopic").value.trim()},
+        matter:{wsUrl:$("#matterWsUrl").value.trim()},
+        homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true}
+      };
+      await api("/api/settings",{method:"PUT",body:JSON.stringify(settings)});
+      showToast(t("settingsSaved"));
+      await api("/api/settings/apply",{method:"POST",body:JSON.stringify({confirmation:"APPLY"})});
+      waitForRestart();
+    }catch(error){button.disabled=false;showToast(error.message,true)}
+  }
+  function activateView(viewName){
+    $$(".nav-button").forEach(item=>item.classList.toggle("active",item.dataset.view===viewName));
+    $$(".view").forEach(view=>view.classList.toggle("active",view.id===viewName));
+    if(viewName==="connections")loadMatter();
+    if(viewName==="connections")loadSettings();
+    if(viewName==="settings")loadSettings();
+  }
+  function showDevice(id){
+    state.openDevices.add(id);
+    $("#search").value="";
+    activateView("devices");
+    filterDevices();
+    bindCards();
+    requestAnimationFrame(()=>{
+      const card=$$("[data-device-card]").find(item=>item.dataset.deviceCard===id);
+      if(!card)return;
+      card.open=true;
+      card.classList.add("focused");
+      card.scrollIntoView({behavior:"smooth",block:"center"});
+      setTimeout(()=>card.classList.remove("focused"),1800);
+    });
+  }
+  function applyQuickLayout(){
+    const container=$("#quickDevices");
+    container.classList.toggle("grid-view",state.quickLayout==="grid");
+    container.classList.toggle("list-view",state.quickLayout==="list");
+    $$("[data-quick-layout]").forEach(button=>{
+      const active=button.dataset.quickLayout===state.quickLayout;
+      button.classList.toggle("active",active);
+      button.setAttribute("aria-pressed",String(active));
+      const label=t(button.dataset.quickLayout==="grid"?"gridView":"listView");
+      button.setAttribute("aria-label",label);
+      button.title=label;
+    });
+    $(".view-toggle").setAttribute("aria-label",state.language==="tr"?"Hızlı kontrol görünümü":"Quick control layout");
+  }
+  function setQuickLayout(layout){
+    state.quickLayout=layout==="list"?"list":"grid";
+    try{localStorage.setItem("villa-quick-layout",state.quickLayout)}catch{}
+    applyQuickLayout();
+  }
+  function applyLanguage(){
+    document.documentElement.lang=state.language;
+    $$("[data-i18n]").forEach(element=>element.textContent=t(element.dataset.i18n));
+    $$("[data-i18n-placeholder]").forEach(element=>element.placeholder=t(element.dataset.i18nPlaceholder));
+    $$("[data-language]").forEach(button=>button.classList.toggle("active",button.dataset.language===state.language));
+    $(".language-switch").setAttribute("aria-label",state.language==="tr"?"Dil":"Language");
+    $("#closeLight").setAttribute("aria-label",t("close"));
+    render();
+    renderFabrics();
+    renderHomeAssistant();
+    applyQuickLayout();
+  }
+  function setLanguage(language){
+    state.language=language==="tr"?"tr":"en";
+    try{localStorage.setItem("villa-language",state.language)}catch{}
+    applyLanguage();
+  }
+  $$(".nav-button").forEach(button=>button.onclick=()=>activateView(button.dataset.view));
+  $$("[data-language]").forEach(button=>button.onclick=()=>setLanguage(button.dataset.language));
+  $$("[data-quick-layout]").forEach(button=>button.onclick=()=>setQuickLayout(button.dataset.quickLayout));
+  $$(".add-device").forEach(button=>button.onclick=()=>startPairing(true));$("#stopPairing").onclick=()=>startPairing(false);$("#refreshButton").onclick=refresh;$("#search").oninput=()=>{filterDevices();bindCards()};$("#saveName").onclick=event=>{event.preventDefault();saveName()};$("#openMatter").onclick=()=>loadMatter(true);$("#closeMatter").onclick=async()=>{try{await api("/api/matter/commissioning",{method:"POST",body:JSON.stringify({open:false})})}catch{}$("#matterDialog").close()};$("#closeLight").onclick=()=>$("#lightDialog").close();$("#settingsForm").onsubmit=saveSettings;$("#toggleHaDiscovery").onclick=toggleHomeAssistantDiscovery;
+  applyLanguage();refresh();loadMatter();loadFavorites();setInterval(refresh,5000);setInterval(()=>{if(state.pairing?.open)render()},1000);
+</script>
+</body>
+</html>
