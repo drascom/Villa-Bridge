@@ -29,6 +29,10 @@ touch-friendly mobile view.
   >
 </p>
 
+> **Coming in a future release:** a native Android app is on the roadmap,
+> bringing the same English/Turkish experience, favorites and quick controls to
+> phones and tablets.
+
 ## What makes it useful
 
 - **One name everywhere.** A device keeps its UID internally while its friendly
@@ -40,21 +44,43 @@ touch-friendly mobile view.
 - **No protocol hunting.** Add or remove Zigbee devices, inspect signal quality,
   create a Matter pairing code and manage connections in the same interface.
 - **Made for real homes.** Responsive grid/list views, English and Turkish
-  language support, and a layout ready to become an Android app.
+  language support, with a native Android app planned for a future release.
 
 ## How it fits together
 
 ```mermaid
 flowchart LR
-    Z[Zigbee devices] --> S[Villa Bridge]
-    S --> D[Simple web dashboard]
-    S --> M[Matter controllers]
-    S --> H[Home Assistant]
-    M --> A[Alexa / Apple Home]
+    subgraph Zigbee["Zigbee network"]
+        Z["Zigbee devices"] <--> C["Coordinator"]
+        C -->|"Shadow mode"| Z2M["Zigbee2MQTT"]
+    end
+
+    subgraph Core["Villa Bridge"]
+        V["Unified device model"]
+        UI["Responsive web dashboard"] <--> V
+        AND["Native Android app<br/>(future)"] -.-> V
+    end
+
+    C -->|"Direct mode"| V
+    Z2M <--> MQTT["MQTT broker"]
+    MQTT <--> V
+    MQTT -->|"Optional discovery"| HA["Home Assistant"]
+
+    V --> MB["Matterbridge"]
+    MB --> MATTER["Matter fabric"]
+    MATTER --> ALEXA["Alexa"]
+    MATTER --> APPLE["Apple Home"]
 ```
 
-Zigbee remains the source of truth. Low-level actions use immutable device UIDs;
-friendly names are presentation data and can change safely.
+In **direct mode**, Villa Bridge owns the Zigbee coordinator and provides MQTT
+compatibility. In **shadow mode**, Zigbee2MQTT remains in charge and Villa
+Bridge follows its device state through the MQTT broker. Matterbridge publishes
+the same devices into Matter for Alexa and Apple Home, while Home Assistant
+discovery stays optional.
+
+Zigbee remains the source of truth in both modes. Low-level actions use
+immutable device UIDs; friendly names are presentation data and can change
+safely.
 
 ## Try it locally
 
