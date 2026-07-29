@@ -4,6 +4,7 @@ import {
   access,
   cp,
   mkdir,
+  readdir,
   readFile,
   rename,
   rm,
@@ -11,12 +12,14 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { create as createTar } from "tar";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeSource = path.join(projectRoot, "apps", "android", "node-runtime");
 const generatedRoot = path.join(projectRoot, "apps", "android", "app", "build", "generated", "node-assets");
 const stagingRoot = `${generatedRoot}.staging-${process.pid}`;
 const stagedProject = path.join(stagingRoot, "nodejs-project");
+const assetArchive = path.join(stagingRoot, "nodejs-project.tgz");
 const bundledCore = path.join(stagedProject, "villa-bridge");
 const lazySerialPortPatch = path.join(
   projectRoot,
@@ -78,6 +81,24 @@ async function replaceAllExactly(file, expected, replacement, expectedOccurrence
     );
   }
   await writeFile(file, source.split(expected).join(replacement), "utf8");
+}
+
+async function pruneRuntimeMetadata(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await pruneRuntimeMetadata(target);
+      continue;
+    }
+    if (
+      entry.name.endsWith(".map") ||
+      entry.name.endsWith(".d.ts") ||
+      entry.name.endsWith(".d.mts") ||
+      entry.name.endsWith(".d.cts")
+    ) {
+      await rm(target, { force: true });
+    }
+  }
 }
 
 async function prepare() {
@@ -184,6 +205,7 @@ async function prepare() {
       "label: endpointLabel",
       7
     );
+    await pruneRuntimeMetadata(stagedProject);
     await run(
       process.execPath,
       [
@@ -225,6 +247,19 @@ async function prepare() {
       `${JSON.stringify(manifest, null, 2)}\n`,
       "utf8"
     );
+    await createTar(
+      {
+        cwd: stagingRoot,
+        file: assetArchive,
+        follow: true,
+        gzip: { level: 6 },
+        noMtime: true,
+        noPax: true,
+        portable: true
+      },
+      ["nodejs-project"]
+    );
+    await rm(stagedProject, { recursive: true, force: true });
 
     await mkdir(path.dirname(generatedRoot), { recursive: true });
     await rm(generatedRoot, { recursive: true, force: true });

@@ -22,6 +22,7 @@ import android.webkit.WebSettings
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
 import java.util.concurrent.Executors
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MainActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var loadingStatus: TextView
+    private lateinit var startingPanel: LinearLayout
     private lateinit var stoppedPanel: LinearLayout
     private lateinit var startRuntimeButton: Button
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -46,6 +48,7 @@ class MainActivity : Activity() {
 
         webView = findViewById(R.id.dashboard)
         loadingStatus = findViewById(R.id.loading_status)
+        startingPanel = findViewById(R.id.runtime_starting)
         stoppedPanel = findViewById(R.id.runtime_stopped)
         startRuntimeButton = findViewById(R.id.start_runtime)
         startRuntimeButton.setOnClickListener { startRuntime() }
@@ -94,7 +97,7 @@ class MainActivity : Activity() {
                 val uri = Uri.parse(url)
                 if (isTrustedDashboard(uri)) {
                     pageLoaded = true
-                    loadingStatus.visibility = View.GONE
+                    startingPanel.visibility = View.GONE
                     webView.visibility = View.VISIBLE
                 }
             }
@@ -107,7 +110,7 @@ class MainActivity : Activity() {
                 if (request.isForMainFrame) {
                     pageLoaded = false
                     webView.visibility = View.INVISIBLE
-                    loadingStatus.visibility = View.VISIBLE
+                    showStartingUi()
                     waitForLocalServer()
                 }
             }
@@ -122,16 +125,7 @@ class MainActivity : Activity() {
             !serverProbePending.compareAndSet(false, true)
         ) return
         probeExecutor.execute {
-            val ready = runCatching {
-                val connection = URI(HEALTH_URL).toURL().openConnection() as HttpURLConnection
-                try {
-                    connection.connectTimeout = 800
-                    connection.readTimeout = 800
-                    connection.responseCode == HttpURLConnection.HTTP_OK
-                } finally {
-                    connection.disconnect()
-                }
-            }.getOrDefault(false)
+            val probe = probeRuntime()
             mainHandler.postDelayed(
                 {
                     serverProbePending.set(false)
@@ -139,13 +133,63 @@ class MainActivity : Activity() {
                         RuntimeStateStore.desired(this) != RuntimeStateStore.DesiredState.RUNNING
                     ) {
                         showStoppedUi()
-                    } else if (ready && !pageLoaded) {
+                    } else if (probe.ready && !pageLoaded) {
+                        loadingStatus.setText(R.string.runtime_stage_dashboard)
                         webView.loadUrl(DASHBOARD_URL)
+                    } else {
+                        loadingStatus.setText(probe.stage)
+                        waitForLocalServer()
                     }
-                    else waitForLocalServer()
                 },
-                if (ready) 0 else 750
+                if (probe.ready) 0 else 750
             )
+        }
+    }
+
+    private fun probeRuntime(): RuntimeProbe {
+        val diagnostics = runCatching { readJson(DIAGNOSTICS_URL) }.getOrNull()
+        if (diagnostics != null) {
+            val provisioning = diagnostics.optJSONObject("provisioning")
+            val mqtt = diagnostics.optJSONObject("mqtt")
+            val core = diagnostics.optJSONObject("core")
+            val matter = diagnostics.optJSONObject("matter")
+            val stage = when {
+                provisioning?.optBoolean("provisioned") != true ->
+                    R.string.runtime_stage_configuration
+                mqtt?.optBoolean("listening") != true || mqtt?.optBoolean("selfTest") != true ->
+                    R.string.runtime_stage_mqtt
+                core?.optBoolean("ready") != true -> R.string.runtime_stage_zigbee
+                matter?.optBoolean("ready") != true -> R.string.runtime_stage_matter
+                else -> R.string.runtime_stage_dashboard
+            }
+            return RuntimeProbe(diagnostics.optBoolean("ready"), stage)
+        }
+
+        val dashboardReady = runCatching {
+            val connection = URI(HEALTH_URL).toURL().openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = 800
+                connection.readTimeout = 800
+                connection.responseCode == HttpURLConnection.HTTP_OK
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrDefault(false)
+        return RuntimeProbe(
+            dashboardReady,
+            if (dashboardReady) R.string.runtime_stage_dashboard else R.string.runtime_stage_preparing
+        )
+    }
+
+    private fun readJson(url: String): JSONObject {
+        val connection = URI(url).toURL().openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = 800
+            connection.readTimeout = 800
+            check(connection.responseCode == HttpURLConnection.HTTP_OK)
+            return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -163,14 +207,14 @@ class MainActivity : Activity() {
         stoppedPanel.visibility = View.GONE
         if (!pageLoaded) {
             webView.visibility = View.INVISIBLE
-            loadingStatus.visibility = View.VISIBLE
+            startingPanel.visibility = View.VISIBLE
         }
     }
 
     private fun showStoppedUi() {
         pageLoaded = false
         webView.visibility = View.INVISIBLE
-        loadingStatus.visibility = View.GONE
+        startingPanel.visibility = View.GONE
         stoppedPanel.visibility = View.VISIBLE
         startRuntimeButton.isEnabled = true
     }
@@ -178,6 +222,8 @@ class MainActivity : Activity() {
     private fun startRuntime() {
         startRuntimeButton.isEnabled = false
         RuntimeStateStore.setDesired(this, RuntimeStateStore.DesiredState.RUNNING)
+        pageLoaded = false
+        loadingStatus.setText(R.string.runtime_stage_preparing)
         showStartingUi()
         NodeRuntimeService.start(this)
         waitForLocalServer()
@@ -255,7 +301,10 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private data class RuntimeProbe(val ready: Boolean, val stage: Int)
+
         private const val DASHBOARD_URL = "http://127.0.0.1:8091/"
         private const val HEALTH_URL = "http://127.0.0.1:8091/api/health"
+        private const val DIAGNOSTICS_URL = "http://127.0.0.1:8092/api/android/diagnostics"
     }
 }

@@ -219,3 +219,25 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
     dashboardScripts(dashboard)
   ));
 });
+
+test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="widgetBoard"/);
+  assert.match(dashboard, /id="widgetDialog"/);
+  assert.match(dashboard, /data-widget="status"/);
+  assert.match(dashboard, /data-widget="quick"/);
+  assert.match(dashboard, /data-widget="signal"/);
+  assert.match(dashboard, /data-widget="availability"/);
+  assert.match(dashboard, /data-widget="recent"/);
+  assert.match(dashboard, /localStorage\.getItem\("villa-dashboard-widgets"\)/);
+  assert.match(dashboard, /localStorage\.setItem\("villa-dashboard-widgets"/);
+  assert.match(dashboard, /data-widget-move="up"/);
+  assert.match(dashboard, /data-widget-remove/);
+  assert.match(dashboard, /addWidgetTitle:"Add a dashboard widget"/);
+  assert.match(dashboard, /addWidgetTitle:"Dashboard widget’ı ekle"/);
+  assert.doesNotMatch(dashboard, /draggable="true"/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});

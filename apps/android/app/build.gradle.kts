@@ -115,6 +115,10 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        noCompress += "tgz"
+    }
+
     lint {
         disable += "ChromeOsAbiSupport"
     }

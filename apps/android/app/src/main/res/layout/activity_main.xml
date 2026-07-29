@@ -11,19 +11,48 @@
         android:layout_height="match_parent"
         android:visibility="invisible" />
 
-    <TextView
-        android:id="@+id/loading_status"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:background="#FFFFFF"
-        android:elevation="8dp"
-        android:paddingHorizontal="28dp"
-        android:paddingVertical="20dp"
-        android:text="@string/loading_dashboard"
-        android:textColor="#17382D"
-        android:textSize="17sp"
-        android:textStyle="bold" />
+    <LinearLayout
+        android:id="@+id/runtime_starting"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <TextView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/ic_villa_bridge"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/runtime_starting_title"
+            android:textColor="#17382D"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="320dp"
+            android:layout_height="6dp"
+            android:layout_marginTop="24dp"
+            android:indeterminate="true"
+            android:indeterminateTint="#2F7A60" />
+
+        <TextView
+            android:id="@+id/loading_status"
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:maxWidth="420dp"
+            android:text="@string/runtime_stage_preparing"
+            android:textColor="#64736C"
+            android:textSize="16sp" />
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/runtime_stopped"

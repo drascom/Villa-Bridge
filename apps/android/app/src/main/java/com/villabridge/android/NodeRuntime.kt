@@ -5,7 +5,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.zip.GZIPInputStream
 
 object NodeRuntime {
     enum class State { STOPPED, STARTING, RUNNING, FAILED }
@@ -81,8 +84,10 @@ object NodeRuntime {
 
 private object AssetProjectInstaller {
     private const val ASSET_PATH = "nodejs-project"
+    private const val ASSET_ARCHIVE = "nodejs-project.tgz"
     private const val PREFS_NAME = "villa_node_assets"
     private const val PREFS_APK_TIME = "apk_update_time"
+    private const val TAR_BLOCK_SIZE = 512
 
     fun install(assetContext: Context, storageContext: Context): File {
         val destination = File(storageContext.filesDir, ASSET_PATH)
@@ -96,7 +101,7 @@ private object AssetProjectInstaller {
         check(!staging.exists() || staging.deleteRecursively()) {
             "Unable to clear the staged Node.js project"
         }
-        check(copyAssetTree(assetContext, ASSET_PATH, staging)) {
+        check(extractAssetArchive(assetContext, staging)) {
             "Unable to unpack the Node.js project"
         }
         check(!destination.exists() || destination.deleteRecursively()) {
@@ -122,18 +127,91 @@ private object AssetProjectInstaller {
         return packageInfo.lastUpdateTime
     }
 
-    private fun copyAssetTree(context: Context, assetPath: String, destination: File): Boolean {
-        val children = context.assets.list(assetPath) ?: return false
-        if (children.isEmpty()) {
-            destination.parentFile?.mkdirs()
-            context.assets.open(assetPath).use { input ->
-                destination.outputStream().use { output -> input.copyTo(output) }
+    private fun extractAssetArchive(context: Context, destination: File): Boolean = runCatching {
+        val root = destination.canonicalFile
+        root.mkdirs()
+        GZIPInputStream(context.assets.open(ASSET_ARCHIVE)).use { input ->
+            val header = ByteArray(TAR_BLOCK_SIZE)
+            while (readFully(input, header)) {
+                if (header.all { it == 0.toByte() }) break
+                val name = tarString(header, 0, 100)
+                val prefix = tarString(header, 345, 155)
+                val relativePath = if (prefix.isEmpty()) name else "$prefix/$name"
+                check(relativePath == ASSET_PATH || relativePath.startsWith("$ASSET_PATH/")) {
+                    "Unexpected archive path: $relativePath"
+                }
+                val strippedPath = relativePath.removePrefix(ASSET_PATH).trimStart('/')
+                val target = File(root, strippedPath).canonicalFile
+                check(target == root || target.path.startsWith("${root.path}${File.separator}")) {
+                    "Archive path escapes the project directory"
+                }
+                val size = tarOctal(header, 124, 12)
+                when (header[156].toInt().toChar()) {
+                    '5' -> target.mkdirs()
+                    '0', '\u0000' -> {
+                        target.parentFile?.mkdirs()
+                        FileOutputStream(target).use { output ->
+                            copyExactly(input, output, size)
+                        }
+                    }
+                    else -> skipExactly(input, size)
+                }
+                val padding = (TAR_BLOCK_SIZE - size % TAR_BLOCK_SIZE) % TAR_BLOCK_SIZE
+                skipExactly(input, padding)
             }
-            return true
         }
-        if (!destination.mkdirs() && !destination.isDirectory) return false
-        return children.all { child ->
-            copyAssetTree(context, "$assetPath/$child", File(destination, child))
+        File(root, "main.cjs").isFile &&
+            File(root, "asset-manifest.json").isFile &&
+            File(root, "villa-bridge/dist/index.js").isFile
+    }.getOrDefault(false)
+
+    private fun readFully(input: InputStream, buffer: ByteArray): Boolean {
+        var offset = 0
+        while (offset < buffer.size) {
+            val count = input.read(buffer, offset, buffer.size - offset)
+            if (count < 0) {
+                if (offset == 0) return false
+                error("Unexpected end of Android asset archive")
+            }
+            offset += count
+        }
+        return true
+    }
+
+    private fun tarString(header: ByteArray, offset: Int, length: Int): String {
+        val end = (offset until offset + length)
+            .firstOrNull { header[it] == 0.toByte() } ?: offset + length
+        return header.copyOfRange(offset, end).toString(Charsets.UTF_8).trim()
+    }
+
+    private fun tarOctal(header: ByteArray, offset: Int, length: Int): Long {
+        val value = tarString(header, offset, length).trim()
+        return if (value.isEmpty()) 0L else value.toLong(8)
+    }
+
+    private fun copyExactly(input: InputStream, output: FileOutputStream, byteCount: Long) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var remaining = byteCount
+        while (remaining > 0) {
+            val count = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+            check(count > 0) { "Unexpected end of Android asset archive" }
+            output.write(buffer, 0, count)
+            remaining -= count
+        }
+    }
+
+    private fun skipExactly(input: InputStream, byteCount: Long) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var remaining = byteCount
+        while (remaining > 0) {
+            val skipped = input.skip(remaining)
+            if (skipped > 0) {
+                remaining -= skipped
+                continue
+            }
+            val count = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+            check(count > 0) { "Unexpected end of Android asset archive" }
+            remaining -= count
         }
     }
 }

@@ -26,6 +26,16 @@ both `mqtt.user` and `mqtt.password`, those credentials are mandatory for all
 MQTT clients, including Home Assistant. Omitting either value preserves
 anonymous compatibility and is unsuitable for an untrusted LAN.
 
+The native start screen follows the runtime diagnostics endpoint and reports
+the active MQTT, Zigbee, Matter, and dashboard stages. Settings can stop the
+entire runtime while leaving a native **Start Villa Bridge** control available.
+The desired stopped/running state survives app and tablet restarts.
+
+To keep first launch practical on low-power tablets, the Node project is
+packaged as one compressed `tgz` asset. Source maps and TypeScript declaration
+files are removed from the runtime-only bundle, then the archive is streamed
+into app-private storage with path traversal checks.
+
 ## Build and Test
 
 Host requirements are JDK 17, Android SDK 35, NDK `27.2.12479018`, CMake
