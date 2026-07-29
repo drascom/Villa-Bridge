@@ -15,7 +15,7 @@ test("cihaz adı IEEE adresine göre İngilizce takma adla yayınlanır", () => 
       definition: {
         model: "TS0003",
         vendor: "Tuya",
-        exposes: [{ name: "light", features: [{ property: "state_l1" }] }]
+        exposes: [{ name: "light", features: [{ property: "state_l1", access: 7 }] }]
       }
     }]))
   );
@@ -26,6 +26,79 @@ test("cihaz adı IEEE adresine göre İngilizce takma adla yayınlanır", () => 
   assert.equal(device.sourceName, "Balkon Duvar Lambaları");
   assert.equal(device.state.state_l1, "ON");
   assert.deepEqual(device.features, ["light", "state_l1"]);
+});
+
+test("durumu olmayan yazılabilir ışık özellikleri kumanda olarak sunulur", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0x456",
+      friendly_name: "Kitchen LED",
+      type: "Router",
+      supported: true,
+      interview_completed: true,
+      definition: {
+        model: "YSR-MINI-01_wwcw",
+        vendor: "YSRSAI",
+        exposes: [{
+          name: "light",
+          features: [
+            { property: "state", access: 7 },
+            { property: "brightness", access: 7 },
+            { property: "color_temp", access: 7 }
+          ]
+        }]
+      }
+    }]))
+  );
+
+  assert.deepEqual(
+    store.getDevices()[0].controls.map(({ property, value }) => ({ property, value })),
+    [
+      { property: "state", value: null },
+      { property: "brightness", value: null },
+      { property: "color_temp", value: null }
+    ]
+  );
+});
+
+test("genel Tuya modeli üretici parmak iziyle doğru katalog modeline çevrilir", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0xa4c13852d27dc01a",
+      friendly_name: "Button",
+      type: "Router",
+      manufacturer: "_TZ3000_i9oy2rdq",
+      supported: true,
+      interview_completed: true,
+      definition: {
+        model: "TS0001",
+        vendor: "Tuya",
+        description: "1 gang switch",
+        exposes: [{ property: "state", access: 7 }]
+      }
+    }]))
+  );
+
+  assert.equal(store.getDevices()[0].model, "WHD02");
+});
+
+test("parmak izi eşleşmeyen cihazın raporlanan modeli korunur", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0xother",
+      type: "Router",
+      manufacturer: "_TZ3000_other",
+      definition: { model: "TS0001", vendor: "Tuya" }
+    }]))
+  );
+
+  assert.equal(store.getDevices()[0].model, "TS0001");
 });
 
 test("shadow sağlık bilgisi kaynak köprü ve MQTT durumuna bağlıdır", () => {
@@ -43,4 +116,69 @@ test("permit join yanıtı eşleştirme süresini açar", () => {
   );
   assert.equal(store.getPairing().open, true);
   assert.equal(store.getPairing().status, "open");
+});
+
+test("eşleştirme yalnız gerçek katılma ve görüşme olaylarıyla ilerler", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from('[{"ieee_address":"0xexisting","friendly_name":"Existing"}]')
+  );
+  store.pairingRequested(180);
+
+  assert.equal(store.getPairing().device, null);
+
+  store.ingest(
+    "bridge/event",
+    Buffer.from(JSON.stringify({
+      type: "device_joined",
+      data: { ieee_address: "0xNEW", friendly_name: "New device" }
+    }))
+  );
+  assert.deepEqual(store.getPairing().device, {
+    id: "0xnew",
+    name: "New device",
+    interviewCompleted: false,
+    supported: null
+  });
+
+  store.ingest(
+    "bridge/event",
+    Buffer.from(JSON.stringify({
+      type: "device_interview",
+      data: { ieee_address: "0xnew", status: "successful", supported: true }
+    }))
+  );
+  assert.deepEqual(store.getPairing().device, {
+    id: "0xnew",
+    name: "New device",
+    interviewCompleted: true,
+    supported: true
+  });
+});
+
+test("kapalı oturum ve farklı cihaz görüşmesi eşleştirme sonucu üretmez", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/event",
+    Buffer.from('{"type":"device_joined","data":{"ieee_address":"0xold"}}')
+  );
+  assert.equal(store.getPairing().device, null);
+
+  store.pairingRequested(180);
+  store.ingest(
+    "bridge/event",
+    Buffer.from('{"type":"device_joined","data":{"ieee_address":"0xnew"}}')
+  );
+  store.ingest(
+    "bridge/event",
+    Buffer.from('{"type":"device_interview","data":{"ieee_address":"0xother","status":"successful","supported":true}}')
+  );
+
+  assert.deepEqual(store.getPairing().device, {
+    id: "0xnew",
+    name: "0xnew",
+    interviewCompleted: false,
+    supported: null
+  });
 });

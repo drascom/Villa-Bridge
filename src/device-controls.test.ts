@@ -27,8 +27,27 @@ test("ana ve alt Zigbee kanalları UID tabanlı ortak isimlerle sunulur", () => 
 
 test("sensörün state alanı aç/kapat kumandası sayılmaz", () => {
   assert.deepEqual(
-    deviceControls("0xdef", "Presence", ["state", "presence"], { state: "none", presence: false }, new Map()),
+    deviceControls("0xdef", "Presence", [], { state: "none", presence: false }, new Map()),
     []
+  );
+});
+
+test("yazılabilir ışık özellikleri güncel durum gelmeden de kumanda oluşturur", () => {
+  const controls = deviceControls(
+    "0x456",
+    "Kitchen LED",
+    ["state", "brightness", "color_temp"],
+    {},
+    new Map()
+  );
+
+  assert.deepEqual(
+    controls.map(({ property, kind, value }) => ({ property, kind, value })),
+    [
+      { property: "state", kind: "switch", value: null },
+      { property: "brightness", kind: "level", value: null },
+      { property: "color_temp", kind: "temperature", value: null }
+    ]
   );
 });
 

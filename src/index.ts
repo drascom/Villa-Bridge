@@ -1,23 +1,28 @@
 import Fastify from "fastify";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAliases, saveAliases } from "./aliases.js";
 import { loadConfig } from "./config.js";
 import { hexToXy } from "./device-controls.js";
+import { DeviceImagesStore } from "./device-images.js";
 import { DeviceStore } from "./device-store.js";
 import { HomeFavoritesStore, validateHomeFavorites } from "./home-favorites.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
+import { getNetworkInfo } from "./network-info.js";
+import { isDeviceRemovalConfirmation } from "./removal-confirmation.js";
 import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
 
 const config = await loadConfig();
 const aliases = await loadAliases(config.aliasesFile);
-const store = new DeviceStore(aliases);
-const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const configPath = resolve(process.env.VILLA_BRIDGE_CONFIG ?? "config/default.yaml");
+const imagesStore = new DeviceImagesStore(resolve(dirname(configPath), "device-images.json"));
+let imagePreferences = await imagesStore.get();
+const store = new DeviceStore(aliases, imagePreferences);
+const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
 const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
@@ -34,13 +39,53 @@ let source: ZigbeeSource;
 if (config.mode === "direct") {
   if (!config.zigbee) throw new Error("Doğrudan Zigbee ayarları bulunamadı.");
   const { DirectZigbeeSource } = await import("./direct-zigbee-source.js");
-  source = new DirectZigbeeSource(config.zigbee, config.mqtt, store, config.homeAssistant.discoveryEnabled);
+  source = new DirectZigbeeSource(
+    config.zigbee,
+    config.mqtt,
+    store,
+    config.homeAssistant.discoveryEnabled,
+    aliases
+  );
 } else {
   source = new MqttShadowSource(config.mqtt, store);
 }
 const app = Fastify({ logger: true });
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
+const localesDirectory = resolve(moduleDir, "../public/locales");
+
+app.get("/api/locales", async (_request, reply) => {
+  try {
+    const files = (await readdir(localesDirectory))
+      .filter((file) => /^[a-z]{2}(?:-[A-Z]{2})?\.json$/.test(file))
+      .sort((left, right) => left.localeCompare(right, "en"));
+    const locales = await Promise.all(files.map(async (file) => {
+      const parsed = JSON.parse(await readFile(resolve(localesDirectory, file), "utf8")) as {
+        code?: unknown;
+        name?: unknown;
+        translations?: unknown;
+      };
+      if (
+        typeof parsed.code !== "string"
+        || typeof parsed.name !== "string"
+        || typeof parsed.translations !== "object"
+        || parsed.translations === null
+        || Array.isArray(parsed.translations)
+        || parsed.code !== file.slice(0, -".json".length)
+        || !Object.values(parsed.translations).every((value) => typeof value === "string")
+      ) {
+        throw new Error(`Geçersiz dil paketi: ${file}`);
+      }
+      return parsed;
+    }));
+    return { defaultLanguage: "en", locales };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
 
 app.get("/api/health", async () => store.getHealth());
 app.get("/api/devices", async () => ({ devices: store.getDevices() }));
@@ -102,6 +147,41 @@ app.put<{ Body?: { favorites?: unknown } }>("/api/favorites", async (request, re
     return { ok: true, favorites: await favoritesStore.save(favorites) };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{
+  Params: { id: string };
+  Body?: { imageModel?: unknown; applyToModel?: unknown };
+}>("/api/devices/:id/image", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  const device = store.getDevice(id);
+  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  const imageModel = request.body?.imageModel;
+  if (imageModel !== null && typeof imageModel !== "string") {
+    return reply.code(400).send({ ok: false, error: "Görsel seçimi geçersiz." });
+  }
+  if (
+    typeof imageModel === "string"
+    && !device.image.candidates.some((candidate) => candidate.model === imageModel)
+  ) {
+    return reply.code(400).send({ ok: false, error: "Bu görsel cihaz için sunulan adaylar arasında değil." });
+  }
+  try {
+    imagePreferences = await imagesStore.select(
+      imagePreferences,
+      id,
+      device.image.preferenceKey,
+      imageModel,
+      request.body?.applyToModel === true
+    );
+    store.setImagePreferences(imagePreferences);
+    return { ok: true, device: store.getDevice(id) };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
@@ -174,8 +254,8 @@ app.delete<{
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
   if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
-  if (request.body?.confirmation !== device.name) {
-    return reply.code(400).send({ ok: false, error: "Silme onayı cihaz adıyla eşleşmiyor." });
+  if (!isDeviceRemovalConfirmation(request.body?.confirmation)) {
+    return reply.code(400).send({ ok: false, error: "Silmek için küçük harflerle yes veya evet yazın." });
   }
   try {
     await source.removeDevice(id);
@@ -183,7 +263,10 @@ app.delete<{
       if (key === id || key.startsWith(`${id}:`)) aliases.delete(key);
     }
     await saveAliases(config.aliasesFile, aliases);
-    return { ok: true };
+    imagePreferences = await imagesStore.removeDevice(imagePreferences, id).catch(() => imagePreferences);
+    store.setImagePreferences(imagePreferences);
+    const favorites = await favoritesStore.removeDevice(id);
+    return { ok: true, favorites };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -200,7 +283,11 @@ app.get("/api/matter", async (_request, reply) => {
 app.get("/api/settings", async (_request, reply) => {
   if (!settingsStore) return reply.code(503).send({ ok: false, error: "Bağlantı ayarları bu çalışma modunda kullanılamıyor." });
   try {
-    return { ok: true, settings: await settingsStore.get() };
+    return {
+      ok: true,
+      settings: await settingsStore.get(),
+      network: getNetworkInfo()
+    };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -237,14 +324,27 @@ app.post<{ Body?: { open?: boolean } }>("/api/matter/commissioning", async (requ
 
 app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(dashboard));
 
+type EmbeddedVillaBridgeGlobal = typeof globalThis & {
+  __villaBridgeReady?: boolean;
+  __villaBridgeStop?: () => Promise<void>;
+};
+
+const embeddedRuntime = process.env.VILLA_BRIDGE_EMBEDDED === "true";
+const embeddedGlobal = globalThis as EmbeddedVillaBridgeGlobal;
 const shutdown = async (): Promise<void> => {
+  if (!embeddedGlobal.__villaBridgeReady) return;
+  embeddedGlobal.__villaBridgeReady = false;
   await source.stop();
   await app.close();
-  process.exit(0);
+  if (!embeddedRuntime) process.exit(0);
 };
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+embeddedGlobal.__villaBridgeStop = shutdown;
+if (!embeddedRuntime) {
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
 
 await source.start();
 await app.listen({ host: config.http.host, port: config.http.port });
+embeddedGlobal.__villaBridgeReady = true;
 console.log(`Villa Bridge paneli ${config.http.host}:${config.http.port} adresinde hazır.`);

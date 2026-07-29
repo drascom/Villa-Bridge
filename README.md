@@ -29,9 +29,11 @@ touch-friendly mobile view.
   >
 </p>
 
-> **Coming in a future release:** a native Android app is on the roadmap,
-> bringing the same English/Turkish experience, favorites and quick controls to
-> phones and tablets.
+> **Android alpha available:** the native tablet APK has been validated on a
+> Nokia T10 as a standalone host for the dashboard, embedded local MQTT, direct
+> TCP Zigbee core, and Matterbridge/Matter. It does not require a Raspberry Pi.
+> See the [Android alpha guide](apps/android/README.md) for its tested scope,
+> installation steps, and current limitations.
 
 ## What makes it useful
 
@@ -44,7 +46,8 @@ touch-friendly mobile view.
 - **No protocol hunting.** Add or remove Zigbee devices, inspect signal quality,
   create a Matter pairing code and manage connections in the same interface.
 - **Made for real homes.** Responsive grid/list views, English and Turkish
-  language support, with a native Android app planned for a future release.
+  language support, plus an Android tablet alpha and the original Linux/Pi
+  deployment path.
 
 ## How it fits together
 
@@ -55,19 +58,35 @@ flowchart LR
         C -->|"Shadow mode"| Z2M["Zigbee2MQTT"]
     end
 
-    subgraph Core["Villa Bridge"]
+    subgraph Android["Android tablet — standalone alpha"]
+        AND["Native Android host"]
+        AMQTT["Embedded MQTT"]
+        AMB["Matterbridge / Matter"]
+        AND --> AMQTT
+        AND --> AMB
+    end
+
+    subgraph Core["Shared Villa Bridge core"]
         V["Unified device model"]
         UI["Responsive web dashboard"] <--> V
-        AND["Native Android app<br/>(future)"] -.-> V
     end
+
+    AND <--> V
+    C -->|"Direct TCP mode"| AND
+    AMQTT <--> V
+    V --> AMB
+
+    subgraph Linux["Linux / Raspberry Pi host"]
+        L["Node.js service"]
+    end
+    L <--> V
 
     C -->|"Direct mode"| V
     Z2M <--> MQTT["MQTT broker"]
     MQTT <--> V
     MQTT -->|"Optional discovery"| HA["Home Assistant"]
 
-    V --> MB["Matterbridge"]
-    MB --> MATTER["Matter fabric"]
+    AMB --> MATTER["Matter fabric"]
     MATTER --> ALEXA["Alexa"]
     MATTER --> APPLE["Apple Home"]
 ```
@@ -101,12 +120,33 @@ pairing.
 Home Assistant users can open **Connections**, copy the displayed MQTT details
 and enable discovery when ready. Discovery is off by default.
 
+## Add a language
+
+Dashboard translations are independent JSON packages in `public/locales/`.
+Copy `en.json`, rename it with a language code such as `de.json`, then update
+its `code`, native `name`, and every value under `translations`. Villa Bridge
+discovers valid language files at runtime and adds them to the language switch;
+no HTML or TypeScript change is required. Keep the same translation keys as the
+English package and run `npm test` before submitting the new language.
+
+## Appearance
+
+The dashboard offers **Light**, **Dark**, and **System** appearance modes from
+the top bar. The selection is stored on the device. System mode follows the
+operating-system theme and updates immediately when it changes.
+
 ## Project status
 
 Villa Bridge is under active development. Shadow mode observes an existing
 Zigbee2MQTT network. Direct mode takes ownership of the coordinator and is for
 experienced installers; never run two coordinator owners at once and always
 back up Zigbee network data first.
+
+The Android build is an alpha validated on a Nokia T10. It can host the local
+MQTT broker, direct TCP Zigbee core, Matterbridge/Matter services, and dashboard
+without a separate server. This validation is device-specific and is not yet a
+general production-readiness claim. Linux and Raspberry Pi remain supported
+deployment targets.
 
 ## Contributing
 

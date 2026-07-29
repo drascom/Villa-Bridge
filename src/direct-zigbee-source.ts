@@ -30,6 +30,43 @@ const quietLogger = {
 setConverterLogger(quietLogger);
 setHerdsmanLogger(quietLogger);
 
+export function parsePermitJoinSeconds(payload: Buffer): number {
+  const parsed = JSON.parse(payload.toString("utf8")) as { time?: number; value?: boolean };
+  const requested = parsed.time ?? (parsed.value === true ? 180 : 0);
+  return Math.min(254, Math.max(0, requested));
+}
+
+export function directBridgeInfo(permitted: boolean, time: number): JsonObject {
+  return {
+    version: "1.0.0",
+    commit: "villa-bridge-direct",
+    permit_join: permitted,
+    permit_join_timeout: time,
+    zigbee_herdsman: { version: "embedded" },
+    zigbee_herdsman_converters: { version: "embedded" },
+    config: {
+      availability: { enabled: true },
+      advanced: {
+        output: "json",
+        legacy_api: false,
+        legacy_availability_payload: false
+      }
+    }
+  };
+}
+
+export function endpointNamesForDevice(
+  id: string,
+  aliases: ReadonlyMap<string, string>
+): Record<string, string> {
+  const prefix = `${id.toLowerCase()}:`;
+  return Object.fromEntries(
+    [...aliases.entries()]
+      .filter(([key, value]) => key.toLowerCase().startsWith(prefix) && value.trim().length > 0)
+      .map(([key, value]) => [key.slice(prefix.length), value.trim()])
+  );
+}
+
 export class DirectZigbeeSource implements ZigbeeSource {
   private controller: Controller | null = null;
   private readonly definitions = new Map<string, Definition>();
@@ -39,12 +76,15 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private bridgeDevices: BridgeDevice[] = [];
   private bridgeGroups: BridgeGroup[] = [];
   private homeAssistantDiscoveryTopics = new Set<string>();
+  private pairingState = { permitted: false, time: 0 };
+  private statePersistTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly config: DirectZigbeeConfig,
     private readonly mqttConfig: AppConfig["mqtt"],
     private readonly store: DeviceStore,
-    private readonly homeAssistantDiscoveryEnabled = false
+    private readonly homeAssistantDiscoveryEnabled = false,
+    private readonly aliases: ReadonlyMap<string, string> = new Map()
   ) {}
 
   async start(): Promise<void> {
@@ -83,6 +123,8 @@ export class DirectZigbeeSource implements ZigbeeSource {
     await this.startMqttCompatibility();
     const parameters = await controller.getNetworkParameters();
     console.log(`SLZB koordinatörü devralındı; Zigbee kanalı ${parameters.channel}.`);
+    const initialStateTimer = setTimeout(() => void this.requestInitialActuatorStates(), 1_000);
+    initialStateTimer.unref();
   }
 
   async permitJoin(seconds: number): Promise<void> {
@@ -102,6 +144,10 @@ export class DirectZigbeeSource implements ZigbeeSource {
       throw error;
     }
     await this.refreshDevices();
+    this.publish("bridge/response/device/rename", {
+      status: "ok",
+      data: { from: previousName, to: name }
+    });
     const state = this.states.get(id);
     if (state) {
       this.store.ingest(name, Buffer.from(JSON.stringify(state)));
@@ -122,6 +168,15 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.states.delete(id);
     this.publishRetained(previousName, "");
     await this.refreshDevices();
+    this.publish("bridge/response/device/remove", {
+      status: "ok",
+      data: { id: previousName, block: false, force: false }
+    });
+    this.publish("bridge/event", {
+      type: "device_leave",
+      data: { friendly_name: previousName, ieee_address: id }
+    });
+    await this.persistStates();
   }
 
   async stop(): Promise<void> {
@@ -132,6 +187,11 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.store.ingest("bridge/state", Buffer.from('{"state":"offline"}'));
     const mqttClient = this.mqtt;
     this.mqtt = null;
+    if (this.statePersistTimer) {
+      clearTimeout(this.statePersistTimer);
+      this.statePersistTimer = null;
+    }
+    await this.persistStates();
     if (mqttClient) {
       mqttClient.publish(`${this.mqttConfig.baseTopic}/bridge/state`, JSON.stringify({ state: "offline" }), { retain: true });
       await new Promise<void>((resolve) => mqttClient.end(false, {}, () => resolve()));
@@ -143,15 +203,42 @@ export class DirectZigbeeSource implements ZigbeeSource {
     controller.on("adapterDisconnected", () => {
       this.store.setMqttConnected(false);
       this.store.ingest("bridge/state", Buffer.from('{"state":"offline"}'));
+      this.publishRetained("bridge/state", { state: "offline" });
     });
     controller.on("permitJoinChanged", ({ permitted, time }) => {
+      this.pairingState = { permitted, time: permitted ? time ?? 0 : 0 };
+      const response = {
+        status: "ok",
+        data: {
+          time: this.pairingState.time,
+          value: permitted
+        }
+      };
       this.store.ingest(
         "bridge/response/permit_join",
-        Buffer.from(JSON.stringify({ status: "ok", data: { time: permitted ? time ?? 0 : 0 } }))
+        Buffer.from(JSON.stringify(response))
       );
+      this.publish("bridge/response/permit_join", response);
+      this.publishBridgeInfo();
     });
-    controller.on("deviceJoined", async () => this.refreshDevices());
-    controller.on("deviceLeave", async () => this.refreshDevices());
+    controller.on("deviceJoined", async ({ device }) => {
+      const friendlyName = this.config.devices[device.ieeeAddr]?.friendly_name ?? device.ieeeAddr;
+      const event = {
+        type: "device_joined",
+        data: { friendly_name: friendlyName, ieee_address: device.ieeeAddr }
+      };
+      this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
+      this.publish("bridge/event", event);
+      await this.refreshDevices();
+    });
+    controller.on("deviceLeave", async ({ ieeeAddr }) => {
+      const friendlyName = this.config.devices[ieeeAddr]?.friendly_name ?? ieeeAddr;
+      this.publish("bridge/event", {
+        type: "device_leave",
+        data: { friendly_name: friendlyName, ieee_address: ieeeAddr }
+      });
+      await this.refreshDevices();
+    });
     controller.on("deviceInterview", async ({ status, device }) => {
       if (status !== "successful") return;
       const definition = await findByDevice(device);
@@ -167,6 +254,18 @@ export class DirectZigbeeSource implements ZigbeeSource {
         }
       }
       await this.refreshDevices();
+      void this.requestInitialActuatorStates();
+      const event = {
+        type: "device_interview",
+        data: {
+          friendly_name: this.config.devices[device.ieeeAddr]?.friendly_name ?? device.ieeeAddr,
+          ieee_address: device.ieeeAddr,
+          status,
+          supported: Boolean(definition)
+        }
+      };
+      this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
+      this.publish("bridge/event", event);
     });
     controller.on("message", (message) => void this.onMessage(message));
   }
@@ -181,12 +280,15 @@ export class DirectZigbeeSource implements ZigbeeSource {
           ieee_address: device.ieeeAddr,
           friendly_name: "Coordinator",
           type: "Coordinator",
+          disabled: false,
           supported: true,
-          interview_completed: true
+          interview_completed: true,
+          interviewing: false
         });
         continue;
       }
       const configured = this.config.devices[device.ieeeAddr] ?? {};
+      const endpointNames = endpointNamesForDevice(device.ieeeAddr, this.aliases);
       const definition = await findByDevice(device);
       if (definition) this.definitions.set(device.ieeeAddr, definition);
       const options = configured as JsonObject;
@@ -212,6 +314,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
         type: device.type,
         disabled: configured.disabled === true,
         interview_completed: device.interviewState === "SUCCESSFUL",
+        interviewing: device.interviewState === "IN_PROGRESS",
         supported: Boolean(definition) || Boolean(inferredDefinition),
         network_address: device.networkAddress,
         date_code: device.dateCode,
@@ -225,6 +328,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
           exposes,
           options: definition.options ?? []
         } : inferredDefinition,
+        ...(Object.keys(endpointNames).length > 0 ? { endpoint_names: endpointNames } : {}),
         endpoints: Object.fromEntries(device.endpoints.map((endpoint) => [String(endpoint.ID), {
           bindings: [],
           configured_reportings: [],
@@ -277,6 +381,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.store.ingest(`${friendlyName}/availability`, Buffer.from('{"state":"online"}'));
       this.publish(friendlyName, merged, true);
       this.publish(`${friendlyName}/availability`, { state: "online" }, true);
+      this.queueStatePersistence();
     };
     let result: JsonObject = {};
     for (const converter of matching) {
@@ -330,11 +435,13 @@ export class DirectZigbeeSource implements ZigbeeSource {
     await new Promise<void>((resolve, reject) => {
       client.subscribe([
         `${this.mqttConfig.baseTopic}/+/set`,
+        `${this.mqttConfig.baseTopic}/+/get`,
         `${this.mqttConfig.baseTopic}/bridge/request/permit_join`,
         "homeassistant/status"
       ], { qos: 1 }, (error) => error ? reject(error) : resolve());
     });
     this.publishRetained("bridge/state", { state: "online" });
+    this.publishBridgeInfo();
     this.publishRetained("bridge/devices", this.bridgeDevices);
     this.publishRetained("bridge/groups", this.bridgeGroups);
     for (const [ieeeAddress, state] of this.states) {
@@ -384,17 +491,57 @@ export class DirectZigbeeSource implements ZigbeeSource {
     }
   }
 
+  private async requestInitialActuatorStates(): Promise<void> {
+    const controller = this.controller;
+    if (!controller) return;
+    for (const device of controller.getDevicesIterator()) {
+      if (device.type !== "Router") continue;
+      const definition = this.definitions.get(device.ieeeAddr) ?? await findByDevice(device);
+      if (!definition) continue;
+      const endpoint = device.getEndpoint(1) ?? device.endpoints[0];
+      if (!endpoint) continue;
+      const configured = this.config.devices[device.ieeeAddr] ?? {};
+      const options = configured as JsonObject;
+      const state = this.states.get(device.ieeeAddr) ?? {};
+      for (const key of ["state", "brightness", "color_temp"]) {
+        const converter = definition.toZigbee.find((item) =>
+          item.key?.includes(key) && typeof item.convertGet === "function"
+        );
+        if (!converter?.convertGet) continue;
+        try {
+          await converter.convertGet(endpoint, key, {
+            message: {},
+            device,
+            mapped: definition,
+            options,
+            state,
+            endpoint_name: undefined
+          } as never);
+        } catch (error) {
+          console.warn(`Başlangıç cihaz durumu okunamadı (${device.ieeeAddr}/${key}): ${String(error)}`);
+        }
+      }
+    }
+  }
+
   private async onMqttCommand(topic: string, payload: Buffer): Promise<void> {
     const prefix = `${this.mqttConfig.baseTopic}/`;
     if (!topic.startsWith(prefix)) return;
     const relative = topic.slice(prefix.length);
     if (relative === "bridge/request/permit_join") {
       try {
-        const parsed = JSON.parse(payload.toString("utf8")) as { time?: number };
-        await this.permitJoin(Math.min(254, Math.max(0, parsed.time ?? 0)));
+        await this.permitJoin(parsePermitJoinSeconds(payload));
       } catch (error) {
         console.warn(`Eşleştirme komutu işlenemedi: ${String(error)}`);
       }
+      return;
+    }
+    if (relative.endsWith("/get")) {
+      const friendlyName = relative.slice(0, -4);
+      const deviceEntry = Object.entries(this.config.devices)
+        .find(([, options]) => options.friendly_name === friendlyName);
+      const state = deviceEntry ? this.states.get(deviceEntry[0]) : undefined;
+      if (state) this.publish(friendlyName, state, true);
       return;
     }
     if (!relative.endsWith("/set")) return;
@@ -464,6 +611,36 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const friendlyName = configured.friendly_name ?? ieeeAddress;
     this.store.ingest(friendlyName, Buffer.from(JSON.stringify(state)));
     this.publish(friendlyName, state, true);
+    await this.persistStates();
+  }
+
+  private publishBridgeInfo(): void {
+    this.publishRetained(
+      "bridge/info",
+      directBridgeInfo(this.pairingState.permitted, this.pairingState.time)
+    );
+  }
+
+  private queueStatePersistence(): void {
+    if (this.statePersistTimer) clearTimeout(this.statePersistTimer);
+    this.statePersistTimer = setTimeout(() => {
+      this.statePersistTimer = null;
+      void this.persistStates().catch((error) => {
+        console.warn(`Zigbee durum önbelleği yazılamadı: ${String(error)}`);
+      });
+    }, 250);
+    this.statePersistTimer.unref();
+  }
+
+  private async persistStates(): Promise<void> {
+    const path = join(this.config.dataDir, "state.json");
+    const temporaryPath = `${path}.${process.pid}.tmp`;
+    await writeFile(
+      temporaryPath,
+      `${JSON.stringify(Object.fromEntries(this.states), null, 2)}\n`,
+      "utf8"
+    );
+    await rename(temporaryPath, path);
   }
 
   private async persistDeviceConfiguration(id: string, name: string | null): Promise<void> {

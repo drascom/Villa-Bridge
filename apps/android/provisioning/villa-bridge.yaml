@@ -1,0 +1,17 @@
+mode: direct
+pairingControl: true
+zigbee:
+  dataDir: ../zigbee
+  configurationFile: ../zigbee/configuration.yaml
+mqtt:
+  url: mqtt://127.0.0.1:1883
+  baseTopic: zigbee2mqtt
+  credentialsFile: ../zigbee/configuration.yaml
+aliasesFile: ../aliases.json
+matterbridge:
+  wsUrl: ws://127.0.0.1:8283
+homeAssistant:
+  discoveryEnabled: false
+http:
+  host: 127.0.0.1
+  port: 8091

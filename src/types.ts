@@ -20,6 +20,7 @@ export interface BridgeDevice {
   network_address?: number;
   definition?: BridgeDeviceDefinition;
   endpoints?: Record<string, unknown>;
+  endpoint_names?: Record<string, string>;
   date_code?: string;
   manufacturer?: string;
   power_source?: string;
@@ -39,6 +40,7 @@ export interface DeviceView {
   name: string;
   type: string;
   model: string | null;
+  image: DeviceImageView;
   vendor: string | null;
   description: string | null;
   supported: boolean;
@@ -49,6 +51,19 @@ export interface DeviceView {
   features: string[];
   controls: DeviceControlView[];
   state: JsonObject;
+}
+
+export interface DeviceImageCandidate {
+  model: string;
+  label: "catalogMatch" | "miniModule" | "switchModule" | "wallSwitch" | "otherSwitch";
+}
+
+export interface DeviceImageView {
+  model: string | null;
+  candidates: DeviceImageCandidate[];
+  selectionRequired: boolean;
+  userSelected: boolean;
+  preferenceKey: string;
 }
 
 export interface DeviceControlView {

@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Villa Bridge</string>
+    <string name="service_channel_name">Villa Bridge Core</string>
+    <string name="service_starting">Villa Bridge is starting…</string>
+    <string name="service_running">Villa Bridge is running</string>
+    <string name="service_stopping">Villa Bridge is stopping…</string>
+    <string name="service_error">Villa Bridge needs attention</string>
+    <string name="loading_dashboard">Starting the local home controller…</string>
+    <string name="runtime_stopped_title">Villa Bridge is stopped</string>
+    <string name="runtime_stopped_message">Zigbee, MQTT and Matter services are off. Start the system when this tablet is ready to become the home controller again.</string>
+    <string name="runtime_start">Start Villa Bridge</string>
+</resources>

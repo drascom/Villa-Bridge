@@ -9,6 +9,13 @@ const light: DeviceView = {
   name: "Kitchen Light",
   type: "Router",
   model: "RGB-CCT",
+  image: {
+    model: "RGB-CCT",
+    candidates: [{ model: "RGB-CCT", label: "catalogMatch" }],
+    selectionRequired: false,
+    userSelected: false,
+    preferenceKey: "RGB-CCT::Example"
+  },
   vendor: "Example",
   description: null,
   supported: true,

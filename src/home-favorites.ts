@@ -46,4 +46,9 @@ export class HomeFavoritesStore {
     await rename(temporary, this.path);
     return favorites;
   }
+
+  async removeDevice(deviceId: string): Promise<HomeFavorite[]> {
+    const normalizedId = deviceId.trim().toLowerCase();
+    return this.save((await this.get()).filter((favorite) => favorite.deviceId !== normalizedId));
+  }
 }

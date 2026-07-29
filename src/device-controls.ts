@@ -93,16 +93,17 @@ export const hexToXy = (hex: string): { x: number; y: number } => {
 export function deviceControls(
   id: string,
   deviceName: string,
-  features: string[],
+  writableFeatures: string[],
   state: JsonObject,
   aliases: Map<string, string>
 ): DeviceControlView[] {
-  const available = new Set([...features, ...Object.keys(state)]);
+  const writable = new Set(writableFeatures);
+  const available = new Set([...writableFeatures, ...Object.keys(state)]);
   const controls: DeviceControlView[] = [];
 
   for (const property of [...available].filter((key) => key === "state" || key.startsWith("state_")).sort()) {
     const value = onOff(state[property]);
-    if (value === null) continue;
+    if (value === null && !writable.has(property)) continue;
     const channel = suffixOf(property, "state");
     controls.push({
       id: channel,
@@ -115,14 +116,14 @@ export function deviceControls(
 
   for (const property of [...available].filter((key) => key === "brightness" || key.startsWith("brightness_")).sort()) {
     const raw = state[property];
-    if (typeof raw !== "number") continue;
+    if (typeof raw !== "number" && !writable.has(property)) continue;
     const channel = suffixOf(property, "brightness");
     controls.push({
       id: `${channel}:brightness`,
       property,
       name: channel === "main" ? "Parlaklık" : `${aliases.get(`${id}:${channel}`) ?? defaultChannelName(deviceName, channel)} parlaklığı`,
       kind: "level",
-      value: raw,
+      value: typeof raw === "number" ? raw : null,
       min: 1,
       max: 254
     });
@@ -130,26 +131,26 @@ export function deviceControls(
 
   for (const property of [...available].filter((key) => key === "color_temp" || key.startsWith("color_temp_")).sort()) {
     const raw = state[property];
-    if (typeof raw !== "number") continue;
+    if (typeof raw !== "number" && !writable.has(property)) continue;
     const channel = suffixOf(property, "color_temp");
     controls.push({
       id: `${channel}:temperature`,
       property,
       name: channel === "main" ? "Işık sıcaklığı" : `${aliases.get(`${id}:${channel}`) ?? defaultChannelName(deviceName, channel)} sıcaklığı`,
       kind: "temperature",
-      value: raw,
+      value: typeof raw === "number" ? raw : null,
       min: 153,
       max: 500
     });
   }
 
-  if (features.some((feature) => feature === "color" || feature === "color_xy" || feature === "color_hs")) {
+  if (writableFeatures.some((feature) => feature === "color" || feature === "color_xy" || feature === "color_hs")) {
     controls.push({
       id: "main:color",
       property: "color",
       name: "Renk",
       kind: "color",
-      value: colorHex(state.color)
+      value: state.color === undefined ? null : colorHex(state.color)
     });
   }
 

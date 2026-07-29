@@ -6,10 +6,19 @@ import type {
   JsonObject
 } from "./types.js";
 import { deviceControls } from "./device-controls.js";
+import { canonicalDeviceModel, deviceIdentity } from "./device-identity.js";
+import type { DeviceImagePreferences } from "./device-images.js";
 
 interface StateEntry {
   value: JsonObject;
   updatedAt: Date;
+}
+
+interface PairingDevice {
+  id: string;
+  name: string;
+  interviewCompleted: boolean;
+  supported: boolean | null;
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -40,6 +49,25 @@ function featureNames(exposes: unknown): string[] {
   return [...names].sort();
 }
 
+function writableFeatureNames(exposes: unknown): string[] {
+  const names = new Set<string>();
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!isObject(value)) return;
+    const access = typeof value.access === "number" ? value.access : 0;
+    if ((access & 2) !== 0) {
+      if (typeof value.property === "string") names.add(value.property);
+      if (typeof value.name === "string") names.add(value.name);
+    }
+    if ("features" in value) visit(value.features);
+  };
+  visit(exposes);
+  return [...names].sort();
+}
+
 export class DeviceStore {
   private readonly aliases: Map<string, string>;
   private readonly states = new Map<string, StateEntry>();
@@ -52,10 +80,18 @@ export class DeviceStore {
   private pairingUntil: Date | null = null;
   private pairingStatus: "closed" | "open" | "pending" | "error" = "closed";
   private pairingMessage: string | null = null;
+  private pairingDevice: PairingDevice | null = null;
   private mode: "shadow" | "direct" = "shadow";
 
-  constructor(aliases: Map<string, string>) {
+  constructor(
+    aliases: Map<string, string>,
+    private imagePreferences: DeviceImagePreferences = { devices: {}, models: {} }
+  ) {
     this.aliases = aliases;
+  }
+
+  setImagePreferences(preferences: DeviceImagePreferences): void {
+    this.imagePreferences = preferences;
   }
 
   setMqttConnected(connected: boolean): void {
@@ -93,6 +129,10 @@ export class DeviceStore {
       }
       return;
     }
+    if (topic === "bridge/event" && isObject(parsed)) {
+      this.ingestPairingEvent(parsed);
+      return;
+    }
     if (topic.startsWith("bridge/") || topic.endsWith("/set") || topic.endsWith("/get")) return;
     if (topic.endsWith("/availability")) {
       const name = topic.slice(0, -"/availability".length);
@@ -113,12 +153,22 @@ export class DeviceStore {
         const lastSeen = state?.value.last_seen;
         const availability: DeviceView["availability"] = this.availability.get(sourceName) ?? "unknown";
         const name = this.aliases.get(id) ?? sourceName;
+        const exposes = device.definition?.exposes;
+        const features = featureNames(exposes);
+        const writableFeatures = writableFeatureNames(exposes);
+        const image = deviceIdentity(
+          id,
+          device.definition?.model,
+          device.manufacturer,
+          this.imagePreferences
+        );
         return {
           id,
           sourceName,
           name,
           type: device.type ?? "Unknown",
-          model: device.definition?.model ?? null,
+          model: canonicalDeviceModel(device.definition?.model, device.manufacturer),
+          image,
           vendor: device.definition?.vendor ?? null,
           description: device.definition?.description ?? null,
           supported: device.supported !== false,
@@ -126,8 +176,8 @@ export class DeviceStore {
           availability,
           lastSeen: typeof lastSeen === "string" || typeof lastSeen === "number" ? String(lastSeen) : null,
           stateUpdatedAt: state?.updatedAt.toISOString() ?? null,
-          features: featureNames(device.definition?.exposes),
-          controls: deviceControls(id, name, featureNames(device.definition?.exposes), state?.value ?? {}, this.aliases),
+          features,
+          controls: deviceControls(id, name, writableFeatures, state?.value ?? {}, this.aliases),
           state: state?.value ?? {}
         };
       })
@@ -174,12 +224,14 @@ export class DeviceStore {
     this.pairingStatus = "pending";
     this.pairingUntil = new Date(Date.now() + seconds * 1_000);
     this.pairingMessage = "Koordinatörden onay bekleniyor.";
+    this.pairingDevice = null;
   }
 
   pairingRequestFailed(message: string): void {
     this.pairingStatus = "error";
     this.pairingUntil = null;
     this.pairingMessage = message;
+    this.pairingDevice = null;
   }
 
   getPairing(): JsonObject {
@@ -192,7 +244,8 @@ export class DeviceStore {
       status: this.pairingStatus,
       open: this.pairingStatus === "open" || this.pairingStatus === "pending",
       until: this.pairingUntil?.toISOString() ?? null,
-      message: this.pairingMessage
+      message: this.pairingMessage,
+      device: this.pairingDevice
     };
   }
 
@@ -206,8 +259,40 @@ export class DeviceStore {
   }
 
   private setPairingOpen(seconds: number): void {
+    if (seconds > 0 && this.pairingStatus !== "pending" && this.pairingStatus !== "open") {
+      this.pairingDevice = null;
+    }
     this.pairingStatus = seconds > 0 ? "open" : "closed";
     this.pairingUntil = seconds > 0 ? new Date(Date.now() + seconds * 1_000) : null;
     this.pairingMessage = seconds > 0 ? "Yeni Zigbee cihazları eklenebilir." : null;
+  }
+
+  private ingestPairingEvent(event: JsonObject): void {
+    if (this.pairingStatus !== "open" && this.pairingStatus !== "pending") return;
+    if (!isObject(event.data)) return;
+    const id = typeof event.data.ieee_address === "string"
+      ? event.data.ieee_address.toLowerCase()
+      : null;
+    if (!id) return;
+    if (event.type === "device_joined") {
+      this.pairingDevice = {
+        id,
+        name: typeof event.data.friendly_name === "string" ? event.data.friendly_name : id,
+        interviewCompleted: false,
+        supported: null
+      };
+      return;
+    }
+    if (
+      event.type === "device_interview"
+      && event.data.status === "successful"
+      && this.pairingDevice?.id === id
+    ) {
+      this.pairingDevice = {
+        ...this.pairingDevice,
+        interviewCompleted: true,
+        supported: typeof event.data.supported === "boolean" ? event.data.supported : null
+      };
+    }
   }
 }

@@ -7,7 +7,11 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "test": "npm run build && node --test dist/**/*.test.js"
+    "test": "npm run build && node --test dist/**/*.test.js",
+    "android:prepare": "node scripts/prepare-android-node.mjs",
+    "android:build": "node scripts/android-build.mjs",
+    "android:devices": "adb devices -l",
+    "android:install": "npm run android:build && adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk"
   },
   "engines": {
     "node": ">=22"
