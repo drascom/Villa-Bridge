@@ -697,6 +697,11 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
   assert.match(dashboard, /data-group-command-value=/);
   assert.match(dashboard, /JSON\.parse\(button\.dataset\.groupCommandValue\)/);
   assert.match(dashboard, /groupPowerControl=control=>\["switch","fan","siren","cover"\]\.includes\(control\.kind\)/);
+  assert.match(dashboard, /function matchingZigbeePowerGroup\(entries\)/);
+  assert.match(dashboard, /api\(`\/api\/groups\/\$\{encodeURIComponent\(zigbeeGroup\.id\)\}\/command`/);
+  assert.match(dashboard, /data-ota-check=/);
+  assert.match(dashboard, /function checkOta\(id\)/);
+  assert.match(dashboard, /\/ota-check`/);
   assert.doesNotMatch(dashboard, /const controllable=devices\.filter\(device=>device\.controls\.some\(control=>control\.kind==="switch"\)\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)

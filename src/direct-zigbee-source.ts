@@ -14,7 +14,7 @@ import type { AppConfig } from "./config.js";
 import { DeviceStore } from "./device-store.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
-import type { ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
+import type { OtaCheckResult, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
 import type { BridgeDevice, BridgeGroup, JsonObject } from "./types.js";
 
 function messageText(value: string | (() => string)): string {
@@ -119,6 +119,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private availabilityTimer: NodeJS.Timeout | null = null;
   private readonly deviceAvailability = new Map<string, "online" | "offline">();
   private readonly lastDevicePublications = new Map<string, DeviceStatePublication>();
+  private readonly otaUpdates = new Set<string>();
 
   constructor(
     private readonly config: DirectZigbeeConfig,
@@ -258,6 +259,18 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.refreshGroups();
   }
 
+  async setGroup(id: string, command: JsonObject): Promise<void> {
+    const group = this.groupByIdentifier(id);
+    const state = command.state;
+    if (
+      typeof state !== "string"
+      || !["ON", "OFF", "TOGGLE"].includes(state.toUpperCase())
+    ) {
+      throw new Error("Direct Zigbee grubu yalnız aç, kapat veya değiştir komutunu destekliyor.");
+    }
+    await group.command("genOnOff", state.toLowerCase(), {} as never);
+  }
+
   async bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void> {
     const controller = this.controller;
     const from = controller?.getDeviceByIeeeAddr(fromId);
@@ -318,8 +331,34 @@ export class DirectZigbeeSource implements ZigbeeSource {
     if (!device) throw new Error("Cihaz bulunamadı.");
     const definition = this.definitions.get(id) ?? await findByDevice(device);
     if (!definition?.ota) throw new Error("Bu cihaz kablosuz yazılım güncellemesini desteklemiyor.");
-    if (enabled) device.scheduleOta({});
-    else device.unscheduleOta();
+    if (enabled) {
+      device.scheduleOta({});
+      this.publishOtaState(id, { state: "scheduled", progress: 0 });
+    } else {
+      device.unscheduleOta();
+      this.publishOtaState(id, { state: "idle", progress: 0 });
+    }
+  }
+
+  async checkOta(id: string): Promise<OtaCheckResult> {
+    const device = this.controller?.getDeviceByIeeeAddr(id);
+    if (!device) throw new Error("Cihaz bulunamadı.");
+    const definition = this.definitions.get(id) ?? await findByDevice(device);
+    if (!definition?.ota) throw new Error("Bu cihaz kablosuz yazılım güncellemesini desteklemiyor.");
+    const extraMetas = typeof definition.ota === "object" ? definition.ota : {};
+    const result = await device.checkOta({}, undefined, extraMetas);
+    const checked: OtaCheckResult = {
+      available: result.available,
+      currentVersion: result.current.fileVersion,
+      ...(result.availableMeta ? { availableVersion: result.availableMeta.fileVersion } : {})
+    };
+    this.publishOtaState(id, {
+      state: result.available ? "available" : "idle",
+      progress: 0,
+      current_version: checked.currentVersion ?? null,
+      available_version: checked.availableVersion ?? null
+    });
+    return checked;
   }
 
   async setDeviceOptions(
@@ -622,6 +661,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const definition = this.definitions.get(message.device.ieeeAddr) ?? await findByDevice(message.device);
     if (!definition) return;
     this.definitions.set(message.device.ieeeAddr, definition);
+    if (await this.handleScheduledOta(message, definition)) return;
     const configured = this.config.devices[message.device.ieeeAddr] ?? {};
     const friendlyName = configured.friendly_name ?? message.device.ieeeAddr;
     this.setAvailability(message.device.ieeeAddr, "online");
@@ -672,6 +712,72 @@ export class DirectZigbeeSource implements ZigbeeSource {
       postProcessConvertedFromZigbeeMessage(definition, result, options, message.device);
       publish(result);
     }
+  }
+
+  private publishOtaState(id: string, update: JsonObject): void {
+    const configured = this.config.devices[id] ?? {};
+    const friendlyName = configured.friendly_name ?? id;
+    const merged = {
+      ...(this.states.get(id) ?? {}),
+      update
+    };
+    this.states.set(id, merged);
+    this.store.ingest(friendlyName, Buffer.from(JSON.stringify(merged)));
+    this.publish(friendlyName, merged, configured.retain === true);
+    this.queueStatePersistence();
+  }
+
+  private async handleScheduledOta(
+    message: Events.MessagePayload,
+    definition: Definition
+  ): Promise<boolean> {
+    const id = message.device.ieeeAddr;
+    if (
+      message.cluster !== "genOta"
+      || message.type !== "commandQueryNextImageRequest"
+      || !message.device.scheduledOta
+      || this.otaUpdates.has(id)
+      || !definition.ota
+    ) {
+      return false;
+    }
+    this.otaUpdates.add(id);
+    const extraMetas = typeof definition.ota === "object" ? definition.ota : {};
+    this.publishOtaState(id, { state: "updating", progress: 0 });
+    try {
+      const [, installed] = await message.device.updateOta(
+        undefined,
+        message.data as never,
+        message.meta.zclTransactionSequenceNumber,
+        extraMetas,
+        (progress, remaining) => this.publishOtaState(id, {
+          state: "updating",
+          progress: Math.max(0, Math.min(100, progress)),
+          remaining
+        }),
+        {
+          requestTimeout: 150_000,
+          responseDelay: 250,
+          baseSize: 50
+        },
+        message.endpoint
+      );
+      this.publishOtaState(id, {
+        state: "idle",
+        progress: installed ? 100 : 0,
+        installed_version: installed?.fileVersion ?? null
+      });
+    } catch (error) {
+      this.publishOtaState(id, {
+        state: "failed",
+        progress: 0,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      console.error(`OTA güncellemesi başarısız (${id}): ${String(error)}`);
+    } finally {
+      this.otaUpdates.delete(id);
+    }
+    return true;
   }
 
   private async startMqttCompatibility(): Promise<void> {

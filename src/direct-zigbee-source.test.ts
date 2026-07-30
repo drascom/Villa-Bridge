@@ -147,10 +147,21 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
     groupID: 1,
     members: [],
     async command(cluster: string, command: string, value: unknown) {
-      calls.push({ operation: "scene", value: { cluster, command, value } });
+      calls.push({
+        operation: cluster === "genOnOff" ? "group-command" : "scene",
+        value: { cluster, command, value }
+      });
     }
   };
   const otaDevice = {
+    async checkOta() {
+      calls.push({ operation: "ota-check" });
+      return {
+        available: true,
+        current: { fileVersion: 10 },
+        availableMeta: { fileVersion: 11 }
+      };
+    },
     scheduleOta(value: unknown) {
       calls.push({ operation: "ota-schedule", value });
     },
@@ -227,6 +238,7 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
   await source.resetTouchlink("0xtouch", 15);
   await source.setGroupMember("group-1", "0xmember", true);
   await source.setGroupMember("group-1", "0xmember", false);
+  await source.setGroup("group-1", { state: "ON" });
   await source.bindDevice("0xfrom", "0xto", true);
   await source.bindDevice("0xfrom", "0xto", false);
   await source.groupScene("group-1", 7, "store");
@@ -234,6 +246,11 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
   await source.groupScene("group-1", 7, "remove");
   await source.scheduleOta("0xota", true);
   await source.scheduleOta("0xota", false);
+  assert.deepEqual(await source.checkOta("0xota"), {
+    available: true,
+    currentVersion: 10,
+    availableVersion: 11
+  });
   assert.deepEqual(await source.networkMap(), {
     nodes: [
       { id: "0xcoordinator", name: "Coordinator", type: "Coordinator" },
@@ -250,13 +267,15 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
       "touchlink-reset",
       "group-add",
       "group-remove",
+      "group-command",
       "bind",
       "unbind",
       "scene",
       "scene",
       "scene",
       "ota-schedule",
-      "ota-unschedule"
+      "ota-unschedule",
+      "ota-check"
     ]
   );
   assert.equal(
@@ -265,6 +284,69 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
     }).selectedRouter,
     router
   );
+  assert.deepEqual(
+    calls.find((call) => call.operation === "group-command")?.value,
+    { cluster: "genOnOff", command: "on", value: {} }
+  );
+});
+
+test("direct OTA planı cihaz isteğinde ilerleme durumunu yayınlar", async () => {
+  const published: Array<Record<string, unknown>> = [];
+  const device = {
+    ieeeAddr: "0xota-progress",
+    scheduledOta: {},
+    async updateOta(
+      _source: unknown,
+      _payload: unknown,
+      _transaction: unknown,
+      _metas: unknown,
+      onProgress: (progress: number, remaining: number) => void
+    ) {
+      onProgress(42, 90);
+      return [
+        { fileVersion: 10 },
+        { fileVersion: 11 }
+      ];
+    }
+  };
+  const source = new DirectZigbeeSource(
+    {
+      devices: { "0xota-progress": { friendly_name: "OTA Test" } },
+      groups: {}
+    } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    new DeviceStore(new Map())
+  );
+  Object.assign(source, {
+    definitions: new Map([["0xota-progress", { ota: true, fromZigbee: [] }]]),
+    mqtt: {
+      connected: true,
+      publish(_topic: string, payload: string) {
+        published.push(JSON.parse(payload) as Record<string, unknown>);
+      }
+    }
+  });
+
+  await (source as unknown as {
+    onMessage(message: unknown): Promise<void>;
+  }).onMessage({
+    cluster: "genOta",
+    type: "commandQueryNextImageRequest",
+    device,
+    endpoint: {},
+    data: { fileVersion: 10 },
+    meta: { zclTransactionSequenceNumber: 7 }
+  });
+
+  assert.ok(published.some((payload) =>
+    (payload.update as Record<string, unknown>)?.state === "updating"
+    && (payload.update as Record<string, unknown>)?.progress === 42
+  ));
+  assert.deepEqual(published.at(-1)?.update, {
+    state: "idle",
+    progress: 100,
+    installed_version: 11
+  });
 });
 
 test("direct cihaz seçenekleri configuration.yaml dosyasına kalıcı yazılır", async (context) => {

@@ -47,6 +47,13 @@ class FakeMqttClient extends EventEmitter {
     if (topic.endsWith("/backup")) {
       data = { zip: Buffer.from("PK\u0003\u0004test backup").toString("base64") };
     }
+    if (topic.endsWith("/device/ota_update/check")) {
+      data = {
+        update_available: true,
+        current_file_version: 10,
+        ota_file_version: 11
+      };
+    }
     queueMicrotask(() => this.emit(
       "message",
       responseTopic,
@@ -67,6 +74,12 @@ class FakeMqttClient extends EventEmitter {
 test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler", async () => {
   const client = new FakeMqttClient();
   const store = new DeviceStore(new Map());
+  store.ingest("bridge/groups", Buffer.from(JSON.stringify([{
+    id: 1,
+    friendly_name: "Lounge",
+    members: [],
+    scenes: []
+  }])));
   const source = new MqttShadowSource(
     { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
     store,
@@ -81,8 +94,14 @@ test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler
   await source.renameGroup("group-1", "Lounge");
   await source.removeGroup("group-1", true);
   await source.setGroupMember("group-1", "0x0011223344556677", true, 1);
+  await source.setGroup("group-1", { state: "ON" });
   await source.bindDevice("0x0011223344556677", "group-1", true, ["genOnOff"]);
   await source.scheduleOta("0x0011223344556677", true);
+  assert.deepEqual(await source.checkOta("0x0011223344556677"), {
+    available: true,
+    currentVersion: 10,
+    availableVersion: 11
+  });
   await source.setDeviceOptions("0x0011223344556677", {
     transition: 1,
     debounce: 0.2,
@@ -113,8 +132,10 @@ test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler
       "group/rename",
       "group/remove",
       "group/members/add",
+      "zigbee2mqtt/Lounge/set",
       "device/bind",
       "device/ota_update/schedule",
+      "device/ota_update/check",
       "device/options",
       "touchlink/scan",
       "networkmap",
@@ -123,10 +144,16 @@ test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler
       "backup"
     ]
   );
-  assert.ok(client.requests.every((request) => typeof request.payload.transaction === "string"));
+  assert.ok(client.requests
+    .filter((request) => request.topic.includes("/bridge/request/"))
+    .every((request) => typeof request.payload.transaction === "string"));
   assert.equal(client.requests.find((request) => request.topic.endsWith("/group/rename"))?.payload.from, "1");
   assert.equal(client.requests.find((request) => request.topic.endsWith("/group/remove"))?.payload.id, "1");
   assert.equal(client.requests.find((request) => request.topic.endsWith("/group/members/add"))?.payload.group, "1");
+  assert.deepEqual(
+    client.requests.find((request) => request.topic === "zigbee2mqtt/Lounge/set")?.payload,
+    { state: "ON" }
+  );
   assert.equal(client.requests.find((request) => request.topic.endsWith("/device/bind"))?.payload.to, "1");
   await source.stop();
 });

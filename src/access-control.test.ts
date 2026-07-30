@@ -25,6 +25,7 @@ const setupApp = async (context: { after: (callback: () => Promise<void>) => voi
   app.put("/api/groups/:id", async () => ({ ok: true }));
   app.delete("/api/groups/:id", async () => ({ ok: true }));
   app.put("/api/groups/:id/member", async () => ({ ok: true }));
+  app.post("/api/groups/:id/command", async () => ({ ok: true }));
   app.post("/api/groups/:id/scene", async () => ({ ok: true }));
   app.post("/api/pairing/start", async () => ({ ok: true }));
   app.post("/api/zigbee/install-code", async () => ({ ok: true }));
@@ -35,6 +36,7 @@ const setupApp = async (context: { after: (callback: () => Promise<void>) => voi
   app.post("/api/devices/:id/reconfigure", async () => ({ ok: true }));
   app.put("/api/devices/:id/options", async () => ({ ok: true }));
   app.put("/api/devices/:id/ota-schedule", async () => ({ ok: true }));
+  app.post("/api/devices/:id/ota-check", async () => ({ ok: true }));
   app.get("/api/zigbee/backup", async () => ({ ok: true }));
   app.post("/api/zigbee/restore", async () => ({ ok: true }));
   app.put("/api/favorites", async () => ({ ok: true }));
@@ -97,6 +99,11 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
     url: "/api/devices/test/command",
     headers: { cookie, "x-villa-csrf": csrfToken }
   })).statusCode, 200);
+  assert.equal((await app.inject({
+    method: "POST",
+    url: "/api/groups/1/command",
+    headers: { cookie, "x-villa-csrf": csrfToken }
+  })).statusCode, 200);
   const settings = await app.inject({ method: "GET", url: "/api/settings", headers: { cookie } });
   assert.equal(settings.statusCode, 403);
   assert.equal(settings.json().code, "ADMIN_REQUIRED");
@@ -107,6 +114,7 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
     "/api/zigbee/touchlink/scan",
     "/api/zigbee/touchlink/reset",
     "/api/devices/test/reconfigure",
+    "/api/devices/test/ota-check",
     "/api/groups/1/scene"
   ]) {
     const response = await app.inject({

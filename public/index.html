@@ -651,7 +651,7 @@
     const updateRunning=updateState.state==="updating";
     const updateScheduled=updateState.state==="scheduled";
     const updateLabel=updateRunning?t("updatingFirmware",{progress:Math.round(Number(updateState.progress)||0)}):t(updateScheduled?"cancelScheduledUpdate":"scheduleUpdate");
-    const otaButton=device.otaSupported?`<button class="secondary" data-admin-only data-ota="${esc(device.id)}" data-ota-enabled="${updateScheduled?"false":"true"}"${updateRunning?" disabled":""}>⇧ ${esc(updateLabel)}</button>`:"";
+    const otaButton=device.otaSupported?`<button class="secondary" data-admin-only data-ota-check="${esc(device.id)}"${updateRunning?" disabled":""}>↻ ${t("checkForUpdate")}</button><button class="secondary" data-admin-only data-ota="${esc(device.id)}" data-ota-enabled="${updateScheduled?"false":"true"}"${updateRunning?" disabled":""}>⇧ ${esc(updateLabel)}</button>`:"";
     return`<details class="device-card"${state.openDevices.has(device.id)?" open":""} data-device-card="${esc(device.id)}" data-name="${esc(device.name.toLowerCase())}">
       <summary class="device-card-header"><div class="device-title">${deviceVisual(device)}<div><div class="device-name-row"><div class="device-name">${esc(device.name)}</div>${linkQualityBadge(device)}</div><div class="device-meta">${deviceKind(device)} · <span class="${device.availability==="online"?"online-text":device.availability==="offline"?"offline-text":"unknown-text"}">${device.availability==="online"?t("ready"):device.availability==="offline"?t("unreachable"):t("standby")}</span></div></div></div></summary>
       <div class="device-card-body">
@@ -827,6 +827,7 @@
     $$("[data-rename-channel]").forEach(button=>button.onclick=()=>openRename(button.dataset.renameChannel,button.dataset.channel));
     $$("[data-reconfigure]").forEach(button=>button.onclick=()=>reconfigureDevice(button.dataset.reconfigure));
     $$("[data-note]").forEach(button=>button.onclick=()=>openDeviceNote(button.dataset.note));
+    $$("[data-ota-check]").forEach(button=>button.onclick=()=>checkOta(button.dataset.otaCheck));
     $$("[data-ota]").forEach(button=>button.onclick=()=>scheduleOta(button.dataset.ota,button.dataset.otaEnabled!=="false"));
     $$("[data-options]").forEach(button=>button.onclick=()=>openDeviceOptions(button.dataset.options));
     $$("[data-remove]").forEach(button=>button.onclick=()=>removeDevice(button.dataset.remove));
@@ -1359,20 +1360,36 @@
     $$("[data-edit-group]").forEach(button=>button.onclick=()=>openGroupEditor(button.dataset.editGroup));
     bindDashboardDeviceActions();
   }
+  function matchingZigbeePowerGroup(entries){
+    if(!entries.length||entries.some(({control})=>!["switch","fan","siren"].includes(control.kind)||control.property!=="state"))return null;
+    const memberIds=[...new Set(entries.map(({device})=>device.id.toLowerCase()))].sort();
+    return state.zigbeeGroups.find(group=>{
+      const zigbeeMemberIds=[...new Set((group.memberIds||[]).map(id=>id.toLowerCase()))].sort();
+      return memberIds.length===zigbeeMemberIds.length&&memberIds.every((id,index)=>id===zigbeeMemberIds[index]);
+    })||null;
+  }
   async function commandDashboardGroup(groupId){
     const group=state.groups.find(candidate=>candidate.id===groupId);
     if(!group||state.pendingGroups.has(groupId))return;
     const entries=groupControlEntries(group).filter(({device,control})=>control&&groupPowerControl(control)&&device.availability!=="offline");
     if(!entries.length)return;
     const activate=!entries.every(({control})=>dashboardControlAction(control)?.active===true);
+    const zigbeeGroup=matchingZigbeePowerGroup(entries);
     state.pendingGroups.add(groupId);
     for(const {device,control} of entries)state.pendingCommands.add(commandKey(device.id,control.property));
     render();
     try{
-      await Promise.all(entries.map(({device,control})=>{
-        const value=dashboardControlValueForState(control,activate);
-        return api(`/api/devices/${encodeURIComponent(device.id)}/command`,{method:"POST",body:JSON.stringify({property:control.property,value})});
-      }));
+      if(zigbeeGroup){
+        await api(`/api/groups/${encodeURIComponent(zigbeeGroup.id)}/command`,{
+          method:"POST",
+          body:JSON.stringify({property:"state",value:activate})
+        });
+      }else{
+        await Promise.all(entries.map(({device,control})=>{
+          const value=dashboardControlValueForState(control,activate);
+          return api(`/api/devices/${encodeURIComponent(device.id)}/command`,{method:"POST",body:JSON.stringify({property:control.property,value})});
+        }));
+      }
       for(const {control} of entries)control.value=dashboardControlValueForState(control,activate);
     }catch(error){showToast(error.message,true)}
     finally{
@@ -2181,6 +2198,16 @@
     try{
       await api(`/api/devices/${encodeURIComponent(id)}/ota-schedule`,{method:"PUT",body:JSON.stringify({enabled})});
       showToast(t(enabled?"updateScheduled":"updateUnscheduled"));
+    }catch(error){showToast(error.message,true)}
+    finally{if(button)button.disabled=false}
+  }
+  async function checkOta(id){
+    const button=$$("[data-ota-check]").find(item=>item.dataset.otaCheck===id);
+    if(button)button.disabled=true;
+    try{
+      const data=await api(`/api/devices/${encodeURIComponent(id)}/ota-check`,{method:"POST"});
+      showToast(t(data.ota?.available?"updateAvailable":"noUpdateAvailable"));
+      await refresh();
     }catch(error){showToast(error.message,true)}
     finally{if(button)button.disabled=false}
   }

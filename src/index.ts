@@ -11,7 +11,11 @@ import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
 import { DeviceNotesStore } from "./device-notes.js";
 import { DeviceStore } from "./device-store.js";
-import { HomeFavoritesStore, validateHomeFavorites } from "./home-favorites.js";
+import {
+  HomeFavoritesStore,
+  isHomeFavoriteControlKind,
+  validateHomeFavorites
+} from "./home-favorites.js";
 import { InstallationStateStore } from "./installation-state.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
@@ -206,6 +210,28 @@ app.put<{
   }
 });
 app.post<{
+  Params: { id: string };
+  Body?: { property?: unknown; value?: unknown };
+}>("/api/groups/:id/command", async (request, reply) => {
+  if (
+    request.body?.property !== "state"
+    || typeof request.body.value !== "boolean"
+  ) {
+    return reply.code(400).send({ ok: false, error: "Grup aç/kapat komutu geçersiz." });
+  }
+  try {
+    await source.setGroup(request.params.id, {
+      state: request.body.value ? "ON" : "OFF"
+    });
+    return { ok: true };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+app.post<{
   Body?: { fromId?: unknown; toId?: unknown; bind?: unknown; clusters?: unknown };
 }>("/api/zigbee/bind", async (request, reply) => {
   const fromId = typeof request.body?.fromId === "string" ? request.body.fromId.toLowerCase() : "";
@@ -315,6 +341,20 @@ app.put<{ Params: { id: string }; Body?: { enabled?: unknown } }>(
     }
   }
 );
+app.post<{ Params: { id: string } }>("/api/devices/:id/ota-check", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) {
+    return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  }
+  try {
+    return { ok: true, ota: await source.checkOta(id) };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
 app.put<{
   Params: { id: string };
   Body?: { transition?: unknown; debounce?: unknown; retain?: unknown };
@@ -430,8 +470,12 @@ app.put<{ Body?: { favorites?: unknown } }>("/api/favorites", async (request, re
     const devices = store.getDevices();
     for (const favorite of favorites) {
       const device = devices.find((item) => item.id === favorite.deviceId);
-      const control = device?.controls.find((item) => item.id === favorite.controlId && item.kind === "switch");
-      if (!device || !control) return reply.code(400).send({ ok: false, error: "Favori cihaz veya anahtar bulunamadı." });
+      const control = device?.controls.find((item) =>
+        item.id === favorite.controlId && isHomeFavoriteControlKind(item.kind)
+      );
+      if (!device || !control) {
+        return reply.code(400).send({ ok: false, error: "Favori cihaz veya kontrol bulunamadı." });
+      }
     }
     return { ok: true, favorites: await favoritesStore.save(favorites) };
   } catch (error) {
