@@ -658,3 +658,29 @@ test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellik
   assert.match(dashboard, /<button class="secondary" data-note=/);
   assert.doesNotMatch(dashboard, /data-admin-only data-note=/);
 });
+
+test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla gösterilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="networkMapResults" class="network-graph-host"/);
+  assert.match(dashboard, /function renderNetworkGraph\(map\)/);
+  assert.match(dashboard, /class="network-graph-svg"/);
+  assert.match(dashboard, /class="network-edge \$\{tone\}"/);
+  assert.match(dashboard, /columns\[type==="coordinator"\?0:type==="router"\?1:2\]/);
+  assert.match(dashboard, /networkGraphLead:"Devices are arranged by their role/);
+  assert.match(dashboard, /networkGraphLead:"Cihazlar ağdaki rollerine göre dizilir/);
+  assert.doesNotMatch(dashboard, /class="touchlink-device network-map-link"/);
+
+  assert.match(dashboard, /class="zigbee-group-panel"/);
+  assert.match(dashboard, /class="zigbee-binding-panel"/);
+  assert.match(dashboard, /data-i18n="zigbeeGroupsLead"/);
+  assert.match(dashboard, /data-i18n="directBindingLead"/);
+  assert.match(dashboard, /class="zigbee-group-empty"/);
+  assert.match(dashboard, /groupMembers:"\{count\} devices"/);
+  assert.match(dashboard, /groupMembers:"\{count\} cihaz"/);
+  assert.match(dashboard, /\.setting-field input,\.setting-field select\{/);
+  assert.match(dashboard, /\.zigbee-tool input,\.zigbee-tool select/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});
