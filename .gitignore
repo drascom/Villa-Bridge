@@ -8,6 +8,7 @@ coverage/
 *.settings-backup
 config/home-favorites.json
 config/installation-state.json
+config/auth.json
 backup-*/
 home-assistant-*-test.json
 scripts/test-home-assistant-devices.py
