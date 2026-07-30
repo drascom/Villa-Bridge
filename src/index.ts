@@ -332,7 +332,11 @@ app.put<{
     return reply.code(400).send({ ok: false, error: "Cihaz seçenekleri geçersiz." });
   }
   try {
-    const options = { transition, debounce, retain: retain as boolean | undefined };
+    const options = {
+      ...(transition !== undefined ? { transition } : {}),
+      ...(debounce !== undefined ? { debounce } : {}),
+      ...(retain !== undefined ? { retain } : {})
+    };
     await source.setDeviceOptions(id, options);
     return { ok: true, options };
   } catch (error) {

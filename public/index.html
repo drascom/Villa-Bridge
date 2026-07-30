@@ -497,7 +497,7 @@
     return{icon:"•",label:String(event.value).replaceAll("_"," ")};
   };
   const deviceKind=device=>device.controls.some(control=>control.kind==="cover"||control.kind==="position")?t("coverDevice"):device.controls.some(control=>control.kind==="climate")?t("climateDevice"):device.controls.some(control=>control.kind==="lock")?t("lockDevice"):device.controls.some(control=>control.kind==="fan")?t("fanDevice"):device.controls.some(control=>control.kind==="siren")?t("sirenDevice"):device.controls.some(control=>control.kind==="switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
-  const deviceGlyph=device=>device.controls.some(control=>control.kind==="cover"||control.kind==="position")?"▤":device.controls.some(control=>control.kind==="lock")?"⌑":device.controls.some(control=>control.kind==="fan")?"✣":device.controls.some(control=>control.kind==="siren")?"△":device.controls.some(control=>control.kind==="switch")?"◉":device.features.includes("contact")?"⌑":device.features.some(x=>x==="presence"||x==="occupancy")?"⌁":device.features.includes("smoke")?"△":"•";
+  const deviceGlyph=device=>device.controls.some(control=>control.kind==="cover"||control.kind==="position")?"▤":device.controls.some(control=>control.kind==="climate")?"♨":device.controls.some(control=>control.kind==="lock")?"⌑":device.controls.some(control=>control.kind==="fan")?"✣":device.controls.some(control=>control.kind==="siren")?"△":device.controls.some(control=>control.kind==="switch")?"◉":device.features.includes("contact")?"⌑":device.features.some(x=>x==="presence"||x==="occupancy")?"⌁":device.features.includes("smoke")?"△":"•";
   const deviceIconKind=device=>{
     const features=device.features||[];
     const identity=`${device.name||""} ${device.model||""}`.toLowerCase();
@@ -577,6 +577,40 @@
   };
   const commandValue=value=>esc(JSON.stringify(value));
   const optionValue=(values,pattern,fallback)=>values?.find(value=>pattern.test(String(value).toUpperCase()))??fallback;
+  const dashboardControlKinds=new Set(["switch","fan","siren","cover","position","lock","climate"]);
+  const isDashboardControl=control=>dashboardControlKinds.has(control.kind)&&control.adminOnly!==true;
+  const dashboardControlForDevice=device=>device.controls.find(control=>isDashboardControl(control)&&control.id==="main")
+    ||device.controls.find(control=>isDashboardControl(control)&&["switch","fan","siren","cover","lock"].includes(control.kind))
+    ||device.controls.find(isDashboardControl);
+  const dashboardControlValueForState=(control,active)=>{
+    if(["switch","fan","siren"].includes(control.kind))return active?(control.valueOn??true):(control.valueOff??false);
+    if(control.kind==="cover"){
+      const values=control.values||[];
+      return active?optionValue(values,/OPEN|UP/,"OPEN"):optionValue(values,/CLOSE|DOWN/,"CLOSE");
+    }
+    if(control.kind==="lock"){
+      const values=control.values||[];
+      return active?optionValue(values,/^LOCK(?:ED)?$/,"LOCK"):optionValue(values,/UNLOCK/,"UNLOCK");
+    }
+    return undefined;
+  };
+  const dashboardControlAction=control=>{
+    if(!control)return null;
+    if(["switch","fan","siren"].includes(control.kind)){
+      const active=control.value===true||String(control.value).toUpperCase()===String(control.valueOn??"ON").toUpperCase();
+      return{active,value:dashboardControlValueForState(control,!active)};
+    }
+    if(control.kind==="cover"){
+      const active=/OPEN|OPENING|UP/.test(String(control.value??"").toUpperCase());
+      return{active,value:dashboardControlValueForState(control,!active)};
+    }
+    if(control.kind==="lock"){
+      const active=/^LOCK(?:ED)?$/.test(String(control.value??"").toUpperCase());
+      return{active,value:dashboardControlValueForState(control,!active)};
+    }
+    return null;
+  };
+  const groupPowerControl=control=>["switch","fan","siren","cover"].includes(control.kind);
   const controlHtml=(device,control)=>{
     const adminClass=control.adminOnly?" admin-control":"";
     const adminAttr=control.adminOnly?" data-admin-only":"";
@@ -585,7 +619,7 @@
       const known=typeof control.value==="boolean";
       const valueLabel=control.value===null?t("unknownState"):active?t("on"):t("off");
       const pending=commandPending(device.id,control.property);
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}${control.kind==="switch"&&control.id!=="main"?`<button class="channel-rename" data-admin-only data-rename-channel="${esc(device.id)}" data-channel="${esc(control.id)}">${t("nameChannel")}</button>`:""}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${control.kind==="switch"&&control.id!=="main"?favoriteButton(device,control):""}<button class="switch ${active?"on":""}${pending?" pending":""}" data-command="${esc(device.id)}" data-property="${esc(control.property)}" data-value="${active?"false":"true"}" aria-label="${esc(control.name)} ${pending?t("sendingCommand"):active?t("off"):t("on")}"${pending?" disabled":""}><span></span></button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}${control.kind==="switch"&&control.id!=="main"?`<button class="channel-rename" data-admin-only data-rename-channel="${esc(device.id)}" data-channel="${esc(control.id)}">${t("nameChannel")}</button>`:""}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${isDashboardControl(control)&&dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<button class="switch ${active?"on":""}${pending?" pending":""}" data-command-value="${commandValue(active?(control.valueOff??false):(control.valueOn??true))}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)} ${pending?t("sendingCommand"):active?t("off"):t("on")}"${pending?" disabled":""}><span></span></button></div></div>`;
     }
     if(control.kind==="cover"){
       const values=control.values||[];
@@ -593,14 +627,14 @@
       const stopValue=optionValue(values,/STOP/,"STOP");
       const closeValue=optionValue(values,/CLOSE|DOWN/,"CLOSE");
       const current=String(control.value??"").toUpperCase();
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("cover"))}</div><div class="control-value">${esc(control.value??t("unknownState"))}</div></div><div class="control-icon-actions"><button class="control-command ${current===String(openValue).toUpperCase()?"active":""}" data-command-value="${commandValue(openValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("open")}" title="${t("open")}">↑</button><button class="control-command stop" data-command-value="${commandValue(stopValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("stop")}" title="${t("stop")}">■</button><button class="control-command close-action ${current===String(closeValue).toUpperCase()?"active":""}" data-command-value="${commandValue(closeValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("close")}" title="${t("close")}">↓</button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("cover"))}</div><div class="control-value">${esc(control.value??t("unknownState"))}</div></div><div class="control-icon-actions">${dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<button class="control-command ${current===String(openValue).toUpperCase()?"active":""}" data-command-value="${commandValue(openValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("open")}" title="${t("open")}">↑</button><button class="control-command stop" data-command-value="${commandValue(stopValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("stop")}" title="${t("stop")}">■</button><button class="control-command close-action ${current===String(closeValue).toUpperCase()?"active":""}" data-command-value="${commandValue(closeValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("close")}" title="${t("close")}">↓</button></div></div>`;
     }
     if(control.kind==="lock"){
       const values=control.values||[];
       const lockValue=optionValue(values,/^LOCK(?:ED)?$/,"LOCK");
       const unlockValue=optionValue(values,/UNLOCK/,"UNLOCK");
       const locked=/^LOCK(?:ED)?$/.test(String(control.value??"").toUpperCase());
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("lockDevice"))}</div><div class="control-value">${locked?t("lock"):t("unlock")}</div></div><div class="control-icon-actions"><button class="control-command ${locked?"active":""}" data-command-value="${commandValue(lockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("lock")}" title="${t("lock")}">▣</button><button class="control-command ${!locked?"active":""}" data-command-value="${commandValue(unlockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("unlock")}" title="${t("unlock")}">□</button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("lockDevice"))}</div><div class="control-value">${locked?t("lock"):t("unlock")}</div></div><div class="control-icon-actions">${dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<button class="control-command ${locked?"active":""}" data-command-value="${commandValue(lockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("lock")}" title="${t("lock")}">▣</button><button class="control-command ${!locked?"active":""}" data-command-value="${commandValue(unlockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("unlock")}" title="${t("unlock")}">□</button></div></div>`;
     }
     if(control.kind==="select"){
       return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}</div>${control.adminOnly?`<div class="control-value">${t("deviceSetting")}</div>`:""}</div><select class="control-select" data-select="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)}">${(control.values||[]).map(value=>`<option value="${esc(value)}"${String(value)===String(control.value)?" selected":""}>${esc(String(value).replaceAll("_"," "))}</option>`).join("")}</select></div>`;
@@ -608,11 +642,11 @@
     if(control.kind==="color")return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${t("color")}</div><div class="control-value">${esc(control.value)}</div></div><input type="color" value="${esc(control.value||"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("color")}"></div>`;
     const known=typeof control.value==="number";
     const label=control.kind==="position"?t("position"):control.kind==="climate"?t("targetTemperature"):control.name;
-    return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(label)}</div><div class="control-value">${known?esc(control.value):t("unknownState")}${control.unit?`<span class="control-unit">${esc(control.unit)}</span>`:""}</div></div><input type="range" min="${control.min??0}" max="${control.max??100}" step="${control.step??1}" value="${known?control.value:control.min??0}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(label)}"></div>`;
+    return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(label)}</div><div class="control-value">${known?esc(control.value):t("unknownState")}${control.unit?`<span class="control-unit">${esc(control.unit)}</span>`:""}</div></div><div class="control-actions">${isDashboardControl(control)&&dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<input type="range" min="${control.min??0}" max="${control.max??100}" step="${control.step??1}" value="${known?control.value:control.min??0}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(label)}"></div></div>`;
   };
   const deviceCardHtml=device=>{
     const deviceFacts=facts(device);
-    const mainControl=device.controls.find(control=>control.kind==="switch"&&control.id==="main")||device.controls.find(control=>control.kind==="switch");
+    const mainControl=dashboardControlForDevice(device);
     const updateState=device.state.update&&typeof device.state.update==="object"?device.state.update:{};
     const updateRunning=updateState.state==="updating";
     const updateScheduled=updateState.state==="scheduled";
@@ -629,17 +663,22 @@
     </details>`;
   };
   const quickDeviceHtml=(device,selectedControl=null)=>{
-    const control=selectedControl||device.controls.find(item=>item.kind==="switch"&&item.id==="main")||device.controls.find(item=>item.kind==="switch");
+    const control=selectedControl||dashboardControlForDevice(device);
     if(!control)return"";
     const mainControl=control.id==="main";
     const displayName=mainControl?device.name:control.name;
     const availability=device.availability==="online"?t("ready"):device.availability==="offline"?t("unreachable"):t("standby");
-    const visualState=device.availability==="offline"?"offline":control.value===true?"on":"off";
-    const pending=commandPending(device.id,control.property);
+    const action=dashboardControlAction(control);
+    const visualState=device.availability==="offline"?"offline":action?.active?"on":"off";
+    const pending=Boolean(action&&commandPending(device.id,control.property));
     const battery=typeof device.state.battery==="number"?Math.round(Math.max(0,Math.min(100,device.state.battery))):null;
     const batteryPill=battery===null?"":`<span class="quick-battery${battery<15?" low":""}" aria-label="${t("battery")} ${battery}%"><span class="battery-glyph" aria-hidden="true"><i style="width:${battery}%"></i></span>${battery}%</span>`;
+    const actionAttributes=action
+      ?`data-command-value="${commandValue(action.value)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}"`
+      :`data-quick-show="${esc(device.id)}"`;
+    const actionLabel=action?(action.active?t("off"):t("on")):t("showInDevices");
     return`<article class="device-card quick-card ${visualState}" data-name="${esc(displayName.toLowerCase())}" data-quick-controls="${esc(device.id)}">
-      <button class="quick-toggle ${control.value===true?"on":""}${pending?" pending":""}" data-command="${esc(device.id)}" data-property="${esc(control.property)}" data-value="${control.value===true?"false":"true"}" aria-label="${esc(displayName)} ${pending?t("sendingCommand"):device.availability==="offline"?availability:control.value===true?t("off"):t("on")}"${device.availability==="offline"||pending?" disabled":""}><span class="quick-device-icon" aria-hidden="true">${deviceTypeIcon(device)}</span><span class="device-name">${esc(displayName)}</span>${pending?'<span class="command-spinner" aria-hidden="true"></span>':batteryPill}</button>
+      <button class="quick-toggle ${action?.active?"on":""}${pending?" pending":""}" ${actionAttributes} aria-label="${esc(displayName)} ${pending?t("sendingCommand"):device.availability==="offline"?availability:actionLabel}"${(device.availability==="offline"&&Boolean(action))||pending?" disabled":""}><span class="quick-device-icon" aria-hidden="true">${deviceTypeIcon(device)}</span><span class="device-name">${esc(displayName)}</span>${pending?'<span class="command-spinner" aria-hidden="true"></span>':batteryPill}</button>
     </article>`;
   };
   function bindDeviceImages(){
@@ -767,16 +806,16 @@
       if(details.open)state.openDevices.add(details.dataset.deviceCard);
       else state.openDevices.delete(details.dataset.deviceCard);
     });
-    $$("[data-command]").forEach(button=>button.onclick=()=>command(button.dataset.command,button.dataset.property,button.dataset.value==="true"));
     $$("[data-command-value]").forEach(button=>button.onclick=()=>command(button.dataset.device,button.dataset.property,JSON.parse(button.dataset.commandValue)));
+    $$("[data-quick-show]").forEach(button=>button.onclick=()=>showDevice(button.dataset.quickShow));
     $$("[data-level]").forEach(input=>input.onchange=()=>command(input.dataset.level,input.dataset.property,Number(input.value)));
     $$("[data-select]").forEach(input=>input.onchange=()=>command(input.dataset.select,input.dataset.property,input.value));
     $$("[data-color]").forEach(input=>input.onchange=()=>command(input.dataset.color,input.dataset.property,input.value));
     $$("[data-quick-controls]").forEach(card=>{
       const toggle=()=>{
-        const button=card.querySelector("[data-command]");
+        const button=card.querySelector("[data-command-value],[data-quick-show]");
         if(!button||button.disabled)return;
-        command(button.dataset.command,button.dataset.property,button.dataset.value==="true");
+        button.click();
       };
       card.onclick=event=>{if(!event.target.closest("button,input"))toggle()};
       card.onkeydown=event=>{if((event.key==="Enter"||event.key===" ")&&!event.target.closest("button,input")){event.preventDefault();toggle()}};
@@ -858,18 +897,18 @@
       const presentation=eventPresentation(event);
       return`<div class="widget-list-row"><strong>${esc(device?.name||event.sourceName)}</strong><span>${presentation.icon} ${esc(presentation.label)} · ${ago(event.at)}</span></div>`;
     }).join(""):`<div class="device-meta">${t("noActivity")}</div>`;
-    const controllable=devices.filter(device=>device.controls.some(control=>control.kind==="switch"));
+    const controllable=devices.filter(device=>Boolean(dashboardControlForDevice(device)));
     if(!state.quickOrder&&controllable.length)state.quickOrder=[...controllable].sort((a,b)=>(state.usage[b.id]||0)-(state.usage[a.id]||0)).map(device=>device.id);
     const orderedIds=[...(state.quickOrder||[]),...controllable.map(device=>device.id).filter(id=>!state.quickOrder?.includes(id))];
     const quick=[];
     for(const favorite of state.favorites){
       const device=controllable.find(item=>item.id===favorite.deviceId);
-      const control=device?.controls.find(item=>item.id===favorite.controlId&&item.kind==="switch");
+      const control=device?.controls.find(item=>item.id===favorite.controlId&&isDashboardControl(item));
       if(device&&control)quick.push({device,control});
     }
     for(const id of orderedIds){
       const device=controllable.find(item=>item.id===id);
-      const control=device?.controls.find(item=>item.kind==="switch"&&item.id==="main")||device?.controls.find(item=>item.kind==="switch");
+      const control=device?dashboardControlForDevice(device):null;
       if(!device||!control||quick.some(item=>item.device.id===device.id&&item.control.id===control.id))continue;
       if(quick.length>=Math.max(8,state.favorites.length))break;
       quick.push({device,control});
@@ -900,7 +939,7 @@
     return group.items.map(item=>{
       const device=state.devices.find(candidate=>candidate.id===item.deviceId);
       if(device&&item.controlId===groupDeviceControlId)return{device,control:null};
-      const control=device?.controls.find(candidate=>candidate.id===item.controlId&&candidate.kind==="switch");
+      const control=device?.controls.find(candidate=>candidate.id===item.controlId&&isDashboardControl(candidate));
       return device&&control?{device,control}:null;
     }).filter(Boolean);
   }
@@ -914,16 +953,17 @@
   const groupEditIcon=()=>'<svg class="group-action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>';
   function groupWidgetHtml(group){
     const entries=groupControlEntries(group);
-    const anyOn=entries.some(({device,control})=>control?.value===true||["active","alert"].includes(groupDeviceVisualState(device)));
-    const available=entries.filter(({device,control})=>control&&device.availability!=="offline");
-    const allOn=available.length>0&&available.every(({control})=>control.value===true);
+    const anyOn=entries.some(({device,control})=>dashboardControlAction(control)?.active===true||["active","alert"].includes(groupDeviceVisualState(device)));
+    const available=entries.filter(({device,control})=>control&&groupPowerControl(control)&&device.availability!=="offline");
+    const allOn=available.length>0&&available.every(({control})=>dashboardControlAction(control)?.active===true);
     const controls=entries.map(({device,control})=>{
       const name=control?(control.id==="main"?device.name:control.name):device.name;
-      const visualState=control?(device.availability==="offline"?"offline":control.value===true?"on":"off"):groupDeviceVisualState(device);
-      const pending=Boolean(control&&commandPending(device.id,control.property));
-      const action=control?`data-group-device="${esc(device.id)}" data-group-property="${esc(control.property)}" data-group-value="${control.value===true?"false":"true"}"`:`data-group-show-device="${esc(device.id)}"`;
-      const label=control?`${name} ${pending?t("sendingCommand"):control.value===true?t("off"):t("on")}`:`${t("showInDevices")}: ${name}`;
-      return`<button class="group-control-tile ${visualState}${pending?" pending":""}" type="button" ${action} aria-label="${esc(label)}"${(device.availability==="offline"&&control)||pending?" disabled":""}><div class="group-control-visual" aria-hidden="true">${deviceVisual(device)}</div><strong>${esc(name)}</strong>${pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</button>`;
+      const controlAction=dashboardControlAction(control);
+      const visualState=control?(device.availability==="offline"?"offline":controlAction?.active?"on":"off"):groupDeviceVisualState(device);
+      const pending=Boolean(controlAction&&commandPending(device.id,control.property));
+      const action=controlAction?`data-group-device="${esc(device.id)}" data-group-property="${esc(control.property)}" data-group-command-value="${commandValue(controlAction.value)}"`:`data-group-show-device="${esc(device.id)}"`;
+      const label=controlAction?`${name} ${pending?t("sendingCommand"):controlAction.active?t("off"):t("on")}`:`${t("showInDevices")}: ${name}`;
+      return`<button class="group-control-tile ${visualState}${pending?" pending":""}" type="button" ${action} aria-label="${esc(label)}"${(device.availability==="offline"&&Boolean(controlAction))||pending?" disabled":""}><div class="group-control-visual" aria-hidden="true">${deviceVisual(device)}</div><strong>${esc(name)}</strong>${pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</button>`;
     }).join("");
     const widgetId=groupWidgetId(group.id);
     const groupPending=state.pendingGroups.has(group.id);
@@ -1313,7 +1353,7 @@
   }
   function bindGroupControls(){
     bindDeviceImages();
-    $$("[data-group-device]").forEach(button=>button.onclick=()=>command(button.dataset.groupDevice,button.dataset.groupProperty,button.dataset.groupValue==="true"));
+    $$("[data-group-device]").forEach(button=>button.onclick=()=>command(button.dataset.groupDevice,button.dataset.groupProperty,JSON.parse(button.dataset.groupCommandValue)));
     $$("[data-group-show-device]").forEach(button=>button.onclick=()=>showDevice(button.dataset.groupShowDevice));
     $$("[data-group-power]").forEach(button=>button.onclick=()=>commandDashboardGroup(button.dataset.groupPower));
     $$("[data-edit-group]").forEach(button=>button.onclick=()=>openGroupEditor(button.dataset.editGroup));
@@ -1322,15 +1362,18 @@
   async function commandDashboardGroup(groupId){
     const group=state.groups.find(candidate=>candidate.id===groupId);
     if(!group||state.pendingGroups.has(groupId))return;
-    const entries=groupControlEntries(group).filter(({device,control})=>control&&device.availability!=="offline");
+    const entries=groupControlEntries(group).filter(({device,control})=>control&&groupPowerControl(control)&&device.availability!=="offline");
     if(!entries.length)return;
-    const value=!entries.every(({control})=>control.value===true);
+    const activate=!entries.every(({control})=>dashboardControlAction(control)?.active===true);
     state.pendingGroups.add(groupId);
     for(const {device,control} of entries)state.pendingCommands.add(commandKey(device.id,control.property));
     render();
     try{
-      await Promise.all(entries.map(({device,control})=>api(`/api/devices/${encodeURIComponent(device.id)}/command`,{method:"POST",body:JSON.stringify({property:control.property,value})})));
-      for(const {control} of entries)control.value=value;
+      await Promise.all(entries.map(({device,control})=>{
+        const value=dashboardControlValueForState(control,activate);
+        return api(`/api/devices/${encodeURIComponent(device.id)}/command`,{method:"POST",body:JSON.stringify({property:control.property,value})});
+      }));
+      for(const {control} of entries)control.value=dashboardControlValueForState(control,activate);
     }catch(error){showToast(error.message,true)}
     finally{
       state.pendingGroups.delete(groupId);
@@ -1343,7 +1386,7 @@
     const editing=state.groupEditing;
     if(!editing)return;
     const choices=state.devices.flatMap(device=>{
-      const controls=device.controls.filter(control=>control.kind==="switch");
+      const controls=device.controls.filter(isDashboardControl);
       return controls.length?controls.map(control=>({device,control})):[{device,control:null}];
     });
     $("#groupDeviceChoices").innerHTML=choices.length?choices.map(({device,control})=>{
@@ -1351,7 +1394,7 @@
       const checked=editing.selected.has(key);
       const name=control?(control.id==="main"?device.name:control.name):device.name;
       const detail=control?(control.id==="main"?deviceKind(device):device.name):deviceKind(device);
-      const visualState=control?(device.availability==="offline"?"offline":control.value===true?"on":"off"):groupDeviceVisualState(device);
+      const visualState=control?(device.availability==="offline"?"offline":dashboardControlAction(control)?.active?"on":"off"):groupDeviceVisualState(device);
       return`<label class="group-device-choice"><input type="checkbox" data-group-choice="${esc(key)}"${checked?" checked":""}><span class="group-choice-state ${visualState}" aria-hidden="true"></span><span><strong>${esc(name)}</strong><small>${esc(detail)}</small></span></label>`;
     }).join(""):`<div class="group-empty">${t("groupNoAvailableControls")}</div>`;
     $$("[data-group-choice]").forEach(input=>input.onchange=()=>{

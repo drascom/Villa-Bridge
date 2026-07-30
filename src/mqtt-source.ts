@@ -4,6 +4,11 @@ import { DeviceStore } from "./device-store.js";
 import type { PreparedNetworkBackup, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
 
+export function z2mGroupIdentifier(id: string): string {
+  const match = /^group-(\d+)$/.exec(id);
+  return match?.[1] ?? id;
+}
+
 export class MqttShadowSource implements ZigbeeSource {
   private client: MqttClient | null = null;
   private transaction = 0;
@@ -89,27 +94,27 @@ export class MqttShadowSource implements ZigbeeSource {
 
   async renameGroup(id: string, name: string): Promise<void> {
     await this.request("group/rename", {
-      from: id,
+      from: z2mGroupIdentifier(id),
       to: name,
       homeassistant_rename: true
     });
   }
 
   async removeGroup(id: string, force = false): Promise<void> {
-    await this.request("group/remove", { id, force });
+    await this.request("group/remove", { id: z2mGroupIdentifier(id), force });
   }
 
   async setGroupMember(id: string, deviceId: string, add: boolean, endpoint?: number): Promise<void> {
     await this.request(
       `group/members/${add ? "add" : "remove"}`,
-      { group: id, device: deviceId, ...(endpoint ? { endpoint } : {}) }
+      { group: z2mGroupIdentifier(id), device: deviceId, ...(endpoint ? { endpoint } : {}) }
     );
   }
 
   async bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void> {
     await this.request(`device/${bind ? "bind" : "unbind"}`, {
       from: fromId,
-      to: toId,
+      to: z2mGroupIdentifier(toId),
       ...(clusters?.length ? { clusters } : {})
     });
   }

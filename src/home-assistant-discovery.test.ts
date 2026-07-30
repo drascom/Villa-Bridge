@@ -107,3 +107,31 @@ test("Home Assistant perde, iklim, kilit, fan, siren ve ayar bileşenlerini yay�
   assert.equal(select?.payload.entity_category, "config");
   assert.deepEqual(select?.payload.options, ["quiet", "normal"]);
 });
+
+test("yalnız pozisyon bildiren perde var olmayan state alanını yayınlamaz", () => {
+  const device: DeviceView = {
+    ...light,
+    id: "0xposition-only",
+    sourceName: "Position Blind",
+    name: "Position Blind",
+    features: ["position"],
+    controls: [{
+      id: "cover:position",
+      property: "position",
+      name: "Position",
+      kind: "position",
+      value: 35,
+      min: 0,
+      max: 100
+    }],
+    state: { position: 35 }
+  };
+  const cover = buildHomeAssistantDiscovery([device], "zigbee2mqtt")
+    .find((item) => item.topic.startsWith("homeassistant/cover/"));
+
+  assert.equal(cover?.payload.state_topic, undefined);
+  assert.equal(cover?.payload.value_template, undefined);
+  assert.equal(cover?.payload.command_topic, undefined);
+  assert.equal(cover?.payload.position_template, "{{ value_json.position }}");
+  assert.equal(cover?.payload.set_position_topic, "zigbee2mqtt/Position Blind/set");
+});
