@@ -279,7 +279,9 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /if\(localComplete&&!installationOnboardingComplete\)/);
   assert.match(dashboard, /await markOnboardingComplete\(\)/);
   assert.match(dashboard, /if\(!onboardingComplete\(\)\)openOnboarding\(\)/);
-  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\),loadInstallationOnboarding\(\)\]\)/);
+  assert.match(dashboard, /const startup=\[refresh\(\),loadFavorites\(\),loadInstallationOnboarding\(\)\]/);
+  assert.match(dashboard, /if\(state\.auth\.user\?\.role==="admin"\)startup\.push\(loadSettings\(\)\)/);
+  assert.match(dashboard, /await Promise\.allSettled\(startup\)/);
   assert.match(dashboard, /data-onboarding-language="en"/);
   assert.match(dashboard, /onboardingZigbeeUrl/);
   assert.match(dashboard, /onboardingMqttUrl/);
@@ -299,6 +301,25 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /\.onboarding-actions\.final\{justify-content:flex-end\}/);
   assert.match(dashboard, /id="restartOnboarding"/);
   assert.match(dashboard, /id="restartDashboardTour"/);
+});
+
+test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetki ayrımı sunar", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="authSetupDialog"/);
+  assert.match(dashboard, /id="authLoginDialog"/);
+  assert.match(dashboard, /id="authSetupPassword" type="password" minlength="12"/);
+  assert.match(dashboard, /id="authSetupPin" type="password" inputmode="numeric" pattern="\[0-9\]\{6\}"/);
+  assert.match(dashboard, /api\("\/api\/auth\/session"\)/);
+  assert.match(dashboard, /api\("\/api\/auth\/setup",\{method:"POST"/);
+  assert.match(dashboard, /api\("\/api\/auth\/login",\{method:"POST"/);
+  assert.match(dashboard, /api\("\/api\/auth\/logout",\{method:"POST"/);
+  assert.match(dashboard, /"x-villa-csrf":state\.auth\.csrfToken/);
+  assert.match(dashboard, /body\.resident-session \[data-admin-only\]\{display:none!important\}/);
+  assert.match(dashboard, /data-view="connections" data-admin-only/);
+  assert.match(dashboard, /data-view="settings" data-admin-only/);
+  assert.match(dashboard, /data-admin-only data-remove=/);
+  assert.match(dashboard, /if\(!state\.auth\.authenticated\)\{openAuthGate\(\);return\}/);
 });
 
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
@@ -351,8 +372,8 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /document\.body\.dataset\.activeView=viewName/);
   assert.match(dashboard, /body\.android-app dialog::backdrop\{backdrop-filter:none\}/);
   assert.match(dashboard, /signature!==state\.overviewSignature/);
-  assert.match(dashboard, /if\(!document\.hidden\)refresh\(\)/);
-  assert.match(dashboard, /setInterval\(\(\)=>\{if\(!document\.hidden\)refresh\(\)\},8000\)/);
+  assert.match(dashboard, /if\(!document\.hidden&&state\.auth\.authenticated\)refresh\(\)/);
+  assert.match(dashboard, /setInterval\(\(\)=>\{if\(!document\.hidden&&state\.auth\.authenticated\)refresh\(\)\},8000\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
@@ -372,7 +393,7 @@ test("Settings debug modu son API hatalarını güvenli ve isteğe bağlı göst
   assert.match(dashboard, /debugMode:"Debug mode"/);
   assert.match(dashboard, /debugMode:"Debug modu"/);
   assert.match(dashboard, /debugLogPanel"\)\.hidden=!enabled/);
-  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\),loadInstallationOnboarding\(\)\]\)/);
+  assert.match(dashboard, /if\(state\.auth\.user\?\.role==="admin"\)startup\.push\(loadSettings\(\)\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));

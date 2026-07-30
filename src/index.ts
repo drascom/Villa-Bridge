@@ -2,7 +2,9 @@ import Fastify from "fastify";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerAccessControl } from "./access-control.js";
 import { loadAliases, saveAliases } from "./aliases.js";
+import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { hexToXy } from "./device-controls.js";
 import { DeviceImagesStore } from "./device-images.js";
@@ -30,6 +32,7 @@ const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home
 const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
 );
+const authStore = new AuthStore(resolve(dirname(configPath), "auth.json"));
 const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
   config.zigbee.configurationFile,
@@ -58,6 +61,9 @@ if (config.mode === "direct") {
   source = new MqttShadowSource(config.mqtt, store);
 }
 const app = Fastify({ logger: true });
+await registerAccessControl(app, authStore, {
+  secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true"
+});
 registerRecentErrorApi(app, recentErrors);
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
