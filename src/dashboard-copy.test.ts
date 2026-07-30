@@ -398,6 +398,9 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /data-widget="recent"/);
   assert.match(dashboard, /data-widget="clock"[\s\S]*id="worldClockRows"/);
   assert.match(dashboard, /data-widget="weather"[\s\S]*id="weatherContent"/);
+  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","clock","weather","recent"\]/);
+  assert.match(dashboard, /if\(!Array\.isArray\(value\)\)return\[\.\.\.defaultDashboardWidgets\]/);
+  assert.match(dashboard, /catch\{return\[\.\.\.defaultDashboardWidgets\]\}/);
   assert.doesNotMatch(dashboard, /data-widget="signal"/);
   assert.match(dashboard, /class="home-title-line"[\s\S]*id="homeGreeting"[\s\S]*class="home-metrics"/);
   assert.match(dashboard, /\.home-title-line\{[^}]*grid-template-columns:1fr auto 1fr[^}]*align-items:baseline/);
