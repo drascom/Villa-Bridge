@@ -279,6 +279,7 @@
     clock:{title:"worldClock",lead:"worldClockLead"},
     weather:{title:"weather",lead:"weatherLead"}
   };
+  const defaultDashboardWidgets=["quick","clock","weather","recent"];
   const fixedDashboardWidgets=new Set(["quick"]);
   const savedGroups=(()=>{try{
     const value=JSON.parse(localStorage.getItem("villa-dashboard-groups")||"[]");
@@ -291,9 +292,9 @@
   }catch{return[]}})();
   const savedWidgets=(()=>{try{
     const value=JSON.parse(localStorage.getItem("villa-dashboard-widgets")||"null");
-    if(!Array.isArray(value))return["quick"];
+    if(!Array.isArray(value))return[...defaultDashboardWidgets];
     return[...new Set(value.filter(id=>Object.hasOwn(dashboardWidgetTypes,id)||savedGroups.some(group=>groupWidgetId(group.id)===id)))];
-  }catch{return["quick"]}})();
+  }catch{return[...defaultDashboardWidgets]}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
   const state={devices:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],favorites:[],editing:null,imageEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,onboardingStep:0,onboardingDraft:null,coach:null,imageFormats:{},openDevices:new Set(),pendingCommands:new Set(),pendingGroups:new Set(),usage:savedUsage,quickOrder:null,deviceLayout:savedDeviceLayout==="list"?"list":"grid",widgets:savedWidgets,groups:savedGroups,dashboardEditing:false,language:savedLanguage||"en",themeMode:savedThemeMode};
   const weatherState={location:savedWeatherLocation,data:null,error:null,loading:false,updatedAt:0};
