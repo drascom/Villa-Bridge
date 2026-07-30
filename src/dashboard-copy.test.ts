@@ -473,7 +473,10 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.quick-toggle\{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:26px minmax\(0,1fr\) auto/);
   assert.match(dashboard, /<button class="quick-toggle \$\{control\.value===true\?"on":""\}\$\{pending\?" pending":""\}" data-command="[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
   assert.match(dashboard, /\.quick-grid\.grid-view\{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto/);
-  assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:144px;flex:0 0 144px;aspect-ratio:auto;scroll-snap-align:start\}/);
+  assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start\}/);
+  assert.match(dashboard, /\.quick-grid \.device-name\{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:11px\}/);
+  assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex-basis:auto\}/);
+  assert.doesNotMatch(dashboard, /\.quick-grid \.device-name\{[^}]*text-overflow:ellipsis/);
   assert.match(dashboard, /body\[data-active-view="home"\]\{overflow:hidden\}/);
   assert.match(dashboard, /id="widgetRail" class="widget-rail"/);
   assert.match(dashboard, /#home \.widget-board\{height:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:10px;overflow:hidden\}/);
@@ -485,7 +488,6 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const rail=\$\("#widgetRail"\)/);
   assert.match(dashboard, /rail\.insertBefore\(widget,\$\("#widgetEmpty"\)\)/);
   assert.match(dashboard, /\$\$\("#widgetRail \[data-widget\]"\)/);
-  assert.match(dashboard, /@media\(max-width:560px\)\{[\s\S]*\.quick-grid\.grid-view \.quick-card\{width:144px\}/);
   assert.match(dashboard, /\.group-widget\{grid-column:span 6;padding:22px/);
   assert.match(dashboard, /\.group-control-tile\{[^}]*min-height:100px[^}]*grid-template-columns:56px/);
   assert.match(dashboard, /class="group-control-visual" aria-hidden="true">\$\{deviceVisual\(device\)\}/);
