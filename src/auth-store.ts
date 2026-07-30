@@ -99,11 +99,11 @@ const commonPins = new Set([
 
 export const validateAdminPassword = (value: unknown): string => {
   if (typeof value !== "string") {
-    throw new Error("Yönetici parolası 12–128 karakter olmalıdır.");
+    throw new Error("Yönetici parolası 8–128 karakter olmalıdır.");
   }
   const normalized = value.normalize("NFC");
-  if (normalized.length < 12 || normalized.length > 128) {
-    throw new Error("Yönetici parolası 12–128 karakter olmalıdır.");
+  if (normalized.length < 8 || normalized.length > 128) {
+    throw new Error("Yönetici parolası 8–128 karakter olmalıdır.");
   }
   return normalized;
 };
