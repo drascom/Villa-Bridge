@@ -126,7 +126,10 @@
     @media(max-width:900px){.shell{grid-template-columns:minmax(0,1fr)}aside{left:0;right:0;width:auto}main,.view,.page-head,.home-heading,.widget-board,.widget-rail{min-width:0}#home .page-head{display:block;margin-bottom:18px}#home .home-title-line{display:flex;align-items:baseline;justify-content:space-between;gap:14px}#home .home-title-line::after{display:none}#home .home-title-line h1{width:auto;flex:none}#home .home-metrics{width:auto;justify-content:flex-end}#home .home-actions{justify-content:flex-start;margin-top:14px}#home .group-control-grid{grid-template-columns:1fr}}
     @media(orientation:portrait){.topbar{justify-content:flex-end}.theme-switch,.language-switch{display:none}.mobile-topbar-actions{display:flex;align-items:center;gap:4px}#home .home-actions{display:flex;justify-content:flex-end;gap:4px}#home .home-actions button,body[data-active-view="home"] #home .home-actions button,#devices .page-head>.add-device,#refreshButton{width:46px;height:46px;flex:none;padding:0;border-radius:50%;color:var(--ink);background:transparent;box-shadow:none}#home .home-actions button:hover,#home .home-actions button:focus-visible,#devices .page-head>.add-device:hover,#devices .page-head>.add-device:focus-visible,#refreshButton:hover,#refreshButton:focus-visible{color:var(--forest);background:transparent;outline:2px solid var(--forest-soft);outline-offset:1px}#home #editDashboard.secondary{color:var(--forest)}#home .home-action-glyph,#devices .page-action-glyph{display:block}#home .home-action-label,#devices .page-action-label{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}#devices .page-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px}#devices .page-head>.add-device{margin-top:32px}#refreshButton{display:grid}}
     @media(orientation:portrait) and (max-width:560px){main{padding:12px 14px 96px}.topbar{margin-bottom:14px}.page-head{margin-bottom:22px}#home .home-title-line{align-items:flex-start;justify-content:flex-start;flex-wrap:wrap;gap:8px}#home .home-title-line h1{width:100%;text-align:left}#home .home-metrics{width:100%;justify-content:flex-start}.toolbar-actions{justify-content:flex-end}.connection-card,.ha-setup-details,.setting-card{padding:18px}.connection-card>.primary,.ha-connect-button,.ha-actions button,.ha-guide-actions button{width:100%;min-width:0}.ha-value{align-items:flex-start;flex-direction:column}.ha-value code{text-align:left}.runtime-card{align-items:stretch;flex-direction:column}.runtime-card button{width:100%}.group-control-tile{grid-template-columns:48px minmax(0,1fr) auto;padding:12px}.group-control-visual,.group-control-visual .device-visual{width:46px;height:46px}}
+    body[data-active-view="home"] #home [data-widget="recent"] .widget-list-row{background:transparent;box-shadow:none}
     .quick-grid.grid-view .quick-card{width:max-content;min-width:144px;flex-basis:auto}
+    #quickDevices{cursor:grab}#quickDevices.mouse-dragging,#quickDevices.mouse-dragging *{cursor:grabbing!important}
+    #home #editDashboard.editing-active{color:#fff!important;background:#16a765!important;box-shadow:0 0 0 3px rgba(43,214,137,.32),0 8px 22px rgba(10,112,68,.34)!important}
   </style>
 </head>
 <body>
@@ -495,6 +498,55 @@
       event.preventDefault();
       event.stopImmediatePropagation();
     },true);
+  }
+  function setupQuickMouseScrolling(){
+    const scroller=$("#quickDevices");
+    if(!scroller||scroller.dataset.mouseDragBound==="true")return;
+    scroller.dataset.mouseDragBound="true";
+    let pointerId=null,startX=0,startScrollLeft=0,dragged=false,startCard=null;
+    const reset=()=>{
+      pointerId=null;
+      startCard=null;
+      dragged=false;
+      scroller.classList.remove("mouse-dragging");
+    };
+    scroller.addEventListener("pointerdown",event=>{
+      if(event.pointerType!=="mouse"||event.button!==0)return;
+      pointerId=event.pointerId;
+      startX=event.clientX;
+      startScrollLeft=scroller.scrollLeft;
+      dragged=false;
+      startCard=event.target.closest("[data-quick-controls]");
+    });
+    window.addEventListener("pointermove",event=>{
+      if(pointerId===null||event.pointerId!==pointerId)return;
+      const distance=event.clientX-startX;
+      if(!dragged&&Math.abs(distance)>6){
+        dragged=true;
+        startCard?.dispatchEvent(new Event("pointercancel"));
+        scroller.classList.add("mouse-dragging");
+      }
+      if(!dragged)return;
+      event.preventDefault();
+      scroller.scrollLeft=startScrollLeft-distance;
+    },{passive:false});
+    const finish=event=>{
+      if(pointerId===null||event.pointerId!==pointerId)return;
+      const suppressClick=dragged;
+      reset();
+      if(!suppressClick)return;
+      scroller.dataset.suppressMouseClick="true";
+      setTimeout(()=>delete scroller.dataset.suppressMouseClick,0);
+    };
+    window.addEventListener("pointerup",finish);
+    window.addEventListener("pointercancel",finish);
+    scroller.addEventListener("click",event=>{
+      if(scroller.dataset.suppressMouseClick!=="true")return;
+      delete scroller.dataset.suppressMouseClick;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },true);
+    scroller.addEventListener("dragstart",event=>event.preventDefault());
   }
   function openDeviceActions(deviceId){
     const device=state.devices.find(item=>item.id===deviceId);
@@ -932,6 +984,7 @@
     editDashboard.title=editDashboardText;
     editDashboard.classList.toggle("secondary",state.dashboardEditing);
     editDashboard.classList.toggle("quiet",!state.dashboardEditing);
+    editDashboard.classList.toggle("editing-active",state.dashboardEditing);
     $$("[data-widget-move]").forEach(button=>{
       const widgetId=button.closest("[data-widget]")?.dataset.widget;
       const movable=state.widgets.filter(id=>!fixedDashboardWidgets.has(id));
@@ -2044,7 +2097,7 @@
     document.body.dataset.activeView="home";
     try{await loadLanguages()}
     catch(error){showToast(error.message,true)}
-    setupPullToRefresh();configureAndroidActions();bindWidgetControls();applyWidgetLayout();
+    setupPullToRefresh();setupQuickMouseScrolling();configureAndroidActions();bindWidgetControls();applyWidgetLayout();
     if(Object.keys(translations).length)applyLanguage();
     await Promise.allSettled([refresh(),loadFavorites(),loadSettings()]);
     if(!onboardingComplete())openOnboarding();
