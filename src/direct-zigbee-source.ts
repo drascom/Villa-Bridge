@@ -49,6 +49,21 @@ export function zigbeeAvailabilityState(
   return typeof lastSeen === "number" && now - lastSeen <= timeout ? "online" : "offline";
 }
 
+export interface DeviceStatePublication {
+  payload: string;
+  at: number;
+}
+
+export function shouldPublishDeviceState(
+  previous: DeviceStatePublication | undefined,
+  payload: string,
+  debounceSeconds: number,
+  now = Date.now()
+): boolean {
+  if (!previous || previous.payload !== payload) return true;
+  return debounceSeconds <= 0 || now - previous.at >= debounceSeconds * 1_000;
+}
+
 export interface RemovableZigbeeDevice {
   removeFromNetwork(): Promise<void>;
   removeFromDatabase(): void;
@@ -103,6 +118,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private statePersistTimer: NodeJS.Timeout | null = null;
   private availabilityTimer: NodeJS.Timeout | null = null;
   private readonly deviceAvailability = new Map<string, "online" | "offline">();
+  private readonly lastDevicePublications = new Map<string, DeviceStatePublication>();
 
   constructor(
     private readonly config: DirectZigbeeConfig,
@@ -314,13 +330,16 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const path = this.config.configurationFile;
     if (!path) throw new Error("Zigbee yapılandırma dosyası tanımlı değil.");
     const document = YAML.parseDocument(await readFile(path, "utf8"));
-    for (const [key, value] of Object.entries(options)) {
+    const definedOptions = Object.fromEntries(
+      Object.entries(options).filter((entry): entry is [string, number | boolean] => entry[1] !== undefined)
+    );
+    for (const [key, value] of Object.entries(definedOptions)) {
       document.setIn(["devices", id, key], value);
     }
     const temporaryPath = `${path}.${process.pid}.tmp`;
     await writeFile(temporaryPath, document.toString(), "utf8");
     await rename(temporaryPath, path);
-    this.config.devices[id] = { ...(this.config.devices[id] ?? {}), ...options };
+    this.config.devices[id] = { ...(this.config.devices[id] ?? {}), ...definedOptions };
     await this.refreshDevices();
   }
 
@@ -350,7 +369,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     if (state) {
       this.store.ingest(name, Buffer.from(JSON.stringify(state)));
       this.publishRetained(previousName, "");
-      this.publish(name, state, true);
+      this.publish(name, state, this.config.devices[id]?.retain === true);
     }
     this.publishHomeAssistantDiscovery();
   }
@@ -365,6 +384,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.definitions.delete(id);
     this.states.delete(id);
     this.deviceAvailability.delete(id);
+    this.lastDevicePublications.delete(id);
     this.publishRetained(previousName, "");
     this.publishRetained(`${previousName}/availability`, "");
     await this.refreshDevices();
@@ -615,7 +635,18 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const merged = { ...(this.states.get(message.device.ieeeAddr) ?? {}), ...payload };
       this.states.set(message.device.ieeeAddr, merged);
       this.store.ingest(friendlyName, Buffer.from(JSON.stringify(merged)));
-      this.publish(friendlyName, merged, true);
+      const serialized = JSON.stringify(merged);
+      const debounce = typeof configured.debounce === "number" ? configured.debounce : 0;
+      const now = Date.now();
+      if (shouldPublishDeviceState(
+        this.lastDevicePublications.get(message.device.ieeeAddr),
+        serialized,
+        debounce,
+        now
+      )) {
+        this.publish(friendlyName, merged, configured.retain === true);
+        this.lastDevicePublications.set(message.device.ieeeAddr, { payload: serialized, at: now });
+      }
       this.queueStatePersistence();
     };
     let result: JsonObject = {};
@@ -687,7 +718,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.publishRetained("bridge/groups", this.bridgeGroups);
     for (const [ieeeAddress, state] of this.states) {
       const friendlyName = this.config.devices[ieeeAddress]?.friendly_name ?? ieeeAddress;
-      this.publish(friendlyName, state, true);
+      this.publish(friendlyName, state, this.config.devices[ieeeAddress]?.retain === true);
     }
     this.publishHomeAssistantDiscovery();
     console.log("Home Assistant ve Matterbridge için MQTT uyumluluk katmanı hazır.");
@@ -812,7 +843,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const deviceEntry = Object.entries(this.config.devices)
         .find(([, options]) => options.friendly_name === friendlyName);
       const state = deviceEntry ? this.states.get(deviceEntry[0]) : undefined;
-      if (state) this.publish(friendlyName, state, true);
+      if (state) this.publish(friendlyName, state, deviceEntry?.[1].retain === true);
       return;
     }
     if (!relative.endsWith("/set")) return;
@@ -881,7 +912,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.states.set(ieeeAddress, state);
     const friendlyName = configured.friendly_name ?? ieeeAddress;
     this.store.ingest(friendlyName, Buffer.from(JSON.stringify(state)));
-    this.publish(friendlyName, state, true);
+    this.publish(friendlyName, state, configured.retain === true);
     await this.persistStates();
   }
 

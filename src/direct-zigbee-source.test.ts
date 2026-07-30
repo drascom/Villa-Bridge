@@ -8,6 +8,7 @@ import {
   directBridgeInfo,
   endpointNamesForDevice,
   parsePermitJoinSeconds,
+  shouldPublishDeviceState,
   zigbeeAvailabilityState
 } from "./direct-zigbee-source.js";
 import { DeviceStore } from "./device-store.js";
@@ -62,6 +63,14 @@ test("battery devices remain available longer than routers", () => {
     "online"
   );
   assert.equal(zigbeeAvailabilityState(undefined, { type: "Router" }, now), "offline");
+});
+
+test("direct durum debounce yalnız aynı payload'u süre içinde bastırır", () => {
+  const previous = { payload: '{"state":"ON"}', at: 1_000 };
+  assert.equal(shouldPublishDeviceState(previous, '{"state":"ON"}', 2, 2_500), false);
+  assert.equal(shouldPublishDeviceState(previous, '{"state":"ON"}', 2, 3_000), true);
+  assert.equal(shouldPublishDeviceState(previous, '{"state":"OFF"}', 2, 1_100), true);
+  assert.equal(shouldPublishDeviceState(previous, '{"state":"ON"}', 0, 1_100), true);
 });
 
 test("Home Assistant discovery toggles live without restarting the source", () => {
@@ -297,6 +306,65 @@ test("direct cihaz seçenekleri configuration.yaml dosyasına kalıcı yazılır
     debounce: 0.25,
     retain: true
   });
+
+  await source.setDeviceOptions("0xoptions", {
+    transition: 2,
+    debounce: undefined,
+    retain: undefined
+  });
+  const partiallySaved = await readFile(configurationFile, "utf8");
+  assert.match(partiallySaved, /transition: 2/);
+  assert.match(partiallySaved, /debounce: 0\.25/);
+  assert.match(partiallySaved, /retain: true/);
+  assert.doesNotMatch(partiallySaved, /(?:debounce|retain): null/);
+});
+
+test("direct cihaz state yayını retain seçeneğini uygular", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-zigbee-retain-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const config = {
+    dataDir: directory,
+    devices: {
+      "0xretain": { friendly_name: "Retain Test", retain: false }
+    },
+    groups: {}
+  };
+  const endpoint = {};
+  const device = {
+    ieeeAddr: "0xretain",
+    endpoints: [endpoint],
+    getEndpoint: () => endpoint
+  };
+  const definition = {
+    toZigbee: [{
+      key: ["state"],
+      async convertSet() {
+        return { state: { state: "ON" } };
+      }
+    }]
+  };
+  const published: Array<{ topic: string; retain: boolean }> = [];
+  const source = new DirectZigbeeSource(
+    config as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    new DeviceStore(new Map())
+  );
+  Object.assign(source, {
+    controller: { getDeviceByIeeeAddr: () => device },
+    definitions: new Map([["0xretain", definition]]),
+    mqtt: {
+      connected: true,
+      publish(topic: string, _payload: string, options: { retain?: boolean }) {
+        published.push({ topic, retain: options.retain === true });
+      }
+    }
+  });
+
+  await source.setDevice("0xretain", { state: "ON" });
+  assert.equal(published.at(-1)?.retain, false);
+  config.devices["0xretain"].retain = true;
+  await source.setDevice("0xretain", { state: "ON" });
+  assert.equal(published.at(-1)?.retain, true);
 });
 
 test("direct Zigbee grupları oluşturulur, yeniden adlandırılır ve kalıcı silinir", async (context) => {

@@ -139,7 +139,7 @@ test("aç/kapat komutları sonuçlanana kadar kontrolü kilitler ve spinner gös
   assert.match(dashboard, /class="command-spinner"/);
   assert.match(dashboard, /\.switch\.pending::after/);
   assert.match(dashboard, /\.light-power\.pending::after/);
-  assert.match(dashboard, /device\.availability==="offline"\|\|pending\?" disabled":""/);
+  assert.match(dashboard, /\(device\.availability==="offline"&&Boolean\(action\)\)\|\|pending\?" disabled":""/);
 });
 
 test("cihaz kaldırma Android WebView uyumlu ve açıkça yıkıcı bir diyalog kullanır", async () => {
@@ -510,7 +510,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.quick-control-widget \.quick-card\{min-height:44px;padding:5px 12px\}/);
   assert.match(dashboard, /class="quick-device-icon"/);
   assert.match(dashboard, /\.quick-toggle\{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:26px minmax\(0,1fr\) auto/);
-  assert.match(dashboard, /<button class="quick-toggle \$\{control\.value===true\?"on":""\}\$\{pending\?" pending":""\}" data-command="[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
+  assert.match(dashboard, /<button class="quick-toggle \$\{action\?\.active\?"on":""\}\$\{pending\?" pending":""\}" \$\{actionAttributes\}[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
   assert.match(dashboard, /\.quick-grid\.grid-view\{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto/);
   assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start\}/);
   assert.match(dashboard, /\.quick-grid \.device-name\{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:11px\}/);
@@ -571,9 +571,9 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /function scrollWidgetRail\(direction\)\{scrollDashboardRow\(\$\("#widgetRail"\),direction,220,\.72\)\}/);
   assert.match(dashboard, /function scrollQuickControls\(direction\)\{scrollDashboardRow\(\$\("#quickDevices"\),direction,120,\.55\)\}/);
   assert.match(dashboard, /#home \.quick-scroll-hint\{top:calc\(50% - 16px\);width:28px;height:32px/);
-  assert.match(dashboard, /const button=card\.querySelector\("\[data-command\]"\)/);
+  assert.match(dashboard, /const button=card\.querySelector\("\[data-command-value\],\[data-quick-show\]"\)/);
   assert.match(dashboard, /if\(!button\|\|button\.disabled\)return/);
-  assert.match(dashboard, /command\(button\.dataset\.command,button\.dataset\.property,button\.dataset\.value==="true"\)/);
+  assert.match(dashboard, /const button=card\.querySelector\("\[data-command-value\],\[data-quick-show\]"\);[\s\S]*?button\.click\(\)/);
   assert.match(dashboard, /if\(!event\.target\.closest\("button,input"\)\)toggle\(\)/);
   assert.doesNotMatch(dashboard, /if\(!event\.target\.closest\("button,input"\)\)openLightControls/);
   assert.match(dashboard, /id="deviceActionDialog"/);
@@ -680,6 +680,24 @@ test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla göst
   assert.match(dashboard, /groupMembers:"\{count\} cihaz"/);
   assert.match(dashboard, /\.setting-field input,\.setting-field select\{/);
   assert.match(dashboard, /\.zigbee-tool input,\.zigbee-tool select/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});
+
+test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kullanılabilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /dashboardControlKinds=new Set\(\["switch","fan","siren","cover","position","lock","climate"\]\)/);
+  assert.match(dashboard, /const dashboardControlForDevice=/);
+  assert.match(dashboard, /const dashboardControlAction=/);
+  assert.match(dashboard, /const mainControl=dashboardControlForDevice\(device\)/);
+  assert.match(dashboard, /device\?\.controls\.find\(item=>item\.id===favorite\.controlId&&isDashboardControl\(item\)\)/);
+  assert.match(dashboard, /const controls=device\.controls\.filter\(isDashboardControl\)/);
+  assert.match(dashboard, /data-group-command-value=/);
+  assert.match(dashboard, /JSON\.parse\(button\.dataset\.groupCommandValue\)/);
+  assert.match(dashboard, /groupPowerControl=control=>\["switch","fan","siren","cover"\]\.includes\(control\.kind\)/);
+  assert.doesNotMatch(dashboard, /const controllable=devices\.filter\(device=>device\.controls\.some\(control=>control\.kind==="switch"\)\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));

@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import test from "node:test";
 import type { MqttClient } from "mqtt";
 import { DeviceStore } from "./device-store.js";
-import { MqttShadowSource } from "./mqtt-source.js";
+import { MqttShadowSource, z2mGroupIdentifier } from "./mqtt-source.js";
 
 class FakeMqttClient extends EventEmitter {
   connected = true;
@@ -124,7 +124,17 @@ test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler
     ]
   );
   assert.ok(client.requests.every((request) => typeof request.payload.transaction === "string"));
+  assert.equal(client.requests.find((request) => request.topic.endsWith("/group/rename"))?.payload.from, "1");
+  assert.equal(client.requests.find((request) => request.topic.endsWith("/group/remove"))?.payload.id, "1");
+  assert.equal(client.requests.find((request) => request.topic.endsWith("/group/members/add"))?.payload.group, "1");
+  assert.equal(client.requests.find((request) => request.topic.endsWith("/device/bind"))?.payload.to, "1");
   await source.stop();
+});
+
+test("shadow grup görünüm kimliğini Zigbee2MQTT kimliğine dönüştürür", () => {
+  assert.equal(z2mGroupIdentifier("group-27"), "27");
+  assert.equal(z2mGroupIdentifier("Living Room"), "Living Room");
+  assert.equal(z2mGroupIdentifier("group-kitchen"), "group-kitchen");
 });
 
 test("shadow kaynak yalnız açık Zigbee2MQTT ok yanıtını başarı sayar", async () => {

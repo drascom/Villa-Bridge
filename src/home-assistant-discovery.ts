@@ -77,20 +77,20 @@ const specialDiscovery = (
   const position = device.controls.find((control) => control.kind === "position");
   if (cover || position) {
     const uniqueId = `villa_${safeId(device.id)}_cover`;
-    const stateProperty = cover?.property ?? "state";
+    const stateProperty = cover?.property;
     result.push(message("cover", uniqueId, {
       ...common(device, uniqueId, baseTopic),
       name: device.name,
-      state_topic: stateTopic,
-      command_topic: commandTopic,
-      value_template: `{{ value_json.${stateProperty} }}`,
-      payload_open: jsonCommand(stateProperty, "OPEN"),
-      payload_close: jsonCommand(stateProperty, "CLOSE"),
-      payload_stop: jsonCommand(stateProperty, "STOP"),
-      state_open: "OPEN",
-      state_opening: "OPENING",
-      state_closed: "CLOSE",
-      state_closing: "CLOSING",
+      state_topic: cover ? stateTopic : undefined,
+      command_topic: cover ? commandTopic : undefined,
+      value_template: stateProperty ? `{{ value_json.${stateProperty} }}` : undefined,
+      payload_open: stateProperty ? jsonCommand(stateProperty, "OPEN") : undefined,
+      payload_close: stateProperty ? jsonCommand(stateProperty, "CLOSE") : undefined,
+      payload_stop: stateProperty ? jsonCommand(stateProperty, "STOP") : undefined,
+      state_open: cover ? "OPEN" : undefined,
+      state_opening: cover ? "OPENING" : undefined,
+      state_closed: cover ? "CLOSE" : undefined,
+      state_closing: cover ? "CLOSING" : undefined,
       position_topic: position ? stateTopic : undefined,
       position_template: position ? `{{ value_json.${position.property} }}` : undefined,
       set_position_topic: position ? commandTopic : undefined,
