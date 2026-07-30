@@ -8,6 +8,8 @@ import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { hexToXy } from "./device-controls.js";
 import { DeviceImagesStore } from "./device-images.js";
+import { DeviceEventsStore } from "./device-events.js";
+import { DeviceNotesStore } from "./device-notes.js";
 import { DeviceStore } from "./device-store.js";
 import { HomeFavoritesStore, validateHomeFavorites } from "./home-favorites.js";
 import { InstallationStateStore } from "./installation-state.js";
@@ -20,15 +22,32 @@ import { RecentErrorLog } from "./recent-error-log.js";
 import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
+import {
+  applyPendingZigbeeNetworkRestore,
+  createZigbeeNetworkBackup,
+  stageZigbeeNetworkRestore
+} from "./zigbee-backup.js";
 
 const config = await loadConfig();
+if (config.zigbee && await applyPendingZigbeeNetworkRestore(config.zigbee.dataDir)) {
+  console.log("Doğrulanmış Zigbee ağ yedeği geri yüklendi.");
+}
 const aliases = await loadAliases(config.aliasesFile);
 const configPath = resolve(process.env.VILLA_BRIDGE_CONFIG ?? "config/default.yaml");
 const imagesStore = new DeviceImagesStore(resolve(dirname(configPath), "device-images.json"));
 let imagePreferences = await imagesStore.get();
-const store = new DeviceStore(aliases, imagePreferences);
+const deviceEventsStore = new DeviceEventsStore(resolve(dirname(configPath), "device-events.json"));
+const store = new DeviceStore(
+  aliases,
+  imagePreferences,
+  await deviceEventsStore.get(),
+  (events) => void deviceEventsStore.save(events).catch((error) => {
+    console.error(`Cihaz olay geçmişi kaydedilemedi: ${String(error)}`);
+  })
+);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
+const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
 const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
 );
@@ -37,7 +56,7 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
   config.zigbee.configurationFile,
   {
-    zigbee: { adapterUrl: config.zigbee.serial.path },
+    zigbee: { adapterUrl: config.zigbee.serial.path, channel: config.zigbee.network.channel },
     mqtt: { url: config.mqtt.url, baseTopic: config.mqtt.baseTopic },
     matter: { wsUrl: config.matterbridge.wsUrl },
     homeAssistant: { discoveryEnabled: config.homeAssistant.discoveryEnabled },
@@ -60,7 +79,7 @@ if (config.mode === "direct") {
 } else {
   source = new MqttShadowSource(config.mqtt, store);
 }
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
   secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true"
 });
@@ -109,18 +128,131 @@ app.get("/api/locales", async (_request, reply) => {
 });
 
 app.get("/api/health", async () => store.getHealth());
-app.get("/api/devices", async () => ({ devices: store.getDevices() }));
+const visibleDevices = (role: "admin" | "resident" | undefined) => store.getDevices().map((device) => ({
+  ...device,
+  controls: role === "resident"
+    ? device.controls.filter((control) => control.adminOnly !== true)
+    : device.controls
+}));
+
+app.get("/api/devices", async (request) => ({
+  devices: visibleDevices(request.villaSession?.role)
+}));
+app.get<{ Params: { id: string } }>("/api/devices/:id/note", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  return { ok: true, note: await deviceNotesStore.get(id) };
+});
+app.put<{ Params: { id: string }; Body?: { note?: unknown } }>("/api/devices/:id/note", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  try {
+    return { ok: true, note: await deviceNotesStore.set(id, request.body?.note) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
 app.get("/api/groups", async () => ({ groups: store.getGroups() }));
+app.post<{ Body?: { name?: unknown } }>("/api/groups", async (request, reply) => {
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+  if (name.length < 2 || name.length > 64) {
+    return reply.code(400).send({ ok: false, error: "Grup adı 2-64 karakter olmalıdır." });
+  }
+  try {
+    await source.createGroup(name);
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.put<{ Params: { id: string }; Body?: { name?: unknown } }>("/api/groups/:id", async (request, reply) => {
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+  if (name.length < 2 || name.length > 64) {
+    return reply.code(400).send({ ok: false, error: "Grup adı 2-64 karakter olmalıdır." });
+  }
+  try {
+    await source.renameGroup(request.params.id, name);
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.delete<{ Params: { id: string }; Querystring: { force?: string } }>("/api/groups/:id", async (request, reply) => {
+  try {
+    await source.removeGroup(request.params.id, request.query.force === "true");
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.put<{
+  Params: { id: string };
+  Body?: { deviceId?: unknown; add?: unknown; endpoint?: unknown };
+}>("/api/groups/:id/member", async (request, reply) => {
+  const deviceId = typeof request.body?.deviceId === "string" ? request.body.deviceId.toLowerCase() : "";
+  const endpoint = request.body?.endpoint;
+  if (
+    !/^0x[0-9a-f]{16}$/.test(deviceId) ||
+    typeof request.body?.add !== "boolean" ||
+    (endpoint !== undefined && (!Number.isInteger(endpoint) || Number(endpoint) < 1 || Number(endpoint) > 240))
+  ) {
+    return reply.code(400).send({ ok: false, error: "Grup üyeliği isteği geçersiz." });
+  }
+  try {
+    await source.setGroupMember(request.params.id, deviceId, request.body.add, endpoint === undefined ? undefined : Number(endpoint));
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.post<{
+  Body?: { fromId?: unknown; toId?: unknown; bind?: unknown; clusters?: unknown };
+}>("/api/zigbee/bind", async (request, reply) => {
+  const fromId = typeof request.body?.fromId === "string" ? request.body.fromId.toLowerCase() : "";
+  const toId = typeof request.body?.toId === "string" ? request.body.toId.toLowerCase() : "";
+  const clusters = Array.isArray(request.body?.clusters)
+    ? request.body.clusters.filter((value): value is string => typeof value === "string").slice(0, 32)
+    : undefined;
+  if (!/^0x[0-9a-f]{16}$/.test(fromId) || !toId || typeof request.body?.bind !== "boolean") {
+    return reply.code(400).send({ ok: false, error: "Bağlama isteği geçersiz." });
+  }
+  try {
+    await source.bindDevice(fromId, toId, request.body.bind, clusters);
+    return { ok: true };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.post<{
+  Params: { id: string };
+  Body?: { sceneId?: unknown; action?: unknown };
+}>("/api/groups/:id/scene", async (request, reply) => {
+  const sceneId = Number(request.body?.sceneId);
+  const action = request.body?.action;
+  if (!Number.isInteger(sceneId) || sceneId < 1 || sceneId > 255 || !["store", "recall", "remove"].includes(String(action))) {
+    return reply.code(400).send({ ok: false, error: "Sahne isteği geçersiz." });
+  }
+  try {
+    await source.groupScene(request.params.id, sceneId, action as "store" | "recall" | "remove");
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
 app.get("/api/pairing", async () => store.getPairing());
-app.post<{ Body?: { seconds?: number } }>("/api/pairing/start", async (request, reply) => {
+app.post<{ Body?: { seconds?: number; routerId?: string } }>("/api/pairing/start", async (request, reply) => {
   if (!config.pairingControl) {
     return reply.code(403).send({ ok: false, error: "Cihaz ekleme denetimi kapalı." });
   }
   const requested = request.body?.seconds ?? 180;
   const seconds = Number.isInteger(requested) ? Math.min(254, Math.max(10, requested)) : 180;
+  const routerId =
+    typeof request.body?.routerId === "string" && /^0x[0-9a-f]{16}$/i.test(request.body.routerId)
+      ? request.body.routerId.toLowerCase()
+      : undefined;
   store.pairingRequested(seconds);
   try {
-    await source.permitJoin(seconds);
+    await source.permitJoin(seconds, routerId);
     return { ok: true, pairing: store.getPairing() };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -128,6 +260,109 @@ app.post<{ Body?: { seconds?: number } }>("/api/pairing/start", async (request, 
     return reply.code(503).send({ ok: false, error: message });
   }
 });
+
+app.post<{ Body?: { value?: unknown } }>("/api/zigbee/install-code", async (request, reply) => {
+  const value = typeof request.body?.value === "string" ? request.body.value.trim() : "";
+  // Herdsman accepts several vendor QR formats containing "$", "|" and spaces.
+  if (value.length < 16 || value.length > 512 || !/^[\x20-\x7e]+$/.test(value)) {
+    return reply.code(400).send({ ok: false, error: "Install code veya Zigbee QR değeri geçersiz." });
+  }
+  try {
+    await source.addInstallCode(value);
+    return { ok: true };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post<{ Params: { id: string } }>("/api/devices/:id/reconfigure", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  try {
+    await source.reconfigureDevice(id);
+    return { ok: true, device: store.getDevice(id) };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post("/api/zigbee/touchlink/scan", async (_request, reply) => {
+  try {
+    return { ok: true, devices: await source.scanTouchlink() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.get("/api/zigbee/network-map", async (_request, reply) => {
+  try {
+    return { ok: true, map: await source.networkMap() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.put<{ Params: { id: string }; Body?: { enabled?: unknown } }>(
+  "/api/devices/:id/ota-schedule",
+  async (request, reply) => {
+    const id = request.params.id.toLowerCase();
+    if (!store.getDevice(id) || typeof request.body?.enabled !== "boolean") {
+      return reply.code(400).send({ ok: false, error: "Yazılım güncelleme isteği geçersiz." });
+    }
+    try {
+      await source.scheduleOta(id, request.body.enabled);
+      return { ok: true, scheduled: request.body.enabled };
+    } catch (error) {
+      return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
+app.put<{
+  Params: { id: string };
+  Body?: { transition?: unknown; debounce?: unknown; retain?: unknown };
+}>("/api/devices/:id/options", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  const transition = request.body?.transition === undefined ? undefined : Number(request.body.transition);
+  const debounce = request.body?.debounce === undefined ? undefined : Number(request.body.debounce);
+  const retain = request.body?.retain;
+  if (
+    (transition !== undefined && (!Number.isFinite(transition) || transition < 0 || transition > 60)) ||
+    (debounce !== undefined && (!Number.isFinite(debounce) || debounce < 0 || debounce > 60)) ||
+    (retain !== undefined && typeof retain !== "boolean")
+  ) {
+    return reply.code(400).send({ ok: false, error: "Cihaz seçenekleri geçersiz." });
+  }
+  try {
+    const options = { transition, debounce, retain: retain as boolean | undefined };
+    await source.setDeviceOptions(id, options);
+    return { ok: true, options };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post<{ Body?: { ieeeAddress?: unknown; channel?: unknown; confirmation?: unknown } }>(
+  "/api/zigbee/touchlink/reset",
+  async (request, reply) => {
+    const ieeeAddress =
+      typeof request.body?.ieeeAddress === "string" ? request.body.ieeeAddress.toLowerCase() : "";
+    const channel = request.body?.channel;
+    if (
+      request.body?.confirmation !== "RESET" ||
+      !/^0x[0-9a-f]{16}$/.test(ieeeAddress) ||
+      !Number.isInteger(channel) ||
+      Number(channel) < 11 ||
+      Number(channel) > 26
+    ) {
+      return reply.code(400).send({ ok: false, error: "Touchlink sıfırlama isteği geçersiz." });
+    }
+    try {
+      await source.resetTouchlink(ieeeAddress, Number(channel));
+      return { ok: true };
+    } catch (error) {
+      return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
 app.post("/api/pairing/stop", async (_request, reply) => {
   if (!config.pairingControl) {
     return reply.code(403).send({ ok: false, error: "Cihaz ekleme denetimi kapalı." });
@@ -141,11 +376,12 @@ app.post("/api/pairing/stop", async (_request, reply) => {
     return reply.code(503).send({ ok: false, error: message });
   }
 });
-app.get("/api/overview", async () => ({
+app.get("/api/overview", async (request) => ({
   health: store.getHealth(),
-  devices: store.getDevices(),
+  devices: visibleDevices(request.villaSession?.role),
   groups: store.getGroups(),
-  pairing: store.getPairing()
+  pairing: store.getPairing(),
+  events: store.getEvents(20)
 }));
 
 app.get("/api/onboarding", async (_request, reply) => {
@@ -243,20 +479,34 @@ app.post<{
   if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
   const control = device.controls.find((item) => item.property === request.body?.property);
   if (!control) return reply.code(400).send({ ok: false, error: "Bu denetim cihaz tarafından sunulmuyor." });
+  if (control.adminOnly && request.villaSession?.role !== "admin") {
+    return reply.code(403).send({ ok: false, error: "Bu cihaz ayarı için yönetici yetkisi gerekiyor." });
+  }
   let value: unknown = request.body?.value;
-  if (control.kind === "switch") {
+  if (["switch", "fan", "siren"].includes(control.kind)) {
     if (typeof value !== "boolean") return reply.code(400).send({ ok: false, error: "Aç/kapat değeri geçersiz." });
-    value = value ? "ON" : "OFF";
+    value = value ? control.valueOn ?? "ON" : control.valueOff ?? "OFF";
   } else if (control.kind === "color") {
     if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value)) {
       return reply.code(400).send({ ok: false, error: "Renk değeri geçersiz." });
     }
     value = hexToXy(value);
+  } else if (["cover", "lock", "select"].includes(control.kind)) {
+    if (
+      (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
+      || (control.values?.length && !control.values.includes(value))
+    ) {
+      return reply.code(400).send({ ok: false, error: "Seçilen cihaz komutu geçersiz." });
+    }
   } else {
     if (typeof value !== "number" || !Number.isFinite(value)) {
       return reply.code(400).send({ ok: false, error: "Sayısal denetim değeri geçersiz." });
     }
-    value = Math.round(Math.min(control.max ?? value, Math.max(control.min ?? value, value)));
+    const clamped = Math.min(control.max ?? value, Math.max(control.min ?? value, value));
+    const step = control.step;
+    value = step && step > 0
+      ? Number((Math.round((clamped - (control.min ?? 0)) / step) * step + (control.min ?? 0)).toFixed(6))
+      : clamped;
   }
   try {
     await source.setDevice(id, { [control.property]: value } satisfies JsonObject);
@@ -316,6 +566,7 @@ app.delete<{
     imagePreferences = await imagesStore.removeDevice(imagePreferences, id).catch(() => imagePreferences);
     store.setImagePreferences(imagePreferences);
     const favorites = await favoritesStore.removeDevice(id);
+    await deviceNotesStore.removeDevice(id);
     return { ok: true, force, favorites };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
@@ -407,6 +658,53 @@ app.post<{ Body?: { open?: boolean } }>("/api/matter/commissioning", async (requ
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
+
+app.get("/api/zigbee/backup", async (_request, reply) => {
+  try {
+    const prepared = await source.prepareNetworkBackup();
+    const date = new Date().toISOString().slice(0, 10);
+    if (prepared) {
+      return reply
+        .header("Content-Disposition", `attachment; filename="villa-bridge-zigbee-${date}.${prepared.extension}"`)
+        .type(prepared.contentType)
+        .send(prepared.body);
+    }
+    if (!config.zigbee) throw new Error("Yerel Zigbee veri dizini bulunamadı.");
+    const backup = await createZigbeeNetworkBackup(config.zigbee.dataDir);
+    return reply
+      .header("Content-Disposition", `attachment; filename="villa-bridge-zigbee-${date}.json"`)
+      .type("application/json; charset=utf-8")
+      .send(`${JSON.stringify(backup, null, 2)}\n`);
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post<{ Body?: { confirmation?: unknown; backup?: unknown } }>(
+  "/api/zigbee/restore",
+  async (request, reply) => {
+    if (!config.zigbee) {
+      return reply.code(503).send({ ok: false, error: "Yerel Zigbee ağı bu çalışma modunda kullanılmıyor." });
+    }
+    if (request.body?.confirmation !== "RESTORE") {
+      return reply.code(400).send({ ok: false, error: "Geri yükleme onayı geçersiz." });
+    }
+    try {
+      await stageZigbeeNetworkRestore(config.zigbee.dataDir, request.body.backup);
+      const timer = setTimeout(() => process.kill(process.pid, "SIGTERM"), 750);
+      timer.unref();
+      return { ok: true, restarting: true };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
 
 app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(dashboard));
 

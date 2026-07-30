@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   DirectZigbeeSource,
   directBridgeInfo,
   endpointNamesForDevice,
-  parsePermitJoinSeconds
+  parsePermitJoinSeconds,
+  zigbeeAvailabilityState
 } from "./direct-zigbee-source.js";
 import { DeviceStore } from "./device-store.js";
 
@@ -47,6 +51,17 @@ test("endpoint names are derived from UID-scoped channel aliases", () => {
     l1: "Ceiling One",
     l2: "Ceiling Two"
   });
+});
+
+test("battery devices remain available longer than routers", () => {
+  const now = Date.UTC(2026, 6, 30, 12);
+  const twentyMinutesAgo = now - 20 * 60 * 1_000;
+  assert.equal(zigbeeAvailabilityState(twentyMinutesAgo, { type: "Router" }, now), "offline");
+  assert.equal(
+    zigbeeAvailabilityState(twentyMinutesAgo, { type: "EndDevice", powerSource: "Battery" }, now),
+    "online"
+  );
+  assert.equal(zigbeeAvailabilityState(undefined, { type: "Router" }, now), "offline");
 });
 
 test("Home Assistant discovery toggles live without restarting the source", () => {
@@ -94,4 +109,248 @@ test("Home Assistant discovery toggles live without restarting the source", () =
   source.setHomeAssistantDiscovery(false);
   assert.ok(published.length > 0);
   assert.ok(published.every((item) => item.payload === "" && item.retain));
+});
+
+test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine iletir", async () => {
+  const calls: Array<{ operation: string; value?: unknown }> = [];
+  const router = { ieeeAddr: "0xrouter" };
+  const fromEndpoint = {
+    outputClusters: [6, 8],
+    async bind(cluster: number, target: unknown) {
+      calls.push({ operation: "bind", value: { cluster, target } });
+    },
+    async unbind(cluster: number, target: unknown) {
+      calls.push({ operation: "unbind", value: { cluster, target } });
+    }
+  };
+  const targetEndpoint = { inputClusters: [6] };
+  const memberEndpoint = {
+    ID: 1,
+    inputClusters: [6],
+    async addToGroup(target: unknown) {
+      calls.push({ operation: "group-add", value: target });
+    },
+    async removeFromGroup(target: unknown) {
+      calls.push({ operation: "group-remove", value: target });
+    }
+  };
+  const group = {
+    groupID: 1,
+    members: [],
+    async command(cluster: string, command: string, value: unknown) {
+      calls.push({ operation: "scene", value: { cluster, command, value } });
+    }
+  };
+  const otaDevice = {
+    scheduleOta(value: unknown) {
+      calls.push({ operation: "ota-schedule", value });
+    },
+    unscheduleOta() {
+      calls.push({ operation: "ota-unschedule" });
+    }
+  };
+  const mapDevices = [
+    {
+      ieeeAddr: "0xcoordinator",
+      type: "Coordinator",
+      async lqi() {
+        return [{ eui64: "0xrouter", lqi: 180 }];
+      }
+    },
+    {
+      ieeeAddr: "0xrouter",
+      type: "Router",
+      async lqi() {
+        return [];
+      }
+    }
+  ];
+  const controller = {
+    getDeviceByIeeeAddr(id: string) {
+      if (id === "0xrouter") return router;
+      if (id === "0xfrom") return { endpoints: [fromEndpoint] };
+      if (id === "0xto") return { endpoints: [targetEndpoint] };
+      if (id === "0xmember") return { endpoints: [memberEndpoint] };
+      if (id === "0xota") return otaDevice;
+      return undefined;
+    },
+    async permitJoin(seconds: number, selectedRouter: unknown) {
+      calls.push({ operation: "permit-join", value: { seconds, selectedRouter } });
+    },
+    async addInstallCode(value: string) {
+      calls.push({ operation: "install-code", value });
+    },
+    touchlink: {
+      async scan() {
+        return [{ ieeeAddr: "0xtouch", channel: 15 }];
+      },
+      async factoryReset(ieeeAddress: string, channel: number) {
+        calls.push({ operation: "touchlink-reset", value: { ieeeAddress, channel } });
+        return true;
+      }
+    },
+    getGroupByID(id: number) {
+      return id === 1 ? group : undefined;
+    },
+    getGroupsIterator() {
+      return [group].values();
+    },
+    getDevicesIterator() {
+      return mapDevices.values();
+    }
+  };
+  const source = new DirectZigbeeSource(
+    {
+      devices: {},
+      groups: { "1": { friendly_name: "Living Room" } }
+    } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    new DeviceStore(new Map())
+  );
+  Object.assign(source, {
+    controller,
+    definitions: new Map([["0xota", { ota: {} }]])
+  });
+
+  await source.permitJoin(120, "0xrouter");
+  await source.addInstallCode("install-code-value");
+  assert.deepEqual(await source.scanTouchlink(), [{ ieeeAddress: "0xtouch", channel: 15 }]);
+  await source.resetTouchlink("0xtouch", 15);
+  await source.setGroupMember("group-1", "0xmember", true);
+  await source.setGroupMember("group-1", "0xmember", false);
+  await source.bindDevice("0xfrom", "0xto", true);
+  await source.bindDevice("0xfrom", "0xto", false);
+  await source.groupScene("group-1", 7, "store");
+  await source.groupScene("group-1", 7, "recall");
+  await source.groupScene("group-1", 7, "remove");
+  await source.scheduleOta("0xota", true);
+  await source.scheduleOta("0xota", false);
+  assert.deepEqual(await source.networkMap(), {
+    nodes: [
+      { id: "0xcoordinator", name: "Coordinator", type: "Coordinator" },
+      { id: "0xrouter", name: "0xrouter", type: "Router" }
+    ],
+    links: [{ from: "0xcoordinator", to: "0xrouter", quality: 180 }]
+  });
+
+  assert.deepEqual(
+    calls.map((call) => call.operation),
+    [
+      "permit-join",
+      "install-code",
+      "touchlink-reset",
+      "group-add",
+      "group-remove",
+      "bind",
+      "unbind",
+      "scene",
+      "scene",
+      "scene",
+      "ota-schedule",
+      "ota-unschedule"
+    ]
+  );
+  assert.equal(
+    (calls.find((call) => call.operation === "permit-join")?.value as {
+      selectedRouter: unknown;
+    }).selectedRouter,
+    router
+  );
+});
+
+test("direct cihaz seçenekleri configuration.yaml dosyasına kalıcı yazılır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-zigbee-options-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const configurationFile = join(directory, "configuration.yaml");
+  await writeFile(configurationFile, 'devices:\n  "0xoptions":\n    friendly_name: Office Light\ngroups: {}\n');
+  const config = {
+    dataDir: directory,
+    configurationFile,
+    devices: { "0xoptions": { friendly_name: "Office Light" } },
+    groups: {}
+  };
+  const source = new DirectZigbeeSource(
+    config as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    new DeviceStore(new Map())
+  );
+  Object.assign(source, {
+    controller: {
+      getDeviceByIeeeAddr: (id: string) => id === "0xoptions" ? {} : undefined,
+      getDevicesIterator: () => [].values()
+    }
+  });
+
+  await source.setDeviceOptions("0xoptions", {
+    transition: 1.5,
+    debounce: 0.25,
+    retain: true
+  });
+
+  const saved = await readFile(configurationFile, "utf8");
+  assert.match(saved, /transition: 1\.5/);
+  assert.match(saved, /debounce: 0\.25/);
+  assert.match(saved, /retain: true/);
+  assert.deepEqual(config.devices["0xoptions"], {
+    friendly_name: "Office Light",
+    transition: 1.5,
+    debounce: 0.25,
+    retain: true
+  });
+});
+
+test("direct Zigbee grupları oluşturulur, yeniden adlandırılır ve kalıcı silinir", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-zigbee-groups-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const configurationFile = join(directory, "configuration.yaml");
+  await writeFile(configurationFile, "devices: {}\ngroups: {}\n");
+  const config = {
+    dataDir: directory,
+    configurationFile,
+    devices: {},
+    groups: {} as Record<string, { friendly_name?: string }>
+  };
+  const groups = new Map<number, {
+    groupID: number;
+    members: [];
+    removeFromDatabase: () => void;
+    removeFromNetwork: () => Promise<void>;
+  }>();
+  const makeGroup = (id: number) => {
+    const group = {
+      groupID: id,
+      members: [] as [],
+      removeFromDatabase: () => {
+        groups.delete(id);
+      },
+      removeFromNetwork: async () => {
+        groups.delete(id);
+      }
+    };
+    groups.set(id, group);
+    return group;
+  };
+  const source = new DirectZigbeeSource(
+    config as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    new DeviceStore(new Map())
+  );
+  Object.assign(source, {
+    controller: {
+      getGroupByID: (id: number) => groups.get(id),
+      createGroup: (id: number) => makeGroup(id),
+      getGroupsIterator: () => groups.values()
+    }
+  });
+
+  await source.createGroup("Living Room");
+  assert.match(await readFile(configurationFile, "utf8"), /friendly_name: Living Room/);
+  await source.renameGroup("group-1", "Lounge");
+  assert.match(await readFile(configurationFile, "utf8"), /friendly_name: Lounge/);
+  await source.removeGroup("group-1", true);
+
+  const saved = await readFile(configurationFile, "utf8");
+  assert.doesNotMatch(saved, /Living Room|Lounge/);
+  assert.equal(groups.size, 0);
+  assert.deepEqual(config.groups, {});
 });
