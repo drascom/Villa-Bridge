@@ -721,6 +721,10 @@ test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla göst
   assert.match(dashboard, /id="zigbeeBindingList"/);
   assert.match(dashboard, /function renderBindingEndpoints\(\)/);
   assert.match(dashboard, /function renderBindingList\(\)/);
+  assert.match(dashboard, /const bindingTarget=binding=>binding\.targetType==="group"/);
+  assert.match(dashboard, /\.filter\(\(\{binding\}\)=>Boolean\(bindingTarget\(binding\)\)\)/);
+  assert.match(dashboard, /directBindingLead:"Connect a button directly[\s\S]*Automatic reporting links to the coordinator stay hidden\."/);
+  assert.match(dashboard, /directBindingLead:"Bir düğmeyi doğrudan[\s\S]*otomatik raporlama bağlantıları gizlenir\."/);
   assert.match(dashboard, /data-zgroup-existing-scene=/);
   assert.match(dashboard, /data-zgroup-scene-name=/);
   assert.match(dashboard, /class="zigbee-group-empty"/);

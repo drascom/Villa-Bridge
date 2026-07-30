@@ -475,7 +475,7 @@
     "noZigbeeGroupsLead": "Name a room or area above, create the group, then add its lights.",
     "deleteZigbeeGroupConfirm": "Delete this Zigbee group?",
     "directBinding": "Direct binding",
-    "directBindingLead": "Connect a button directly to a light or group. It keeps working even when Villa Bridge is offline.",
+    "directBindingLead": "Connect a button directly to a light or group. It keeps working while Villa Bridge is offline. Automatic reporting links to the coordinator stay hidden.",
     "sourceDevice": "Button or remote",
     "targetDevice": "Light or group",
     "automaticEndpoint": "Automatic endpoint",
