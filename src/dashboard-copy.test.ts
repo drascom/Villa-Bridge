@@ -335,6 +335,31 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
   assert.match(dashboard, /if\(!state\.auth\.authenticated\)\{openAuthGate\(\);return\}/);
 });
 
+test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla sıralanır", async () => {
+  const dashboard = await readDashboardBundle();
+  const settingsStart = dashboard.indexOf('<section id="settings"');
+  const settings = dashboard.slice(
+    settingsStart,
+    dashboard.indexOf("</section>\n  </main>", settingsStart) + 10
+  );
+
+  assert.ok(settings.indexOf("onboarding-settings-card") < settings.indexOf("settings-security-grid"));
+  assert.ok(settings.indexOf("settings-security-grid") < settings.indexOf('id="settingsForm"'));
+  assert.ok(settings.indexOf('id="settingsForm"') < settings.indexOf('id="androidRuntimeCard"'));
+  assert.match(settings, /class="settings-security-grid"/);
+  assert.match(settings, /class="setting-card security-card"/);
+  assert.match(settings, /id="adminPasswordForm"/);
+  assert.match(settings, /id="settingsForm" class="setting-card connection-settings-card"/);
+  assert.match(settings, /class="connection-settings-grid"/);
+  assert.match(settings, /class="connection-settings-section"><h2>Zigbee2MQTT/);
+  assert.match(settings, /class="connection-settings-section"><h2>MQTT/);
+  assert.match(settings, /class="connection-settings-section"><h2>Matter/);
+  assert.match(settings, /class="settings-actions"[\s\S]*id="saveSettings"/);
+  assert.match(dashboard, /\.settings-security-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(dashboard, /\.connection-settings-section\+\.connection-settings-section\{border-left:1px solid var\(--line\)\}/);
+  assert.match(dashboard, /api\("\/api\/auth\/admin-password",\{method:"PUT"/);
+});
+
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
   const dashboard = await readDashboardBundle();
 

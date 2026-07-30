@@ -297,6 +297,33 @@ export class AuthStore {
     });
   }
 
+  async updateAdminPassword(
+    usernameValue: string,
+    currentPasswordValue: unknown,
+    newPasswordValue: unknown
+  ): Promise<void> {
+    if (typeof currentPasswordValue !== "string" || currentPasswordValue.length > 128) {
+      throw new Error("Mevcut yönetici parolası yanlış.");
+    }
+    const username = normalizeUsername(usernameValue);
+    const newPassword = validateAdminPassword(newPasswordValue);
+    await this.exclusive(async () => {
+      const state = await this.load();
+      const admin = state.users.find((user) =>
+        user.role === "admin" && user.username === username
+      );
+      if (!admin || !await this.verifySecret(admin, currentPasswordValue)) {
+        throw new Error("Mevcut yönetici parolası yanlış.");
+      }
+      if (await this.verifySecret(admin, newPassword)) {
+        throw new Error("Yeni yönetici parolası mevcut paroladan farklı olmalıdır.");
+      }
+      Object.assign(admin, await this.hashSecret(newPassword));
+      state.sessions = this.activeSessions(state.sessions).filter((session) => session.role !== "admin");
+      await this.save(state);
+    });
+  }
+
   async updateResidentPin(pinValue: unknown): Promise<void> {
     const pin = validateResidentPin(pinValue);
     await this.exclusive(async () => {

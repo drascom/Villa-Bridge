@@ -254,6 +254,26 @@ export const registerAccessControl = async (
       .send({ ok: true });
   });
 
+  app.put<{
+    Body?: { currentPassword?: unknown; newPassword?: unknown };
+  }>("/api/auth/admin-password", async (request, reply) => {
+    try {
+      await authStore.updateAdminPassword(
+        request.villaSession?.username ?? "",
+        request.body?.currentPassword,
+        request.body?.newPassword
+      );
+      return reply
+        .header("Set-Cookie", expiredSessionCookie(secureCookies))
+        .send({ ok: true, reauthenticationRequired: true });
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   app.put<{ Body?: { pin?: unknown } }>("/api/auth/resident-pin", async (request, reply) => {
     try {
       await authStore.updateResidentPin(request.body?.pin);

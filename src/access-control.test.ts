@@ -134,7 +134,8 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
     ["PUT", "/api/devices/test/options"],
     ["PUT", "/api/devices/test/ota-schedule"],
     ["GET", "/api/zigbee/backup"],
-    ["POST", "/api/zigbee/restore"]
+    ["POST", "/api/zigbee/restore"],
+    ["PUT", "/api/auth/admin-password"]
   ] as const) {
     const response = await app.inject({
       method,
@@ -144,6 +145,52 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
     assert.equal(response.statusCode, 403);
     assert.equal(response.json().code, "ADMIN_REQUIRED");
   }
+});
+
+test("yönetici parolası doğrulanarak değiştirilir ve yeniden giriş gerekir", async (context) => {
+  const { app } = await setupApp(context);
+  const setup = await app.inject({
+    method: "POST",
+    url: "/api/auth/setup",
+    payload: { username: "owner", password: "correct horse battery", residentPin: "638251" }
+  });
+  const cookie = cookieFrom(setup);
+  const headers = { cookie, "x-villa-csrf": setup.json().csrfToken };
+
+  const denied = await app.inject({
+    method: "PUT",
+    url: "/api/auth/admin-password",
+    headers,
+    payload: { currentPassword: "wrong password", newPassword: "new secure passphrase" }
+  });
+  assert.equal(denied.statusCode, 400);
+
+  const changed = await app.inject({
+    method: "PUT",
+    url: "/api/auth/admin-password",
+    headers,
+    payload: {
+      currentPassword: "correct horse battery",
+      newPassword: "new secure passphrase"
+    }
+  });
+  assert.equal(changed.statusCode, 200);
+  assert.equal(changed.json().reauthenticationRequired, true);
+  assert.equal((await app.inject({
+    method: "GET",
+    url: "/api/settings",
+    headers: { cookie }
+  })).statusCode, 401);
+  assert.equal((await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { mode: "admin", username: "owner", secret: "correct horse battery" }
+  })).statusCode, 401);
+  assert.equal((await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { mode: "admin", username: "owner", secret: "new secure passphrase" }
+  })).statusCode, 200);
 });
 
 test("durum değiştiren API geçerli oturum yanında CSRF doğrulaması ister", async (context) => {
