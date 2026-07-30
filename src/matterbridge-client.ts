@@ -22,34 +22,44 @@ interface MatterResponse {
     rootVendorName?: string;
     label?: string;
   }>;
+  matterbridgeInformation?: {
+    matterbridgeQrPairingCode?: string;
+    matterbridgeManualPairingCode?: string;
+    matterbridgePaired?: boolean;
+    matterbridgeAdvertise?: boolean;
+    matterbridgeFabricInformations?: Array<{
+      fabricIndex?: number;
+      rootVendorName?: string;
+      label?: string;
+    }>;
+  };
 }
 
 export class MatterbridgeClient {
   constructor(private readonly wsUrl: string) {}
 
   async getStatus(): Promise<MatterStatus> {
-    const response = await this.request({ id: "Matterbridge", server: true });
+    const response = await this.request("/api/settings");
     return this.normalize(response);
   }
 
   async setCommissioning(open: boolean): Promise<MatterStatus> {
-    await this.request({
-      id: "Matterbridge",
-      ...(open ? { startCommission: true } : { stopCommission: true })
-    });
+    await this.request(open ? "/api/advertise" : "/api/stopadvertise");
     await new Promise((resolve) => setTimeout(resolve, 150));
     return this.getStatus();
   }
 
   private async normalize(response: MatterResponse): Promise<MatterStatus> {
-    const qrPairingCode = response.qrPairingCode ?? "";
+    const information = response.matterbridgeInformation;
+    const qrPairingCode = information?.matterbridgeQrPairingCode ?? response.qrPairingCode ?? "";
+    const fabricInformations = information?.matterbridgeFabricInformations ?? response.fabricInformations ?? [];
     return {
-      online: response.online === true,
-      commissioned: response.commissioned === true,
-      advertising: response.advertising === true,
+      online: information !== undefined || response.online === true,
+      commissioned: information?.matterbridgePaired ?? response.commissioned === true,
+      advertising: information?.matterbridgeAdvertise ?? response.advertising === true,
       qrPairingCode,
-      manualPairingCode: response.manualPairingCode ?? "",
-      fabrics: (response.fabricInformations ?? []).map((fabric) => ({
+      manualPairingCode: information?.matterbridgeManualPairingCode ?? response.manualPairingCode ?? "",
+      fabrics: fabricInformations.map((fabric) => ({
         index: fabric.fabricIndex ?? 0,
         name: fabric.label || fabric.rootVendorName?.replace(/[()]/g, "") || "Bağlı platform"
       })),
@@ -59,7 +69,7 @@ export class MatterbridgeClient {
     };
   }
 
-  private async request(params: Record<string, unknown>): Promise<MatterResponse> {
+  private async request(method: string, params: Record<string, unknown> = {}): Promise<MatterResponse> {
     return await new Promise<MatterResponse>((resolve, reject) => {
       const socket = new WebSocket(this.wsUrl);
       const id = Date.now() % 2_000_000_000;
@@ -77,7 +87,7 @@ export class MatterbridgeClient {
         socket.send(JSON.stringify({
           id,
           sender: "VillaBridge",
-          method: "/api/matter",
+          method,
           src: "Frontend",
           dst: "Matterbridge",
           params
@@ -95,7 +105,7 @@ export class MatterbridgeClient {
         } catch {
           return;
         }
-        if (message.id !== id || message.method !== "/api/matter") return;
+        if (message.id !== id || message.method !== method) return;
         if (message.error) done(new Error(message.error));
         else done(undefined, message.response);
       });

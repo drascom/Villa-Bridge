@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const dashboardUrl = new URL("../public/index.html", import.meta.url);
+const dashboardBackgroundUrl = new URL("../public/assets/dashboard-landscape.jpg", import.meta.url);
+const serverUrl = new URL("./index.js", import.meta.url);
 const englishLocaleUrl = new URL("../public/locales/en.json", import.meta.url);
 const turkishLocaleUrl = new URL("../public/locales/tr.json", import.meta.url);
 
@@ -28,21 +30,86 @@ function dashboardScripts(dashboard: string): string {
 test("bağlantılar ekranı yalnız Matter sistemlerini tarif eder", async () => {
   const dashboard = await readDashboardBundle();
 
+  assert.match(dashboard, /\.connection-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(dashboard, /homePlatforms:"Matter systems"/);
   assert.match(dashboard, /homePlatforms:"Matter sistemleri"/);
   assert.match(dashboard, /connectPlatform:"Connect Matter system"/);
   assert.match(dashboard, /connectPlatform:"Matter sistemi bağla"/);
+  assert.doesNotMatch(dashboard, /data-i18n="oneNameSystem"/);
+  assert.match(dashboard, /id="toggleHaSetup"[^>]*aria-expanded="false"[^>]*aria-controls="haSetupDetails"/);
+  assert.match(dashboard, /id="haSetupDetails" class="ha-setup-details" hidden/);
+  assert.match(dashboard, /connectHomeAssistant:"Connect Home Assistant"/);
+  assert.match(dashboard, /connectHomeAssistant:"Home Assistant’a bağlan"/);
+  assert.match(dashboard, /hideHomeAssistantSetup:"Hide connection details"/);
+  assert.match(dashboard, /hideHomeAssistantSetup:"Bağlantı ayrıntılarını gizle"/);
+  const networkGuide = dashboard.indexOf('class="ha-network-guide connection-network-guide"');
+  const matterCard = dashboard.indexOf('data-i18n="homePlatforms"');
+  const homeAssistantCard = dashboard.indexOf('class="connection-card home-assistant-card"');
+  assert.ok(networkGuide >= 0 && networkGuide < matterCard && matterCard < homeAssistantCard);
+  assert.match(dashboard, /home-assistant-card"[\s\S]*?<\/article>\s*<div id="haSetupDetails" class="ha-setup-details" hidden>/);
+  assert.match(dashboard, /\.ha-setup-details\{grid-column:1\/-1/);
+  assert.match(dashboard, /\.ha-layout\{display:grid;grid-template-columns:1fr 1fr/);
+  assert.match(dashboard, /details\.hidden=!details\.hidden/);
+  assert.match(dashboard, /\$\("#toggleHaSetup"\)\.onclick=toggleHomeAssistantSetup/);
   assert.doesNotMatch(dashboard, />Home platforms</);
   assert.doesNotMatch(dashboard, />Ev platformları</);
   assert.doesNotMatch(dashboard, /Connect a platform/);
   assert.doesNotMatch(dashboard, /Yeni platform bağla/);
 });
 
+test("dashboard sabit ve hafif manzara arka planı üzerinde iki katmanlı saydam yüzeyler kullanır", async () => {
+  const [dashboard, background, server] = await Promise.all([
+    readDashboardBundle(),
+    readFile(dashboardBackgroundUrl),
+    readFile(serverUrl, "utf8")
+  ]);
+
+  assert.match(dashboard, /body\[data-active-view="home"\]\{background-color:#c5ccc7;background-image:[^}]*url\("\/assets\/dashboard-landscape\.jpg"\)[^}]*background-attachment:fixed/);
+  assert.match(dashboard, /--home-glass:rgba\(247,250,248,.22\)/);
+  assert.match(dashboard, /--home-control:rgba\(251,252,252,.82\)/);
+  assert.match(dashboard, /body\[data-active-view="home"\] aside\{color:#f4f8f5;background:rgba\(23,65,54,.9\)/);
+  assert.match(dashboard, /#home \.quick-control-widget,[^}]*#home \.widget-card\{[^}]*background:var\(--home-glass\)/);
+  assert.match(dashboard, /#home \.quick-card,[^}]*#home \.group-control-tile,[^}]*background:var\(--home-control\)/);
+  assert.equal(background[0], 0xff);
+  assert.equal(background[1], 0xd8);
+  assert.ok(background.length < 180_000);
+  assert.match(server, /app\.get\("\/assets\/dashboard-landscape\.jpg"/);
+  assert.match(server, /Cache-Control", "public, max-age=31536000, immutable"/);
+});
+
 test("Home Assistant kartı LAN IP ve EN/TR sabitleme rehberi sunar", async () => {
-  const dashboard = await readDashboardBundle();
+  const [dashboard, server] = await Promise.all([
+    readDashboardBundle(),
+    readFile(serverUrl, "utf8")
+  ]);
 
   assert.match(dashboard, /state\.network\?\.preferredAddress/);
   assert.doesNotMatch(dashboard, /location\.hostname/);
+  assert.match(dashboard, /id="haProtocol"/);
+  assert.match(dashboard, /id="haUsername"/);
+  assert.match(dashboard, /id="haPassword"/);
+  assert.match(dashboard, /id="toggleHaPassword"/);
+  assert.match(dashboard, /mqttProtocol:"MQTT protocol"/);
+  assert.match(dashboard, /mqttProtocol:"MQTT protokolü"/);
+  assert.match(dashboard, /leaveBlank:"Not required — leave blank"/);
+  assert.match(dashboard, /leaveBlank:"Gerekmiyor — boş bırakın"/);
+  assert.match(dashboard, /state\.mqttAccess=data\.mqttAccess\|\|null/);
+  assert.match(server, /protocol: "3\.1\.1"/);
+  assert.match(server, /authenticationRequired/);
+  assert.match(server, /app\.put\("\/api\/home-assistant\/discovery"/);
+  assert.match(server, /await source\.setHomeAssistantDiscovery\(request\.body\.enabled\)/);
+  assert.match(server, /restartRequired: false/);
+  assert.match(dashboard, /api\("\/api\/home-assistant\/discovery",\{method:"PUT",body:JSON\.stringify\(\{enabled\}\)\}\)/);
+  const discoveryToggle = dashboard.match(
+    /async function toggleHomeAssistantDiscovery\(\)\{([\s\S]*?)\n  \}\n  async function loadFavorites/
+  )?.[1] ?? "";
+  assert.doesNotMatch(discoveryToggle, /settings\/apply|waitForRestart|confirm\(/);
+  assert.match(dashboard, /enableDiscovery:"Start service"/);
+  assert.match(dashboard, /disableDiscovery:"Stop service"/);
+  assert.match(dashboard, /enableDiscovery:"Servisi başlat"/);
+  assert.match(dashboard, /disableDiscovery:"Servisi durdur"/);
+  assert.match(dashboard, /discoveryEnabledLive:"Home Assistant publishing service started\. MQTT stayed online\."/);
+  assert.match(dashboard, /discoveryEnabledLive:"Home Assistant yayın servisi başlatıldı\. MQTT kesintisiz çalışıyor\."/);
   assert.match(dashboard, /haStableIpTitle:"Keep the tablet IP address stable"/);
   assert.match(dashboard, /haStableIpTitle:"Tabletin IP adresini sabit tutun"/);
   assert.match(dashboard, /DHCP reservation/);
@@ -63,11 +130,24 @@ test("Home Assistant kartı LAN IP ve EN/TR sabitleme rehberi sunar", async () =
   ));
 });
 
+test("aç/kapat komutları sonuçlanana kadar kontrolü kilitler ve spinner gösterir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /pendingCommands:new Set\(\)/);
+  assert.match(dashboard, /if\(state\.pendingCommands\.has\(key\)\)return/);
+  assert.match(dashboard, /state\.pendingCommands\.add\(key\);[\s\S]*?finally\{state\.pendingCommands\.delete\(key\);render\(\)\}/);
+  assert.match(dashboard, /class="command-spinner"/);
+  assert.match(dashboard, /\.switch\.pending::after/);
+  assert.match(dashboard, /\.light-power\.pending::after/);
+  assert.match(dashboard, /device\.availability==="offline"\|\|pending\?" disabled":""/);
+});
+
 test("cihaz kaldırma Android WebView uyumlu ve açıkça yıkıcı bir diyalog kullanır", async () => {
   const dashboard = await readDashboardBundle();
 
   assert.match(dashboard, /id="removeDialog"/);
   assert.match(dashboard, /id="removeConfirmation"/);
+  assert.match(dashboard, /id="forceRemove"/);
   assert.match(dashboard, /Remove from Zigbee network\?/);
   assert.match(dashboard, /Zigbee ağından kaldırılsın mı\?/);
   assert.match(dashboard, /physical Zigbee device/);
@@ -76,6 +156,10 @@ test("cihaz kaldırma Android WebView uyumlu ve açıkça yıkıcı bir diyalog 
   assert.match(dashboard, /küçük harflerle yes veya evet yazın/);
   assert.match(dashboard, /autocapitalize="none"/);
   assert.match(dashboard, /\["yes","evet"\]\.includes/);
+  assert.match(dashboard, /confirmDeviceRemoval\(force=false\)/);
+  assert.match(dashboard, /JSON\.stringify\(\{confirmation,force\}\)/);
+  assert.match(dashboard, /forceRemove:"Kaydı zorla sil"/);
+  assert.match(dashboard, /forceRemove:"Force delete record"/);
   assert.match(dashboard, /if\(Array\.isArray\(data\.favorites\)\)state\.favorites=data\.favorites/);
   assert.match(dashboard, /showModal\(\)/);
   assert.doesNotMatch(dashboard, /prompt\(t\("confirmRemoval"/);
@@ -107,8 +191,14 @@ test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
   const dashboard = await readDashboardBundle();
 
   assert.match(dashboard, /id="pullRefresh"/);
+  assert.match(dashboard, /addDevice:"＋ Cihaz ekle"/);
+  assert.doesNotMatch(dashboard, /Yeni cihaz ekle/);
+  assert.match(dashboard, /id="devicesAddDevice" class="primary add-device"[^>]*><svg class="page-action-glyph"/);
+  assert.match(dashboard, /id="refreshButton"><svg class="page-action-glyph"/);
+  assert.match(dashboard, /#devices \.page-head>\.add-device,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
   assert.match(dashboard, /pullToRefresh:"Pull to refresh"/);
   assert.match(dashboard, /pullToRefresh:"Yenilemek için aşağı çekin"/);
+  assert.match(dashboard, /@media\(min-width:561px\)\{#devices \.page-head>\.add-device\{margin-top:32px\}\}/);
   assert.match(dashboard, /addEventListener\("touchmove"/);
   assert.match(dashboard, /\{passive:false\}/);
   assert.match(dashboard, /window\.scrollY>0/);
@@ -126,8 +216,10 @@ test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async 
   assert.match(dashboard, /nameNewDevice:"Yeni cihazınıza isim verin"/);
   assert.match(dashboard, /id="cancelName"/);
   assert.match(dashboard, /minlength="2"/);
-  assert.match(dashboard, /openPairingName\(session\.foundId\)/);
-  assert.match(dashboard, /state\.editing=\{id,channel:null,afterPairing:true\}/);
+  assert.match(dashboard, /openPairingName\(session\.foundId,session\.reconnected\)/);
+  assert.match(dashboard, /pairingReconnectComplete:"Known device reconnected successfully\."/);
+  assert.match(dashboard, /pairingReconnectComplete:"Kayıtlı cihaz yeniden bağlandı\."/);
+  assert.match(dashboard, /state\.editing=\{id,channel:null,afterPairing:true,reconnected\}/);
   assert.match(dashboard, /editing\?\.afterPairing/);
   assert.match(dashboard, /finishPairingFlow\(editing\.id\)/);
   assert.match(dashboard, /\$\("#cancelName"\)\.textContent=t\(afterPairing\?"skip":"cancel"\)/);
@@ -173,6 +265,37 @@ test("diller ayrı ve genişletilebilir JSON paketlerinden yüklenir", async () 
   assert.doesNotMatch(dashboard, /const translations=\{\s*en:/);
 });
 
+test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı yönlendirir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="onboardingDialog" class="onboarding-dialog"/);
+  assert.match(dashboard, /const onboardingStepCount=6/);
+  assert.match(dashboard, /villa-onboarding-complete-v1/);
+  assert.match(dashboard, /villa-dashboard-tour-complete-v1/);
+  assert.match(dashboard, /villa-device-hint-complete-v1/);
+  assert.match(dashboard, /if\(!onboardingComplete\(\)\)openOnboarding\(\)/);
+  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\)\]\)/);
+  assert.match(dashboard, /data-onboarding-language="en"/);
+  assert.match(dashboard, /onboardingZigbeeUrl/);
+  assert.match(dashboard, /onboardingMqttUrl/);
+  assert.match(dashboard, /onboardingMatterUrl/);
+  assert.match(dashboard, /setupReadyTitle:"Congratulations, your home hub is ready"/);
+  assert.match(dashboard, /setupReadyTitle:"Tebrikler, ev merkeziniz hazır"/);
+  assert.match(dashboard, /emptyDevicesTitle:"Add your first device"/);
+  assert.match(dashboard, /emptyDevicesTitle:"İlk cihazınızı ekleyin"/);
+  assert.match(dashboard, /data-empty-add-device/);
+  assert.match(dashboard, /const dashboardTourSteps=\(\)=>\[/);
+  assert.match(dashboard, /target:"#quickDevices"/);
+  assert.match(dashboard, /target:"#addWidget"/);
+  assert.match(dashboard, /target:"#editDashboard"/);
+  assert.match(dashboard, /target:'.nav-button\[data-view="devices"\]'/);
+  assert.match(dashboard, /box-shadow:0 0 0 9999px rgba\(10,23,17,.68\)/);
+  assert.match(dashboard, /\.onboarding-actions button\[hidden\],\.coach-actions button\[hidden\]\{display:none\}/);
+  assert.match(dashboard, /\.onboarding-actions\.final\{justify-content:flex-end\}/);
+  assert.match(dashboard, /id="restartOnboarding"/);
+  assert.match(dashboard, /id="restartDashboardTour"/);
+});
+
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
   const dashboard = await readDashboardBundle();
 
@@ -208,13 +331,43 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /runtimeStopConfirm:"Stop Zigbee, MQTT and Matter/);
   assert.match(dashboard, /runtimeStopConfirm:"Bu tablette Zigbee, MQTT ve Matter/);
   assert.match(dashboard, /orientation:landscape/);
-  assert.match(dashboard, /body\[data-active-view="home"\] \.topbar/);
-  assert.match(dashboard, /grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+  assert.match(dashboard, /aside\{position:fixed;z-index:10;top:0;bottom:auto/);
+  assert.match(dashboard, /grid-template-columns:repeat\(4,minmax\(120px,1fr\)\) auto/);
+  assert.match(dashboard, /\.nav-utilities\{display:flex/);
+  assert.match(dashboard, /\.topbar\{display:none\}main\{max-width:none;padding:82px 20px 20px\}/);
+  assert.match(dashboard, /id="landscapeTheme"/);
+  assert.match(dashboard, /id="landscapeLanguage"/);
+  assert.match(dashboard, /id="mobileTheme" class="mobile-utility"[^>]*data-theme-toggle/);
+  assert.match(dashboard, /id="mobileLanguage" class="mobile-utility"[^>]*data-language-cycle/);
+  assert.match(dashboard, /\$\$\("\[data-theme-toggle\]"\)\.forEach\(button=>button\.onclick=\(\)=>setThemeMode/);
+  assert.match(dashboard, /\$\$\("\[data-language-cycle\]"\)\.forEach\(button=>button\.onclick=cycleLanguage\)/);
+  assert.match(dashboard, /\.mobile-utility\{[^}]*border:0[^}]*background:transparent\}/);
+  assert.match(dashboard, /@media\(orientation:portrait\)\{\.topbar\{justify-content:flex-end\}\.theme-switch,\.language-switch\{display:none\}\.mobile-topbar-actions\{display:flex/);
   assert.match(dashboard, /document\.body\.dataset\.activeView=viewName/);
-  assert.match(dashboard, /body\.android-app \.quick-toggle\.on::before\{animation:none\}/);
+  assert.match(dashboard, /body\.android-app dialog::backdrop\{backdrop-filter:none\}/);
   assert.match(dashboard, /signature!==state\.overviewSignature/);
   assert.match(dashboard, /if\(!document\.hidden\)refresh\(\)/);
   assert.match(dashboard, /setInterval\(\(\)=>\{if\(!document\.hidden\)refresh\(\)\},8000\)/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});
+
+test("Settings debug modu son API hatalarını güvenli ve isteğe bağlı gösterir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="debugCard"/);
+  assert.match(dashboard, /id="toggleDebug"/);
+  assert.match(dashboard, /id="debugLogPanel"/);
+  assert.match(dashboard, /id="debugErrorList"/);
+  assert.match(dashboard, /api\("\/api\/debug\/errors"\)/);
+  assert.match(dashboard, /api\("\/api\/debug\/errors",\{method:"DELETE"\}\)/);
+  assert.match(dashboard, /debug:\{enabled:state\.settings\?\.debug\?\.enabled!==false\}/);
+  assert.match(dashboard, /state\.settings\?\.debug\?\.enabled===true\?state\.debugErrors\.length:0/);
+  assert.match(dashboard, /debugMode:"Debug mode"/);
+  assert.match(dashboard, /debugMode:"Debug modu"/);
+  assert.match(dashboard, /debugLogPanel"\)\.hidden=!enabled/);
+  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\)\]\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
@@ -225,15 +378,186 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
 
   assert.match(dashboard, /id="widgetBoard"/);
   assert.match(dashboard, /id="widgetDialog"/);
-  assert.match(dashboard, /data-widget="status"/);
+  assert.match(dashboard, /--paper:#edf0f2;--surface:#fbfcfc;--surface-soft:#f3f5f6/);
+  assert.match(dashboard, /--card-shadow:0 2px 8px rgba\(35,45,41,.055\)/);
+  assert.match(dashboard, /id="systemAlertBar" class="system-alert-bar" role="alert" hidden/);
+  assert.match(dashboard, /\.system-alert-bar\[hidden\]\{display:none\}/);
+  assert.match(dashboard, /body\.has-system-alert main\{padding-top:112px\}/);
+  assert.match(dashboard, /\.device-card\{[^}]*border-radius:16px[^}]*box-shadow:var\(--card-shadow\)/);
+  assert.match(dashboard, /\.widget-card\{[^}]*border-radius:16px[^}]*background:var\(--surface\)/);
+  assert.match(dashboard, /addWidget:"＋ Add"/);
+  assert.match(dashboard, /addWidget:"＋ Ekle"/);
+  assert.match(dashboard, /editDashboard:"✎ Edit"/);
+  assert.match(dashboard, /editDashboard:"✎ Düzenle"/);
+  assert.doesNotMatch(dashboard, /Add widget|Widget ekle|Edit dashboard|Dashboard’u düzenle/);
+  assert.doesNotMatch(dashboard, /data-widget="status"/);
   assert.match(dashboard, /data-widget="quick"/);
-  assert.match(dashboard, /data-widget="signal"/);
+  assert.match(dashboard, /class="dashboard-widget widget-wide quick-control-widget" data-widget="quick"[\s\S]*?id="quickDevices"/);
+  assert.doesNotMatch(dashboard, /data-widget="quick"[\s\S]*?<h2[\s\S]*?id="quickDevices"/);
   assert.match(dashboard, /data-widget="availability"/);
   assert.match(dashboard, /data-widget="recent"/);
+  assert.match(dashboard, /data-widget="clock"[\s\S]*id="worldClockRows"/);
+  assert.match(dashboard, /data-widget="weather"[\s\S]*id="weatherContent"/);
+  assert.doesNotMatch(dashboard, /data-widget="signal"/);
+  assert.match(dashboard, /class="home-title-line"[\s\S]*id="homeGreeting"[\s\S]*class="home-metrics"/);
+  assert.match(dashboard, /\.home-title-line\{[^}]*grid-template-columns:1fr auto 1fr[^}]*align-items:baseline/);
+  assert.match(dashboard, /\.home-metrics\{justify-self:center/);
+  assert.match(dashboard, /@media\(max-width:900px\)\{\.shell\{grid-template-columns:minmax\(0,1fr\)\}aside\{left:0;right:0;width:auto\}/);
+  assert.match(dashboard, /main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:18px\}/);
+  assert.match(dashboard, /#home \.group-control-grid\{grid-template-columns:1fr\}/);
+  assert.match(dashboard, /@media\(orientation:portrait\) and \(max-width:560px\)\{main\{padding:12px 14px 96px\}/);
+  assert.match(dashboard, /#home \.home-actions\{display:flex;justify-content:flex-end;gap:4px\}/);
+  assert.match(dashboard, /#home \.home-actions button,body\[data-active-view="home"\] #home \.home-actions button,#devices \.page-head>\.add-device,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
+  assert.match(dashboard, /id="addWidget" class="secondary"><svg class="home-action-glyph"/);
+  assert.match(dashboard, /id="editDashboardLabel" class="home-action-label"/);
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{#home \.home-actions\{gap:6px\}#home \.home-actions button,#devices \.page-head>\.add-device,#refreshButton\{[^}]*width:46px[^}]*background:var\(--forest-soft\)/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{[^}]*background:rgba\(23,65,54,.76\)/);
+  assert.match(dashboard, /\.clock-row span\{color:var\(--ink\);font:750 18px\/1 system-ui,sans-serif/);
+  assert.match(dashboard, /\.weather-facts span\{padding:6px 9px[^}]*font-size:12px;font-weight:700\}/);
+  assert.doesNotMatch(dashboard, /id="homeAddDevice"/);
+  assert.match(dashboard, /\$\("#editDashboardLabel"\)\.textContent=editDashboardText/);
+  assert.match(dashboard, /data-home-metric="devices"[\s\S]*id="deviceCount"/);
+  assert.match(dashboard, /data-home-metric="alerts"[\s\S]*id="alertCount"/);
+  assert.match(dashboard, /data-home-metric="signal"[\s\S]*id="signalAverage"/);
+  assert.match(dashboard, /\.home-metric-link\{[^}]*border:0[^}]*color:var\(--muted\)[^}]*background:transparent/);
+  assert.doesNotMatch(dashboard, /id="homeSignalIndicator"/);
+  assert.doesNotMatch(dashboard, /id="homeSignalBars"/);
+  assert.doesNotMatch(dashboard, /class="summary-item connectivity-summary"/);
+  assert.match(dashboard, /data-i18n="signal">Signal/);
+  assert.match(dashboard, /signal:"Sinyal"/);
+  assert.match(dashboard, /id="deviceCount"[\s\S]*id="alertCount"[\s\S]*id="signalAverage"/);
+  assert.doesNotMatch(dashboard, /id="homeState"/);
+  assert.match(dashboard, /id="signalAverage"/);
+  assert.match(dashboard, /`\$\{averageSignal\}%`/);
+  assert.doesNotMatch(dashboard, /id="activeCount"/);
+  assert.doesNotMatch(dashboard, /\$\("#activeCount"\)/);
+  assert.doesNotMatch(dashboard, /data-i18n="homeStatus">Home status/);
+  assert.match(dashboard, /function navigateHomeMetric\(metric\)/);
+  assert.match(dashboard, /const alertDevice=state\.devices\.find\(isAlert\)/);
+  assert.match(dashboard, /sort\(\(a,b\)=>Number\(a\.state\.linkquality\)-Number\(b\.state\.linkquality\)\)/);
+  assert.match(dashboard, /\$\$\("\[data-home-metric\]"\)\.forEach\(button=>button\.onclick=\(\)=>navigateHomeMetric\(button\.dataset\.homeMetric\)\)/);
+  assert.match(dashboard, /greetingKeyForHour=hour=>hour<5\?"greetingNight":hour<12\?"greetingMorning":hour<18\?"greetingAfternoon":hour<22\?"greetingEvening":"greetingNight"/);
+  assert.match(dashboard, /setInterval\(updateGreeting,60000\)/);
+  assert.match(dashboard, /function renderSystemAlertBar\(\)/);
+  assert.doesNotMatch(dashboard, /function renderSystemAlertBar\(\)\{[\s\S]*?debugErrors\[0\]/);
+  assert.match(dashboard, /bar\.hidden=!message/);
+  assert.match(dashboard, /document\.body\.classList\.toggle\("has-system-alert",Boolean\(message\)\)/);
+  assert.match(dashboard, /const fixedDashboardWidgets=new Set\(\["quick"\]\)/);
+  assert.match(dashboard, /data-quick-controls=/);
+  assert.match(dashboard, /\.layout-glyph\{position:relative;width:14px;height:14px/);
+  assert.match(dashboard, /\.layout-glyph\.grid::before\{left:2px;top:2px/);
+  assert.match(dashboard, /\.layout-glyph\.list::before\{left:0;top:1px/);
+  assert.match(dashboard, /id="devices"[\s\S]*data-device-layout-toggle[\s\S]*data-device-layout="grid"[\s\S]*data-device-layout="list"[\s\S]*id="allDevices"/);
+  assert.doesNotMatch(dashboard, /data-quick-layout/);
+  assert.match(dashboard, /localStorage\.getItem\("villa-device-layout"\)/);
+  assert.match(dashboard, /localStorage\.setItem\("villa-device-layout",state\.deviceLayout\)/);
+  assert.match(dashboard, /container\.classList\.toggle\("devices-list-view",state\.deviceLayout==="list"\)/);
+  assert.match(dashboard, /\.device-grid\.devices-list-view\{grid-template-columns:1fr\}/);
+  assert.match(dashboard, /deviceLayout:"Cihaz görünümü"/);
+  assert.match(dashboard, /id="showLightDevice"/);
+  assert.match(dashboard, /class="device-card quick-card \$\{visualState\}"/);
+  assert.doesNotMatch(dashboard, /class="quick-state /);
+  assert.match(dashboard, /class="quick-battery\$\{battery<15\?" low":""\}"/);
+  assert.match(dashboard, /class="battery-glyph"/);
+  assert.match(dashboard, /const linkQualityPercent=device=>/);
+  assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div>\$\{linkQualityBadge\(device\)\}/);
+  assert.match(dashboard, /class="device-link-level\$\{tone\?`\ \$\{tone\}`:""\}"/);
+  assert.match(dashboard, /\.device-link-level\.strong\{color:#24805a/);
+  assert.match(dashboard, /\.device-link-level\.weak\{color:var\(--danger\)/);
+  assert.match(dashboard, /\.quick-control-widget\{[^}]*padding:12px 10px 4px[^}]*border-radius:16px[^}]*background:var\(--surface\)[^}]*box-shadow:var\(--card-shadow\)/);
+  assert.match(dashboard, /\.quick-control-widget \.quick-card\{min-height:44px;padding:5px 12px\}/);
+  assert.match(dashboard, /class="quick-device-icon"/);
+  assert.match(dashboard, /\.quick-toggle\{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:26px minmax\(0,1fr\) auto/);
+  assert.match(dashboard, /<button class="quick-toggle \$\{control\.value===true\?"on":""\}\$\{pending\?" pending":""\}" data-command="[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
+  assert.match(dashboard, /\.quick-grid\.grid-view\{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto/);
+  assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:144px;flex:0 0 144px;aspect-ratio:auto;scroll-snap-align:start\}/);
+  assert.match(dashboard, /body\[data-active-view="home"\]\{overflow:hidden\}/);
+  assert.match(dashboard, /id="widgetRail" class="widget-rail"/);
+  assert.match(dashboard, /#home \.widget-board\{height:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:10px;overflow:hidden\}/);
+  assert.doesNotMatch(dashboard, /#home \[data-widget="status"\]/);
+  assert.match(dashboard, /#home \[data-widget="quick"\]\{height:62px;flex-basis:62px\}/);
+  assert.match(dashboard, /#home \.widget-rail\{min-height:0;flex:1;display:grid;grid-template-columns:repeat\(3,calc\(33\.333vw - 27px\)\)/);
+  assert.match(dashboard, /grid-auto-columns:calc\(33\.333vw - 27px\)/);
+  assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2\}/);
+  assert.match(dashboard, /const rail=\$\("#widgetRail"\)/);
+  assert.match(dashboard, /rail\.insertBefore\(widget,\$\("#widgetEmpty"\)\)/);
+  assert.match(dashboard, /\$\$\("#widgetRail \[data-widget\]"\)/);
+  assert.match(dashboard, /@media\(max-width:560px\)\{[\s\S]*\.quick-grid\.grid-view \.quick-card\{width:144px\}/);
+  assert.match(dashboard, /\.group-widget\{grid-column:span 6;padding:22px/);
+  assert.match(dashboard, /\.group-control-tile\{[^}]*min-height:100px[^}]*grid-template-columns:56px/);
+  assert.match(dashboard, /class="group-control-visual" aria-hidden="true">\$\{deviceVisual\(device\)\}/);
+  assert.match(dashboard, /\.group-control-visual,\.group-control-visual \.device-visual\{width:54px;height:54px\}/);
+  assert.match(dashboard, /const deviceTypeIcon=device=>/);
+  assert.match(dashboard, /function bindGroupControls\(\)\{\s*bindDeviceImages\(\)/);
+  assert.match(dashboard, /clock:\{title:"worldClock",lead:"worldClockLead"\}/);
+  assert.match(dashboard, /weather:\{title:"weather",lead:"weatherLead"\}/);
+  assert.match(dashboard, /function renderWorldClock\(\)/);
+  assert.match(dashboard, /localStorage\.getItem\("villa-world-clock-zones"\)/);
+  assert.match(dashboard, /localStorage\.setItem\("villa-world-clock-zones"/);
+  assert.match(dashboard, /id="clockDialog"/);
+  assert.match(dashboard, /id="clockCitySearch"/);
+  assert.match(dashboard, /https:\/\/geocoding-api\.open-meteo\.com\/v1\/search\?\$\{params\}/);
+  assert.match(dashboard, /function addWorldClockCity\(location\)/);
+  assert.match(dashboard, /data-remove-clock-city=/);
+  assert.match(dashboard, /id="weatherLocationDialog"/);
+  assert.match(dashboard, /id="weatherLocationSearch"/);
+  assert.match(dashboard, /function chooseWeatherLocation\(location\)/);
+  assert.match(dashboard, /https:\/\/api\.open-meteo\.com\/v1\/forecast\?\$\{params\}/);
+  assert.match(dashboard, /navigator\.geolocation\.getCurrentPosition/);
+  assert.match(dashboard, /setInterval\(renderWorldClock,60000\)/);
+  assert.match(dashboard, /refreshWeatherIfNeeded\(\)/);
+  assert.match(dashboard, /id="widgetScrollHint" class="widget-scroll-hint"/);
+  assert.match(dashboard, /rail\.scrollWidth-rail\.clientWidth-rail\.scrollLeft>8/);
+  assert.match(dashboard, /scrollBy\(\{left:Math\.max\(220,Math\.round\(rail\.clientWidth\*\.72\)\),behavior:"smooth"\}\)/);
+  assert.match(dashboard, /const button=card\.querySelector\("\[data-command\]"\)/);
+  assert.match(dashboard, /if\(!button\|\|button\.disabled\)return/);
+  assert.match(dashboard, /command\(button\.dataset\.command,button\.dataset\.property,button\.dataset\.value==="true"\)/);
+  assert.match(dashboard, /if\(!event\.target\.closest\("button,input"\)\)toggle\(\)/);
+  assert.doesNotMatch(dashboard, /if\(!event\.target\.closest\("button,input"\)\)openLightControls/);
+  assert.match(dashboard, /id="deviceActionDialog"/);
+  assert.match(dashboard, /data-i18n="showDetails">Show Details/);
+  assert.match(dashboard, /const longPressDelay=560/);
+  assert.match(dashboard, /bindLongPress\(card,\(\)=>openDeviceActions\(card\.dataset\.quickControls\)\)/);
+  assert.match(dashboard, /event\.stopImmediatePropagation\(\)/);
+  assert.match(dashboard, /showDetails:"Detayları Göster"/);
+  assert.doesNotMatch(dashboard, /class="state-overlay"/);
+  assert.doesNotMatch(dashboard, /class="view-device"/);
+  assert.doesNotMatch(dashboard, /class="light-controls-button"/);
   assert.match(dashboard, /localStorage\.getItem\("villa-dashboard-widgets"\)/);
   assert.match(dashboard, /localStorage\.setItem\("villa-dashboard-widgets"/);
-  assert.match(dashboard, /data-widget-move="up"/);
+  assert.match(dashboard, /localStorage\.getItem\("villa-dashboard-groups"\)/);
+  assert.match(dashboard, /localStorage\.setItem\("villa-dashboard-groups"/);
+  assert.match(dashboard, /id="groupDialog"/);
+  assert.match(dashboard, /id="groupDeviceChoices"/);
+  assert.match(dashboard, /const groupItemKey=\(deviceId,controlId\)=>JSON\.stringify\(\[deviceId,controlId\]\)/);
+  assert.match(dashboard, /group\.items\.map\(item=>/);
+  assert.match(dashboard, /data-group-device=/);
+  assert.match(dashboard, /const groupDeviceControlId="@device"/);
+  assert.match(dashboard, /data-group-show-device=/);
+  assert.match(dashboard, /groupDeviceVisualState\(device\)/);
+  assert.match(dashboard, /data-group-power=/);
+  assert.match(dashboard, /const groupPowerIcon=.*class="group-action-svg"/);
+  assert.match(dashboard, /const groupEditIcon=.*class="group-action-svg"/);
+  assert.doesNotMatch(dashboard, /groupPending\?[^:]+:"⏻"/);
+  assert.match(dashboard, /createDeviceGroup:"Create device group"/);
+  assert.match(dashboard, /createDeviceGroup:"Cihaz grubu oluştur"/);
+  assert.match(dashboard, /data-widget-move="left">←/);
+  assert.match(dashboard, /data-widget-move="right">→/);
   assert.match(dashboard, /data-widget-remove/);
+  assert.match(dashboard, /moveWidgetLeft:"Move widget left"/);
+  assert.match(dashboard, /moveWidgetRight:"Widget’ı sağa taşı"/);
+  assert.match(dashboard, /direction==="left"\?-1:1/);
+  assert.match(dashboard, /\.widget-board\.editing #widgetRail>\.dashboard-widget\{padding-top:78px\}/);
+  assert.match(dashboard, /scrollIntoView\(\{behavior:"smooth",block:"nearest",inline:"center"\}\)/);
+  assert.match(dashboard, /classList\.add\("widget-moved"\)/);
+  assert.match(dashboard, /@keyframes widget-moved-pulse/);
+  assert.match(dashboard, /animation:widget-jiggle/);
+  assert.match(dashboard, /saveWidgetLayout\(\);\s*applyWidgetLayout\(\)/);
+  assert.doesNotMatch(dashboard, /data-widget-drag-handle/);
+  assert.doesNotMatch(dashboard, /widget-drag-overlay/);
+  assert.doesNotMatch(dashboard, /document\.elementFromPoint/);
+  assert.doesNotMatch(dashboard, /widget-dragging/);
+  assert.doesNotMatch(dashboard, /dragWidget:/);
   assert.match(dashboard, /addWidgetTitle:"Add a dashboard widget"/);
   assert.match(dashboard, /addWidgetTitle:"Dashboard widget’ı ekle"/);
   assert.doesNotMatch(dashboard, /draggable="true"/);

@@ -139,7 +139,8 @@ test("eşleştirme yalnız gerçek katılma ve görüşme olaylarıyla ilerler",
     id: "0xnew",
     name: "New device",
     interviewCompleted: false,
-    supported: null
+    supported: null,
+    reconnected: false
   });
 
   store.ingest(
@@ -153,8 +154,48 @@ test("eşleştirme yalnız gerçek katılma ve görüşme olaylarıyla ilerler",
     id: "0xnew",
     name: "New device",
     interviewCompleted: true,
-    supported: true
+    supported: true,
+    reconnected: false
   });
+});
+
+test("kayıtlı cihaz eşleştirme sırasında yeniden katıldığında hazır sayılır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0xKNOWN",
+      friendly_name: "Kitchen Left Light",
+      interview_completed: true,
+      supported: true
+    }]))
+  );
+  store.pairingRequested(180);
+  store.ingest(
+    "bridge/event",
+    Buffer.from(JSON.stringify({
+      type: "device_announce",
+      data: { ieee_address: "0xKNOWN", friendly_name: "Kitchen Left Light" }
+    }))
+  );
+
+  assert.deepEqual(store.getPairing().device, {
+    id: "0xknown",
+    name: "Kitchen Left Light",
+    interviewCompleted: true,
+    supported: true,
+    reconnected: true
+  });
+});
+
+test("bilinmeyen cihaz duyurusu yeni eşleştirme sonucu üretmez", () => {
+  const store = new DeviceStore(new Map());
+  store.pairingRequested(180);
+  store.ingest(
+    "bridge/event",
+    Buffer.from('{"type":"device_announce","data":{"ieee_address":"0xunknown"}}')
+  );
+  assert.equal(store.getPairing().device, null);
 });
 
 test("kapalı oturum ve farklı cihaz görüşmesi eşleştirme sonucu üretmez", () => {
@@ -179,6 +220,7 @@ test("kapalı oturum ve farklı cihaz görüşmesi eşleştirme sonucu üretmez"
     id: "0xnew",
     name: "0xnew",
     interviewCompleted: false,
-    supported: null
+    supported: null,
+    reconnected: false
   });
 });

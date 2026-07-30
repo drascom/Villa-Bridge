@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  DirectZigbeeSource,
   directBridgeInfo,
   endpointNamesForDevice,
   parsePermitJoinSeconds
 } from "./direct-zigbee-source.js";
+import { DeviceStore } from "./device-store.js";
 
 test("Matterbridge permit-join boolean requests map to a bounded Zigbee duration", () => {
   assert.equal(parsePermitJoinSeconds(Buffer.from('{"value":true}')), 180);
@@ -45,4 +47,51 @@ test("endpoint names are derived from UID-scoped channel aliases", () => {
     l1: "Ceiling One",
     l2: "Ceiling Two"
   });
+});
+
+test("Home Assistant discovery toggles live without restarting the source", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0xabc",
+      friendly_name: "Kitchen Light",
+      type: "Router",
+      supported: true,
+      interview_completed: true,
+      definition: {
+        model: "TEST-LIGHT",
+        vendor: "Test",
+        exposes: [{ property: "state", access: 7 }]
+      }
+    }]))
+  );
+  store.ingest("Kitchen Light", Buffer.from('{"state":"OFF","linkquality":120}'));
+  const source = new DirectZigbeeSource(
+    {} as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false
+  );
+  const published: Array<{ topic: string; payload: string; retain: boolean }> = [];
+  Object.assign(source, {
+    mqtt: {
+      connected: true,
+      publish(topic: string, payload: string, options: { retain?: boolean }) {
+        published.push({ topic, payload, retain: options.retain === true });
+      }
+    }
+  });
+
+  source.setHomeAssistantDiscovery(true);
+  const discovery = published.filter((item) =>
+    item.topic.startsWith("homeassistant/") && item.payload.length > 0
+  );
+  assert.ok(discovery.length > 0);
+  assert.ok(discovery.every((item) => item.retain));
+
+  published.length = 0;
+  source.setHomeAssistantDiscovery(false);
+  assert.ok(published.length > 0);
+  assert.ok(published.every((item) => item.payload === "" && item.retain));
 });

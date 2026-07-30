@@ -17,6 +17,9 @@ export interface ConnectionSettings {
   homeAssistant: {
     discoveryEnabled: boolean;
   };
+  debug: {
+    enabled: boolean;
+  };
 }
 
 const objectValue = (value: unknown): YamlObject =>
@@ -44,6 +47,7 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
   const mqtt = objectValue(input.mqtt);
   const matter = objectValue(input.matter);
   const homeAssistant = objectValue(input.homeAssistant);
+  const debug = objectValue(input.debug);
   const baseTopic = typeof mqtt.baseTopic === "string" ? mqtt.baseTopic.trim() : "";
   if (!/^[A-Za-z0-9][A-Za-z0-9/_-]{0,79}$/.test(baseTopic) || baseTopic.includes("//")) {
     throw new Error("MQTT temel konusu geçersiz.");
@@ -61,6 +65,9 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
     },
     homeAssistant: {
       discoveryEnabled: homeAssistant.discoveryEnabled === true
+    },
+    debug: {
+      enabled: debug.enabled !== false
     }
   };
 };
@@ -87,6 +94,7 @@ export class SettingsStore {
     const fileMqtt = objectValue(file.mqtt);
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
+    const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
     return validateConnectionSettings({
@@ -102,6 +110,9 @@ export class SettingsStore {
       },
       homeAssistant: {
         discoveryEnabled: fileHomeAssistant.discoveryEnabled ?? this.fallback.homeAssistant.discoveryEnabled
+      },
+      debug: {
+        enabled: fileDebug.enabled ?? this.fallback.debug.enabled
       }
     });
   }
@@ -112,12 +123,14 @@ export class SettingsStore {
     const fileMqtt = objectValue(file.mqtt);
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
+    const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
 
     file.mqtt = { ...fileMqtt, url: settings.mqtt.url, baseTopic: settings.mqtt.baseTopic };
     file.matterbridge = { ...fileMatter, wsUrl: settings.matter.wsUrl };
     file.homeAssistant = { ...fileHomeAssistant, discoveryEnabled: settings.homeAssistant.discoveryEnabled };
+    file.debug = { ...fileDebug, enabled: settings.debug.enabled };
     z2m.mqtt = { ...z2mMqtt, server: settings.mqtt.url, base_topic: settings.mqtt.baseTopic };
     z2m.serial = { ...z2mSerial, port: settings.zigbee.adapterUrl };
 

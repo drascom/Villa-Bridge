@@ -12,6 +12,8 @@ matterbridge:
   wsUrl: ws://127.0.0.1:8283
 homeAssistant:
   discoveryEnabled: false
+debug:
+  enabled: true
 http:
   host: 127.0.0.1
   port: 8091

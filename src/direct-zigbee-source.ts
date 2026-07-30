@@ -36,6 +36,16 @@ export function parsePermitJoinSeconds(payload: Buffer): number {
   return Math.min(254, Math.max(0, requested));
 }
 
+export interface RemovableZigbeeDevice {
+  removeFromNetwork(): Promise<void>;
+  removeFromDatabase(): void;
+}
+
+export async function removeZigbeeDevice(device: RemovableZigbeeDevice, force: boolean): Promise<void> {
+  if (force) device.removeFromDatabase();
+  else await device.removeFromNetwork();
+}
+
 export function directBridgeInfo(permitted: boolean, time: number): JsonObject {
   return {
     version: "1.0.0",
@@ -83,7 +93,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     private readonly config: DirectZigbeeConfig,
     private readonly mqttConfig: AppConfig["mqtt"],
     private readonly store: DeviceStore,
-    private readonly homeAssistantDiscoveryEnabled = false,
+    private homeAssistantDiscoveryEnabled = false,
     private readonly aliases: ReadonlyMap<string, string> = new Map()
   ) {}
 
@@ -157,11 +167,11 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.publishHomeAssistantDiscovery();
   }
 
-  async removeDevice(id: string): Promise<void> {
+  async removeDevice(id: string, force = false): Promise<void> {
     const device = this.controller?.getDeviceByIeeeAddr(id);
     if (!device) throw new Error("Cihaz bulunamadı.");
     const previousName = this.config.devices[id]?.friendly_name ?? id;
-    await device.removeFromNetwork();
+    await removeZigbeeDevice(device, force);
     delete this.config.devices[id];
     await this.persistDeviceConfiguration(id, null);
     this.definitions.delete(id);
@@ -170,7 +180,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     await this.refreshDevices();
     this.publish("bridge/response/device/remove", {
       status: "ok",
-      data: { id: previousName, block: false, force: false }
+      data: { id: previousName, block: false, force }
     });
     this.publish("bridge/event", {
       type: "device_leave",
@@ -230,6 +240,20 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
       this.publish("bridge/event", event);
       await this.refreshDevices();
+    });
+    const announceKnownDevice = (device: { ieeeAddr: string }): void => {
+      if (!this.pairingState.permitted) return;
+      const friendlyName = this.config.devices[device.ieeeAddr]?.friendly_name ?? device.ieeeAddr;
+      const event = {
+        type: "device_announce",
+        data: { friendly_name: friendlyName, ieee_address: device.ieeeAddr }
+      };
+      this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
+      this.publish("bridge/event", event);
+    };
+    controller.on("deviceAnnounce", ({ device }) => announceKnownDevice(device));
+    controller.on("lastSeenChanged", ({ device, reason }) => {
+      if (reason === "deviceJoined") announceKnownDevice(device);
     });
     controller.on("deviceLeave", async ({ ieeeAddr }) => {
       const friendlyName = this.config.devices[ieeeAddr]?.friendly_name ?? ieeeAddr;
@@ -453,11 +477,17 @@ export class DirectZigbeeSource implements ZigbeeSource {
   }
 
   private publishHomeAssistantDiscovery(): void {
-    if (!this.homeAssistantDiscoveryEnabled) return;
     const client = this.mqtt;
     if (!client?.connected) return;
     const messages = buildHomeAssistantDiscovery(this.store.getDevices(), this.mqttConfig.baseTopic);
     const currentTopics = new Set(messages.map((item) => item.topic));
+    if (!this.homeAssistantDiscoveryEnabled) {
+      for (const topic of new Set([...this.homeAssistantDiscoveryTopics, ...currentTopics])) {
+        client.publish(topic, "", { retain: true });
+      }
+      this.homeAssistantDiscoveryTopics.clear();
+      return;
+    }
     for (const topic of this.homeAssistantDiscoveryTopics) {
       if (!currentTopics.has(topic)) client.publish(topic, "", { retain: true });
     }
@@ -465,6 +495,11 @@ export class DirectZigbeeSource implements ZigbeeSource {
       client.publish(item.topic, JSON.stringify(item.payload), { retain: true });
     }
     this.homeAssistantDiscoveryTopics = currentTopics;
+  }
+
+  setHomeAssistantDiscovery(enabled: boolean): void {
+    this.homeAssistantDiscoveryEnabled = enabled;
+    this.publishHomeAssistantDiscovery();
   }
 
   private async loadCachedStates(): Promise<void> {

@@ -19,6 +19,7 @@ interface PairingDevice {
   name: string;
   interviewCompleted: boolean;
   supported: boolean | null;
+  reconnected: boolean;
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -279,7 +280,24 @@ export class DeviceStore {
         id,
         name: typeof event.data.friendly_name === "string" ? event.data.friendly_name : id,
         interviewCompleted: false,
-        supported: null
+        supported: null,
+        reconnected: false
+      };
+      return;
+    }
+    if (event.type === "device_announce") {
+      const knownDevice = this.devices.find((device) =>
+        device.ieee_address?.toLowerCase() === id
+      );
+      if (!knownDevice) return;
+      this.pairingDevice = {
+        id,
+        name: typeof event.data.friendly_name === "string"
+          ? event.data.friendly_name
+          : knownDevice.friendly_name ?? id,
+        interviewCompleted: knownDevice.interview_completed !== false,
+        supported: typeof knownDevice.supported === "boolean" ? knownDevice.supported : null,
+        reconnected: true
       };
       return;
     }

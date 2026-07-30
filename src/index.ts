@@ -12,6 +12,8 @@ import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
 import { getNetworkInfo } from "./network-info.js";
 import { isDeviceRemovalConfirmation } from "./removal-confirmation.js";
+import { registerRecentErrorApi } from "./recent-error-api.js";
+import { RecentErrorLog } from "./recent-error-log.js";
 import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
@@ -31,9 +33,11 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
     zigbee: { adapterUrl: config.zigbee.serial.path },
     mqtt: { url: config.mqtt.url, baseTopic: config.mqtt.baseTopic },
     matter: { wsUrl: config.matterbridge.wsUrl },
-    homeAssistant: { discoveryEnabled: config.homeAssistant.discoveryEnabled }
+    homeAssistant: { discoveryEnabled: config.homeAssistant.discoveryEnabled },
+    debug: { enabled: config.debug.enabled }
   }
 ) : null;
+const recentErrors = new RecentErrorLog(50, config.debug.enabled);
 store.setMode(config.mode);
 let source: ZigbeeSource;
 if (config.mode === "direct") {
@@ -50,9 +54,16 @@ if (config.mode === "direct") {
   source = new MqttShadowSource(config.mqtt, store);
 }
 const app = Fastify({ logger: true });
+registerRecentErrorApi(app, recentErrors);
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
+const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
 const localesDirectory = resolve(moduleDir, "../public/locales");
+
+app.get("/assets/dashboard-landscape.jpg", async (_request, reply) => reply
+  .header("Cache-Control", "public, max-age=31536000, immutable")
+  .type("image/jpeg")
+  .send(dashboardBackground));
 
 app.get("/api/locales", async (_request, reply) => {
   try {
@@ -249,7 +260,7 @@ app.put<{
 
 app.delete<{
   Params: { id: string };
-  Body?: { confirmation?: string };
+  Body?: { confirmation?: string; force?: boolean };
 }>("/api/devices/:id", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
@@ -258,7 +269,8 @@ app.delete<{
     return reply.code(400).send({ ok: false, error: "Silmek için küçük harflerle yes veya evet yazın." });
   }
   try {
-    await source.removeDevice(id);
+    const force = request.body?.force === true;
+    await source.removeDevice(id, force);
     for (const key of [...aliases.keys()]) {
       if (key === id || key.startsWith(`${id}:`)) aliases.delete(key);
     }
@@ -266,7 +278,7 @@ app.delete<{
     imagePreferences = await imagesStore.removeDevice(imagePreferences, id).catch(() => imagePreferences);
     store.setImagePreferences(imagePreferences);
     const favorites = await favoritesStore.removeDevice(id);
-    return { ok: true, favorites };
+    return { ok: true, force, favorites };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -283,10 +295,20 @@ app.get("/api/matter", async (_request, reply) => {
 app.get("/api/settings", async (_request, reply) => {
   if (!settingsStore) return reply.code(503).send({ ok: false, error: "Bağlantı ayarları bu çalışma modunda kullanılamıyor." });
   try {
+    const authenticationRequired =
+      typeof config.mqtt.username === "string"
+      && config.mqtt.username.length > 0
+      && typeof config.mqtt.password === "string";
     return {
       ok: true,
       settings: await settingsStore.get(),
-      network: getNetworkInfo()
+      network: getNetworkInfo(),
+      mqttAccess: {
+        protocol: "3.1.1",
+        authenticationRequired,
+        username: authenticationRequired ? config.mqtt.username : null,
+        password: authenticationRequired ? config.mqtt.password : null
+      }
     };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
@@ -296,9 +318,35 @@ app.get("/api/settings", async (_request, reply) => {
 app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
   if (!settingsStore) return reply.code(503).send({ ok: false, error: "Bağlantı ayarları bu çalışma modunda kullanılamıyor." });
   try {
-    return { ok: true, settings: await settingsStore.save(request.body), restartRequired: true };
+    const settings = await settingsStore.save(request.body);
+    recentErrors.setEnabled(settings.debug.enabled);
+    return { ok: true, settings, restartRequired: true };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{ Body?: { enabled?: unknown } }>("/api/home-assistant/discovery", async (request, reply) => {
+  if (!settingsStore) {
+    return reply.code(503).send({ ok: false, error: "Home Assistant keşif ayarı bu çalışma modunda kullanılamıyor." });
+  }
+  if (typeof request.body?.enabled !== "boolean") {
+    return reply.code(400).send({ ok: false, error: "Home Assistant keşif durumu geçersiz." });
+  }
+  try {
+    const current = await settingsStore.get();
+    const settings = await settingsStore.save({
+      ...current,
+      homeAssistant: { discoveryEnabled: request.body.enabled }
+    });
+    await source.setHomeAssistantDiscovery(request.body.enabled);
+    config.homeAssistant.discoveryEnabled = request.body.enabled;
+    return { ok: true, settings, restartRequired: false };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 

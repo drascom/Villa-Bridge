@@ -23,6 +23,9 @@ interface FileConfig {
   homeAssistant?: {
     discoveryEnabled?: boolean;
   };
+  debug?: {
+    enabled?: boolean;
+  };
   http?: {
     host?: string;
     port?: number;
@@ -109,6 +112,9 @@ export interface AppConfig {
   homeAssistant: {
     discoveryEnabled: boolean;
   };
+  debug: {
+    enabled: boolean;
+  };
   http: {
     host: string;
     port: number;
@@ -162,6 +168,11 @@ export async function loadConfig(): Promise<AppConfig> {
       discoveryEnabled: process.env.VILLA_BRIDGE_HOME_ASSISTANT_DISCOVERY
         ? process.env.VILLA_BRIDGE_HOME_ASSISTANT_DISCOVERY === "true"
         : file.homeAssistant?.discoveryEnabled === true
+    },
+    debug: {
+      enabled: process.env.VILLA_BRIDGE_DEBUG
+        ? process.env.VILLA_BRIDGE_DEBUG === "true"
+        : file.debug?.enabled !== false
     },
     http: {
       host: process.env.VILLA_BRIDGE_HOST ?? file.http?.host ?? "0.0.0.0",

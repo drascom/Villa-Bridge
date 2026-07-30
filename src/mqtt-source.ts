@@ -66,9 +66,13 @@ export class MqttShadowSource implements ZigbeeSource {
     });
   }
 
-  async removeDevice(id: string): Promise<void> {
+  async removeDevice(id: string, force = false): Promise<void> {
     if (!this.store.getDevice(id)) throw new Error("Cihaz bulunamadı.");
-    await this.publish(`${this.config.baseTopic}/bridge/request/device/remove`, { id, force: false });
+    await this.publish(`${this.config.baseTopic}/bridge/request/device/remove`, { id, force });
+  }
+
+  setHomeAssistantDiscovery(_enabled: boolean): void {
+    // Shadow mode leaves discovery ownership with the external Zigbee2MQTT instance.
   }
 
   private async publish(topic: string, value: JsonObject): Promise<void> {

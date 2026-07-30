@@ -16,6 +16,8 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.GeolocationPermissions
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebSettings
@@ -38,6 +40,8 @@ class MainActivity : Activity() {
     private val probeExecutor = Executors.newSingleThreadExecutor()
     private val serverProbePending = AtomicBoolean(false)
     private var pageLoaded = false
+    private var pendingGeolocationCallback: GeolocationPermissions.Callback? = null
+    private var pendingGeolocationOrigin: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +67,9 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        pendingGeolocationCallback?.invoke(pendingGeolocationOrigin, false, false)
+        pendingGeolocationCallback = null
+        pendingGeolocationOrigin = null
         mainHandler.removeCallbacksAndMessages(null)
         probeExecutor.shutdownNow()
         webView.destroy()
@@ -73,6 +80,7 @@ class MainActivity : Activity() {
     private fun configureWebView() {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.setGeolocationEnabled(true)
         webView.settings.allowFileAccess = false
         webView.settings.allowContentAccess = false
         webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
@@ -80,6 +88,28 @@ class MainActivity : Activity() {
             webView.settings.safeBrowsingEnabled = true
         }
         webView.addJavascriptInterface(AndroidBridge(), "VillaAndroid")
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String,
+                callback: GeolocationPermissions.Callback
+            ) {
+                if (!isTrustedDashboard(Uri.parse(origin))) {
+                    callback.invoke(origin, false, false)
+                    return
+                }
+                if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    callback.invoke(origin, true, false)
+                    return
+                }
+                pendingGeolocationCallback?.invoke(pendingGeolocationOrigin, false, false)
+                pendingGeolocationCallback = callback
+                pendingGeolocationOrigin = origin
+                requestPermissions(
+                    arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
+                    LOCATION_PERMISSION_REQUEST
+                )
+            }
+        }
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
@@ -115,6 +145,19 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != LOCATION_PERMISSION_REQUEST) return
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        pendingGeolocationCallback?.invoke(pendingGeolocationOrigin, granted, false)
+        pendingGeolocationCallback = null
+        pendingGeolocationOrigin = null
     }
 
     private fun waitForLocalServer() {
@@ -306,5 +349,6 @@ class MainActivity : Activity() {
         private const val DASHBOARD_URL = "http://127.0.0.1:8091/"
         private const val HEALTH_URL = "http://127.0.0.1:8091/api/health"
         private const val DIAGNOSTICS_URL = "http://127.0.0.1:8092/api/android/diagnostics"
+        private const val LOCATION_PERMISSION_REQUEST = 2002
     }
 }
