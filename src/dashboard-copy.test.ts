@@ -273,8 +273,13 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /villa-onboarding-complete-v1/);
   assert.match(dashboard, /villa-dashboard-tour-complete-v1/);
   assert.match(dashboard, /villa-device-hint-complete-v1/);
+  assert.match(dashboard, /const locallyCompletedOnboarding=/);
+  assert.match(dashboard, /let installationOnboardingComplete=null/);
+  assert.match(dashboard, /api\("\/api\/onboarding"\)/);
+  assert.match(dashboard, /if\(localComplete&&!installationOnboardingComplete\)/);
+  assert.match(dashboard, /await markOnboardingComplete\(\)/);
   assert.match(dashboard, /if\(!onboardingComplete\(\)\)openOnboarding\(\)/);
-  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\)\]\)/);
+  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\),loadInstallationOnboarding\(\)\]\)/);
   assert.match(dashboard, /data-onboarding-language="en"/);
   assert.match(dashboard, /onboardingZigbeeUrl/);
   assert.match(dashboard, /onboardingMqttUrl/);
@@ -367,7 +372,7 @@ test("Settings debug modu son API hatalarını güvenli ve isteğe bağlı göst
   assert.match(dashboard, /debugMode:"Debug mode"/);
   assert.match(dashboard, /debugMode:"Debug modu"/);
   assert.match(dashboard, /debugLogPanel"\)\.hidden=!enabled/);
-  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\)\]\)/);
+  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadSettings\(\),loadInstallationOnboarding\(\)\]\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
