@@ -147,7 +147,7 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
   }
 });
 
-test("yönetici parolası doğrulanarak değiştirilir ve yeniden giriş gerekir", async (context) => {
+test("oturum açmış yönetici parolayı değiştirir ve yeniden giriş yapar", async (context) => {
   const { app } = await setupApp(context);
   const setup = await app.inject({
     method: "POST",
@@ -157,22 +157,11 @@ test("yönetici parolası doğrulanarak değiştirilir ve yeniden giriş gerekir
   const cookie = cookieFrom(setup);
   const headers = { cookie, "x-villa-csrf": setup.json().csrfToken };
 
-  const denied = await app.inject({
-    method: "PUT",
-    url: "/api/auth/admin-password",
-    headers,
-    payload: { currentPassword: "wrong password", newPassword: "new secure passphrase" }
-  });
-  assert.equal(denied.statusCode, 400);
-
   const changed = await app.inject({
     method: "PUT",
     url: "/api/auth/admin-password",
     headers,
-    payload: {
-      currentPassword: "correct horse battery",
-      newPassword: "new secure passphrase"
-    }
+    payload: { newPassword: "new secure passphrase" }
   });
   assert.equal(changed.statusCode, 200);
   assert.equal(changed.json().reauthenticationRequired, true);

@@ -255,12 +255,11 @@ export const registerAccessControl = async (
   });
 
   app.put<{
-    Body?: { currentPassword?: unknown; newPassword?: unknown };
+    Body?: { newPassword?: unknown };
   }>("/api/auth/admin-password", async (request, reply) => {
     try {
       await authStore.updateAdminPassword(
         request.villaSession?.username ?? "",
-        request.body?.currentPassword,
         request.body?.newPassword
       );
       return reply

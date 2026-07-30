@@ -64,13 +64,7 @@ test("yönetici parolası değişikliği eski parolayı ve yönetici oturumları
   const second = await store.login("admin", "admin", "a long local passphrase");
   assert.ok(second);
 
-  await assert.rejects(
-    store.updateAdminPassword("admin", "wrong password", "a different passphrase"),
-    /Mevcut yönetici parolası yanlış/
-  );
-  assert.ok(await store.getSession(initial.token));
-
-  await store.updateAdminPassword("admin", "a long local passphrase", "a different passphrase");
+  await store.updateAdminPassword("admin", "a different passphrase");
 
   assert.equal(await store.getSession(initial.token), null);
   assert.equal(await store.getSession(second.token), null);
