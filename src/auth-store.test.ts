@@ -80,6 +80,8 @@ test("oturum süresi dolar ve çıkış oturumu geçersiz kılar", async (contex
 });
 
 test("zayıf parola ve kolay PIN reddedilir", () => {
+  assert.equal(validateAdminPassword("eight888"), "eight888");
+  assert.throws(() => validateAdminPassword("seven77"));
   assert.throws(() => validateAdminPassword("short"));
   assert.throws(() => validateResidentPin("123456"));
   assert.throws(() => validateResidentPin("12345a"));
