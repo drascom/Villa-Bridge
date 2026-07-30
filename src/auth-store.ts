@@ -299,12 +299,8 @@ export class AuthStore {
 
   async updateAdminPassword(
     usernameValue: string,
-    currentPasswordValue: unknown,
     newPasswordValue: unknown
   ): Promise<void> {
-    if (typeof currentPasswordValue !== "string" || currentPasswordValue.length > 128) {
-      throw new Error("Mevcut yönetici parolası yanlış.");
-    }
     const username = normalizeUsername(usernameValue);
     const newPassword = validateAdminPassword(newPasswordValue);
     await this.exclusive(async () => {
@@ -312,9 +308,7 @@ export class AuthStore {
       const admin = state.users.find((user) =>
         user.role === "admin" && user.username === username
       );
-      if (!admin || !await this.verifySecret(admin, currentPasswordValue)) {
-        throw new Error("Mevcut yönetici parolası yanlış.");
-      }
+      if (!admin) throw new Error("Yönetici hesabı bulunamadı.");
       if (await this.verifySecret(admin, newPassword)) {
         throw new Error("Yeni yönetici parolası mevcut paroladan farklı olmalıdır.");
       }

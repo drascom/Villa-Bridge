@@ -349,6 +349,8 @@ test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla
   assert.match(settings, /class="settings-security-grid"/);
   assert.match(settings, /class="setting-card security-card"/);
   assert.match(settings, /id="adminPasswordForm"/);
+  assert.doesNotMatch(settings, /id="currentAdminPassword"/);
+  assert.match(settings, /id="newAdminPassword"[\s\S]*id="confirmAdminPassword"/);
   assert.match(settings, /id="settingsForm" class="setting-card connection-settings-card"/);
   assert.match(settings, /class="connection-settings-grid"/);
   assert.match(settings, /class="connection-settings-section"><h2>Zigbee2MQTT/);
@@ -357,7 +359,10 @@ test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla
   assert.match(settings, /class="settings-actions"[\s\S]*id="saveSettings"/);
   assert.match(dashboard, /\.settings-security-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(dashboard, /\.connection-settings-section\+\.connection-settings-section\{border-left:1px solid var\(--line\)\}/);
-  assert.match(dashboard, /api\("\/api\/auth\/admin-password",\{method:"PUT"/);
+  assert.match(dashboard, /api\("\/api\/auth\/admin-password",\{method:"PUT",body:JSON\.stringify\(\{newPassword:next\.value\}\)\}/);
+  assert.match(settings, /class="setting-card zigbee-settings-card" data-admin-only/);
+  assert.match(settings, /class="backup-card zigbee-settings-section"[\s\S]*class="zigbee-tools zigbee-settings-section"/);
+  assert.match(dashboard, /\.zigbee-settings-section\+\.zigbee-settings-section\{border-top:1px solid var\(--line\)\}/);
 });
 
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
@@ -673,7 +678,7 @@ test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellik
   assert.match(dashboard, /<section id="settings" class="view" data-admin-only>/);
   assert.match(dashboard, /body\.resident-session \[data-admin-only\]\{display:none!important\}/);
   assert.match(dashboard, /id="devicesAddDevice"[^>]*data-admin-only/);
-  assert.match(dashboard, /class="setting-card zigbee-tools" data-admin-only/);
+  assert.match(dashboard, /class="setting-card zigbee-settings-card" data-admin-only/);
   assert.match(dashboard, /data-admin-only data-options=/);
   assert.match(dashboard, /data-admin-only data-reconfigure=/);
   assert.match(dashboard, /data-admin-only data-ota=/);
