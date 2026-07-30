@@ -10,7 +10,7 @@
     "secureHomeLead": "Create one admin login and a simpler PIN for household members.",
     "adminUsername": "Admin username",
     "adminPassword": "Admin passphrase",
-    "adminPasswordHelp": "Use at least 12 characters. A memorable passphrase works well.",
+    "adminPasswordHelp": "Use at least 8 characters. A memorable passphrase works well.",
     "residentPin": "Home user PIN",
     "residentPinHelp": "Choose six non-obvious digits for everyday household access.",
     "createSecureHome": "Create secure home",

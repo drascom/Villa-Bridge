@@ -308,12 +308,18 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
 
   assert.match(dashboard, /id="authSetupDialog"/);
   assert.match(dashboard, /id="authLoginDialog"/);
-  assert.match(dashboard, /id="authSetupPassword" type="password" minlength="12"/);
+  assert.match(dashboard, /id="authSetupError" class="auth-error" role="alert" aria-live="assertive" hidden/);
+  assert.match(dashboard, /id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden/);
+  assert.match(dashboard, /id="authSetupPassword" type="password" minlength="8"/);
   assert.match(dashboard, /id="authSetupPin" type="password" inputmode="numeric" pattern="\[0-9\]\{6\}"/);
   assert.match(dashboard, /api\("\/api\/auth\/session"\)/);
   assert.match(dashboard, /api\("\/api\/auth\/setup",\{method:"POST"/);
   assert.match(dashboard, /api\("\/api\/auth\/login",\{method:"POST"/);
   assert.match(dashboard, /api\("\/api\/auth\/logout",\{method:"POST"/);
+  assert.match(dashboard, /catch\(error\)\{setAuthFormError\("authSetupError",error\.message\)\}/);
+  assert.match(dashboard, /catch\(error\)\{setAuthFormError\("authLoginError",error\.message\)\}/);
+  assert.match(dashboard, /authSetupForm"\)\.addEventListener\("input",\(\)=>setAuthFormError\("authSetupError"\)\)/);
+  assert.match(dashboard, /authLoginForm"\)\.addEventListener\("input",\(\)=>setAuthFormError\("authLoginError"\)\)/);
   assert.match(dashboard, /"x-villa-csrf":state\.auth\.csrfToken/);
   assert.match(dashboard, /body\.resident-session \[data-admin-only\]\{display:none!important\}/);
   assert.match(dashboard, /data-view="connections" data-admin-only/);

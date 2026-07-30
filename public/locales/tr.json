@@ -10,7 +10,7 @@
     "secureHomeLead": "Bir yönetici girişi ve ev halkı için daha kolay bir PIN oluşturun.",
     "adminUsername": "Yönetici kullanıcı adı",
     "adminPassword": "Yönetici parolası",
-    "adminPasswordHelp": "En az 12 karakter kullanın. Hatırlanabilir bir parola cümlesi uygundur.",
+    "adminPasswordHelp": "En az 8 karakter kullanın. Hatırlanabilir bir parola cümlesi uygundur.",
     "residentPin": "Ev kullanıcısı PIN’i",
     "residentPinHelp": "Günlük ev erişimi için kolay tahmin edilemeyen altı rakam seçin.",
     "createSecureHome": "Güvenli evi oluştur",
