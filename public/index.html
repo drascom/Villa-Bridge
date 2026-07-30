@@ -412,7 +412,8 @@
     $("#authLoginSecretLabel").textContent=t(admin?"adminPassword":"residentPin");
     const secret=$("#authLoginSecret");
     secret.inputMode=admin?"text":"numeric";
-    secret.pattern=admin?"":"[0-9]{6}";
+    if(admin)secret.removeAttribute("pattern");
+    else secret.setAttribute("pattern","[0-9]{6}");
     secret.maxLength=admin?128:6;
     secret.value="";
     setAuthFormError("authLoginError");
