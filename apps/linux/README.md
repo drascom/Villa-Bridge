@@ -44,7 +44,9 @@ sudo journalctl -u villa-bridge -f
 
 Open `http://<host-ip>:8091`. Home Assistant connects to `<host-ip>:1883`
 using the MQTT credentials in the private Zigbee configuration. Matter
-commissioning uses UDP `5540`.
+commissioning uses UDP `5540`. A full start can take around 40 seconds while
+the Zigbee database and Matter endpoints are restored; `doctor.sh` waits up to
+60 seconds for readiness.
 
 ## Service Management
 

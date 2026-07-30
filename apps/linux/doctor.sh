@@ -13,6 +13,21 @@ check() {
   fi
 }
 
+wait_for_ready() {
+  attempt=1
+  while [ "$attempt" -le 30 ]; do
+    if curl --fail --silent --max-time 3 \
+      http://127.0.0.1:8092/api/ready >/dev/null 2>&1; then
+      printf 'OK   runtime ready after at most %s seconds\n' "$((attempt * 2))"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 2
+  done
+  printf 'FAIL runtime did not become ready within 60 seconds\n'
+  FAILED=1
+}
+
 echo "Villa Bridge Linux doctor"
 echo "Host: $(uname -s) $(uname -m)"
 if command -v node >/dev/null 2>&1; then
@@ -29,7 +44,7 @@ check systemctl is-enabled villa-bridge.service
 check systemctl is-active villa-bridge.service
 
 if command -v curl >/dev/null 2>&1; then
-  check curl --fail --silent --max-time 3 http://127.0.0.1:8092/api/ready
+  wait_for_ready
   check curl --fail --silent --max-time 3 http://127.0.0.1:8091/api/health
 fi
 
