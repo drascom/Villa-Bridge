@@ -139,6 +139,50 @@ test("OTA desteği ve kayıtlı cihaz seçenekleri cihaz görünümüne taşın�
   assert.deepEqual(device.options, { transition: 1.5, debounce: 0.3, retain: true });
 });
 
+test("endpoint, binding ve grup sahneleri arayüz görünümüne taşınır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0x0011223344556677",
+    friendly_name: "Wall Remote",
+    endpoint_names: { "2": "Right button" },
+    endpoints: {
+      "2": {
+        bindings: [{
+          cluster: "genOnOff",
+          target: {
+            ieee_address: "0x8899aabbccddeeff",
+            endpoint: 3
+          }
+        }],
+        clusters: {
+          input: [],
+          output: [6]
+        }
+      }
+    }
+  }])));
+  store.ingest("bridge/groups", Buffer.from(JSON.stringify([{
+    id: 7,
+    friendly_name: "Evening Lights",
+    members: [],
+    scenes: [{ id: 2, name: "Movie" }]
+  }])));
+
+  assert.deepEqual(store.getDevices()[0].endpoints, [{
+    id: 2,
+    name: "Right button",
+    inputClusters: [],
+    outputClusters: [6],
+    bindings: [{
+      cluster: "genOnOff",
+      targetType: "device",
+      targetId: "0x8899aabbccddeeff",
+      targetEndpoint: 3
+    }]
+  }]);
+  assert.deepEqual(store.getGroups()[0].scenes, [{ id: 2, name: "Movie" }]);
+});
+
 test("genel Tuya modeli üretici parmak iziyle doğru katalog modeline çevrilir", () => {
   const store = new DeviceStore(new Map());
   store.ingest(

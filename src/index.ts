@@ -232,34 +232,70 @@ app.post<{
   }
 });
 app.post<{
-  Body?: { fromId?: unknown; toId?: unknown; bind?: unknown; clusters?: unknown };
+  Body?: {
+    fromId?: unknown;
+    toId?: unknown;
+    bind?: unknown;
+    clusters?: unknown;
+    fromEndpoint?: unknown;
+    toEndpoint?: unknown;
+  };
 }>("/api/zigbee/bind", async (request, reply) => {
   const fromId = typeof request.body?.fromId === "string" ? request.body.fromId.toLowerCase() : "";
   const toId = typeof request.body?.toId === "string" ? request.body.toId.toLowerCase() : "";
   const clusters = Array.isArray(request.body?.clusters)
     ? request.body.clusters.filter((value): value is string => typeof value === "string").slice(0, 32)
     : undefined;
-  if (!/^0x[0-9a-f]{16}$/.test(fromId) || !toId || typeof request.body?.bind !== "boolean") {
+  const fromEndpoint = request.body?.fromEndpoint;
+  const toEndpoint = request.body?.toEndpoint;
+  const validEndpoint = (value: unknown): boolean =>
+    value === undefined || (Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 240);
+  if (
+    !/^0x[0-9a-f]{16}$/.test(fromId)
+    || !toId
+    || typeof request.body?.bind !== "boolean"
+    || !validEndpoint(fromEndpoint)
+    || !validEndpoint(toEndpoint)
+  ) {
     return reply.code(400).send({ ok: false, error: "Bağlama isteği geçersiz." });
   }
   try {
-    await source.bindDevice(fromId, toId, request.body.bind, clusters);
-    return { ok: true };
+    await source.bindDevice(
+      fromId,
+      toId,
+      request.body.bind,
+      clusters,
+      fromEndpoint === undefined ? undefined : Number(fromEndpoint),
+      toEndpoint === undefined ? undefined : Number(toEndpoint)
+    );
+    return { ok: true, devices: visibleDevices(request.villaSession?.role) };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 app.post<{
   Params: { id: string };
-  Body?: { sceneId?: unknown; action?: unknown };
+  Body?: { sceneId?: unknown; action?: unknown; name?: unknown };
 }>("/api/groups/:id/scene", async (request, reply) => {
   const sceneId = Number(request.body?.sceneId);
   const action = request.body?.action;
-  if (!Number.isInteger(sceneId) || sceneId < 1 || sceneId > 255 || !["store", "recall", "remove"].includes(String(action))) {
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : undefined;
+  if (
+    !Number.isInteger(sceneId)
+    || sceneId < 1
+    || sceneId > 255
+    || !["store", "recall", "remove"].includes(String(action))
+    || (name !== undefined && (name.length < 1 || name.length > 64))
+  ) {
     return reply.code(400).send({ ok: false, error: "Sahne isteği geçersiz." });
   }
   try {
-    await source.groupScene(request.params.id, sceneId, action as "store" | "recall" | "remove");
+    await source.groupScene(
+      request.params.id,
+      sceneId,
+      action as "store" | "recall" | "remove",
+      name
+    );
     return { ok: true, groups: store.getGroups() };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });

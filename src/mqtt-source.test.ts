@@ -95,7 +95,8 @@ test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler
   await source.removeGroup("group-1", true);
   await source.setGroupMember("group-1", "0x0011223344556677", true, 1);
   await source.setGroup("group-1", { state: "ON" });
-  await source.bindDevice("0x0011223344556677", "group-1", true, ["genOnOff"]);
+  await source.groupScene("group-1", 5, "store", "Movie");
+  await source.bindDevice("0x0011223344556677", "group-1", true, ["genOnOff"], 2, 3);
   await source.scheduleOta("0x0011223344556677", true);
   assert.deepEqual(await source.checkOta("0x0011223344556677"), {
     available: true,
@@ -133,6 +134,7 @@ test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler
       "group/remove",
       "group/members/add",
       "zigbee2mqtt/Lounge/set",
+      "zigbee2mqtt/Lounge/set",
       "device/bind",
       "device/ota_update/schedule",
       "device/ota_update/check",
@@ -154,7 +156,13 @@ test("shadow kaynak yönetim isteklerinin gerçek Zigbee2MQTT yanıtını bekler
     client.requests.find((request) => request.topic === "zigbee2mqtt/Lounge/set")?.payload,
     { state: "ON" }
   );
-  assert.equal(client.requests.find((request) => request.topic.endsWith("/device/bind"))?.payload.to, "1");
+  assert.deepEqual(
+    client.requests.filter((request) => request.topic === "zigbee2mqtt/Lounge/set").at(-1)?.payload,
+    { scene_store: { ID: 5, name: "Movie" } }
+  );
+  assert.equal(client.requests.find((request) => request.topic.endsWith("/device/bind"))?.payload.to, "Lounge");
+  assert.equal(client.requests.find((request) => request.topic.endsWith("/device/bind"))?.payload.from_endpoint, 2);
+  assert.equal(client.requests.find((request) => request.topic.endsWith("/device/bind"))?.payload.to_endpoint, undefined);
   await source.stop();
 });
 

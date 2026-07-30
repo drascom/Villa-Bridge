@@ -62,9 +62,25 @@ export interface DeviceView {
     debounce: number;
     retain: boolean;
   };
+  endpoints?: DeviceEndpointView[];
   features: string[];
   controls: DeviceControlView[];
   state: JsonObject;
+}
+
+export interface DeviceEndpointBindingView {
+  cluster: string;
+  targetType: "device" | "group";
+  targetId: string;
+  targetEndpoint: number | null;
+}
+
+export interface DeviceEndpointView {
+  id: number;
+  name: string;
+  inputClusters: Array<string | number>;
+  outputClusters: Array<string | number>;
+  bindings: DeviceEndpointBindingView[];
 }
 
 export interface DeviceImageCandidate {
@@ -115,6 +131,7 @@ export interface GroupView {
   name: string;
   members: number;
   memberIds: string[];
+  scenes: Array<{ id: number; name: string }>;
   state: JsonObject;
 }
 

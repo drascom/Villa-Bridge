@@ -675,6 +675,13 @@ test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla göst
   assert.match(dashboard, /class="zigbee-binding-panel"/);
   assert.match(dashboard, /data-i18n="zigbeeGroupsLead"/);
   assert.match(dashboard, /data-i18n="directBindingLead"/);
+  assert.match(dashboard, /id="bindSourceEndpoint"/);
+  assert.match(dashboard, /id="bindTargetEndpoint"/);
+  assert.match(dashboard, /id="zigbeeBindingList"/);
+  assert.match(dashboard, /function renderBindingEndpoints\(\)/);
+  assert.match(dashboard, /function renderBindingList\(\)/);
+  assert.match(dashboard, /data-zgroup-existing-scene=/);
+  assert.match(dashboard, /data-zgroup-scene-name=/);
   assert.match(dashboard, /class="zigbee-group-empty"/);
   assert.match(dashboard, /groupMembers:"\{count\} devices"/);
   assert.match(dashboard, /groupMembers:"\{count\} cihaz"/);

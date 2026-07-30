@@ -124,19 +124,38 @@ export class MqttShadowSource implements ZigbeeSource {
     await this.publish(`${this.config.baseTopic}/${group.sourceName}/set`, command);
   }
 
-  async bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void> {
+  async bindDevice(
+    fromId: string,
+    toId: string,
+    bind: boolean,
+    clusters?: string[],
+    fromEndpoint?: number,
+    toEndpoint?: number
+  ): Promise<void> {
+    const targetGroup = this.store.getGroups().find((group) =>
+      group.id === toId || group.sourceName === toId
+    );
     await this.request(`device/${bind ? "bind" : "unbind"}`, {
       from: fromId,
-      to: z2mGroupIdentifier(toId),
+      to: targetGroup?.sourceName ?? toId,
+      ...(fromEndpoint ? { from_endpoint: fromEndpoint } : {}),
+      ...(toEndpoint && !targetGroup ? { to_endpoint: toEndpoint } : {}),
       ...(clusters?.length ? { clusters } : {})
     });
   }
 
-  async groupScene(id: string, sceneId: number, action: "store" | "recall" | "remove"): Promise<void> {
+  async groupScene(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void> {
     const group = this.store.getGroups().find((item) => item.id === id || item.sourceName === id);
     if (!group) throw new Error("Zigbee grubu bulunamadı.");
     await this.publish(`${this.config.baseTopic}/${group.sourceName}/set`, {
-      [`scene_${action}`]: sceneId
+      [`scene_${action}`]: action === "store" && name
+        ? { ID: sceneId, name }
+        : sceneId
     });
   }
 

@@ -271,34 +271,61 @@ export class DirectZigbeeSource implements ZigbeeSource {
     await group.command("genOnOff", state.toLowerCase(), {} as never);
   }
 
-  async bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void> {
+  async bindDevice(
+    fromId: string,
+    toId: string,
+    bind: boolean,
+    clusters?: string[],
+    fromEndpoint?: number,
+    toEndpoint?: number
+  ): Promise<void> {
     const controller = this.controller;
     const from = controller?.getDeviceByIeeeAddr(fromId);
     if (!controller || !from) throw new Error("Kaynak cihaz bulunamadı.");
-    const fromEndpoint = from.endpoints[0];
+    const sourceEndpoint = fromEndpoint ? from.getEndpoint(fromEndpoint) : from.endpoints[0];
     const targetDevice = controller.getDeviceByIeeeAddr(toId);
-    const target = targetDevice?.endpoints[0] ?? this.groupByIdentifier(toId);
-    if (!fromEndpoint || !target) throw new Error("Bağlama hedefi bulunamadı.");
+    const target = targetDevice
+      ? toEndpoint
+        ? targetDevice.getEndpoint(toEndpoint)
+        : targetDevice.endpoints[0]
+      : this.groupByIdentifier(toId);
+    if (!sourceEndpoint || !target) throw new Error("Bağlama uç noktası bulunamadı.");
     const commonControlClusters = new Set([5, 6, 8, 768]);
     const selected = clusters?.length
       ? clusters
-      : fromEndpoint.outputClusters.filter((cluster) =>
+      : sourceEndpoint.outputClusters.filter((cluster) =>
         commonControlClusters.has(cluster)
         && ("inputClusters" in target ? target.inputClusters.includes(cluster) : true)
       );
     if (!selected.length) throw new Error("Cihazlar arasında bağlanabilir küme bulunamadı.");
     for (const cluster of selected) {
-      if (bind) await fromEndpoint.bind(cluster, target);
-      else await fromEndpoint.unbind(cluster, target);
+      if (bind) await sourceEndpoint.bind(cluster, target);
+      else await sourceEndpoint.unbind(cluster, target);
     }
+    await this.refreshDevices();
   }
 
-  async groupScene(id: string, sceneId: number, action: "store" | "recall" | "remove"): Promise<void> {
+  async groupScene(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void> {
     const group = this.groupByIdentifier(id);
     if (action === "store") await group.command("genScenes", "store", { groupid: group.groupID, sceneid: sceneId });
     else if (action === "recall") {
       await group.command("genScenes", "recall", { groupid: group.groupID, sceneid: sceneId });
     } else await group.command("genScenes", "remove", { groupid: group.groupID, sceneid: sceneId });
+    if (action !== "recall") {
+      const scenes = this.configuredGroupScenes(group);
+      const updated = action === "store"
+        ? [
+          ...scenes.filter((scene) => scene.id !== sceneId),
+          { id: sceneId, name: name?.trim() || `Scene ${sceneId}` }
+        ].sort((left, right) => left.id - right.id)
+        : scenes.filter((scene) => scene.id !== sceneId);
+      this.persistGroupScenes(group, updated);
+    }
     this.refreshGroups();
   }
 
@@ -625,7 +652,19 @@ export class DirectZigbeeSource implements ZigbeeSource {
         },
         ...(Object.keys(endpointNames).length > 0 ? { endpoint_names: endpointNames } : {}),
         endpoints: Object.fromEntries(device.endpoints.map((endpoint) => [String(endpoint.ID), {
-          bindings: [],
+          bindings: endpoint.binds.map((binding) => ({
+            cluster: binding.cluster.name,
+            target: "groupID" in binding.target
+              ? {
+                type: "group",
+                id: binding.target.groupID
+              }
+              : {
+                type: "device",
+                ieee_address: binding.target.deviceIeeeAddress,
+                endpoint: binding.target.ID
+              }
+          })),
           configured_reportings: [],
           clusters: {
             input: endpoint.inputClusters,
@@ -651,7 +690,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
         ieee_address: endpoint.deviceIeeeAddress,
         endpoint: endpoint.ID
       })),
-      scenes: []
+      scenes: this.configuredGroupScenes(group)
     }));
     this.store.ingest("bridge/groups", Buffer.from(JSON.stringify(this.bridgeGroups)));
     this.publishRetained("bridge/groups", this.bridgeGroups);
@@ -1084,6 +1123,37 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const temporaryPath = `${path}.${process.pid}.tmp`;
     await writeFile(temporaryPath, document.toString(), "utf8");
     await rename(temporaryPath, path);
+  }
+
+  private configuredGroupScenes(group: {
+    meta: JsonObject;
+  }): Array<{ id: number; name: string }> {
+    const raw = group.meta.villa_scenes;
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((scene) => {
+      if (!scene || typeof scene !== "object" || Array.isArray(scene)) return [];
+      const value = scene as Record<string, unknown>;
+      const sceneId = Number(value.id);
+      if (!Number.isInteger(sceneId) || sceneId < 1 || sceneId > 255) return [];
+      return [{
+        id: sceneId,
+        name: typeof value.name === "string" && value.name.trim()
+          ? value.name.trim().slice(0, 64)
+          : `Scene ${sceneId}`
+      }];
+    }).sort((left, right) => left.id - right.id);
+  }
+
+  private persistGroupScenes(
+    group: {
+      meta: JsonObject;
+      save(): void;
+    },
+    scenes: Array<{ id: number; name: string }>
+  ): void {
+    if (scenes.length) group.meta.villa_scenes = scenes;
+    else delete group.meta.villa_scenes;
+    group.save();
   }
 
   private publish(relativeTopic: string, value: unknown, retain = false): void {

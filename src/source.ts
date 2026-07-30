@@ -30,8 +30,20 @@ export interface ZigbeeSource {
   removeGroup(id: string, force?: boolean): Promise<void>;
   setGroupMember(id: string, deviceId: string, add: boolean, endpoint?: number): Promise<void>;
   setGroup(id: string, command: JsonObject): Promise<void>;
-  bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void>;
-  groupScene(id: string, sceneId: number, action: "store" | "recall" | "remove"): Promise<void>;
+  bindDevice(
+    fromId: string,
+    toId: string,
+    bind: boolean,
+    clusters?: string[],
+    fromEndpoint?: number,
+    toEndpoint?: number
+  ): Promise<void>;
+  groupScene(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void>;
   networkMap(): Promise<ZigbeeNetworkMap>;
   checkOta(id: string): Promise<OtaCheckResult>;
   scheduleOta(id: string, enabled: boolean): Promise<void>;

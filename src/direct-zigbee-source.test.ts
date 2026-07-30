@@ -124,6 +124,7 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
   const calls: Array<{ operation: string; value?: unknown }> = [];
   const router = { ieeeAddr: "0xrouter" };
   const fromEndpoint = {
+    ID: 2,
     outputClusters: [6, 8],
     async bind(cluster: number, target: unknown) {
       calls.push({ operation: "bind", value: { cluster, target } });
@@ -132,7 +133,7 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
       calls.push({ operation: "unbind", value: { cluster, target } });
     }
   };
-  const targetEndpoint = { inputClusters: [6] };
+  const targetEndpoint = { ID: 3, inputClusters: [6] };
   const memberEndpoint = {
     ID: 1,
     inputClusters: [6],
@@ -146,6 +147,8 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
   const group = {
     groupID: 1,
     members: [],
+    meta: {},
+    save() {},
     async command(cluster: string, command: string, value: unknown) {
       calls.push({
         operation: cluster === "genOnOff" ? "group-command" : "scene",
@@ -180,6 +183,7 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
     {
       ieeeAddr: "0xrouter",
       type: "Router",
+      endpoints: [],
       async lqi() {
         return [];
       }
@@ -188,8 +192,14 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
   const controller = {
     getDeviceByIeeeAddr(id: string) {
       if (id === "0xrouter") return router;
-      if (id === "0xfrom") return { endpoints: [fromEndpoint] };
-      if (id === "0xto") return { endpoints: [targetEndpoint] };
+      if (id === "0xfrom") return {
+        endpoints: [fromEndpoint],
+        getEndpoint: (endpoint: number) => endpoint === 2 ? fromEndpoint : undefined
+      };
+      if (id === "0xto") return {
+        endpoints: [targetEndpoint],
+        getEndpoint: (endpoint: number) => endpoint === 3 ? targetEndpoint : undefined
+      };
       if (id === "0xmember") return { endpoints: [memberEndpoint] };
       if (id === "0xota") return otaDevice;
       return undefined;
@@ -239,9 +249,9 @@ test("direct kaynak gelişmiş Zigbee işlemlerini Herdsman denetleyicisine ilet
   await source.setGroupMember("group-1", "0xmember", true);
   await source.setGroupMember("group-1", "0xmember", false);
   await source.setGroup("group-1", { state: "ON" });
-  await source.bindDevice("0xfrom", "0xto", true);
-  await source.bindDevice("0xfrom", "0xto", false);
-  await source.groupScene("group-1", 7, "store");
+  await source.bindDevice("0xfrom", "0xto", true, undefined, 2, 3);
+  await source.bindDevice("0xfrom", "0xto", false, undefined, 2, 3);
+  await source.groupScene("group-1", 7, "store", "Movie");
   await source.groupScene("group-1", 7, "recall");
   await source.groupScene("group-1", 7, "remove");
   await source.scheduleOta("0xota", true);
@@ -463,6 +473,9 @@ test("direct Zigbee grupları oluşturulur, yeniden adlandırılır ve kalıcı 
   const groups = new Map<number, {
     groupID: number;
     members: [];
+    meta: Record<string, unknown>;
+    save: () => void;
+    command: (cluster: string, command: string, payload: unknown) => Promise<void>;
     removeFromDatabase: () => void;
     removeFromNetwork: () => Promise<void>;
   }>();
@@ -470,6 +483,9 @@ test("direct Zigbee grupları oluşturulur, yeniden adlandırılır ve kalıcı 
     const group = {
       groupID: id,
       members: [] as [],
+      meta: {} as Record<string, unknown>,
+      save: () => undefined,
+      command: async () => undefined,
       removeFromDatabase: () => {
         groups.delete(id);
       },
@@ -497,6 +513,11 @@ test("direct Zigbee grupları oluşturulur, yeniden adlandırılır ve kalıcı 
   assert.match(await readFile(configurationFile, "utf8"), /friendly_name: Living Room/);
   await source.renameGroup("group-1", "Lounge");
   assert.match(await readFile(configurationFile, "utf8"), /friendly_name: Lounge/);
+  await source.groupScene("group-1", 4, "store", "Movie");
+  assert.deepEqual(groups.get(1)?.meta.villa_scenes, [{ id: 4, name: "Movie" }]);
+  assert.doesNotMatch(await readFile(configurationFile, "utf8"), /villa_scenes|name: Movie/);
+  await source.groupScene("group-1", 4, "remove");
+  assert.equal(groups.get(1)?.meta.villa_scenes, undefined);
   await source.removeGroup("group-1", true);
 
   const saved = await readFile(configurationFile, "utf8");
