@@ -308,6 +308,10 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
 
   assert.match(dashboard, /id="authSetupDialog"/);
   assert.match(dashboard, /id="authLoginDialog"/);
+  assert.match(dashboard, /id="authSetupDialog" class="auth-gate" role="dialog" aria-modal="true"/);
+  assert.match(dashboard, /id="authLoginDialog" class="auth-gate" role="dialog" aria-modal="true"/);
+  assert.doesNotMatch(dashboard, /<dialog id="auth(?:Setup|Login)Dialog"/);
+  assert.doesNotMatch(dashboard, /auth(?:Setup|Login)Dialog"\)\.showModal/);
   assert.match(dashboard, /id="authSetupError" class="auth-error" role="alert" aria-live="assertive" hidden/);
   assert.match(dashboard, /id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden/);
   assert.match(dashboard, /id="authSetupPassword" type="password" minlength="8"/);
