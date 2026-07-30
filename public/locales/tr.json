@@ -475,7 +475,7 @@
     "noZigbeeGroupsLead": "Yukarıya oda veya alan adını yazın, grubu oluşturun ve lambaları ekleyin.",
     "deleteZigbeeGroupConfirm": "Bu Zigbee grubu silinsin mi?",
     "directBinding": "Doğrudan bağlama",
-    "directBindingLead": "Bir düğmeyi doğrudan lamba veya gruba bağlayın. Villa Bridge çevrimdışıyken bile çalışır.",
+    "directBindingLead": "Bir düğmeyi doğrudan lamba veya gruba bağlayın. Villa Bridge çevrimdışıyken bile çalışır. Koordinatöre giden otomatik raporlama bağlantıları gizlenir.",
     "sourceDevice": "Düğme veya kumanda",
     "targetDevice": "Lamba veya grup",
     "automaticEndpoint": "Otomatik uç nokta",

@@ -2455,11 +2455,14 @@
     if([...targetEndpoint.options].some(option=>option.value===previousTarget))targetEndpoint.value=previousTarget;
   }
   function renderBindingList(){
-    const rows=state.devices.flatMap(device=>(device.endpoints||[]).flatMap(endpoint=>(endpoint.bindings||[]).map(binding=>({device,endpoint,binding}))));
+    const bindingTarget=binding=>binding.targetType==="group"
+      ?state.zigbeeGroups.find(group=>group.id===binding.targetId)
+      :state.devices.find(device=>device.id===binding.targetId);
+    const rows=state.devices
+      .flatMap(device=>(device.endpoints||[]).flatMap(endpoint=>(endpoint.bindings||[]).map(binding=>({device,endpoint,binding}))))
+      .filter(({binding})=>Boolean(bindingTarget(binding)));
     $("#zigbeeBindingList").innerHTML=rows.length?rows.map(({device,endpoint,binding})=>{
-      const target=binding.targetType==="group"
-        ?state.zigbeeGroups.find(group=>group.id===binding.targetId)
-        :state.devices.find(candidate=>candidate.id===binding.targetId);
+      const target=bindingTarget(binding);
       const targetEndpoint=binding.targetEndpoint?` · EP ${binding.targetEndpoint}`:"";
       return`<div class="zigbee-binding-row"><span><strong>${esc(device.name)} · ${esc(endpoint.name)}</strong><br>${esc(binding.cluster)} → ${esc(target?.name||binding.targetId)}${targetEndpoint}</span><button class="danger-button" type="button" data-remove-binding="${esc(device.id)}" data-from-endpoint="${endpoint.id}" data-binding-target="${esc(binding.targetId)}" data-to-endpoint="${binding.targetEndpoint??""}" data-binding-cluster="${esc(binding.cluster)}" title="${t("removeBinding")}">×</button></div>`;
     }).join(""):`<div class="zigbee-group-empty"><span aria-hidden="true">⌁</span><div><strong>${t("noBindings")}</strong><p>${t("noBindingsLead")}</p></div></div>`;
