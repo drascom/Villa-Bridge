@@ -58,6 +58,26 @@ test("PIN değişikliği eski ev kullanıcısı oturumlarını ve PIN'i geçersi
   assert.equal((await store.login("resident", "", "472905"))?.role, "resident");
 });
 
+test("yönetici parolası değişikliği eski parolayı ve yönetici oturumlarını geçersiz kılar", async (context) => {
+  const { store } = await createStore(context);
+  const initial = await store.setup("admin", "a long local passphrase", "638251");
+  const second = await store.login("admin", "admin", "a long local passphrase");
+  assert.ok(second);
+
+  await assert.rejects(
+    store.updateAdminPassword("admin", "wrong password", "a different passphrase"),
+    /Mevcut yönetici parolası yanlış/
+  );
+  assert.ok(await store.getSession(initial.token));
+
+  await store.updateAdminPassword("admin", "a long local passphrase", "a different passphrase");
+
+  assert.equal(await store.getSession(initial.token), null);
+  assert.equal(await store.getSession(second.token), null);
+  assert.equal(await store.login("admin", "admin", "a long local passphrase"), null);
+  assert.equal((await store.login("admin", "admin", "a different passphrase"))?.role, "admin");
+});
+
 test("oturum süresi dolar ve çıkış oturumu geçersiz kılar", async (context) => {
   let now = new Date("2026-07-30T10:00:00.000Z");
   const directory = await mkdtemp(join(tmpdir(), "villa-auth-"));
