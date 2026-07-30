@@ -499,7 +499,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /id="showLightDevice"/);
   assert.match(dashboard, /class="device-card quick-card \$\{visualState\}"/);
   assert.doesNotMatch(dashboard, /class="quick-state /);
-  assert.match(dashboard, /class="quick-battery\$\{battery<15\?" low":""\}"/);
+  assert.match(dashboard, /const batteryThreshold=state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
+  assert.match(dashboard, /class="quick-battery\$\{battery<=batteryThreshold\?" low":""\}"/);
   assert.match(dashboard, /class="battery-glyph"/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
   assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div>\$\{linkQualityBadge\(device\)\}/);
@@ -657,6 +658,16 @@ test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellik
   assert.match(dashboard, /defaultDashboardWidgets=\["quick","clock","weather","recent","activity"\]/);
   assert.match(dashboard, /<button class="secondary" data-note=/);
   assert.doesNotMatch(dashboard, /data-admin-only data-note=/);
+});
+
+test("kanal değişikliği ve düşük pil eşiği güvenli ayar akışında sunulur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="lowBatteryThreshold" type="number" min="5" max="50"/);
+  assert.match(dashboard, /function settingsWithChannelConfirmation\(settings\)/);
+  assert.match(dashboard, /zigbeeChannelConfirmation:"CHANGE"/);
+  assert.match(dashboard, /alerts:\{lowBatteryThreshold:Number\(\$\("#lowBatteryThreshold"\)\.value\)\}/);
+  assert.match(dashboard, /const isAlert=device=>Array\.isArray\(device\.alerts\)&&device\.alerts\.length>0/);
 });
 
 test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla gösterilir", async () => {

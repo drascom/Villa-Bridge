@@ -63,6 +63,55 @@ test("durumu olmayan yazılabilir ışık özellikleri kumanda olarak sunulur", 
   );
 });
 
+test("buton action türleri expose bilgisinden çıkarılır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xbutton",
+    friendly_name: "Hall Button",
+    type: "EndDevice",
+    definition: {
+      exposes: [{
+        type: "enum",
+        property: "action",
+        access: 1,
+        values: ["single", "double", "hold"]
+      }]
+    }
+  }])));
+
+  assert.deepEqual(store.getDevices()[0].actionTypes, ["double", "hold", "single"]);
+});
+
+test("düşük pil eşiği backend uyarısı ve kalıcı geçiş olayı üretir", () => {
+  const store = new DeviceStore(new Map());
+  store.setLowBatteryThreshold(20);
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xbattery",
+    friendly_name: "Door Sensor",
+    type: "EndDevice"
+  }])));
+
+  store.ingest("Door Sensor", Buffer.from('{"battery":19}'));
+  assert.deepEqual(store.getDevices()[0].alerts, [{
+    code: "low_battery",
+    severity: "warning",
+    value: 19,
+    threshold: 20
+  }]);
+  assert.equal(store.getEvents()[0].property, "battery_threshold");
+  assert.equal(store.getEvents()[0].value, true);
+
+  store.ingest("Door Sensor", Buffer.from('{"battery":22}'));
+  assert.deepEqual(store.getDevices()[0].alerts, []);
+  assert.equal(store.getEvents()[0].property, "battery_threshold");
+  assert.equal(store.getEvents()[0].value, false);
+
+  store.setLowBatteryThreshold(25);
+  assert.equal(store.getDevices()[0].alerts[0]?.code, "low_battery");
+  assert.equal(store.getEvents()[0].property, "battery_threshold");
+  assert.equal(store.getEvents()[0].value, true);
+});
+
 test("iç içe cihaz expose bilgisi tip, aralık ve admin kategorisini korur", () => {
   const store = new DeviceStore(new Map());
   store.ingest("bridge/devices", Buffer.from(JSON.stringify([{

@@ -64,8 +64,17 @@ export interface DeviceView {
   };
   endpoints?: DeviceEndpointView[];
   features: string[];
+  actionTypes?: string[];
+  alerts: DeviceAlertView[];
   controls: DeviceControlView[];
   state: JsonObject;
+}
+
+export interface DeviceAlertView {
+  code: "low_battery" | "smoke" | "carbon_monoxide";
+  severity: "warning" | "critical";
+  value?: number;
+  threshold?: number;
 }
 
 export interface DeviceEndpointBindingView {

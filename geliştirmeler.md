@@ -1,14 +1,14 @@
 # Geliştirmeler — zigbee2mqtt Karşılaştırması ve Durum Takibi
 
-Son güncelleme: 2026-07-30 (H1–H5, Y1–Y4 öncelikli paket sonrası)
+Son güncelleme: 2026-07-30 (Y5, Y7, Y8 ve Y10 tamamlandı)
 İlgili commit: `e1d0e87 zigbee: add endpoint bindings and scene management`
 Son Linux birleştirme: `eaa0241 Merge documented Zigbee parity fixes`
-Son çalışma doğrulaması: yerelde `npm test` 100/100 geçti
+Son çalışma doğrulaması: yerelde `npm test` 105/105 geçti
 
 Bakış açısı: **geliştirici olmayan, basit ev kullanıcısı** — kurulum ve günlük
 kullanımda fiilen hissedilen eksikler.
 
-**Durum:** 22 madde tamamlandı · 7 madde yarım · açık doğrulanmış hata yok.
+**Durum:** 26 madde tamamlandı · 3 madde ertelendi · açık doğrulanmış hata yok.
 
 ---
 
@@ -40,6 +40,10 @@ Uçtan uca doğrulandı: backend mantığı + HTTP API + arayüz + test.
 | OTA güncelleme denetimi ve direct mod ilerleme durumu | `src/source.ts`, `src/direct-zigbee-source.ts`, `src/mqtt-source.ts`, `src/index.ts`, `public/index.html` |
 | Endpoint bazlı bind/unbind ve mevcut binding listesi | `src/types.ts`, `src/device-store.ts`, `src/direct-zigbee-source.ts`, `src/mqtt-source.ts`, `src/index.ts`, `public/index.html` |
 | Adlandırılmış Zigbee sahnelerini listeleme, oynatma ve silme | `src/types.ts`, `src/device-store.ts`, `src/direct-zigbee-source.ts`, `src/mqtt-source.ts`, `src/index.ts`, `public/index.html` |
+| Ayarlanabilir düşük pil eşiği, backend uyarısı ve kalıcı geçiş olayı | `src/config.ts`, `src/settings-store.ts`, `src/device-store.ts`, `public/index.html` |
+| Home Assistant stateless buton `event` entity'leri | `src/device-store.ts`, `src/home-assistant-discovery.ts`, `src/direct-zigbee-source.ts` |
+| Zigbee kanal değişikliğinde UI ve API seviyesinde açık risk onayı | `src/settings-store.ts`, `src/index.ts`, `public/index.html` |
+| Direct cihaz yeniden yapılandırma regresyon testi | `src/direct-zigbee-source.test.ts` |
 
 Komut zinciri kapalı: UI `command()` → `POST /api/devices/:id/command`
 (`src/index.ts:473-517`) → `source.setDevice` → `convertSet`
@@ -59,24 +63,22 @@ Komut zinciri kapalı: UI `command()` → `POST /api/devices/:id/command`
 
 ---
 
-## ⚠️ Yarım kalanlar
+## ⏸️ Ertelenenler
 
-| # | Madde | Eksik olan |
+Bu maddeler mevcut kullanım için acil görülmedi; bilerek sonraki sürüme bırakıldı.
+
+| # | Madde | Ertelenen kapsam |
 |---|---|---|
-| Y5 | Pil azaldı uyarısı | Backend'de eşik/bildirim yok; sadece UI'da sabit kodlu %15 rozet (`public/index.html:486,639-640`) |
 | Y6 | Fan | Sayısal hız HA'ya hiç gitmiyor — `src/home-assistant-discovery.ts:192` `fan:` önekini `number`'dan da dışlıyor, `percentage_*` alanları üretilmiyor |
-| Y7 | Buton olayları | HA `event` bileşeni yok, sadece "Last action" sensörü (`src/home-assistant-discovery.ts:314-323`) → aynı action iki kez gelirse HA otomasyonu tetiklenmiyor |
-| Y8 | Kanal değiştirme | "Cihazların yeniden eşleşmesi gerekebilir" uyarısı yok; kanal ancak süreç yeniden başlayınca uygulanıyor (`src/settings-store.ts:145`) |
 | Y9 | Touchlink | `identify` yok — ampulü sıfırlamadan önce doğrulama adımı mümkün değil. scan + factory reset var (`src/direct-zigbee-source.ts:184-194`) |
-| Y10 | Yeniden yapılandır | Birim testi yok; yalnız butonun varlığı test ediliyor (`src/dashboard-copy.test.ts:652`) |
 | Y11 | MQTT permit_join | `bridge/request/permit_join` payload'ındaki `device` alanı yok sayılıyor (`src/direct-zigbee-source.ts:802-808`) — router seçimi sadece HTTP'de |
 
 ---
 
 ## Sıradaki iş önceliği
 
-1. **Y6, Y7** — fan yüzdesi, HA `event`
-2. **Y5, Y8, Y9, Y10, Y11** — pil eşiği, kanal uyarısı, touchlink identify, test, MQTT router
+Bu karşılaştırma listesindeki zorunlu işler tamamlandı. Y6, Y9 ve Y11 ancak ilgili
+cihaz veya kurtarma senaryosu gündeme geldiğinde yeniden değerlendirilecek.
 
 ### Y1 uygulama notu
 

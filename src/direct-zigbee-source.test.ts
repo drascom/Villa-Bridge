@@ -65,12 +65,71 @@ test("battery devices remain available longer than routers", () => {
   assert.equal(zigbeeAvailabilityState(undefined, { type: "Router" }, now), "offline");
 });
 
+test("direct yeniden yapılandırma cihazı görüşür ve converter configure çağrısını tamamlar", async () => {
+  const calls: string[] = [];
+  const coordinatorEndpoint = { ID: 1 };
+  const device = {
+    ieeeAddr: "0xreconfigure",
+    type: "EndDevice",
+    endpoints: [],
+    interviewState: "SUCCESSFUL",
+    async interview(force: boolean) {
+      calls.push(`interview:${force}`);
+    }
+  };
+  const definition = {
+    model: "TEST",
+    vendor: "Villa",
+    description: "Reconfigure test",
+    exposes: [],
+    async configure(
+      configuredDevice: unknown,
+      coordinator: unknown,
+      configuredDefinition: unknown
+    ) {
+      assert.equal(configuredDevice, device);
+      assert.equal(coordinator, coordinatorEndpoint);
+      assert.equal(configuredDefinition, definition);
+      calls.push("configure");
+    }
+  };
+  const source = new DirectZigbeeSource(
+    { devices: {}, groups: {} } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    new DeviceStore(new Map()),
+    false,
+    new Map(),
+    (async () => definition) as never
+  );
+  Object.assign(source, {
+    controller: {
+      getDeviceByIeeeAddr(id: string) {
+        return id === device.ieeeAddr ? device : undefined;
+      },
+      getDevicesByType(type: string) {
+        return type === "Coordinator" ? [{ endpoints: [coordinatorEndpoint] }] : [];
+      },
+      getDevicesIterator() {
+        return [device].values();
+      }
+    },
+    refreshDevices: async () => {
+      calls.push("refresh");
+    }
+  });
+
+  await source.reconfigureDevice(device.ieeeAddr);
+
+  assert.deepEqual(calls, ["interview:true", "configure", "refresh"]);
+});
+
 test("direct durum debounce yalnız aynı payload'u süre içinde bastırır", () => {
   const previous = { payload: '{"state":"ON"}', at: 1_000 };
   assert.equal(shouldPublishDeviceState(previous, '{"state":"ON"}', 2, 2_500), false);
   assert.equal(shouldPublishDeviceState(previous, '{"state":"ON"}', 2, 3_000), true);
   assert.equal(shouldPublishDeviceState(previous, '{"state":"OFF"}', 2, 1_100), true);
   assert.equal(shouldPublishDeviceState(previous, '{"state":"ON"}', 0, 1_100), true);
+  assert.equal(shouldPublishDeviceState(previous, '{"state":"ON"}', 60, 1_100, true), true);
 });
 
 test("Home Assistant discovery toggles live without restarting the source", () => {

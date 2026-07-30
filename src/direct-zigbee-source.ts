@@ -58,8 +58,10 @@ export function shouldPublishDeviceState(
   previous: DeviceStatePublication | undefined,
   payload: string,
   debounceSeconds: number,
-  now = Date.now()
+  now = Date.now(),
+  eventPayload = false
 ): boolean {
+  if (eventPayload) return true;
   if (!previous || previous.payload !== payload) return true;
   return debounceSeconds <= 0 || now - previous.at >= debounceSeconds * 1_000;
 }
@@ -126,7 +128,8 @@ export class DirectZigbeeSource implements ZigbeeSource {
     private readonly mqttConfig: AppConfig["mqtt"],
     private readonly store: DeviceStore,
     private homeAssistantDiscoveryEnabled = false,
-    private readonly aliases: ReadonlyMap<string, string> = new Map()
+    private readonly aliases: ReadonlyMap<string, string> = new Map(),
+    private readonly definitionResolver: typeof findByDevice = findByDevice
   ) {}
 
   async start(): Promise<void> {
@@ -190,7 +193,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const device = controller?.getDeviceByIeeeAddr(id);
     if (!controller || !device) throw new Error("Cihaz bulunamadı.");
     await device.interview(true);
-    const definition = await findByDevice(device);
+    const definition = await this.definitionResolver(device);
     const coordinator = controller.getDevicesByType("Coordinator")[0]?.endpoints[0];
     if (!definition || !coordinator) throw new Error("Cihaz yapılandırma tanımı bulunamadı.");
     if (definition.configure) await definition.configure(device, coordinator, definition);
@@ -717,11 +720,13 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const serialized = JSON.stringify(merged);
       const debounce = typeof configured.debounce === "number" ? configured.debounce : 0;
       const now = Date.now();
+      const actionEvent = typeof payload.action === "string" && payload.action.trim().length > 0;
       if (shouldPublishDeviceState(
         this.lastDevicePublications.get(message.device.ieeeAddr),
         serialized,
         debounce,
-        now
+        now,
+        actionEvent
       )) {
         this.publish(friendlyName, merged, configured.retain === true);
         this.lastDevicePublications.set(message.device.ieeeAddr, { payload: serialized, at: now });

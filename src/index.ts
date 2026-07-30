@@ -49,6 +49,7 @@ const store = new DeviceStore(
     console.error(`Cihaz olay geçmişi kaydedilemedi: ${String(error)}`);
   })
 );
+store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
 const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
@@ -64,6 +65,7 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
     mqtt: { url: config.mqtt.url, baseTopic: config.mqtt.baseTopic },
     matter: { wsUrl: config.matterbridge.wsUrl },
     homeAssistant: { discoveryEnabled: config.homeAssistant.discoveryEnabled },
+    alerts: { lowBatteryThreshold: config.alerts.lowBatteryThreshold },
     debug: { enabled: config.debug.enabled }
   }
 ) : null;
@@ -691,7 +693,17 @@ app.get("/api/settings", async (_request, reply) => {
 app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
   if (!settingsStore) return reply.code(503).send({ ok: false, error: "Bağlantı ayarları bu çalışma modunda kullanılamıyor." });
   try {
-    const settings = await settingsStore.save(request.body);
+    const confirmation =
+      typeof request.body === "object"
+      && request.body !== null
+      && !Array.isArray(request.body)
+      && "zigbeeChannelConfirmation" in request.body
+        ? (request.body as { zigbeeChannelConfirmation?: unknown }).zigbeeChannelConfirmation
+        : undefined;
+    const settings = await settingsStore.save(request.body, {
+      confirmZigbeeChannelChange: confirmation === "CHANGE"
+    });
+    store.setLowBatteryThreshold(settings.alerts.lowBatteryThreshold);
     recentErrors.setEnabled(settings.debug.enabled);
     return { ok: true, settings, restartRequired: true };
   } catch (error) {

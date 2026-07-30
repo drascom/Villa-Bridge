@@ -311,7 +311,11 @@ export function buildHomeAssistantDiscovery(
         value_template: `{{ value_json.${property} }}`
       }));
     }
-    if (typeof device.state.action === "string") {
+    const actionTypes = [
+      ...(device.actionTypes ?? []),
+      ...(typeof device.state.action === "string" ? [device.state.action] : [])
+    ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+    if (actionTypes.length > 0) {
       const uniqueId = `villa_${safeId(device.id)}_action`;
       result.push(message("sensor", uniqueId, {
         ...common(device, uniqueId, baseTopic),
@@ -319,6 +323,15 @@ export function buildHomeAssistantDiscovery(
         icon: "mdi:gesture-tap-button",
         state_topic: `${baseTopic}/${device.sourceName}`,
         value_template: "{{ value_json.action }}"
+      }));
+      const eventUniqueId = `villa_${safeId(device.id)}_action_event`;
+      result.push(message("event", eventUniqueId, {
+        ...common(device, eventUniqueId, baseTopic),
+        name: "Action",
+        icon: "mdi:gesture-tap-button",
+        state_topic: `${baseTopic}/${device.sourceName}`,
+        event_types: actionTypes,
+        value_template: "{{ {'event_type': value_json.action} | to_json }}"
       }));
     }
   }

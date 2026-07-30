@@ -249,7 +249,7 @@
       <article class="setting-card zigbee-tools" data-admin-only><div class="zigbee-tools-icon" aria-hidden="true">⌁</div><div><h2 data-i18n="zigbeeTools">Zigbee setup tools</h2><p data-i18n="zigbeeToolsLead">Advanced pairing and recovery tools stay here for administrators.</p><div class="zigbee-tool-grid"><div class="zigbee-tool"><select id="pairingRouter" aria-label="Pair through router"><option value="" data-i18n="coordinator">Coordinator</option></select></div><div class="zigbee-tool"><input id="installCode" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="installCodePlaceholder" placeholder="Install code or Zigbee QR value"><button id="addInstallCode" class="secondary" type="button" data-i18n="add">Add</button></div><div class="zigbee-tool zigbee-tool-actions"><button id="scanTouchlink" class="secondary" type="button" data-i18n="findNearby">Find nearby devices</button><button id="scanNetworkMap" class="secondary" type="button" data-i18n="networkMap">Network map</button></div><div id="touchlinkResults" class="touchlink-results"></div><div id="networkMapResults" class="network-graph-host"></div><section class="zigbee-group-manager"><div class="zigbee-group-panel"><div class="zigbee-panel-head"><span class="zigbee-panel-icon" aria-hidden="true">◇</span><div><strong data-i18n="zigbeeGroups">Zigbee groups</strong><p data-i18n="zigbeeGroupsLead">Create a real Zigbee group so several lights react together with one radio command.</p></div></div><div class="zigbee-group-create"><input id="zigbeeGroupName" maxlength="64" data-i18n-placeholder="groupNamePlaceholder" placeholder="Living room"><button id="createZigbeeGroup" class="secondary" type="button" aria-label="Create group">＋</button></div><div id="zigbeeGroupList" class="zigbee-group-list"></div></div><div class="zigbee-binding-panel"><div class="zigbee-panel-head"><span class="zigbee-panel-icon" aria-hidden="true">⌁</span><div><strong data-i18n="directBinding">Direct binding</strong><p data-i18n="directBindingLead">Connect a button directly to a light or group. It keeps working even when Villa Bridge is offline.</p></div></div><div class="zigbee-binding-actions"><select id="bindSource"></select><select id="bindSourceEndpoint"></select><select id="bindTarget"></select><select id="bindTargetEndpoint"></select><button id="bindDevices" class="secondary" type="button" title="Bind">⌁</button><button id="unbindDevices" class="quiet" type="button" title="Unbind">×</button><div class="zigbee-binding-flow"><span data-i18n="sourceDevice">Button or remote</span><span aria-hidden="true">→</span><span data-i18n="targetDevice">Light or group</span></div><div id="zigbeeBindingList" class="zigbee-binding-list"></div></div></div></section></div></div></article>
       <form id="settingsForm" class="settings-form">
         <div class="settings-grid">
-          <article class="setting-card"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div><div class="setting-field"><label for="zigbeeChannel" data-i18n="zigbeeChannel">Zigbee channel</label><select id="zigbeeChannel"><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option></select><small data-i18n="zigbeeChannelLead">Changing the channel restarts the Zigbee network. Use only when interference requires it.</small></div></article>
+          <article class="setting-card"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div><div class="setting-field"><label for="zigbeeChannel" data-i18n="zigbeeChannel">Zigbee channel</label><select id="zigbeeChannel"><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option></select><small data-i18n="zigbeeChannelLead">Changing the channel can disconnect devices and requires a service restart.</small></div><div class="setting-field"><label for="lowBatteryThreshold" data-i18n="lowBatteryThreshold">Low battery warning</label><input id="lowBatteryThreshold" type="number" min="5" max="50" step="1" required><small data-i18n="lowBatteryThresholdLead">Create an alert when a battery reaches this percentage.</small></div></article>
           <article class="setting-card"><h2>MQTT</h2><p data-i18n="mqttSettingsLead">Broker and base topic shared by Villa Bridge and Zigbee2MQTT.</p><div class="setting-field"><label for="mqttUrl" data-i18n="mqttUrl">Broker URL</label><input id="mqttUrl" name="mqttUrl" type="url" placeholder="mqtt://127.0.0.1:1883" required></div><div class="setting-field"><label for="mqttBaseTopic" data-i18n="baseTopic">Base topic</label><input id="mqttBaseTopic" name="mqttBaseTopic" spellcheck="false" required></div></article>
           <article class="setting-card"><h2>Matter</h2><p data-i18n="matterSettingsLead">WebSocket connection used to publish devices to Matterbridge.</p><div class="setting-field"><label for="matterWsUrl" data-i18n="matterUrl">Matterbridge URL</label><input id="matterWsUrl" name="matterWsUrl" type="url" placeholder="ws://127.0.0.1:8283" required></div></article>
         </div>
@@ -483,7 +483,7 @@
     if(!installationOnboardingComplete)throw new Error(t("operationFailed"));
     try{localStorage.setItem(onboardingStorageKey,"true")}catch{}
   }
-  const isAlert=device=>device.state.smoke===true||device.state.carbon_monoxide===true||device.state.battery_low===true||(typeof device.state.battery==="number"&&device.state.battery<15);
+  const isAlert=device=>Array.isArray(device.alerts)&&device.alerts.length>0;
   const eventPresentation=event=>{
     const enabled=event.value===true||String(event.value).toUpperCase()==="ON";
     if(event.property==="action")return{icon:"◉",label:String(event.value).replaceAll("_"," ")};
@@ -492,6 +492,7 @@
     if(event.property==="smoke")return{icon:"△",label:event.value?t("smokeDetected"):t("noSmoke")};
     if(event.property==="carbon_monoxide")return{icon:"△",label:event.value?t("coDetected"):t("coClear")};
     if(event.property==="battery_low")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
+    if(event.property==="battery_threshold")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
     if(event.property==="availability")return{icon:"●",label:event.value==="online"?t("ready"):t("unreachable")};
     if(event.property==="state")return{icon:"◉",label:enabled?t("on"):t("off")};
     return{icon:"•",label:String(event.value).replaceAll("_"," ")};
@@ -672,7 +673,8 @@
     const visualState=device.availability==="offline"?"offline":action?.active?"on":"off";
     const pending=Boolean(action&&commandPending(device.id,control.property));
     const battery=typeof device.state.battery==="number"?Math.round(Math.max(0,Math.min(100,device.state.battery))):null;
-    const batteryPill=battery===null?"":`<span class="quick-battery${battery<15?" low":""}" aria-label="${t("battery")} ${battery}%"><span class="battery-glyph" aria-hidden="true"><i style="width:${battery}%"></i></span>${battery}%</span>`;
+    const batteryThreshold=state.settings?.alerts?.lowBatteryThreshold??15;
+    const batteryPill=battery===null?"":`<span class="quick-battery${battery<=batteryThreshold?" low":""}" aria-label="${t("battery")} ${battery}%"><span class="battery-glyph" aria-hidden="true"><i style="width:${battery}%"></i></span>${battery}%</span>`;
     const actionAttributes=action
       ?`data-command-value="${commandValue(action.value)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}"`
       :`data-quick-show="${esc(device.id)}"`;
@@ -1814,6 +1816,7 @@
       state.mqttAccess=data.mqttAccess||null;
       $("#zigbeeAdapterUrl").value=state.settings.zigbee.adapterUrl;
       $("#zigbeeChannel").value=String(state.settings.zigbee.channel);
+      $("#lowBatteryThreshold").value=String(state.settings.alerts?.lowBatteryThreshold??15);
       $("#mqttUrl").value=state.settings.mqtt.url;
       $("#mqttBaseTopic").value=state.settings.mqtt.baseTopic;
       $("#matterWsUrl").value=state.settings.matter.wsUrl;
@@ -1843,8 +1846,18 @@
       mqtt:{url:state.onboardingDraft.mqttUrl,baseTopic:state.onboardingDraft.mqttBaseTopic},
       matter:{wsUrl:state.onboardingDraft.matterWsUrl},
       homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true},
+      alerts:{lowBatteryThreshold:state.settings?.alerts?.lowBatteryThreshold??15},
       debug:{enabled:state.settings?.debug?.enabled!==false}
     };
+  }
+  function settingsWithChannelConfirmation(settings){
+    const previous=Number(state.settings?.zigbee?.channel);
+    const next=Number(settings.zigbee?.channel);
+    if(Number.isInteger(previous)&&previous!==next){
+      if(!confirm(t("zigbeeChannelConfirm",{from:previous,to:next})))return null;
+      return{...settings,zigbeeChannelConfirmation:"CHANGE"};
+    }
+    return settings;
   }
   function renderOnboarding(){
     const draft=state.onboardingDraft;
@@ -1923,10 +1936,13 @@
         mqtt:state.settings.mqtt,
         matter:state.settings.matter,
         homeAssistant:state.settings.homeAssistant,
+        alerts:state.settings.alerts,
         debug:state.settings.debug
       };
       if(JSON.stringify(settings)!==JSON.stringify(current)){
-        const data=await api("/api/settings",{method:"PUT",body:JSON.stringify(settings)});
+        const payload=settingsWithChannelConfirmation(settings);
+        if(!payload)return;
+        const data=await api("/api/settings",{method:"PUT",body:JSON.stringify(payload)});
         state.settings=data.settings;
         showToast(t("setupSavedRestart"));
       }
@@ -2514,18 +2530,20 @@
   }
   async function saveSettings(event){
     event.preventDefault();
-    if(!confirm(t("restartConfirm")))return;
-    const button=$("#saveSettings");
-    button.disabled=true;
-    try{
-      const settings={
+    const settings={
         zigbee:{adapterUrl:$("#zigbeeAdapterUrl").value.trim(),channel:Number($("#zigbeeChannel").value)},
         mqtt:{url:$("#mqttUrl").value.trim(),baseTopic:$("#mqttBaseTopic").value.trim()},
         matter:{wsUrl:$("#matterWsUrl").value.trim()},
         homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true},
+        alerts:{lowBatteryThreshold:Number($("#lowBatteryThreshold").value)},
         debug:{enabled:state.settings?.debug?.enabled!==false}
       };
-      await api("/api/settings",{method:"PUT",body:JSON.stringify(settings)});
+    const payload=settingsWithChannelConfirmation(settings);
+    if(!payload||!confirm(t("restartConfirm")))return;
+    const button=$("#saveSettings");
+    button.disabled=true;
+    try{
+      await api("/api/settings",{method:"PUT",body:JSON.stringify(payload)});
       showToast(t("settingsSaved"));
       await api("/api/settings/apply",{method:"POST",body:JSON.stringify({confirmation:"APPLY"})});
       waitForRestart();

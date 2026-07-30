@@ -18,6 +18,9 @@ export interface ConnectionSettings {
   homeAssistant: {
     discoveryEnabled: boolean;
   };
+  alerts: {
+    lowBatteryThreshold: number;
+  };
   debug: {
     enabled: boolean;
   };
@@ -48,6 +51,7 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
   const mqtt = objectValue(input.mqtt);
   const matter = objectValue(input.matter);
   const homeAssistant = objectValue(input.homeAssistant);
+  const alerts = objectValue(input.alerts);
   const debug = objectValue(input.debug);
   const baseTopic = typeof mqtt.baseTopic === "string" ? mqtt.baseTopic.trim() : "";
   const channel = Number(zigbee.channel);
@@ -56,6 +60,14 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
   }
   if (!/^[A-Za-z0-9][A-Za-z0-9/_-]{0,79}$/.test(baseTopic) || baseTopic.includes("//")) {
     throw new Error("MQTT temel konusu geçersiz.");
+  }
+  const lowBatteryThreshold = Number(alerts.lowBatteryThreshold ?? 15);
+  if (
+    !Number.isInteger(lowBatteryThreshold)
+    || lowBatteryThreshold < 5
+    || lowBatteryThreshold > 50
+  ) {
+    throw new Error("Düşük pil eşiği 5-50 arasında olmalıdır.");
   }
   return {
     zigbee: {
@@ -71,6 +83,9 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
     },
     homeAssistant: {
       discoveryEnabled: homeAssistant.discoveryEnabled === true
+    },
+    alerts: {
+      lowBatteryThreshold
     },
     debug: {
       enabled: debug.enabled !== false
@@ -100,6 +115,7 @@ export class SettingsStore {
     const fileMqtt = objectValue(file.mqtt);
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
+    const fileAlerts = objectValue(file.alerts);
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
@@ -119,26 +135,52 @@ export class SettingsStore {
       homeAssistant: {
         discoveryEnabled: fileHomeAssistant.discoveryEnabled ?? this.fallback.homeAssistant.discoveryEnabled
       },
+      alerts: {
+        lowBatteryThreshold:
+          fileAlerts.lowBatteryThreshold
+          ?? this.fallback.alerts.lowBatteryThreshold
+      },
       debug: {
         enabled: fileDebug.enabled ?? this.fallback.debug.enabled
       }
     });
   }
 
-  async save(value: unknown): Promise<ConnectionSettings> {
+  async save(
+    value: unknown,
+    options: { confirmZigbeeChannelChange?: boolean } = {}
+  ): Promise<ConnectionSettings> {
     const settings = validateConnectionSettings(value);
     const [file, z2m] = await Promise.all([readYaml(this.configPath), readYaml(this.z2mPath)]);
     const fileMqtt = objectValue(file.mqtt);
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
+    const fileAlerts = objectValue(file.alerts);
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
     const z2mAdvanced = objectValue(z2m.advanced);
+    const currentChannel = Number(
+      z2mAdvanced.channel
+      ?? this.fallback.zigbee.channel
+    );
+    if (
+      Number.isInteger(currentChannel)
+      && currentChannel !== settings.zigbee.channel
+      && options.confirmZigbeeChannelChange !== true
+    ) {
+      throw new Error(
+        "Zigbee kanal değişikliği açık onay gerektirir; cihazlar bağlantısını kaybedebilir."
+      );
+    }
 
     file.mqtt = { ...fileMqtt, url: settings.mqtt.url, baseTopic: settings.mqtt.baseTopic };
     file.matterbridge = { ...fileMatter, wsUrl: settings.matter.wsUrl };
     file.homeAssistant = { ...fileHomeAssistant, discoveryEnabled: settings.homeAssistant.discoveryEnabled };
+    file.alerts = {
+      ...fileAlerts,
+      lowBatteryThreshold: settings.alerts.lowBatteryThreshold
+    };
     file.debug = { ...fileDebug, enabled: settings.debug.enabled };
     z2m.mqtt = { ...z2mMqtt, server: settings.mqtt.url, base_topic: settings.mqtt.baseTopic };
     z2m.serial = { ...z2mSerial, port: settings.zigbee.adapterUrl };
