@@ -434,7 +434,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /data-widget="recent"/);
   assert.match(dashboard, /data-widget="clock"[\s\S]*id="worldClockRows"/);
   assert.match(dashboard, /data-widget="weather"[\s\S]*id="weatherContent"/);
-  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","clock","weather","recent"\]/);
+  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","clock","weather","recent","activity"\]/);
   assert.match(dashboard, /if\(!Array\.isArray\(value\)\)return\[\.\.\.defaultDashboardWidgets\]/);
   assert.match(dashboard, /catch\{return\[\.\.\.defaultDashboardWidgets\]\}/);
   assert.doesNotMatch(dashboard, /data-widget="signal"/);
@@ -623,4 +623,35 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
+});
+
+test("perde, iklim, kilit, fan ve siren günlük kullanıcıya görsel kontrollerle sunulur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /control\.kind==="cover"/);
+  assert.match(dashboard, /control\.kind==="lock"/);
+  assert.match(dashboard, /\["switch","fan","siren"\]\.includes\(control\.kind\)/);
+  assert.match(dashboard, /data-command-value=/);
+  assert.match(dashboard, /data-select=/);
+  assert.match(dashboard, /class="control-command stop"/);
+  assert.match(dashboard, /control\.adminOnly\?" data-admin-only":""/);
+});
+
+test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellikler ev kullanıcısına açıktır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /<section id="connections" class="view" data-admin-only>/);
+  assert.match(dashboard, /<section id="settings" class="view" data-admin-only>/);
+  assert.match(dashboard, /body\.resident-session \[data-admin-only\]\{display:none!important\}/);
+  assert.match(dashboard, /id="devicesAddDevice"[^>]*data-admin-only/);
+  assert.match(dashboard, /class="setting-card zigbee-tools" data-admin-only/);
+  assert.match(dashboard, /data-admin-only data-options=/);
+  assert.match(dashboard, /data-admin-only data-reconfigure=/);
+  assert.match(dashboard, /data-admin-only data-ota=/);
+  assert.match(dashboard, /data-admin-only data-remove=/);
+
+  assert.match(dashboard, /data-widget="activity"/);
+  assert.match(dashboard, /defaultDashboardWidgets=\["quick","clock","weather","recent","activity"\]/);
+  assert.match(dashboard, /<button class="secondary" data-note=/);
+  assert.doesNotMatch(dashboard, /data-admin-only data-note=/);
 });

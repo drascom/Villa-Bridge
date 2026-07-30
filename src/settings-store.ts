@@ -6,6 +6,7 @@ type YamlObject = Record<string, unknown>;
 export interface ConnectionSettings {
   zigbee: {
     adapterUrl: string;
+    channel: number;
   };
   mqtt: {
     url: string;
@@ -49,12 +50,17 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
   const homeAssistant = objectValue(input.homeAssistant);
   const debug = objectValue(input.debug);
   const baseTopic = typeof mqtt.baseTopic === "string" ? mqtt.baseTopic.trim() : "";
+  const channel = Number(zigbee.channel);
+  if (!Number.isInteger(channel) || channel < 11 || channel > 26) {
+    throw new Error("Zigbee kanalı 11-26 arasında olmalıdır.");
+  }
   if (!/^[A-Za-z0-9][A-Za-z0-9/_-]{0,79}$/.test(baseTopic) || baseTopic.includes("//")) {
     throw new Error("MQTT temel konusu geçersiz.");
   }
   return {
     zigbee: {
-      adapterUrl: endpoint(zigbee.adapterUrl, ["tcp:"], "Zigbee adaptörü")
+      adapterUrl: endpoint(zigbee.adapterUrl, ["tcp:"], "Zigbee adaptörü"),
+      channel
     },
     mqtt: {
       url: endpoint(mqtt.url, ["mqtt:", "mqtts:"], "MQTT sunucusu"),
@@ -97,9 +103,11 @@ export class SettingsStore {
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
+    const z2mAdvanced = objectValue(z2m.advanced);
     return validateConnectionSettings({
       zigbee: {
-        adapterUrl: z2mSerial.port ?? this.fallback.zigbee.adapterUrl
+        adapterUrl: z2mSerial.port ?? this.fallback.zigbee.adapterUrl,
+        channel: z2mAdvanced.channel ?? this.fallback.zigbee.channel
       },
       mqtt: {
         url: fileMqtt.url ?? z2mMqtt.server ?? this.fallback.mqtt.url,
@@ -126,6 +134,7 @@ export class SettingsStore {
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
+    const z2mAdvanced = objectValue(z2m.advanced);
 
     file.mqtt = { ...fileMqtt, url: settings.mqtt.url, baseTopic: settings.mqtt.baseTopic };
     file.matterbridge = { ...fileMatter, wsUrl: settings.matter.wsUrl };
@@ -133,6 +142,7 @@ export class SettingsStore {
     file.debug = { ...fileDebug, enabled: settings.debug.enabled };
     z2m.mqtt = { ...z2mMqtt, server: settings.mqtt.url, base_topic: settings.mqtt.baseTopic };
     z2m.serial = { ...z2mSerial, port: settings.zigbee.adapterUrl };
+    z2m.advanced = { ...z2mAdvanced, channel: settings.zigbee.channel };
 
     const [fileTemporary, z2mTemporary] = await Promise.all([
       writeYamlTemporary(this.configPath, file),

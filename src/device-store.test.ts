@@ -63,6 +63,82 @@ test("durumu olmayan yazılabilir ışık özellikleri kumanda olarak sunulur", 
   );
 });
 
+test("iç içe cihaz expose bilgisi tip, aralık ve admin kategorisini korur", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xcover",
+    friendly_name: "Bedroom Blind",
+    type: "Router",
+    definition: {
+      model: "Blind",
+      exposes: [
+        {
+          type: "cover",
+          name: "cover",
+          features: [
+            { type: "enum", name: "state", property: "state", access: 7, values: ["OPEN", "STOP", "CLOSE"] },
+            { type: "numeric", name: "position", property: "position", access: 7, value_min: 0, value_max: 100 }
+          ]
+        },
+        {
+          type: "numeric",
+          name: "calibration",
+          property: "calibration",
+          access: 3,
+          value_min: -10,
+          value_max: 10,
+          category: "config"
+        }
+      ]
+    }
+  }])));
+  store.ingest("Bedroom Blind", Buffer.from('{"state":"OPEN","position":50,"calibration":1}'));
+
+  const controls = store.getDevices()[0].controls;
+  assert.deepEqual(
+    controls.map(({ property, kind, min, max, adminOnly }) => ({ property, kind, min, max, adminOnly })),
+    [
+      { property: "state", kind: "cover", min: undefined, max: undefined, adminOnly: false },
+      { property: "position", kind: "position", min: 0, max: 100, adminOnly: false },
+      { property: "calibration", kind: "number", min: -10, max: 10, adminOnly: true }
+    ]
+  );
+});
+
+test("önemli cihaz hareketleri kısa geçmişte tutulur, sinyal gürültüsü tutulmaz", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("Hall Button", Buffer.from('{"action":"single","linkquality":120}'));
+  store.ingest("Hall Button", Buffer.from('{"action":"double","linkquality":121}'));
+  store.ingest("Hall Button", Buffer.from('{"action":"","linkquality":122}'));
+  store.ingest("Hall Button/availability", Buffer.from('{"state":"online"}'));
+  store.ingest("Hall Button/availability", Buffer.from('{"state":"online"}'));
+  store.ingest("Hall Button/availability", Buffer.from('{"state":"offline"}'));
+  assert.deepEqual(
+    store.getEvents().map(({ sourceName, property, value }) => ({ sourceName, property, value })),
+    [
+      { sourceName: "Hall Button", property: "availability", value: "offline" },
+      { sourceName: "Hall Button", property: "availability", value: "online" },
+      { sourceName: "Hall Button", property: "action", value: "double" },
+      { sourceName: "Hall Button", property: "action", value: "single" }
+    ]
+  );
+});
+
+test("OTA desteği ve kayıtlı cihaz seçenekleri cihaz görünümüne taşınır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xoptions",
+    friendly_name: "Office Light",
+    type: "Router",
+    definition: { model: "Light", ota: true, exposes: [] },
+    configured_options: { transition: 1.5, debounce: 0.3, retain: true }
+  }])));
+
+  const [device] = store.getDevices();
+  assert.equal(device.otaSupported, true);
+  assert.deepEqual(device.options, { transition: 1.5, debounce: 0.3, retain: true });
+});
+
 test("genel Tuya modeli üretici parmak iziyle doğru katalog modeline çevrilir", () => {
   const store = new DeviceStore(new Map());
   store.ingest(

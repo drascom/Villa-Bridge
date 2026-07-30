@@ -4,13 +4,13 @@ import { validateConnectionSettings } from "./settings-store.js";
 
 test("bağlantı ayarları güvenli protokol, sunucu ve port ile doğrulanır", () => {
   assert.deepEqual(validateConnectionSettings({
-    zigbee: { adapterUrl: "tcp://192.168.0.248:6638" },
+    zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 15 },
     mqtt: { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
     matter: { wsUrl: "ws://127.0.0.1:8283" },
     homeAssistant: { discoveryEnabled: false },
     debug: { enabled: false }
   }), {
-    zigbee: { adapterUrl: "tcp://192.168.0.248:6638" },
+    zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 15 },
     mqtt: { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
     matter: { wsUrl: "ws://127.0.0.1:8283" },
     homeAssistant: { discoveryEnabled: false },
@@ -20,7 +20,7 @@ test("bağlantı ayarları güvenli protokol, sunucu ve port ile doğrulanır", 
 
 test("debug mode defaults to enabled during testing", () => {
   const settings = validateConnectionSettings({
-    zigbee: { adapterUrl: "tcp://192.168.0.248:6638" },
+    zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 15 },
     mqtt: { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
     matter: { wsUrl: "ws://127.0.0.1:8283" },
     homeAssistant: { discoveryEnabled: false }
@@ -31,14 +31,21 @@ test("debug mode defaults to enabled during testing", () => {
 
 test("kimlik bilgisi içeren veya portsuz bağlantı adresleri reddedilir", () => {
   assert.throws(() => validateConnectionSettings({
-    zigbee: { adapterUrl: "tcp://192.168.0.248:6638" },
+    zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 15 },
     mqtt: { url: "mqtt://user:secret@127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
     matter: { wsUrl: "ws://127.0.0.1:8283" },
     homeAssistant: { discoveryEnabled: false },
     debug: { enabled: true }
   }));
   assert.throws(() => validateConnectionSettings({
-    zigbee: { adapterUrl: "tcp://192.168.0.248" },
+    zigbee: { adapterUrl: "tcp://192.168.0.248", channel: 15 },
+    mqtt: { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    matter: { wsUrl: "ws://127.0.0.1:8283" },
+    homeAssistant: { discoveryEnabled: false },
+    debug: { enabled: true }
+  }));
+  assert.throws(() => validateConnectionSettings({
+    zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 27 },
     mqtt: { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
     matter: { wsUrl: "ws://127.0.0.1:8283" },
     homeAssistant: { discoveryEnabled: false },
