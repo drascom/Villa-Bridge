@@ -528,9 +528,15 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /navigator\.geolocation\.getCurrentPosition/);
   assert.match(dashboard, /setInterval\(renderWorldClock,60000\)/);
   assert.match(dashboard, /refreshWeatherIfNeeded\(\)/);
-  assert.match(dashboard, /id="widgetScrollHint" class="widget-scroll-hint"/);
-  assert.match(dashboard, /rail\.scrollWidth-rail\.clientWidth-rail\.scrollLeft>8/);
-  assert.match(dashboard, /scrollBy\(\{left:Math\.max\(220,Math\.round\(rail\.clientWidth\*\.72\)\),behavior:"smooth"\}\)/);
+  assert.match(dashboard, /id="widgetScrollLeft" class="widget-scroll-hint scroll-hint-left"/);
+  assert.match(dashboard, /id="widgetScrollHint" class="widget-scroll-hint scroll-hint-right"/);
+  assert.match(dashboard, /id="quickScrollLeft" class="quick-scroll-hint scroll-hint-left"/);
+  assert.match(dashboard, /id="quickScrollRight" class="quick-scroll-hint scroll-hint-right"/);
+  assert.match(dashboard, /const hasBefore=scroller\.scrollLeft>8/);
+  assert.match(dashboard, /const hasAfter=scroller\.scrollWidth-scroller\.clientWidth-scroller\.scrollLeft>8/);
+  assert.match(dashboard, /function scrollWidgetRail\(direction\)\{scrollDashboardRow\(\$\("#widgetRail"\),direction,220,\.72\)\}/);
+  assert.match(dashboard, /function scrollQuickControls\(direction\)\{scrollDashboardRow\(\$\("#quickDevices"\),direction,120,\.55\)\}/);
+  assert.match(dashboard, /#home \.quick-scroll-hint\{top:calc\(50% - 16px\);width:28px;height:32px/);
   assert.match(dashboard, /const button=card\.querySelector\("\[data-command\]"\)/);
   assert.match(dashboard, /if\(!button\|\|button\.disabled\)return/);
   assert.match(dashboard, /command\(button\.dataset\.command,button\.dataset\.property,button\.dataset\.value==="true"\)/);
