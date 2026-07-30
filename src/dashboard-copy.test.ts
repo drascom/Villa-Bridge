@@ -477,6 +477,18 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.quick-grid \.device-name\{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:11px\}/);
   assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex-basis:auto\}/);
   assert.doesNotMatch(dashboard, /\.quick-grid \.device-name\{[^}]*text-overflow:ellipsis/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \[data-widget="recent"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
+  assert.match(dashboard, /#quickDevices\{cursor:grab\}#quickDevices\.mouse-dragging,#quickDevices\.mouse-dragging \*\{cursor:grabbing!important\}/);
+  assert.match(dashboard, /function setupQuickMouseScrolling\(\)\{/);
+  assert.match(dashboard, /if\(event\.pointerType!=="mouse"\|\|event\.button!==0\)return/);
+  assert.match(dashboard, /if\(!dragged&&Math\.abs\(distance\)>6\)\{/);
+  assert.match(dashboard, /startCard\?\.dispatchEvent\(new Event\("pointercancel"\)\)/);
+  assert.match(dashboard, /scroller\.scrollLeft=startScrollLeft-distance/);
+  assert.match(dashboard, /scroller\.dataset\.suppressMouseClick="true"/);
+  assert.match(dashboard, /event\.stopImmediatePropagation\(\)/);
+  assert.match(dashboard, /setupPullToRefresh\(\);setupQuickMouseScrolling\(\);configureAndroidActions\(\)/);
+  assert.match(dashboard, /#home #editDashboard\.editing-active\{color:#fff!important;background:#16a765!important;box-shadow:0 0 0 3px rgba\(43,214,137,.32\),0 8px 22px rgba\(10,112,68,.34\)!important\}/);
+  assert.match(dashboard, /editDashboard\.classList\.toggle\("editing-active",state\.dashboardEditing\)/);
   assert.match(dashboard, /body\[data-active-view="home"\]\{overflow:hidden\}/);
   assert.match(dashboard, /id="widgetRail" class="widget-rail"/);
   assert.match(dashboard, /#home \.widget-board\{height:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:10px;overflow:hidden\}/);
