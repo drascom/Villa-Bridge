@@ -5,6 +5,19 @@ export interface HomeFavorite {
   controlId: string;
 }
 
+const homeFavoriteControlKinds = new Set([
+  "switch",
+  "fan",
+  "siren",
+  "cover",
+  "position",
+  "lock",
+  "climate"
+]);
+
+export const isHomeFavoriteControlKind = (kind: string): boolean =>
+  homeFavoriteControlKinds.has(kind);
+
 export const validateHomeFavorites = (value: unknown): HomeFavorite[] => {
   if (!Array.isArray(value) || value.length > 64) throw new Error("Ana ekran favorileri geçersiz.");
   const result: HomeFavorite[] = [];

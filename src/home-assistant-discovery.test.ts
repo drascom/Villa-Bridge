@@ -26,6 +26,8 @@ const light: DeviceView = {
   otaSupported: false,
   options: { transition: 0, debounce: 0, retain: false },
   features: ["state", "brightness", "color_temp"],
+  actionTypes: ["single", "double"],
+  alerts: [],
   controls: [
     { id: "main", property: "state", name: "Kitchen Light", kind: "switch", value: true },
     { id: "main:brightness", property: "brightness", name: "Brightness", kind: "level", value: 120, min: 1, max: 254 },
@@ -45,6 +47,12 @@ test("Home Assistant keşfi ışık ve sinyali UID ile yayınlar", () => {
   assert.equal(signalMessage?.payload.unit_of_measurement, "lqi");
   const action = discovery.find((item) => item.topic.includes("_action/"));
   assert.equal(action?.payload.value_template, "{{ value_json.action }}");
+  const actionEvent = discovery.find((item) => item.topic.startsWith("homeassistant/event/"));
+  assert.deepEqual(actionEvent?.payload.event_types, ["single", "double"]);
+  assert.equal(
+    actionEvent?.payload.value_template,
+    "{{ {'event_type': value_json.action} | to_json }}"
+  );
 });
 
 test("Home Assistant ikili kontrolün cihaz tarafından tanımlanan değerlerini korur", () => {

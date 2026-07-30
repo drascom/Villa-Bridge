@@ -63,6 +63,55 @@ test("durumu olmayan yazılabilir ışık özellikleri kumanda olarak sunulur", 
   );
 });
 
+test("buton action türleri expose bilgisinden çıkarılır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xbutton",
+    friendly_name: "Hall Button",
+    type: "EndDevice",
+    definition: {
+      exposes: [{
+        type: "enum",
+        property: "action",
+        access: 1,
+        values: ["single", "double", "hold"]
+      }]
+    }
+  }])));
+
+  assert.deepEqual(store.getDevices()[0].actionTypes, ["double", "hold", "single"]);
+});
+
+test("düşük pil eşiği backend uyarısı ve kalıcı geçiş olayı üretir", () => {
+  const store = new DeviceStore(new Map());
+  store.setLowBatteryThreshold(20);
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xbattery",
+    friendly_name: "Door Sensor",
+    type: "EndDevice"
+  }])));
+
+  store.ingest("Door Sensor", Buffer.from('{"battery":19}'));
+  assert.deepEqual(store.getDevices()[0].alerts, [{
+    code: "low_battery",
+    severity: "warning",
+    value: 19,
+    threshold: 20
+  }]);
+  assert.equal(store.getEvents()[0].property, "battery_threshold");
+  assert.equal(store.getEvents()[0].value, true);
+
+  store.ingest("Door Sensor", Buffer.from('{"battery":22}'));
+  assert.deepEqual(store.getDevices()[0].alerts, []);
+  assert.equal(store.getEvents()[0].property, "battery_threshold");
+  assert.equal(store.getEvents()[0].value, false);
+
+  store.setLowBatteryThreshold(25);
+  assert.equal(store.getDevices()[0].alerts[0]?.code, "low_battery");
+  assert.equal(store.getEvents()[0].property, "battery_threshold");
+  assert.equal(store.getEvents()[0].value, true);
+});
+
 test("iç içe cihaz expose bilgisi tip, aralık ve admin kategorisini korur", () => {
   const store = new DeviceStore(new Map());
   store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
@@ -137,6 +186,50 @@ test("OTA desteği ve kayıtlı cihaz seçenekleri cihaz görünümüne taşın�
   const [device] = store.getDevices();
   assert.equal(device.otaSupported, true);
   assert.deepEqual(device.options, { transition: 1.5, debounce: 0.3, retain: true });
+});
+
+test("endpoint, binding ve grup sahneleri arayüz görünümüne taşınır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0x0011223344556677",
+    friendly_name: "Wall Remote",
+    endpoint_names: { "2": "Right button" },
+    endpoints: {
+      "2": {
+        bindings: [{
+          cluster: "genOnOff",
+          target: {
+            ieee_address: "0x8899aabbccddeeff",
+            endpoint: 3
+          }
+        }],
+        clusters: {
+          input: [],
+          output: [6]
+        }
+      }
+    }
+  }])));
+  store.ingest("bridge/groups", Buffer.from(JSON.stringify([{
+    id: 7,
+    friendly_name: "Evening Lights",
+    members: [],
+    scenes: [{ id: 2, name: "Movie" }]
+  }])));
+
+  assert.deepEqual(store.getDevices()[0].endpoints, [{
+    id: 2,
+    name: "Right button",
+    inputClusters: [],
+    outputClusters: [6],
+    bindings: [{
+      cluster: "genOnOff",
+      targetType: "device",
+      targetId: "0x8899aabbccddeeff",
+      targetEndpoint: 3
+    }]
+  }]);
+  assert.deepEqual(store.getGroups()[0].scenes, [{ id: 2, name: "Movie" }]);
 });
 
 test("genel Tuya modeli üretici parmak iziyle doğru katalog modeline çevrilir", () => {

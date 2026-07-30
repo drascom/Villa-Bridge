@@ -12,6 +12,8 @@ matterbridge:
   wsUrl: ws://127.0.0.1:8283
 homeAssistant:
   discoveryEnabled: false
+alerts:
+  lowBatteryThreshold: 15
 debug:
   enabled: true
 http:

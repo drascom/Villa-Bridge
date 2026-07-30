@@ -11,7 +11,11 @@ import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
 import { DeviceNotesStore } from "./device-notes.js";
 import { DeviceStore } from "./device-store.js";
-import { HomeFavoritesStore, validateHomeFavorites } from "./home-favorites.js";
+import {
+  HomeFavoritesStore,
+  isHomeFavoriteControlKind,
+  validateHomeFavorites
+} from "./home-favorites.js";
 import { InstallationStateStore } from "./installation-state.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
@@ -45,6 +49,7 @@ const store = new DeviceStore(
     console.error(`Cihaz olay geçmişi kaydedilemedi: ${String(error)}`);
   })
 );
+store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
 const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
@@ -60,6 +65,7 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
     mqtt: { url: config.mqtt.url, baseTopic: config.mqtt.baseTopic },
     matter: { wsUrl: config.matterbridge.wsUrl },
     homeAssistant: { discoveryEnabled: config.homeAssistant.discoveryEnabled },
+    alerts: { lowBatteryThreshold: config.alerts.lowBatteryThreshold },
     debug: { enabled: config.debug.enabled }
   }
 ) : null;
@@ -206,34 +212,92 @@ app.put<{
   }
 });
 app.post<{
-  Body?: { fromId?: unknown; toId?: unknown; bind?: unknown; clusters?: unknown };
+  Params: { id: string };
+  Body?: { property?: unknown; value?: unknown };
+}>("/api/groups/:id/command", async (request, reply) => {
+  if (
+    request.body?.property !== "state"
+    || typeof request.body.value !== "boolean"
+  ) {
+    return reply.code(400).send({ ok: false, error: "Grup aç/kapat komutu geçersiz." });
+  }
+  try {
+    await source.setGroup(request.params.id, {
+      state: request.body.value ? "ON" : "OFF"
+    });
+    return { ok: true };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+app.post<{
+  Body?: {
+    fromId?: unknown;
+    toId?: unknown;
+    bind?: unknown;
+    clusters?: unknown;
+    fromEndpoint?: unknown;
+    toEndpoint?: unknown;
+  };
 }>("/api/zigbee/bind", async (request, reply) => {
   const fromId = typeof request.body?.fromId === "string" ? request.body.fromId.toLowerCase() : "";
   const toId = typeof request.body?.toId === "string" ? request.body.toId.toLowerCase() : "";
   const clusters = Array.isArray(request.body?.clusters)
     ? request.body.clusters.filter((value): value is string => typeof value === "string").slice(0, 32)
     : undefined;
-  if (!/^0x[0-9a-f]{16}$/.test(fromId) || !toId || typeof request.body?.bind !== "boolean") {
+  const fromEndpoint = request.body?.fromEndpoint;
+  const toEndpoint = request.body?.toEndpoint;
+  const validEndpoint = (value: unknown): boolean =>
+    value === undefined || (Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 240);
+  if (
+    !/^0x[0-9a-f]{16}$/.test(fromId)
+    || !toId
+    || typeof request.body?.bind !== "boolean"
+    || !validEndpoint(fromEndpoint)
+    || !validEndpoint(toEndpoint)
+  ) {
     return reply.code(400).send({ ok: false, error: "Bağlama isteği geçersiz." });
   }
   try {
-    await source.bindDevice(fromId, toId, request.body.bind, clusters);
-    return { ok: true };
+    await source.bindDevice(
+      fromId,
+      toId,
+      request.body.bind,
+      clusters,
+      fromEndpoint === undefined ? undefined : Number(fromEndpoint),
+      toEndpoint === undefined ? undefined : Number(toEndpoint)
+    );
+    return { ok: true, devices: visibleDevices(request.villaSession?.role) };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 app.post<{
   Params: { id: string };
-  Body?: { sceneId?: unknown; action?: unknown };
+  Body?: { sceneId?: unknown; action?: unknown; name?: unknown };
 }>("/api/groups/:id/scene", async (request, reply) => {
   const sceneId = Number(request.body?.sceneId);
   const action = request.body?.action;
-  if (!Number.isInteger(sceneId) || sceneId < 1 || sceneId > 255 || !["store", "recall", "remove"].includes(String(action))) {
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : undefined;
+  if (
+    !Number.isInteger(sceneId)
+    || sceneId < 1
+    || sceneId > 255
+    || !["store", "recall", "remove"].includes(String(action))
+    || (name !== undefined && (name.length < 1 || name.length > 64))
+  ) {
     return reply.code(400).send({ ok: false, error: "Sahne isteği geçersiz." });
   }
   try {
-    await source.groupScene(request.params.id, sceneId, action as "store" | "recall" | "remove");
+    await source.groupScene(
+      request.params.id,
+      sceneId,
+      action as "store" | "recall" | "remove",
+      name
+    );
     return { ok: true, groups: store.getGroups() };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
@@ -315,6 +379,20 @@ app.put<{ Params: { id: string }; Body?: { enabled?: unknown } }>(
     }
   }
 );
+app.post<{ Params: { id: string } }>("/api/devices/:id/ota-check", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) {
+    return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  }
+  try {
+    return { ok: true, ota: await source.checkOta(id) };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
 app.put<{
   Params: { id: string };
   Body?: { transition?: unknown; debounce?: unknown; retain?: unknown };
@@ -430,8 +508,12 @@ app.put<{ Body?: { favorites?: unknown } }>("/api/favorites", async (request, re
     const devices = store.getDevices();
     for (const favorite of favorites) {
       const device = devices.find((item) => item.id === favorite.deviceId);
-      const control = device?.controls.find((item) => item.id === favorite.controlId && item.kind === "switch");
-      if (!device || !control) return reply.code(400).send({ ok: false, error: "Favori cihaz veya anahtar bulunamadı." });
+      const control = device?.controls.find((item) =>
+        item.id === favorite.controlId && isHomeFavoriteControlKind(item.kind)
+      );
+      if (!device || !control) {
+        return reply.code(400).send({ ok: false, error: "Favori cihaz veya kontrol bulunamadı." });
+      }
     }
     return { ok: true, favorites: await favoritesStore.save(favorites) };
   } catch (error) {
@@ -611,7 +693,17 @@ app.get("/api/settings", async (_request, reply) => {
 app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
   if (!settingsStore) return reply.code(503).send({ ok: false, error: "Bağlantı ayarları bu çalışma modunda kullanılamıyor." });
   try {
-    const settings = await settingsStore.save(request.body);
+    const confirmation =
+      typeof request.body === "object"
+      && request.body !== null
+      && !Array.isArray(request.body)
+      && "zigbeeChannelConfirmation" in request.body
+        ? (request.body as { zigbeeChannelConfirmation?: unknown }).zigbeeChannelConfirmation
+        : undefined;
+    const settings = await settingsStore.save(request.body, {
+      confirmZigbeeChannelChange: confirmation === "CHANGE"
+    });
+    store.setLowBatteryThreshold(settings.alerts.lowBatteryThreshold);
     recentErrors.setEnabled(settings.debug.enabled);
     return { ok: true, settings, restartRequired: true };
   } catch (error) {

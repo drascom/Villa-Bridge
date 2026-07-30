@@ -30,6 +30,7 @@ const residentRoutes = new Set([
   "GET /api/devices/:id/note",
   "PUT /api/devices/:id/note",
   "POST /api/devices/:id/command",
+  "POST /api/groups/:id/command",
   "POST /api/auth/logout"
 ]);
 

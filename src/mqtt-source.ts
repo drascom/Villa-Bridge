@@ -1,7 +1,12 @@
 import mqtt, { type MqttClient } from "mqtt";
 import type { AppConfig } from "./config.js";
 import { DeviceStore } from "./device-store.js";
-import type { PreparedNetworkBackup, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
+import type {
+  OtaCheckResult,
+  PreparedNetworkBackup,
+  ZigbeeNetworkMap,
+  ZigbeeSource
+} from "./source.js";
 import type { JsonObject } from "./types.js";
 
 export function z2mGroupIdentifier(id: string): string {
@@ -111,19 +116,46 @@ export class MqttShadowSource implements ZigbeeSource {
     );
   }
 
-  async bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void> {
+  async setGroup(id: string, command: JsonObject): Promise<void> {
+    const group = this.store.getGroups().find((item) =>
+      item.id === id || item.sourceName === id || item.id === `group-${z2mGroupIdentifier(id)}`
+    );
+    if (!group) throw new Error("Zigbee grubu bulunamadı.");
+    await this.publish(`${this.config.baseTopic}/${group.sourceName}/set`, command);
+  }
+
+  async bindDevice(
+    fromId: string,
+    toId: string,
+    bind: boolean,
+    clusters?: string[],
+    fromEndpoint?: number,
+    toEndpoint?: number
+  ): Promise<void> {
+    const targetGroup = this.store.getGroups().find((group) =>
+      group.id === toId || group.sourceName === toId
+    );
     await this.request(`device/${bind ? "bind" : "unbind"}`, {
       from: fromId,
-      to: z2mGroupIdentifier(toId),
+      to: targetGroup?.sourceName ?? toId,
+      ...(fromEndpoint ? { from_endpoint: fromEndpoint } : {}),
+      ...(toEndpoint && !targetGroup ? { to_endpoint: toEndpoint } : {}),
       ...(clusters?.length ? { clusters } : {})
     });
   }
 
-  async groupScene(id: string, sceneId: number, action: "store" | "recall" | "remove"): Promise<void> {
+  async groupScene(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void> {
     const group = this.store.getGroups().find((item) => item.id === id || item.sourceName === id);
     if (!group) throw new Error("Zigbee grubu bulunamadı.");
     await this.publish(`${this.config.baseTopic}/${group.sourceName}/set`, {
-      [`scene_${action}`]: sceneId
+      [`scene_${action}`]: action === "store" && name
+        ? { ID: sceneId, name }
+        : sceneId
     });
   }
 
@@ -168,6 +200,18 @@ export class MqttShadowSource implements ZigbeeSource {
       `device/ota_update/${enabled ? "schedule" : "unschedule"}`,
       { id }
     );
+  }
+
+  async checkOta(id: string): Promise<OtaCheckResult> {
+    const data = await this.request("device/ota_update/check", { id }, 180_000);
+    const available = data.update_available === true || data.available === true;
+    const currentVersion = Number(data.current_file_version ?? data.currentVersion);
+    const availableVersion = Number(data.ota_file_version ?? data.availableVersion);
+    return {
+      available,
+      ...(Number.isFinite(currentVersion) ? { currentVersion } : {}),
+      ...(Number.isFinite(availableVersion) ? { availableVersion } : {})
+    };
   }
 
   async setDeviceOptions(id: string, options: { transition?: number; debounce?: number; retain?: boolean }): Promise<void> {

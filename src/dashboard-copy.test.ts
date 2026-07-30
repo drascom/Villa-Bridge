@@ -499,7 +499,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /id="showLightDevice"/);
   assert.match(dashboard, /class="device-card quick-card \$\{visualState\}"/);
   assert.doesNotMatch(dashboard, /class="quick-state /);
-  assert.match(dashboard, /class="quick-battery\$\{battery<15\?" low":""\}"/);
+  assert.match(dashboard, /const batteryThreshold=state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
+  assert.match(dashboard, /class="quick-battery\$\{battery<=batteryThreshold\?" low":""\}"/);
   assert.match(dashboard, /class="battery-glyph"/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
   assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div>\$\{linkQualityBadge\(device\)\}/);
@@ -659,6 +660,16 @@ test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellik
   assert.doesNotMatch(dashboard, /data-admin-only data-note=/);
 });
 
+test("kanal değişikliği ve düşük pil eşiği güvenli ayar akışında sunulur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="lowBatteryThreshold" type="number" min="5" max="50"/);
+  assert.match(dashboard, /function settingsWithChannelConfirmation\(settings\)/);
+  assert.match(dashboard, /zigbeeChannelConfirmation:"CHANGE"/);
+  assert.match(dashboard, /alerts:\{lowBatteryThreshold:Number\(\$\("#lowBatteryThreshold"\)\.value\)\}/);
+  assert.match(dashboard, /const isAlert=device=>Array\.isArray\(device\.alerts\)&&device\.alerts\.length>0/);
+});
+
 test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla gösterilir", async () => {
   const dashboard = await readDashboardBundle();
 
@@ -675,6 +686,13 @@ test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla göst
   assert.match(dashboard, /class="zigbee-binding-panel"/);
   assert.match(dashboard, /data-i18n="zigbeeGroupsLead"/);
   assert.match(dashboard, /data-i18n="directBindingLead"/);
+  assert.match(dashboard, /id="bindSourceEndpoint"/);
+  assert.match(dashboard, /id="bindTargetEndpoint"/);
+  assert.match(dashboard, /id="zigbeeBindingList"/);
+  assert.match(dashboard, /function renderBindingEndpoints\(\)/);
+  assert.match(dashboard, /function renderBindingList\(\)/);
+  assert.match(dashboard, /data-zgroup-existing-scene=/);
+  assert.match(dashboard, /data-zgroup-scene-name=/);
   assert.match(dashboard, /class="zigbee-group-empty"/);
   assert.match(dashboard, /groupMembers:"\{count\} devices"/);
   assert.match(dashboard, /groupMembers:"\{count\} cihaz"/);
@@ -697,6 +715,11 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
   assert.match(dashboard, /data-group-command-value=/);
   assert.match(dashboard, /JSON\.parse\(button\.dataset\.groupCommandValue\)/);
   assert.match(dashboard, /groupPowerControl=control=>\["switch","fan","siren","cover"\]\.includes\(control\.kind\)/);
+  assert.match(dashboard, /function matchingZigbeePowerGroup\(entries\)/);
+  assert.match(dashboard, /api\(`\/api\/groups\/\$\{encodeURIComponent\(zigbeeGroup\.id\)\}\/command`/);
+  assert.match(dashboard, /data-ota-check=/);
+  assert.match(dashboard, /function checkOta\(id\)/);
+  assert.match(dashboard, /\/ota-check`/);
   assert.doesNotMatch(dashboard, /const controllable=devices\.filter\(device=>device\.controls\.some\(control=>control\.kind==="switch"\)\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)

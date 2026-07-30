@@ -52,10 +52,85 @@ function featureNames(exposes: unknown): string[] {
   return [...names].sort();
 }
 
+function featureValues(exposes: unknown, property: string): string[] {
+  const values = new Set<string>();
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!isObject(value)) return;
+    if (value.property === property && Array.isArray(value.values)) {
+      for (const item of value.values) {
+        if (typeof item === "string" && item.trim()) values.add(item);
+      }
+    }
+    if ("features" in value) visit(value.features);
+  };
+  visit(exposes);
+  return [...values].sort();
+}
+
 function scalar(value: unknown): JsonScalar | undefined {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
     ? value
     : undefined;
+}
+
+function deviceEndpoints(device: BridgeDevice): DeviceView["endpoints"] {
+  if (!isObject(device.endpoints)) return [];
+  return Object.entries(device.endpoints).flatMap(([key, rawEndpoint]) => {
+    if (!isObject(rawEndpoint)) return [];
+    const id = Number(key);
+    if (!Number.isInteger(id) || id < 1 || id > 240) return [];
+    const clusters = isObject(rawEndpoint.clusters) ? rawEndpoint.clusters : {};
+    const inputClusters = Array.isArray(clusters.input)
+      ? clusters.input.filter((value): value is string | number =>
+        typeof value === "string" || typeof value === "number"
+      )
+      : [];
+    const outputClusters = Array.isArray(clusters.output)
+      ? clusters.output.filter((value): value is string | number =>
+        typeof value === "string" || typeof value === "number"
+      )
+      : [];
+    const bindings = Array.isArray(rawEndpoint.bindings)
+      ? rawEndpoint.bindings.flatMap((rawBinding) => {
+        if (!isObject(rawBinding) || !isObject(rawBinding.target)) return [];
+        const cluster = isObject(rawBinding.cluster)
+          ? rawBinding.cluster.name
+          : rawBinding.cluster;
+        if (typeof cluster !== "string" && typeof cluster !== "number") return [];
+        const target = rawBinding.target;
+        const targetDevice = typeof target.ieee_address === "string"
+          ? target.ieee_address.toLowerCase()
+          : typeof target.deviceIeeeAddress === "string"
+            ? target.deviceIeeeAddress.toLowerCase()
+            : null;
+        const groupId = Number(target.id ?? target.groupID);
+        const targetType: "device" | "group" | null = targetDevice
+          ? "device"
+          : Number.isInteger(groupId)
+            ? "group"
+            : null;
+        if (!targetType) return [];
+        const endpoint = Number(target.endpoint ?? target.endpointID ?? target.ID);
+        return [{
+          cluster: String(cluster),
+          targetType,
+          targetId: targetDevice ?? `group-${groupId}`,
+          targetEndpoint: Number.isInteger(endpoint) ? endpoint : null
+        }];
+      })
+      : [];
+    return [{
+      id,
+      name: device.endpoint_names?.[key] ?? `EP ${id}`,
+      inputClusters,
+      outputClusters,
+      bindings
+    }];
+  }).sort((left, right) => left.id - right.id);
 }
 
 function writableFeatures(exposes: unknown): WritableFeature[] {
@@ -117,6 +192,7 @@ export class DeviceStore {
   private pairingMessage: string | null = null;
   private pairingDevice: PairingDevice | null = null;
   private mode: "shadow" | "direct" = "shadow";
+  private lowBatteryThreshold = 15;
   private readonly events: DeviceEventView[];
 
   constructor(
@@ -131,6 +207,26 @@ export class DeviceStore {
 
   setImagePreferences(preferences: DeviceImagePreferences): void {
     this.imagePreferences = preferences;
+  }
+
+  setLowBatteryThreshold(threshold: number): void {
+    if (!Number.isInteger(threshold) || threshold < 5 || threshold > 50) {
+      throw new Error("Düşük pil eşiği 5-50 arasında olmalıdır.");
+    }
+    const previousThreshold = this.lowBatteryThreshold;
+    this.lowBatteryThreshold = threshold;
+    if (previousThreshold === threshold) return;
+    const at = new Date().toISOString();
+    const events: DeviceEventView[] = [];
+    for (const [sourceName, state] of this.states) {
+      if (typeof state.value.battery !== "number") continue;
+      const wasLow = state.value.battery <= previousThreshold;
+      const low = state.value.battery <= threshold;
+      if (low !== wasLow) {
+        events.push({ sourceName, property: "battery_threshold", value: low, at });
+      }
+    }
+    this.recordEvents(events);
   }
 
   setMqttConnected(connected: boolean): void {
@@ -208,6 +304,20 @@ export class DeviceStore {
         if (property === "action" && typeof value === "string" && value.trim() === "") continue;
         events.push({ sourceName: topic, property, value, at: at.toISOString() });
       }
+      if (typeof parsed.battery === "number") {
+        const low = parsed.battery <= this.lowBatteryThreshold;
+        const previousLow = typeof previous.battery === "number"
+          ? previous.battery <= this.lowBatteryThreshold
+          : undefined;
+        if (low !== previousLow && (low || previousLow !== undefined)) {
+          events.push({
+            sourceName: topic,
+            property: "battery_threshold",
+            value: low,
+            at: at.toISOString()
+          });
+        }
+      }
       this.recordEvents(events);
       this.states.set(topic, { value: parsed, updatedAt: at });
     }
@@ -236,6 +346,7 @@ export class DeviceStore {
         const name = this.aliases.get(id) ?? sourceName;
         const exposes = device.definition?.exposes;
         const features = featureNames(exposes);
+        const actionTypes = featureValues(exposes, "action");
         const writable = writableFeatures(exposes);
         const image = deviceIdentity(
           id,
@@ -243,6 +354,26 @@ export class DeviceStore {
           device.manufacturer,
           this.imagePreferences
         );
+        const stateValue = state?.value ?? {};
+        const alerts: DeviceView["alerts"] = [];
+        if (
+          stateValue.battery_low === true
+          || (
+            typeof stateValue.battery === "number"
+            && stateValue.battery <= this.lowBatteryThreshold
+          )
+        ) {
+          alerts.push({
+            code: "low_battery",
+            severity: "warning",
+            ...(typeof stateValue.battery === "number" ? { value: stateValue.battery } : {}),
+            threshold: this.lowBatteryThreshold
+          });
+        }
+        if (stateValue.smoke === true) alerts.push({ code: "smoke", severity: "critical" });
+        if (stateValue.carbon_monoxide === true) {
+          alerts.push({ code: "carbon_monoxide", severity: "critical" });
+        }
         return {
           id,
           sourceName,
@@ -263,9 +394,12 @@ export class DeviceStore {
             debounce: device.configured_options?.debounce ?? 0,
             retain: device.configured_options?.retain ?? false
           },
+          endpoints: deviceEndpoints(device),
           features,
-          controls: deviceControls(id, name, writable, state?.value ?? {}, this.aliases),
-          state: state?.value ?? {}
+          actionTypes,
+          alerts,
+          controls: deviceControls(id, name, writable, stateValue, this.aliases),
+          state: stateValue
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -289,6 +423,11 @@ export class DeviceStore {
           memberIds: (group.members ?? [])
             .map((member) => member.ieee_address?.toLowerCase())
             .filter((member): member is string => Boolean(member)),
+          scenes: (group.scenes ?? []).flatMap((scene) =>
+            Number.isInteger(scene.id)
+              ? [{ id: Number(scene.id), name: scene.name?.trim() || `Scene ${scene.id}` }]
+              : []
+          ),
           state: this.states.get(sourceName)?.value ?? {}
         };
       })

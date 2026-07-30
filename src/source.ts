@@ -11,6 +11,12 @@ export interface PreparedNetworkBackup {
   body: Buffer;
 }
 
+export interface OtaCheckResult {
+  available: boolean;
+  currentVersion?: number;
+  availableVersion?: number;
+}
+
 export interface ZigbeeSource {
   start(): void | Promise<void>;
   stop(): Promise<void>;
@@ -23,9 +29,23 @@ export interface ZigbeeSource {
   renameGroup(id: string, name: string): Promise<void>;
   removeGroup(id: string, force?: boolean): Promise<void>;
   setGroupMember(id: string, deviceId: string, add: boolean, endpoint?: number): Promise<void>;
-  bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void>;
-  groupScene(id: string, sceneId: number, action: "store" | "recall" | "remove"): Promise<void>;
+  setGroup(id: string, command: JsonObject): Promise<void>;
+  bindDevice(
+    fromId: string,
+    toId: string,
+    bind: boolean,
+    clusters?: string[],
+    fromEndpoint?: number,
+    toEndpoint?: number
+  ): Promise<void>;
+  groupScene(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void>;
   networkMap(): Promise<ZigbeeNetworkMap>;
+  checkOta(id: string): Promise<OtaCheckResult>;
   scheduleOta(id: string, enabled: boolean): Promise<void>;
   setDeviceOptions(id: string, options: { transition?: number; debounce?: number; retain?: boolean }): Promise<void>;
   setDevice(id: string, command: JsonObject): Promise<void>;

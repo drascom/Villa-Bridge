@@ -14,7 +14,7 @@ import type { AppConfig } from "./config.js";
 import { DeviceStore } from "./device-store.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
-import type { ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
+import type { OtaCheckResult, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
 import type { BridgeDevice, BridgeGroup, JsonObject } from "./types.js";
 
 function messageText(value: string | (() => string)): string {
@@ -58,8 +58,10 @@ export function shouldPublishDeviceState(
   previous: DeviceStatePublication | undefined,
   payload: string,
   debounceSeconds: number,
-  now = Date.now()
+  now = Date.now(),
+  eventPayload = false
 ): boolean {
+  if (eventPayload) return true;
   if (!previous || previous.payload !== payload) return true;
   return debounceSeconds <= 0 || now - previous.at >= debounceSeconds * 1_000;
 }
@@ -119,13 +121,15 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private availabilityTimer: NodeJS.Timeout | null = null;
   private readonly deviceAvailability = new Map<string, "online" | "offline">();
   private readonly lastDevicePublications = new Map<string, DeviceStatePublication>();
+  private readonly otaUpdates = new Set<string>();
 
   constructor(
     private readonly config: DirectZigbeeConfig,
     private readonly mqttConfig: AppConfig["mqtt"],
     private readonly store: DeviceStore,
     private homeAssistantDiscoveryEnabled = false,
-    private readonly aliases: ReadonlyMap<string, string> = new Map()
+    private readonly aliases: ReadonlyMap<string, string> = new Map(),
+    private readonly definitionResolver: typeof findByDevice = findByDevice
   ) {}
 
   async start(): Promise<void> {
@@ -189,7 +193,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const device = controller?.getDeviceByIeeeAddr(id);
     if (!controller || !device) throw new Error("Cihaz bulunamadı.");
     await device.interview(true);
-    const definition = await findByDevice(device);
+    const definition = await this.definitionResolver(device);
     const coordinator = controller.getDevicesByType("Coordinator")[0]?.endpoints[0];
     if (!definition || !coordinator) throw new Error("Cihaz yapılandırma tanımı bulunamadı.");
     if (definition.configure) await definition.configure(device, coordinator, definition);
@@ -258,34 +262,73 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.refreshGroups();
   }
 
-  async bindDevice(fromId: string, toId: string, bind: boolean, clusters?: string[]): Promise<void> {
+  async setGroup(id: string, command: JsonObject): Promise<void> {
+    const group = this.groupByIdentifier(id);
+    const state = command.state;
+    if (
+      typeof state !== "string"
+      || !["ON", "OFF", "TOGGLE"].includes(state.toUpperCase())
+    ) {
+      throw new Error("Direct Zigbee grubu yalnız aç, kapat veya değiştir komutunu destekliyor.");
+    }
+    await group.command("genOnOff", state.toLowerCase(), {} as never);
+  }
+
+  async bindDevice(
+    fromId: string,
+    toId: string,
+    bind: boolean,
+    clusters?: string[],
+    fromEndpoint?: number,
+    toEndpoint?: number
+  ): Promise<void> {
     const controller = this.controller;
     const from = controller?.getDeviceByIeeeAddr(fromId);
     if (!controller || !from) throw new Error("Kaynak cihaz bulunamadı.");
-    const fromEndpoint = from.endpoints[0];
+    const sourceEndpoint = fromEndpoint ? from.getEndpoint(fromEndpoint) : from.endpoints[0];
     const targetDevice = controller.getDeviceByIeeeAddr(toId);
-    const target = targetDevice?.endpoints[0] ?? this.groupByIdentifier(toId);
-    if (!fromEndpoint || !target) throw new Error("Bağlama hedefi bulunamadı.");
+    const target = targetDevice
+      ? toEndpoint
+        ? targetDevice.getEndpoint(toEndpoint)
+        : targetDevice.endpoints[0]
+      : this.groupByIdentifier(toId);
+    if (!sourceEndpoint || !target) throw new Error("Bağlama uç noktası bulunamadı.");
     const commonControlClusters = new Set([5, 6, 8, 768]);
     const selected = clusters?.length
       ? clusters
-      : fromEndpoint.outputClusters.filter((cluster) =>
+      : sourceEndpoint.outputClusters.filter((cluster) =>
         commonControlClusters.has(cluster)
         && ("inputClusters" in target ? target.inputClusters.includes(cluster) : true)
       );
     if (!selected.length) throw new Error("Cihazlar arasında bağlanabilir küme bulunamadı.");
     for (const cluster of selected) {
-      if (bind) await fromEndpoint.bind(cluster, target);
-      else await fromEndpoint.unbind(cluster, target);
+      if (bind) await sourceEndpoint.bind(cluster, target);
+      else await sourceEndpoint.unbind(cluster, target);
     }
+    await this.refreshDevices();
   }
 
-  async groupScene(id: string, sceneId: number, action: "store" | "recall" | "remove"): Promise<void> {
+  async groupScene(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void> {
     const group = this.groupByIdentifier(id);
     if (action === "store") await group.command("genScenes", "store", { groupid: group.groupID, sceneid: sceneId });
     else if (action === "recall") {
       await group.command("genScenes", "recall", { groupid: group.groupID, sceneid: sceneId });
     } else await group.command("genScenes", "remove", { groupid: group.groupID, sceneid: sceneId });
+    if (action !== "recall") {
+      const scenes = this.configuredGroupScenes(group);
+      const updated = action === "store"
+        ? [
+          ...scenes.filter((scene) => scene.id !== sceneId),
+          { id: sceneId, name: name?.trim() || `Scene ${sceneId}` }
+        ].sort((left, right) => left.id - right.id)
+        : scenes.filter((scene) => scene.id !== sceneId);
+      this.persistGroupScenes(group, updated);
+    }
     this.refreshGroups();
   }
 
@@ -318,8 +361,34 @@ export class DirectZigbeeSource implements ZigbeeSource {
     if (!device) throw new Error("Cihaz bulunamadı.");
     const definition = this.definitions.get(id) ?? await findByDevice(device);
     if (!definition?.ota) throw new Error("Bu cihaz kablosuz yazılım güncellemesini desteklemiyor.");
-    if (enabled) device.scheduleOta({});
-    else device.unscheduleOta();
+    if (enabled) {
+      device.scheduleOta({});
+      this.publishOtaState(id, { state: "scheduled", progress: 0 });
+    } else {
+      device.unscheduleOta();
+      this.publishOtaState(id, { state: "idle", progress: 0 });
+    }
+  }
+
+  async checkOta(id: string): Promise<OtaCheckResult> {
+    const device = this.controller?.getDeviceByIeeeAddr(id);
+    if (!device) throw new Error("Cihaz bulunamadı.");
+    const definition = this.definitions.get(id) ?? await findByDevice(device);
+    if (!definition?.ota) throw new Error("Bu cihaz kablosuz yazılım güncellemesini desteklemiyor.");
+    const extraMetas = typeof definition.ota === "object" ? definition.ota : {};
+    const result = await device.checkOta({}, undefined, extraMetas);
+    const checked: OtaCheckResult = {
+      available: result.available,
+      currentVersion: result.current.fileVersion,
+      ...(result.availableMeta ? { availableVersion: result.availableMeta.fileVersion } : {})
+    };
+    this.publishOtaState(id, {
+      state: result.available ? "available" : "idle",
+      progress: 0,
+      current_version: checked.currentVersion ?? null,
+      available_version: checked.availableVersion ?? null
+    });
+    return checked;
   }
 
   async setDeviceOptions(
@@ -586,7 +655,19 @@ export class DirectZigbeeSource implements ZigbeeSource {
         },
         ...(Object.keys(endpointNames).length > 0 ? { endpoint_names: endpointNames } : {}),
         endpoints: Object.fromEntries(device.endpoints.map((endpoint) => [String(endpoint.ID), {
-          bindings: [],
+          bindings: endpoint.binds.map((binding) => ({
+            cluster: binding.cluster.name,
+            target: "groupID" in binding.target
+              ? {
+                type: "group",
+                id: binding.target.groupID
+              }
+              : {
+                type: "device",
+                ieee_address: binding.target.deviceIeeeAddress,
+                endpoint: binding.target.ID
+              }
+          })),
           configured_reportings: [],
           clusters: {
             input: endpoint.inputClusters,
@@ -612,7 +693,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
         ieee_address: endpoint.deviceIeeeAddress,
         endpoint: endpoint.ID
       })),
-      scenes: []
+      scenes: this.configuredGroupScenes(group)
     }));
     this.store.ingest("bridge/groups", Buffer.from(JSON.stringify(this.bridgeGroups)));
     this.publishRetained("bridge/groups", this.bridgeGroups);
@@ -622,6 +703,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const definition = this.definitions.get(message.device.ieeeAddr) ?? await findByDevice(message.device);
     if (!definition) return;
     this.definitions.set(message.device.ieeeAddr, definition);
+    if (await this.handleScheduledOta(message, definition)) return;
     const configured = this.config.devices[message.device.ieeeAddr] ?? {};
     const friendlyName = configured.friendly_name ?? message.device.ieeeAddr;
     this.setAvailability(message.device.ieeeAddr, "online");
@@ -638,11 +720,13 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const serialized = JSON.stringify(merged);
       const debounce = typeof configured.debounce === "number" ? configured.debounce : 0;
       const now = Date.now();
+      const actionEvent = typeof payload.action === "string" && payload.action.trim().length > 0;
       if (shouldPublishDeviceState(
         this.lastDevicePublications.get(message.device.ieeeAddr),
         serialized,
         debounce,
-        now
+        now,
+        actionEvent
       )) {
         this.publish(friendlyName, merged, configured.retain === true);
         this.lastDevicePublications.set(message.device.ieeeAddr, { payload: serialized, at: now });
@@ -672,6 +756,72 @@ export class DirectZigbeeSource implements ZigbeeSource {
       postProcessConvertedFromZigbeeMessage(definition, result, options, message.device);
       publish(result);
     }
+  }
+
+  private publishOtaState(id: string, update: JsonObject): void {
+    const configured = this.config.devices[id] ?? {};
+    const friendlyName = configured.friendly_name ?? id;
+    const merged = {
+      ...(this.states.get(id) ?? {}),
+      update
+    };
+    this.states.set(id, merged);
+    this.store.ingest(friendlyName, Buffer.from(JSON.stringify(merged)));
+    this.publish(friendlyName, merged, configured.retain === true);
+    this.queueStatePersistence();
+  }
+
+  private async handleScheduledOta(
+    message: Events.MessagePayload,
+    definition: Definition
+  ): Promise<boolean> {
+    const id = message.device.ieeeAddr;
+    if (
+      message.cluster !== "genOta"
+      || message.type !== "commandQueryNextImageRequest"
+      || !message.device.scheduledOta
+      || this.otaUpdates.has(id)
+      || !definition.ota
+    ) {
+      return false;
+    }
+    this.otaUpdates.add(id);
+    const extraMetas = typeof definition.ota === "object" ? definition.ota : {};
+    this.publishOtaState(id, { state: "updating", progress: 0 });
+    try {
+      const [, installed] = await message.device.updateOta(
+        undefined,
+        message.data as never,
+        message.meta.zclTransactionSequenceNumber,
+        extraMetas,
+        (progress, remaining) => this.publishOtaState(id, {
+          state: "updating",
+          progress: Math.max(0, Math.min(100, progress)),
+          remaining
+        }),
+        {
+          requestTimeout: 150_000,
+          responseDelay: 250,
+          baseSize: 50
+        },
+        message.endpoint
+      );
+      this.publishOtaState(id, {
+        state: "idle",
+        progress: installed ? 100 : 0,
+        installed_version: installed?.fileVersion ?? null
+      });
+    } catch (error) {
+      this.publishOtaState(id, {
+        state: "failed",
+        progress: 0,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      console.error(`OTA güncellemesi başarısız (${id}): ${String(error)}`);
+    } finally {
+      this.otaUpdates.delete(id);
+    }
+    return true;
   }
 
   private async startMqttCompatibility(): Promise<void> {
@@ -978,6 +1128,37 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const temporaryPath = `${path}.${process.pid}.tmp`;
     await writeFile(temporaryPath, document.toString(), "utf8");
     await rename(temporaryPath, path);
+  }
+
+  private configuredGroupScenes(group: {
+    meta: JsonObject;
+  }): Array<{ id: number; name: string }> {
+    const raw = group.meta.villa_scenes;
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((scene) => {
+      if (!scene || typeof scene !== "object" || Array.isArray(scene)) return [];
+      const value = scene as Record<string, unknown>;
+      const sceneId = Number(value.id);
+      if (!Number.isInteger(sceneId) || sceneId < 1 || sceneId > 255) return [];
+      return [{
+        id: sceneId,
+        name: typeof value.name === "string" && value.name.trim()
+          ? value.name.trim().slice(0, 64)
+          : `Scene ${sceneId}`
+      }];
+    }).sort((left, right) => left.id - right.id);
+  }
+
+  private persistGroupScenes(
+    group: {
+      meta: JsonObject;
+      save(): void;
+    },
+    scenes: Array<{ id: number; name: string }>
+  ): void {
+    if (scenes.length) group.meta.villa_scenes = scenes;
+    else delete group.meta.villa_scenes;
+    group.save();
   }
 
   private publish(relativeTopic: string, value: unknown, retain = false): void {
