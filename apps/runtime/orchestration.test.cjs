@@ -75,6 +75,21 @@ test("missing configuration reports unprovisioned without throwing", (context) =
   assert.match(result.reason, /Waiting for config[/\\]villa-bridge.yaml/);
 });
 
+test("generic provisioning takes precedence over the Android legacy filename", (context) => {
+  const fixture = provisionedFixture();
+  context.after(() => fs.rmSync(fixture.dataDir, { recursive: true, force: true }));
+  fs.writeFileSync(
+    path.join(fixture.dataDir, "provisioning.json"),
+    JSON.stringify({ config: "missing-linux-config.yaml", matter: false })
+  );
+
+  const result = loadProvisioning(fixture.config);
+
+  assert.equal(path.basename(result.provisionFile), "provisioning.json");
+  assert.equal(result.matterEnabled, false);
+  assert.match(result.reason, /missing-linux-config\.yaml/);
+});
+
 test("provisioning resolves all mutable paths inside app data", (context) => {
   const fixture = provisionedFixture();
   context.after(() => fs.rmSync(fixture.dataDir, { recursive: true, force: true }));
@@ -136,6 +151,31 @@ test("embedded core receives loopback-only service configuration", async (contex
   assert.equal(environment.VILLA_BRIDGE_MQTT_PASSWORD, "test-only-password");
   await service.stop();
   assert.equal(stopped, true);
+});
+
+test("shared runtime accepts an explicit core entrypoint", async (context) => {
+  const fixture = provisionedFixture();
+  context.after(() => fs.rmSync(fixture.dataDir, { recursive: true, force: true }));
+  const provision = loadProvisioning(fixture.config);
+  const entrypoint = path.join(fixture.dataDir, "shared-core.js");
+  fs.writeFileSync(entrypoint, "");
+  let imported = null;
+
+  const service = await startVillaBridgeCore(
+    { ...fixture.config, coreEntrypoint: entrypoint },
+    provision,
+    {
+      importModule: async (specifier) => {
+        imported = specifier;
+        globalThis.__villaBridgeReady = true;
+        globalThis.__villaBridgeStop = async () => undefined;
+      }
+    }
+  );
+
+  assert.match(imported, /shared-core\.js$/);
+  assert.equal(service.entrypoint, entrypoint);
+  await service.stop();
 });
 
 test("Matterbridge bootstrap registers the bundled plugin and reaches ready state", async (context) => {

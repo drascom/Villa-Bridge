@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { create as createTar } from "tar";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const runtimeSource = path.join(projectRoot, "apps", "android", "node-runtime");
+const runtimeSource = path.join(projectRoot, "apps", "runtime");
 const generatedRoot = path.join(projectRoot, "apps", "android", "app", "build", "generated", "node-assets");
 const stagingRoot = `${generatedRoot}.staging-${process.pid}`;
 const stagedProject = path.join(stagingRoot, "nodejs-project");

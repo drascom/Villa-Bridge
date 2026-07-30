@@ -5,7 +5,8 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const YAML = require("yaml");
 
-const PROVISIONING_FILE = "android-provisioning.json";
+const PROVISIONING_FILE = "provisioning.json";
+const LEGACY_PROVISIONING_FILE = "android-provisioning.json";
 const DEFAULT_CONFIG_FILE = path.join("config", "villa-bridge.yaml");
 
 function errorMessage(error) {
@@ -21,7 +22,7 @@ function resolveDataPath(dataDir, value, fallback) {
   const requested = typeof value === "string" && value.trim() ? value.trim() : fallback;
   const resolved = path.resolve(dataDir, requested);
   if (!isPathInside(dataDir, resolved)) {
-    throw new Error(`Provisioned path must stay inside the Android data directory: ${requested}`);
+    throw new Error(`Provisioned path must stay inside the runtime data directory: ${requested}`);
   }
   return resolved;
 }
@@ -36,7 +37,11 @@ function readJsonIfPresent(file) {
 }
 
 function loadProvisioning(config) {
-  const provisionFile = path.join(config.dataDir, PROVISIONING_FILE);
+  const preferredProvisionFile = path.join(config.dataDir, PROVISIONING_FILE);
+  const legacyProvisionFile = path.join(config.dataDir, LEGACY_PROVISIONING_FILE);
+  const provisionFile = fs.existsSync(preferredProvisionFile)
+    ? preferredProvisionFile
+    : legacyProvisionFile;
   try {
     const options = readJsonIfPresent(provisionFile);
     const sourceConfigPath = resolveDataPath(
@@ -59,11 +64,11 @@ function loadProvisioning(config) {
       throw new Error("Villa Bridge configuration must be a YAML object.");
     }
     if (source.mode !== "direct") {
-      throw new Error("Android standalone mode requires 'mode: direct'.");
+      throw new Error("Shared standalone mode requires 'mode: direct'.");
     }
     const z2mValue = source.zigbee?.configurationFile;
     if (typeof z2mValue !== "string" || !z2mValue.trim()) {
-      throw new Error("zigbee.configurationFile is required for Android direct mode.");
+      throw new Error("zigbee.configurationFile is required for standalone direct mode.");
     }
     const z2mConfigPath = resolveDataPath(
       config.dataDir,
@@ -141,7 +146,7 @@ function loadProvisioning(config) {
 
 function buildCoreEnvironment(config, provision) {
   if (!provision.provisioned) {
-    throw new Error(provision.reason || "Android runtime is not provisioned.");
+    throw new Error(provision.reason || "Standalone runtime is not provisioned.");
   }
   return {
     VILLA_BRIDGE_CONFIG: provision.resolvedConfigPath,
@@ -162,7 +167,7 @@ function buildCoreEnvironment(config, provision) {
 }
 
 async function startVillaBridgeCore(config, provision, dependencies = {}) {
-  const entrypoint = dependencies.entrypoint ||
+  const entrypoint = dependencies.entrypoint || config.coreEntrypoint ||
     path.join(__dirname, "villa-bridge", "dist", "index.js");
   const importModule = dependencies.importModule ||
     ((specifier) => import(specifier));

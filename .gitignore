@@ -16,4 +16,4 @@ apps/android/local.properties
 apps/android/app/build/
 apps/android/app/.cxx/
 apps/android/build/
-apps/android/node-runtime/node_modules/
+apps/runtime/node_modules/

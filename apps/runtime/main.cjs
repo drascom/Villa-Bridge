@@ -32,14 +32,21 @@ function parseArguments(argv) {
     const match = /^--([a-z-]+)=(.*)$/.exec(argument);
     if (match) values[match[1]] = match[2];
   }
+  const platform = ["android", "linux", "raspberry-pi"].includes(values.platform)
+    ? values.platform
+    : "android";
   return {
+    platform,
     diagnosticsHost: isLoopbackAddress(values["diagnostics-host"])
       ? values["diagnostics-host"]
       : "127.0.0.1",
     diagnosticsPort: validPort(values["diagnostics-port"] || values.port) || 8092,
-    coreHost: "127.0.0.1",
-    corePort: 8091,
-    mqttHost: values["mqtt-host"] || "127.0.0.1",
+    coreHost: validBindAddress(values["core-host"]) || "127.0.0.1",
+    corePort: validPort(values["core-port"]) || 8091,
+    coreEntrypoint: values["core-entrypoint"]
+      ? path.resolve(values["core-entrypoint"])
+      : null,
+    mqttHost: validBindAddress(values["mqtt-host"]) || "127.0.0.1",
     mqttPort: validPort(values["mqtt-port"]) || 1883,
     controlToken: values["control-token"] || "",
     dataDir: values["data-dir"] || path.join(process.cwd(), "data")
@@ -49,6 +56,10 @@ function parseArguments(argv) {
 function validPort(value) {
   const port = Number(value);
   return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null;
+}
+
+function validBindAddress(value) {
+  return value === "0.0.0.0" || isLoopbackAddress(value) ? value : null;
 }
 
 function validProbe(input) {
@@ -90,7 +101,10 @@ function diagnostics(config) {
   return {
     ok: ready,
     ready,
-    mode: runtime.provisioning.provisioned ? "android-standalone" : "android-unprovisioned",
+    mode: runtime.provisioning.provisioned
+      ? `${config.platform || "android"}-standalone`
+      : `${config.platform || "android"}-unprovisioned`,
+    runtimePlatform: config.platform || "android",
     node: process.versions.node,
     architecture: process.arch,
     platform: process.platform,
@@ -377,8 +391,12 @@ async function start() {
   const config = parseArguments(process.argv.slice(2));
   fs.mkdirSync(config.dataDir, { recursive: true });
   fs.writeFileSync(
-    path.join(config.dataDir, "android-runtime.json"),
-    JSON.stringify({ startedAt: runtime.startedAt, node: process.versions.node }, null, 2)
+    path.join(config.dataDir, `${config.platform}-runtime.json`),
+    JSON.stringify({
+      startedAt: runtime.startedAt,
+      node: process.versions.node,
+      platform: config.platform
+    }, null, 2)
   );
 
   const provision = loadProvisioning(config);
@@ -405,7 +423,8 @@ async function start() {
   const httpServer = createHttpServer(config, runtimeHooks);
   httpServer.listen(config.diagnosticsPort, config.diagnosticsHost, () => {
     console.log(
-      `Villa Bridge Android diagnostics listening on ${config.diagnosticsHost}:${config.diagnosticsPort}`
+      `Villa Bridge ${config.platform} diagnostics listening on ` +
+      `${config.diagnosticsHost}:${config.diagnosticsPort}`
     );
   });
   httpServer.on("error", (error) => console.error("HTTP server error:", error));
@@ -423,7 +442,7 @@ async function start() {
   if (!provision.provisioned) {
     runtime.core = { status: "unprovisioned", ready: false, error: provision.reason };
     runtime.matter = { status: "unprovisioned", ready: false, error: provision.reason };
-    console.warn(`Villa Bridge Android runtime is unprovisioned: ${provision.reason}`);
+    console.warn(`Villa Bridge ${config.platform} runtime is unprovisioned: ${provision.reason}`);
   } else if (!mqttReady.ok) {
     runtime.core = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
     runtime.matter = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
@@ -509,7 +528,7 @@ async function start() {
 
 if (require.main === module) {
   start().catch((error) => {
-    console.error("Villa Bridge Android runtime failed:", error);
+    console.error("Villa Bridge shared runtime failed:", error);
     process.exitCode = 1;
   });
 }
@@ -525,6 +544,7 @@ module.exports = {
   probeTcp,
   startMqttBroker,
   runtime,
+  validBindAddress,
   validPort,
   validProbe
 };

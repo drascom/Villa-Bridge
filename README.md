@@ -34,6 +34,10 @@ touch-friendly mobile view.
 > TCP Zigbee core, and Matterbridge/Matter. It does not require a Raspberry Pi.
 > See the [Android alpha guide](apps/android/README.md) for its tested scope,
 > installation steps, and current limitations.
+>
+> **Linux/Pi alpha:** Debian 12 and 64-bit Raspberry Pi hosts use the same
+> core and standalone runtime under `systemd`. See the
+> [Linux and Raspberry Pi guide](apps/linux/README.md).
 
 ## What makes it useful
 
@@ -100,6 +104,10 @@ discovery stays optional.
 Zigbee remains the source of truth in both modes. Low-level actions use
 immutable device UIDs; friendly names are presentation data and can change
 safely.
+
+Android, Linux, and Raspberry Pi are built from one `main` branch. The shared
+runtime lives in `apps/runtime`; platform folders contain only host-specific
+launching, packaging, and lifecycle code.
 
 ## Try it locally
 

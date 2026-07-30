@@ -15,6 +15,7 @@ const {
   probeTcp,
   runtime,
   startMqttBroker,
+  validBindAddress,
   validPort,
   validProbe
 } = require("./main.cjs");
@@ -53,12 +54,14 @@ function postJson(port, pathname, headers = {}) {
   });
 }
 
-test("Android runtime arguments use safe defaults", () => {
+test("shared runtime arguments use safe defaults", () => {
   assert.deepEqual(parseArguments([]), {
+    platform: "android",
     diagnosticsHost: "127.0.0.1",
     diagnosticsPort: 8092,
     coreHost: "127.0.0.1",
     corePort: 8091,
+    coreEntrypoint: null,
     mqttHost: "127.0.0.1",
     mqttPort: 1883,
     controlToken: "",
@@ -69,10 +72,17 @@ test("Android runtime arguments use safe defaults", () => {
     "127.0.0.1"
   );
   assert.equal(parseArguments(["--mqtt-host=0.0.0.0"]).mqttHost, "0.0.0.0");
+  assert.equal(parseArguments(["--core-host=0.0.0.0"]).coreHost, "0.0.0.0");
+  assert.equal(parseArguments(["--core-host=192.168.0.61"]).coreHost, "127.0.0.1");
+  assert.equal(parseArguments(["--platform=linux"]).platform, "linux");
+  assert.equal(parseArguments(["--platform=unknown"]).platform, "android");
   assert.equal(parseArguments(["--control-token=secret-token"]).controlToken, "secret-token");
 });
 
-test("Android runtime validates TCP probe targets", () => {
+test("standalone runtime validates bind addresses and TCP probe targets", () => {
+  assert.equal(validBindAddress("0.0.0.0"), "0.0.0.0");
+  assert.equal(validBindAddress("127.0.0.1"), "127.0.0.1");
+  assert.equal(validBindAddress("192.168.0.61"), null);
   assert.deepEqual(validProbe({ host: "192.168.0.248", port: 6638 }), {
     host: "192.168.0.248",
     port: 6638

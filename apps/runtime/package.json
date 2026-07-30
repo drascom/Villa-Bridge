@@ -1,8 +1,8 @@
 {
-  "name": "villa-bridge-android-runtime",
+  "name": "villa-bridge-runtime",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone Android runtime for Villa Bridge, MQTT and Matterbridge",
+  "description": "Shared standalone runtime for Villa Bridge, MQTT and Matterbridge",
   "main": "main.cjs",
   "license": "Apache-2.0",
   "engines": {

@@ -12,8 +12,8 @@ Run from the repository root:
 ```sh
 npm test
 npx --yes node@18.20.4 --test \
-  apps/android/node-runtime/main.test.cjs \
-  apps/android/node-runtime/orchestration.test.cjs
+  apps/runtime/main.test.cjs \
+  apps/runtime/orchestration.test.cjs
 JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
   apps/android/gradlew -p apps/android lintDebug testDebugUnitTest
 npm run android:build
