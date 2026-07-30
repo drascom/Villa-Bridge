@@ -8,6 +8,7 @@ import { hexToXy } from "./device-controls.js";
 import { DeviceImagesStore } from "./device-images.js";
 import { DeviceStore } from "./device-store.js";
 import { HomeFavoritesStore, validateHomeFavorites } from "./home-favorites.js";
+import { InstallationStateStore } from "./installation-state.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
 import { getNetworkInfo } from "./network-info.js";
@@ -26,6 +27,9 @@ let imagePreferences = await imagesStore.get();
 const store = new DeviceStore(aliases, imagePreferences);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
+const installationStateStore = new InstallationStateStore(
+  resolve(dirname(configPath), "installation-state.json")
+);
 const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
   config.zigbee.configurationFile,
@@ -137,6 +141,34 @@ app.get("/api/overview", async () => ({
   groups: store.getGroups(),
   pairing: store.getPairing()
 }));
+
+app.get("/api/onboarding", async (_request, reply) => {
+  try {
+    return { ok: true, installation: await installationStateStore.get() };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.put<{ Body?: { completed?: unknown } }>("/api/onboarding", async (request, reply) => {
+  if (request.body?.completed !== true) {
+    return reply.code(400).send({ ok: false, error: "Onboarding tamamlanma durumu geçersiz." });
+  }
+  try {
+    return {
+      ok: true,
+      installation: await installationStateStore.completeOnboarding()
+    };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
 
 app.get("/api/favorites", async (_request, reply) => {
   try {
