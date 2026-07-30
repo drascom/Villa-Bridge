@@ -316,6 +316,9 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
   assert.match(dashboard, /id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden/);
   assert.match(dashboard, /id="authSetupPassword" type="password" minlength="8"/);
   assert.match(dashboard, /id="authSetupPin" type="password" inputmode="numeric" pattern="\[0-9\]\{6\}"/);
+  assert.match(dashboard, /if\(admin\)secret\.removeAttribute\("pattern"\)/);
+  assert.match(dashboard, /else secret\.setAttribute\("pattern","\[0-9\]\{6\}"\)/);
+  assert.doesNotMatch(dashboard, /secret\.pattern=admin\?"":/);
   assert.match(dashboard, /api\("\/api\/auth\/session"\)/);
   assert.match(dashboard, /api\("\/api\/auth\/setup",\{method:"POST"/);
   assert.match(dashboard, /api\("\/api\/auth\/login",\{method:"POST"/);
