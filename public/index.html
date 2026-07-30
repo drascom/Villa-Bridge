@@ -134,6 +134,7 @@
     @media(max-width:900px){body.resident-session nav{grid-template-columns:repeat(2,1fr)}.auth-account-card{grid-template-columns:1fr}.auth-account-actions{grid-template-columns:minmax(0,1fr) auto}}
     @media(orientation:landscape) and (min-width:901px) and (max-height:900px){body.resident-session nav{grid-template-columns:repeat(2,minmax(120px,1fr)) auto}}
     @media(orientation:landscape) and (max-width:900px) and (max-height:700px){body.resident-session nav{grid-template-columns:repeat(2,1fr) auto}}
+    .auth-gate{position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:22px;background:rgba(15,30,23,.5);backdrop-filter:blur(4px)}.auth-gate[hidden]{display:none}.auth-gate>.auth-modal{width:min(92vw,560px);max-height:calc(100vh - 44px);overflow:auto;border-radius:18px;color:var(--ink);background:var(--surface);box-shadow:0 30px 100px #0a201855}
     @media(max-width:560px){.auth-modal{padding:24px 20px}.auth-hero{grid-template-columns:52px minmax(0,1fr)}.auth-icon{width:52px;height:52px;border-radius:16px}.auth-account-actions{grid-template-columns:1fr}.auth-account-actions button{width:100%}}
   </style>
 </head>
@@ -254,8 +255,8 @@
   </main>
 </div>
 
-<dialog id="authSetupDialog"><form id="authSetupForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><div><h2 data-i18n="secureHomeTitle">Protect your home controls</h2><p data-i18n="secureHomeLead">Create one admin login and a simpler PIN for household members.</p></div></div><div class="auth-fields"><div class="field"><label for="authSetupUsername" data-i18n="adminUsername">Admin username</label><input id="authSetupUsername" value="admin" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_-]{2,31}" autocomplete="username" required></div><div class="field"><label for="authSetupPassword" data-i18n="adminPassword">Admin passphrase</label><input id="authSetupPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required><small class="auth-help" data-i18n="adminPasswordHelp">Use at least 8 characters. A memorable passphrase works well.</small></div><div class="field"><label for="authSetupPin" data-i18n="residentPin">Home user PIN</label><input id="authSetupPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required><small class="auth-help" data-i18n="residentPinHelp">Choose six non-obvious digits for everyday household access.</small></div></div><div id="authSetupError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authSetupSubmit" class="primary auth-submit" type="submit" data-i18n="createSecureHome">Create secure home</button></form></dialog>
-<dialog id="authLoginDialog"><form id="authLoginForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><div><h2 data-i18n="welcomeBack">Welcome home</h2><p data-i18n="signInLead">Sign in as a home user or administrator.</p></div></div><div class="auth-mode-toggle" role="group"><button id="loginResidentMode" class="active" type="button" data-login-mode="resident" data-i18n="homeUser">Home user</button><button id="loginAdminMode" type="button" data-login-mode="admin" data-i18n="administrator">Administrator</button></div><div class="auth-fields"><div id="loginUsernameField" class="field" hidden><label for="authLoginUsername" data-i18n="adminUsername">Admin username</label><input id="authLoginUsername" autocomplete="username"></div><div class="field"><label id="authLoginSecretLabel" for="authLoginSecret" data-i18n="residentPin">Home user PIN</label><input id="authLoginSecret" type="password" inputmode="numeric" autocomplete="current-password" required></div></div><div id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authLoginSubmit" class="primary auth-submit" type="submit" data-i18n="signIn">Sign in</button></form></dialog>
+<div id="authSetupDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authSetupTitle" hidden><form id="authSetupForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><div><h2 id="authSetupTitle" data-i18n="secureHomeTitle">Protect your home controls</h2><p data-i18n="secureHomeLead">Create one admin login and a simpler PIN for household members.</p></div></div><div class="auth-fields"><div class="field"><label for="authSetupUsername" data-i18n="adminUsername">Admin username</label><input id="authSetupUsername" value="admin" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_-]{2,31}" autocomplete="username" required></div><div class="field"><label for="authSetupPassword" data-i18n="adminPassword">Admin passphrase</label><input id="authSetupPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required><small class="auth-help" data-i18n="adminPasswordHelp">Use at least 8 characters. A memorable passphrase works well.</small></div><div class="field"><label for="authSetupPin" data-i18n="residentPin">Home user PIN</label><input id="authSetupPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required><small class="auth-help" data-i18n="residentPinHelp">Choose six non-obvious digits for everyday household access.</small></div></div><div id="authSetupError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authSetupSubmit" class="primary auth-submit" type="submit" data-i18n="createSecureHome">Create secure home</button></form></div>
+<div id="authLoginDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authLoginTitle" hidden><form id="authLoginForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><div><h2 id="authLoginTitle" data-i18n="welcomeBack">Welcome home</h2><p data-i18n="signInLead">Sign in as a home user or administrator.</p></div></div><div class="auth-mode-toggle" role="group"><button id="loginResidentMode" class="active" type="button" data-login-mode="resident" data-i18n="homeUser">Home user</button><button id="loginAdminMode" type="button" data-login-mode="admin" data-i18n="administrator">Administrator</button></div><div class="auth-fields"><div id="loginUsernameField" class="field" hidden><label for="authLoginUsername" data-i18n="adminUsername">Admin username</label><input id="authLoginUsername" autocomplete="username"></div><div class="field"><label id="authLoginSecretLabel" for="authLoginSecret" data-i18n="residentPin">Home user PIN</label><input id="authLoginSecret" type="password" inputmode="numeric" autocomplete="current-password" required></div></div><div id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authLoginSubmit" class="primary auth-submit" type="submit" data-i18n="signIn">Sign in</button></form></div>
 <dialog id="nameDialog"><form id="nameForm" class="modal" method="dialog"><h2 id="nameDialogTitle" data-i18n="changeDisplayName">Change display name</h2><p id="nameDialogLead" data-i18n="displayNameLead">This name will be shared across all home connections.</p><div class="field"><label for="nameInput" data-i18n="newName">New name</label><input id="nameInput" minlength="2" maxlength="32" autocomplete="off" required></div><div class="modal-actions"><button id="cancelName" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveName" class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
 <dialog id="imageDialog"><form id="imageForm" class="modal" method="dialog"><h2 data-i18n="chooseDeviceImage">Which one looks like your device?</h2><p id="imageDialogLead"></p><div id="imageChoices" class="image-choices"></div><label class="image-family"><input id="applyImageToModel" type="checkbox"><span data-i18n="useForSameModel">Use this picture automatically for devices with the same model.</span></label><div class="modal-actions"><button id="cancelImage" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveImage" class="primary" type="submit" data-i18n="saveImage">Save picture</button></div></form></dialog>
 <dialog id="pairingDialog"><div class="modal pairing-modal"><div id="pairingVisual" class="pairing-visual" aria-hidden="true"><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-core"></span></div><div class="eyebrow" id="pairingPhase" data-i18n="pairingSearching">Searching</div><h2 id="pairingModalTitle" data-i18n="pairingTitle">Searching for new devices</h2><p id="pairingModalText" data-i18n="pairingHint">Put the nearby device into pairing mode.</p><div id="pairingDevice" class="pairing-device" hidden><span data-i18n="deviceFound">Device found</span><strong id="pairingDeviceName">—</strong></div><div class="modal-actions"><button id="hidePairing" class="quiet" type="button" data-i18n="hidePairing">Hide</button><button id="cancelPairing" class="secondary" type="button" data-i18n="stopSearch">Stop searching</button></div></div></dialog>
@@ -368,6 +369,7 @@
     const resident=state.auth.user?.role==="resident";
     document.body.classList.toggle("resident-session",resident);
     document.body.classList.toggle("auth-locked",!state.auth.authenticated);
+    $(".shell").inert=!state.auth.authenticated;
     $("#authAccountName").textContent=state.auth.user?.username||"—";
     $("#authRoleBadge").textContent=t(resident?"homeUser":"administrator");
     $$("[data-auth-logout]").forEach(button=>{button.setAttribute("aria-label",t("signOut"));button.title=t("signOut")});
@@ -377,15 +379,17 @@
     const setup=$("#authSetupDialog");
     const login=$("#authLoginDialog");
     if(!state.auth.configured){
-      if(login.open)login.close();
+      login.hidden=true;
       setAuthFormError("authSetupError");
-      if(!setup.open)setup.showModal();
+      setup.hidden=false;
+      requestAnimationFrame(()=>$("#authSetupUsername").focus());
       return;
     }
-    if(setup.open)setup.close();
+    setup.hidden=true;
     setLoginMode(state.loginMode);
     setAuthFormError("authLoginError");
-    if(!login.open)login.showModal();
+    login.hidden=false;
+    requestAnimationFrame(()=>$("#authLoginSecret").focus());
   }
   async function loadAuthSession(){setAuthState(await api("/api/auth/session"))}
   function setLoginMode(mode){
@@ -411,7 +415,7 @@
       setAuthState(data);
       $("#authSetupPassword").value="";
       $("#authSetupPin").value="";
-      $("#authSetupDialog").close();
+      $("#authSetupDialog").hidden=true;
       await startAuthenticatedApplication();
     }catch(error){setAuthFormError("authSetupError",error.message)}
     finally{button.disabled=false}
@@ -425,7 +429,7 @@
       const data=await api("/api/auth/login",{method:"POST",body:JSON.stringify({mode:state.loginMode,username:$("#authLoginUsername").value,secret:$("#authLoginSecret").value})});
       setAuthState(data);
       $("#authLoginSecret").value="";
-      $("#authLoginDialog").close();
+      $("#authLoginDialog").hidden=true;
       await startAuthenticatedApplication();
     }catch(error){setAuthFormError("authLoginError",error.message)}
     finally{button.disabled=false}
@@ -2235,8 +2239,6 @@
   $("#onboardingBack").onclick=previousOnboardingStep;
   $("#skipOnboarding").onclick=skipOnboarding;
   $("#onboardingDialog").oncancel=event=>event.preventDefault();
-  $("#authSetupDialog").oncancel=event=>event.preventDefault();
-  $("#authLoginDialog").oncancel=event=>event.preventDefault();
   $("#authSetupForm").onsubmit=submitAuthSetup;
   $("#authLoginForm").onsubmit=submitAuthLogin;
   $("#authSetupForm").addEventListener("input",()=>setAuthFormError("authSetupError"));
