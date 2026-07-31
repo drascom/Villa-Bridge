@@ -40,6 +40,8 @@ class MainActivity : Activity() {
     private val probeExecutor = Executors.newSingleThreadExecutor()
     private val serverProbePending = AtomicBoolean(false)
     private var pageLoaded = false
+    @Volatile private var trustedDashboardOrigin = Uri.parse(DASHBOARD_URL)
+    @Volatile private var runtimeMode = "starting"
     private var pendingGeolocationCallback: GeolocationPermissions.Callback? = null
     private var pendingGeolocationOrigin: String? = null
 
@@ -178,7 +180,10 @@ class MainActivity : Activity() {
                         showStoppedUi()
                     } else if (probe.ready && !pageLoaded) {
                         loadingStatus.setText(R.string.runtime_stage_dashboard)
-                        webView.loadUrl(DASHBOARD_URL)
+                        runtimeMode = probe.mode ?: "android-standalone"
+                        val dashboardUrl = probe.dashboardUrl ?: DASHBOARD_URL
+                        trustedDashboardOrigin = Uri.parse(dashboardUrl)
+                        webView.loadUrl(dashboardUrl)
                     } else {
                         loadingStatus.setText(probe.stage)
                         waitForLocalServer()
@@ -196,7 +201,13 @@ class MainActivity : Activity() {
             val mqtt = diagnostics.optJSONObject("mqtt")
             val core = diagnostics.optJSONObject("core")
             val matter = diagnostics.optJSONObject("matter")
+            val mode = diagnostics.optString("mode")
+            val monitorMode = mode == "android-monitor"
+            val dashboardUrl = validatedDashboardUrl(
+                diagnostics.optJSONObject("endpoints")?.optString("dashboard")
+            )
             val stage = when {
+                monitorMode -> R.string.runtime_stage_dashboard
                 provisioning?.optBoolean("provisioned") != true ->
                     R.string.runtime_stage_configuration
                 mqtt?.optBoolean("listening") != true || mqtt?.optBoolean("selfTest") != true ->
@@ -205,7 +216,7 @@ class MainActivity : Activity() {
                 matter?.optBoolean("ready") != true -> R.string.runtime_stage_matter
                 else -> R.string.runtime_stage_dashboard
             }
-            return RuntimeProbe(diagnostics.optBoolean("ready"), stage)
+            return RuntimeProbe(diagnostics.optBoolean("ready"), stage, dashboardUrl, mode)
         }
 
         val dashboardReady = runCatching {
@@ -220,8 +231,22 @@ class MainActivity : Activity() {
         }.getOrDefault(false)
         return RuntimeProbe(
             dashboardReady,
-            if (dashboardReady) R.string.runtime_stage_dashboard else R.string.runtime_stage_preparing
+            if (dashboardReady) R.string.runtime_stage_dashboard else R.string.runtime_stage_preparing,
+            if (dashboardReady) DASHBOARD_URL else null,
+            if (dashboardReady) "android-standalone" else null
         )
+    }
+
+    private fun validatedDashboardUrl(value: String?): String? {
+        if (value.isNullOrBlank()) return null
+        return runCatching {
+            val uri = URI(value)
+            check(uri.scheme == "http")
+            check(uri.host?.isNotBlank() == true)
+            check(uri.userInfo == null)
+            check(uri.port in 1..65535)
+            uri.resolve("/").toString()
+        }.getOrNull()
     }
 
     private fun readJson(url: String): JSONObject {
@@ -255,6 +280,7 @@ class MainActivity : Activity() {
     }
 
     private fun showStoppedUi() {
+        runtimeMode = "stopped"
         pageLoaded = false
         webView.visibility = View.INVISIBLE
         startingPanel.visibility = View.GONE
@@ -264,6 +290,7 @@ class MainActivity : Activity() {
 
     private fun startRuntime() {
         startRuntimeButton.isEnabled = false
+        runtimeMode = "starting"
         RuntimeStateStore.setDesired(this, RuntimeStateStore.DesiredState.RUNNING)
         pageLoaded = false
         loadingStatus.setText(R.string.runtime_stage_preparing)
@@ -278,10 +305,12 @@ class MainActivity : Activity() {
         NodeRuntimeService.stop(this)
     }
 
-    private fun isTrustedDashboard(uri: Uri): Boolean =
-        uri.scheme == "http" &&
-            uri.host == "127.0.0.1" &&
-            uri.port == 8091
+    private fun isTrustedDashboard(uri: Uri): Boolean {
+        val trusted = trustedDashboardOrigin
+        return uri.scheme == trusted.scheme &&
+            uri.host == trusted.host &&
+            uri.port == trusted.port
+    }
 
     private fun requestNotificationPermission() {
         if (
@@ -330,7 +359,11 @@ class MainActivity : Activity() {
 
         @android.webkit.JavascriptInterface
         fun runtimeStatus(): String =
-            RuntimeStateStore.desired(this@MainActivity).name.lowercase()
+            if (RuntimeStateStore.desired(this@MainActivity) == RuntimeStateStore.DesiredState.STOPPED) {
+                "stopped"
+            } else {
+                runtimeMode
+            }
 
         @android.webkit.JavascriptInterface
         fun startRuntime() {
@@ -344,7 +377,12 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        private data class RuntimeProbe(val ready: Boolean, val stage: Int)
+        private data class RuntimeProbe(
+            val ready: Boolean,
+            val stage: Int,
+            val dashboardUrl: String?,
+            val mode: String?
+        )
 
         private const val DASHBOARD_URL = "http://127.0.0.1:8091/"
         private const val HEALTH_URL = "http://127.0.0.1:8091/api/health"

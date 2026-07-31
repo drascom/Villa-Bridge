@@ -146,11 +146,29 @@ test("embedded core receives loopback-only service configuration", async (contex
   assert.match(imported, /^file:/);
   assert.equal(environment.VILLA_BRIDGE_HOST, "127.0.0.1");
   assert.equal(environment.VILLA_BRIDGE_PORT, "8091");
+  assert.equal(environment.VILLA_BRIDGE_NODE_ROLE, "android");
   assert.equal(environment.VILLA_BRIDGE_MQTT_URL, "mqtt://127.0.0.1:1883");
   assert.equal(environment.VILLA_BRIDGE_MQTT_USERNAME, "home-assistant");
   assert.equal(environment.VILLA_BRIDGE_MQTT_PASSWORD, "test-only-password");
   await service.stop();
   assert.equal(stopped, true);
+});
+
+test("Linux and Raspberry Pi cores advertise as primary servers", (context) => {
+  const fixture = provisionedFixture();
+  context.after(() => fs.rmSync(fixture.dataDir, { recursive: true, force: true }));
+  const provision = loadProvisioning(fixture.config);
+
+  assert.equal(
+    buildCoreEnvironment({ ...fixture.config, platform: "linux" }, provision)
+      .VILLA_BRIDGE_NODE_ROLE,
+    "server"
+  );
+  assert.equal(
+    buildCoreEnvironment({ ...fixture.config, platform: "raspberry-pi" }, provision)
+      .VILLA_BRIDGE_NODE_ROLE,
+    "server"
+  );
 });
 
 test("shared runtime accepts an explicit core entrypoint", async (context) => {

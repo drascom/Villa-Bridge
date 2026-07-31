@@ -396,6 +396,7 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /id="runtimeStopDialog"/);
   assert.match(dashboard, /VillaAndroid\?\.stopRuntime/);
   assert.match(dashboard, /VillaAndroid\.stopRuntime\(\)/);
+  assert.match(dashboard, /status==="android-monitor"/);
   assert.match(dashboard, /runtimeStopDialog"\)\.showModal\(\)/);
   assert.match(dashboard, /runtimeStopConfirm:"Stop Zigbee, MQTT and Matter/);
   assert.match(dashboard, /runtimeStopConfirm:"Bu tablette Zigbee, MQTT ve Matter/);

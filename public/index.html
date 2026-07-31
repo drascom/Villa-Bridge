@@ -2165,9 +2165,9 @@
       typeof window.VillaAndroid?.stopRuntime==="function"&&
       typeof window.VillaAndroid?.runtimeStatus==="function";
     document.body.classList.toggle("android-app",runtimeAvailable);
-    $("#androidRuntimeCard").hidden=!runtimeAvailable;
+    const status=runtimeAvailable?window.VillaAndroid.runtimeStatus():"";
+    $("#androidRuntimeCard").hidden=!runtimeAvailable||status==="android-monitor";
     if(runtimeAvailable){
-      const status=window.VillaAndroid.runtimeStatus();
       $("#runtimeStatusText").textContent=t(status==="stopped"?"runtimeStopped":"runtimeRunning");
     }
   }

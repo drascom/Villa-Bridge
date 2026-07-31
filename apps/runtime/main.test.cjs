@@ -210,6 +210,7 @@ test("readiness endpoint distinguishes unprovisioned and fully ready states", as
     mqttPort: 1883
   };
   const previous = {
+    monitor: runtime.monitor,
     provisioning: runtime.provisioning,
     mqtt: runtime.mqtt,
     core: runtime.core,
@@ -233,11 +234,28 @@ test("readiness endpoint distinguishes unprovisioned and fully ready states", as
   assert.equal(waiting.body.mode, "android-unprovisioned");
 
   runtime.provisioning = { provisioned: true, reason: null };
+  runtime.monitor = null;
   runtime.core = { status: "ready", ready: true, error: null };
   runtime.matter = { status: "ready", ready: true, error: null };
   const ready = await getJson(address.port, "/api/ready");
   assert.equal(ready.status, 200);
   assert.equal(ready.body.ready, true);
+
+  runtime.monitor = {
+    status: "ready",
+    ready: true,
+    address: "192.168.0.61",
+    dashboardUrl: "http://192.168.0.61:8091/",
+    serverMode: "direct"
+  };
+  runtime.provisioning = { provisioned: false, reason: "Local config is not needed." };
+  runtime.mqtt = { status: "disabled", listening: false, selfTest: false, error: null };
+  runtime.core = { status: "remote", ready: true, error: null };
+  runtime.matter = { status: "remote", ready: true, error: null };
+  const monitor = await getJson(address.port, "/api/ready");
+  assert.equal(monitor.status, 200);
+  assert.equal(monitor.body.mode, "android-monitor");
+  assert.equal(monitor.body.endpoints.dashboard, "http://192.168.0.61:8091/");
 });
 
 test("runtime shutdown requires the local bearer token and runs only once", async (context) => {
