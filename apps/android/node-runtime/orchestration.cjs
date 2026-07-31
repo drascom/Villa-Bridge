@@ -147,6 +147,7 @@ function buildCoreEnvironment(config, provision) {
     VILLA_BRIDGE_CONFIG: provision.resolvedConfigPath,
     VILLA_BRIDGE_MODE: "direct",
     VILLA_BRIDGE_EMBEDDED: "true",
+    VILLA_BRIDGE_NODE_ROLE: "android",
     VILLA_BRIDGE_HOST: config.coreHost,
     VILLA_BRIDGE_PORT: String(config.corePort),
     VILLA_BRIDGE_MQTT_URL: `mqtt://127.0.0.1:${config.mqttPort}`,

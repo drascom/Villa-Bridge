@@ -1,10 +1,13 @@
 # Villa Bridge for Android
 
-The Android application turns an always-powered tablet into a standalone
-Villa Bridge host. The foreground service embeds Node.js Mobile, the compiled
-Villa Bridge core, an Aedes MQTT broker, the direct Zigbee coordinator client,
-and Matterbridge with `matterbridge-zigbee2mqtt`. Linux and Raspberry Pi remain
-supported deployment targets for the same core.
+The Android application can turn an always-powered tablet into a standalone
+Villa Bridge host or a lightweight monitor for a Linux/Raspberry Pi host. On
+startup it sends a Villa Bridge-specific LAN discovery request and verifies the
+answer against the remote `/api/discovery` identity. When a server is found,
+Android opens its dashboard and does not start the embedded MQTT broker, Zigbee
+core, or Matterbridge. Otherwise it starts the complete local stack.
+Firewalled Linux/Pi hosts must allow UDP `8093` and the configured dashboard
+TCP port on the trusted home LAN.
 
 ## Runtime Architecture
 
@@ -12,6 +15,7 @@ supported deployment targets for the same core.
 | --- | --- |
 | `127.0.0.1:8091` | Villa Bridge dashboard and device API |
 | `127.0.0.1:8092` | Android readiness, diagnostics, and local-only probes |
+| UDP `8093` | Villa Bridge Linux/Raspberry Pi discovery |
 | LAN IP `:1883` | Embedded Aedes MQTT 3.1.1 broker for Home Assistant |
 | `8283` | Matterbridge frontend/WebSocket used by the core |
 | UDP `5540` | Matter commissioning server |
@@ -27,9 +31,13 @@ MQTT clients, including Home Assistant. Omitting either value preserves
 anonymous compatibility and is unsuitable for an untrusted LAN.
 
 The native start screen follows the runtime diagnostics endpoint and reports
-the active MQTT, Zigbee, Matter, and dashboard stages. Settings can stop the
-entire runtime while leaving a native **Start Villa Bridge** control available.
-The desired stopped/running state survives app and tablet restarts.
+the active MQTT, Zigbee, Matter, or remote-dashboard stage. Monitor mode keeps
+only the small Android foreground host and its loopback diagnostics endpoint
+running. Linux systemd installations identify themselves with
+`VILLA_BRIDGE_NODE_ROLE=server`; the embedded Android core uses `android`.
+Settings can stop the entire Android runtime while leaving a native
+**Start Villa Bridge** control available. The desired stopped/running state
+survives app and tablet restarts.
 
 To keep first launch practical on low-power tablets, the Node project is
 packaged as one compressed `tgz` asset. Source maps and TypeScript declaration
@@ -45,6 +53,7 @@ Host requirements are JDK 17, Android SDK 35, NDK `27.2.12479018`, CMake
 npm install
 npm test
 npx --yes node@18.20.4 --test \
+  apps/android/node-runtime/lan-discovery.test.cjs \
   apps/android/node-runtime/main.test.cjs \
   apps/android/node-runtime/orchestration.test.cjs
 npm run android:build

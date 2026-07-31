@@ -31,6 +31,7 @@ const lazySerialPortPatch = path.join(
 
 const requiredFiles = [
   "dashboard.html",
+  "lan-discovery.cjs",
   "main.cjs",
   "orchestration.cjs",
   "package-lock.json",

@@ -13,6 +13,7 @@ const stateChangingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 const publicRoutes = new Set([
   "/api/health",
+  "/api/discovery",
   "/api/locales",
   "/api/auth/session",
   "/api/auth/setup",

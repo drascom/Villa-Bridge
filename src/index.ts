@@ -17,6 +17,12 @@ import {
   validateHomeFavorites
 } from "./home-favorites.js";
 import { InstallationStateStore } from "./installation-state.js";
+import {
+  createVillaBridgeDiscoveryRecord,
+  resolveVillaBridgeNodeRole,
+  startLanDiscoveryResponder,
+  villaBridgeDiscoveryPort
+} from "./lan-discovery.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
 import { getNetworkInfo } from "./network-info.js";
@@ -70,6 +76,12 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   }
 ) : null;
 const recentErrors = new RecentErrorLog(50, config.debug.enabled);
+const nodeRole = resolveVillaBridgeNodeRole();
+const discoveryRecord = createVillaBridgeDiscoveryRecord(
+  nodeRole,
+  config.mode,
+  config.http.port
+);
 store.setMode(config.mode);
 let source: ZigbeeSource;
 if (config.mode === "direct") {
@@ -134,6 +146,7 @@ app.get("/api/locales", async (_request, reply) => {
 });
 
 app.get("/api/health", async () => store.getHealth());
+app.get("/api/discovery", async () => discoveryRecord);
 const visibleDevices = (role: "admin" | "resident" | undefined) => store.getDevices().map((device) => ({
   ...device,
   controls: role === "resident"
@@ -811,9 +824,11 @@ type EmbeddedVillaBridgeGlobal = typeof globalThis & {
 
 const embeddedRuntime = process.env.VILLA_BRIDGE_EMBEDDED === "true";
 const embeddedGlobal = globalThis as EmbeddedVillaBridgeGlobal;
+let discoveryResponder: Awaited<ReturnType<typeof startLanDiscoveryResponder>> = null;
 const shutdown = async (): Promise<void> => {
   if (!embeddedGlobal.__villaBridgeReady) return;
   embeddedGlobal.__villaBridgeReady = false;
+  await discoveryResponder?.close();
   await source.stop();
   await app.close();
   if (!embeddedRuntime) process.exit(0);
@@ -826,5 +841,15 @@ if (!embeddedRuntime) {
 
 await source.start();
 await app.listen({ host: config.http.host, port: config.http.port });
+try {
+  discoveryResponder = await startLanDiscoveryResponder(discoveryRecord);
+  if (discoveryResponder) {
+    console.log(
+      `Villa Bridge LAN keşfi UDP ${villaBridgeDiscoveryPort} portunda hazır.`
+    );
+  }
+} catch (error) {
+  console.warn(`Villa Bridge LAN keşfi başlatılamadı: ${String(error)}`);
+}
 embeddedGlobal.__villaBridgeReady = true;
 console.log(`Villa Bridge paneli ${config.http.host}:${config.http.port} adresinde hazır.`);

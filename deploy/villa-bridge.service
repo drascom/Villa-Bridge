@@ -8,6 +8,7 @@ Type=simple
 WorkingDirectory=/opt/villa-bridge
 Environment=NODE_ENV=production
 Environment=VILLA_BRIDGE_MODE=direct
+Environment=VILLA_BRIDGE_NODE_ROLE=server
 Environment=VILLA_BRIDGE_CONFIG=/opt/villa-bridge/config/default.yaml
 ExecStart=/usr/bin/node /opt/villa-bridge/dist/index.js
 Restart=always

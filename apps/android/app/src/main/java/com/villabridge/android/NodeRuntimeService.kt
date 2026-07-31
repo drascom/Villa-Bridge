@@ -158,7 +158,7 @@ class NodeRuntimeService : Service() {
             return
         }
         val healthy = runCatching {
-            val connection = URI("http://127.0.0.1:8091/api/health").toURL()
+            val connection = URI("http://127.0.0.1:8092/api/ready").toURL()
                 .openConnection() as HttpURLConnection
             try {
                 connection.connectTimeout = 1_500
