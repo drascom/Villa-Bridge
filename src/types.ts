@@ -53,6 +53,7 @@ export interface DeviceView {
   description: string | null;
   supported: boolean;
   interviewCompleted: boolean;
+  preparing: boolean;
   availability: "online" | "offline" | "unknown";
   lastSeen: string | null;
   stateUpdatedAt: string | null;

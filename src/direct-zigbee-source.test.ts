@@ -7,11 +7,26 @@ import {
   DirectZigbeeSource,
   directBridgeInfo,
   endpointNamesForDevice,
+  isUnresolvedActionMessage,
   parsePermitJoinSeconds,
   shouldPublishDeviceState,
   zigbeeAvailabilityState
 } from "./direct-zigbee-source.js";
 import { DeviceStore } from "./device-store.js";
+
+test("çözümlenmeyen genOnOff komutları tuş olayı teşhisine alınır", () => {
+  const actionMessage = {
+    cluster: "genOnOff",
+    type: "commandToggle"
+  } as never;
+  assert.equal(isUnresolvedActionMessage(actionMessage, 0, 0), true);
+  assert.equal(isUnresolvedActionMessage(actionMessage, 1, 0), true);
+  assert.equal(isUnresolvedActionMessage(actionMessage, 1, 1), false);
+  assert.equal(isUnresolvedActionMessage({
+    cluster: "genPowerCfg",
+    type: "attributeReport"
+  } as never, 0, 0), false);
+});
 
 test("Matterbridge permit-join boolean requests map to a bounded Zigbee duration", () => {
   assert.equal(parsePermitJoinSeconds(Buffer.from('{"value":true}')), 180);

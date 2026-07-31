@@ -328,7 +328,7 @@ test("eşleştirme yalnız gerçek katılma ve görüşme olaylarıyla ilerler",
   });
 });
 
-test("kayıtlı cihaz eşleştirme sırasında yeniden katıldığında hazır sayılır", () => {
+test("kayıtlı cihaz yeniden katıldığında yeni durum gelene kadar hazırlanıyor sayılır", () => {
   const store = new DeviceStore(new Map());
   store.ingest(
     "bridge/devices",
@@ -351,10 +351,37 @@ test("kayıtlı cihaz eşleştirme sırasında yeniden katıldığında hazır s
   assert.deepEqual(store.getPairing().device, {
     id: "0xknown",
     name: "Kitchen Left Light",
+    interviewCompleted: false,
+    supported: true,
+    reconnected: true
+  });
+  assert.equal(store.getDevices()[0]?.preparing, true);
+
+  store.ingest(
+    "Kitchen Left Light",
+    Buffer.from('{"state":"OFF","linkquality":120}')
+  );
+  assert.deepEqual(store.getPairing().device, {
+    id: "0xknown",
+    name: "Kitchen Left Light",
     interviewCompleted: true,
     supported: true,
     reconnected: true
   });
+  assert.equal(store.getDevices()[0]?.preparing, false);
+
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0xKNOWN",
+      friendly_name: "Living Room Wall Switch",
+      interview_completed: true,
+      supported: true
+    }]))
+  );
+  assert.equal(store.getDevices().length, 1);
+  assert.equal(store.getDevices()[0]?.id, "0xknown");
+  assert.equal(store.getDevices()[0]?.name, "Living Room Wall Switch");
 });
 
 test("bilinmeyen cihaz duyurusu yeni eşleştirme sonucu üretmez", () => {

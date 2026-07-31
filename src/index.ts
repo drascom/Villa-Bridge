@@ -576,6 +576,13 @@ app.post<{
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
   if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (device.preparing) {
+    return reply.code(409).send({
+      ok: false,
+      code: "DEVICE_PREPARING",
+      error: "Cihaz kurulumu tamamlanıyor. Lütfen hazır olmasını bekleyin."
+    });
+  }
   const control = device.controls.find((item) => item.property === request.body?.property);
   if (!control) return reply.code(400).send({ ok: false, error: "Bu denetim cihaz tarafından sunulmuyor." });
   if (control.adminOnly && request.villaSession?.role !== "admin") {

@@ -320,6 +320,7 @@ export class DeviceStore {
       }
       this.recordEvents(events);
       this.states.set(topic, { value: parsed, updatedAt: at });
+      this.completeReconnectedPairingFromState(topic);
     }
   }
 
@@ -335,6 +336,8 @@ export class DeviceStore {
   }
 
   getDevices(): DeviceView[] {
+    this.expirePairingIfNeeded();
+    const pairingActive = this.pairingStatus === "open" || this.pairingStatus === "pending";
     return this.devices
       .filter((device) => device.type !== "Coordinator")
       .map((device) => {
@@ -385,6 +388,9 @@ export class DeviceStore {
           description: device.definition?.description ?? null,
           supported: device.supported !== false,
           interviewCompleted: device.interview_completed !== false,
+          preparing: pairingActive
+            && this.pairingDevice?.id === id
+            && this.pairingDevice.interviewCompleted !== true,
           availability,
           lastSeen: typeof lastSeen === "string" || typeof lastSeen === "number" ? String(lastSeen) : null,
           stateUpdatedAt: state?.updatedAt.toISOString() ?? null,
@@ -464,11 +470,7 @@ export class DeviceStore {
   }
 
   getPairing(): JsonObject {
-    if (this.pairingUntil && this.pairingUntil.getTime() <= Date.now()) {
-      this.pairingUntil = null;
-      this.pairingStatus = "closed";
-      this.pairingMessage = null;
-    }
+    this.expirePairingIfNeeded();
     return {
       status: this.pairingStatus,
       open: this.pairingStatus === "open" || this.pairingStatus === "pending",
@@ -494,6 +496,33 @@ export class DeviceStore {
     this.pairingStatus = seconds > 0 ? "open" : "closed";
     this.pairingUntil = seconds > 0 ? new Date(Date.now() + seconds * 1_000) : null;
     this.pairingMessage = seconds > 0 ? "Yeni Zigbee cihazları eklenebilir." : null;
+  }
+
+  private expirePairingIfNeeded(): void {
+    if (!this.pairingUntil || this.pairingUntil.getTime() > Date.now()) return;
+    this.pairingUntil = null;
+    this.pairingStatus = "closed";
+    this.pairingMessage = null;
+  }
+
+  private completeReconnectedPairingFromState(sourceName: string): void {
+    if (
+      !this.pairingDevice?.reconnected
+      || this.pairingDevice.interviewCompleted
+    ) {
+      return;
+    }
+    const device = this.devices.find((candidate) => {
+      const id = candidate.ieee_address?.toLowerCase();
+      const name = candidate.friendly_name ?? candidate.ieee_address;
+      return id === this.pairingDevice?.id && name === sourceName;
+    });
+    if (!device) return;
+    this.pairingDevice = {
+      ...this.pairingDevice,
+      interviewCompleted: true,
+      supported: typeof device.supported === "boolean" ? device.supported : null
+    };
   }
 
   private ingestPairingEvent(event: JsonObject): void {
@@ -523,7 +552,7 @@ export class DeviceStore {
         name: typeof event.data.friendly_name === "string"
           ? event.data.friendly_name
           : knownDevice.friendly_name ?? id,
-        interviewCompleted: knownDevice.interview_completed !== false,
+        interviewCompleted: false,
         supported: typeof knownDevice.supported === "boolean" ? knownDevice.supported : null,
         reconnected: true
       };

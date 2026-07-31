@@ -1,14 +1,14 @@
 # Geliştirmeler — zigbee2mqtt Karşılaştırması ve Durum Takibi
 
-Son güncelleme: 2026-07-30 (Y5, Y7, Y8 ve Y10 tamamlandı)
+Son güncelleme: 2026-07-31 (TS0043 çoklu tuş olayı incelemeye alındı)
 İlgili commit: `e1d0e87 zigbee: add endpoint bindings and scene management`
 Son Linux birleştirme: `eaa0241 Merge documented Zigbee parity fixes`
-Son çalışma doğrulaması: yerelde `npm test` 105/105 geçti
+Son çalışma doğrulaması: yerelde `npm test` 111/111 geçti
 
 Bakış açısı: **geliştirici olmayan, basit ev kullanıcısı** — kurulum ve günlük
 kullanımda fiilen hissedilen eksikler.
 
-**Durum:** 26 madde tamamlandı · 3 madde ertelendi · açık doğrulanmış hata yok.
+**Durum:** 26 madde tamamlandı · 3 madde ertelendi · 1 açık cihaz olayı sorunu var.
 
 ---
 
@@ -60,6 +60,18 @@ Komut zinciri kapalı: UI `command()` → `POST /api/devices/:id/command`
 | H3 | Direct mod cihaz durumları yapılandırılmış `retain` değerini kullanıyor; aynı payload debounce süresinde tekrar yayınlanmıyor. |
 | H4 | Yalnız gönderilen cihaz seçenekleri YAML'a yazılıyor; eksik alanlar `null` üretmiyor. |
 | H5 | Pozisyon-only perdeler HA discovery'de var olmayan `state` alanına bağlanmıyor. |
+
+---
+
+## 🐞 Açık cihaz olayı sorunları
+
+| # | Cihaz / UID | Bulgular | Sonraki doğrulama |
+|---|---|---|---|
+| R1 | Tuya TS0043 `0x20a716fffe6835f1` | Tanım 3 endpoint ile `1/2/3 × single/double/hold` olaylarını doğru sunuyor. Villa Bridge `actionTypes` bilgisini alıyor ancak arayüz bunu üç olay kanalına dönüştürmüyor. Son canlı denemede tuş basışları coordinator'a ulaşmadı ve `lastSeen` değişmedi. | Cihaz coordinator yakınındayken ham mesaj izleme açık olarak tekrar test edilecek. Mesaj akışı doğrulanınca genel `actionChannels` modeli ve üç tuşlu arayüz uygulanacak. |
+
+Teşhis için çözümlenemeyen `genOnOff` komutlarını endpoint, cluster, mesaj tipi
+ve payload ile kaydeden genel bir log noktası eklendi. Cihaza özel converter veya
+kanıtsız binding uygulanmadı.
 
 ---
 

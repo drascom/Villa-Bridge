@@ -54,6 +54,17 @@ export interface DeviceStatePublication {
   at: number;
 }
 
+export function isUnresolvedActionMessage(
+  message: Pick<Events.MessagePayload, "cluster" | "type">,
+  matchingConverterCount: number,
+  convertedPropertyCount: number
+): boolean {
+  return message.cluster === "genOnOff"
+    && typeof message.type === "string"
+    && message.type.startsWith("command")
+    && (matchingConverterCount === 0 || convertedPropertyCount === 0);
+}
+
 export function shouldPublishDeviceState(
   previous: DeviceStatePublication | undefined,
   payload: string,
@@ -751,6 +762,19 @@ export class DirectZigbeeSource implements ZigbeeSource {
       } catch (error) {
         console.warn(`Zigbee mesajı dönüştürülemedi (${friendlyName}): ${String(error)}`);
       }
+    }
+    if (isUnresolvedActionMessage(message, matching.length, Object.keys(result).length)) {
+      const endpoint = "ID" in message.endpoint ? message.endpoint.ID : "unknown";
+      console.warn(
+        `Zigbee tuş olayı çözümlenemedi (${friendlyName}): `
+        + JSON.stringify({
+          endpoint,
+          cluster: message.cluster,
+          type: message.type,
+          data: message.data,
+          matchingConverters: matching.length
+        })
+      );
     }
     if (Object.keys(result).length > 0) {
       postProcessConvertedFromZigbeeMessage(definition, result, options, message.device);

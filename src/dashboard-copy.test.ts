@@ -200,9 +200,11 @@ test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
   const dashboard = await readDashboardBundle();
 
   assert.match(dashboard, /id="pullRefresh"/);
-  assert.match(dashboard, /addDevice:"＋ Cihaz ekle"/);
+  assert.match(dashboard, /addDevice:"Cihaz ekle"/);
+  assert.match(dashboard, /addDevice:"Add device"/);
   assert.doesNotMatch(dashboard, /Yeni cihaz ekle/);
   assert.match(dashboard, /id="devicesAddDevice" class="primary add-device"[^>]*><svg class="page-action-glyph"/);
+  assert.match(dashboard, /#devices \.page-head>\.add-device \.page-action-label\{position:static!important/);
   assert.match(dashboard, /id="refreshButton"><svg class="page-action-glyph"/);
   assert.match(dashboard, /#devices \.page-head>\.add-device,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
   assert.match(dashboard, /pullToRefresh:"Pull to refresh"/);
@@ -218,6 +220,31 @@ test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
   ));
 });
 
+test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü sunar", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="deviceAttention" class="device-attention" hidden/);
+  assert.match(dashboard, /id="attentionDevices" class="device-grid devices-grid-view"/);
+  assert.match(dashboard, /attentionDevices:"Needs attention"/);
+  assert.match(dashboard, /attentionDevices:"Dikkat gerektiren cihazlar"/);
+  assert.match(dashboard, /const deviceNeedsAttention=device=>device\.availability==="offline"/);
+  assert.match(dashboard, /attention\.hidden=attentionDevices\.length===0/);
+  assert.match(dashboard, /const regularDevices=devices\.filter\(device=>!deviceNeedsAttention\(device\)\)/);
+  assert.match(dashboard, /class="device-card-layout"><aside class="device-image-panel"/);
+  assert.match(dashboard, /class="image-edit-overlay"[^>]*data-change-image=/);
+  assert.match(dashboard, /class="device-exposed-panel"/);
+  assert.match(dashboard, /class="device-name-edit"[^>]*data-rename=/);
+  assert.match(dashboard, /class="device-header-status">\$\{linkQualityBadge\(device\)\}/);
+  assert.match(dashboard, /const primaryStatusForDevice=/);
+  assert.match(dashboard, /value\.smoke!==undefined/);
+  assert.match(dashboard, /value\.carbon_monoxide!==undefined/);
+  assert.match(dashboard, /value\.occupancy!==undefined\?value\.occupancy:value\.presence/);
+  assert.match(dashboard, /\.device-card-layout\{display:grid;grid-template-columns:minmax\(180px,.72fr\) minmax\(0,1.55fr\)/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});
+
 test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async () => {
   const dashboard = await readDashboardBundle();
 
@@ -226,6 +253,10 @@ test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async 
   assert.match(dashboard, /id="cancelName"/);
   assert.match(dashboard, /minlength="2"/);
   assert.match(dashboard, /openPairingName\(session\.foundId,session\.reconnected\)/);
+  assert.match(dashboard, /const preparing=device\.preparing===true/);
+  assert.match(dashboard, /class="device-card\$\{preparing\?" preparing":""\}"/);
+  assert.match(dashboard, /preparing\?' inert aria-busy="true"'/);
+  assert.match(dashboard, /preparing\|\|\(device\.availability==="offline"&&Boolean\(action\)\)\|\|pending/);
   assert.match(dashboard, /pairingReconnectComplete:"Known device reconnected successfully\."/);
   assert.match(dashboard, /pairingReconnectComplete:"Kayıtlı cihaz yeniden bağlandı\."/);
   assert.match(dashboard, /state\.editing=\{id,channel:null,afterPairing:true,reconnected\}/);
@@ -323,6 +354,13 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
   assert.doesNotMatch(dashboard, /auth(?:Setup|Login)Dialog"\)\.showModal/);
   assert.match(dashboard, /id="authSetupError" class="auth-error" role="alert" aria-live="assertive" hidden/);
   assert.match(dashboard, /id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden/);
+  assert.match(dashboard, /serverAccountTitle:"Server account"/);
+  assert.match(dashboard, /serverAccountTitle:"Sunucu hesabı"/);
+  assert.match(dashboard, /"authLoginRuntimeContext"/);
+  assert.match(dashboard, /"authSetupRuntimeContext"/);
+  assert.match(dashboard, /login\.hidden=!state\.androidMonitor/);
+  assert.match(dashboard, /setup\.hidden=!runtimeAvailable/);
+  assert.match(dashboard, /configureAndroidActions\(\);\s*try\{await loadAuthSession\(\)\}/);
   assert.match(dashboard, /id="authSetupPassword" type="password" minlength="8"/);
   assert.match(dashboard, /id="authSetupPin" type="password" inputmode="numeric" pattern="\[0-9\]\{6\}"/);
   assert.match(dashboard, /if\(admin\)secret\.removeAttribute\("pattern"\)/);
@@ -369,7 +407,13 @@ test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla
   assert.match(dashboard, /serverAddress:"Sunucu IP"/);
   assert.match(dashboard, /VillaAndroid\?\.connectedServerAddress/);
   assert.match(dashboard, /String\(window\.VillaAndroid\.connectedServerAddress\(\)\|\|""\)\.trim\(\)/);
-  assert.match(dashboard, /const address=discoveredAddress\|\|state\.network\?\.preferredAddress\|\|state\.network\?\.addresses\?\.\[0\]\|\|t\("ipUnavailable"\)/);
+  assert.match(dashboard, /return discoveredAddress\|\|state\.network\?\.preferredAddress\|\|state\.network\?\.addresses\?\.\[0\]\|\|t\("ipUnavailable"\)/);
+  assert.match(dashboard, /state\.remoteOnboarding=state\.androidMonitor/);
+  assert.match(dashboard, /serverSetupDetectedTitle:"This tablet is already connected"/);
+  assert.match(dashboard, /serverSetupDetectedTitle:"Bu tablet zaten sunucuya bağlı"/);
+  assert.match(dashboard, /if\(state\.remoteOnboarding\)\{/);
+  assert.match(dashboard, /\$\("#onboardingNext"\)\.textContent=t\("openServerSettings"\)/);
+  assert.match(dashboard, /activateView\("settings"\)/);
   assert.match(settings, /class="setting-card security-card"/);
   assert.match(settings, /id="adminPasswordForm"/);
   assert.doesNotMatch(settings, /id="currentAdminPassword"/);
@@ -554,6 +598,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.doesNotMatch(dashboard, /data-quick-layout/);
   assert.match(dashboard, /localStorage\.getItem\("villa-device-layout"\)/);
   assert.match(dashboard, /localStorage\.setItem\("villa-device-layout",state\.deviceLayout\)/);
+  assert.match(dashboard, /\[\$\("#allDevices"\),\$\("#attentionDevices"\)\]\.forEach\(container=>/);
   assert.match(dashboard, /container\.classList\.toggle\("devices-list-view",state\.deviceLayout==="list"\)/);
   assert.match(dashboard, /\.device-grid\.devices-list-view\{grid-template-columns:1fr\}/);
   assert.match(dashboard, /deviceLayout:"Cihaz görünümü"/);
@@ -564,7 +609,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /class="quick-battery\$\{battery<=batteryThreshold\?" low":""\}"/);
   assert.match(dashboard, /class="battery-glyph"/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
-  assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div>\$\{linkQualityBadge\(device\)\}/);
+  assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div><button class="device-name-edit"/);
+  assert.match(dashboard, /class="device-header-status">\$\{linkQualityBadge\(device\)\}<\/div><\/summary>/);
   assert.match(dashboard, /class="device-link-level\$\{tone\?`\ \$\{tone\}`:""\}"/);
   assert.match(dashboard, /\.device-link-level\.strong\{color:#24805a/);
   assert.match(dashboard, /\.device-link-level\.weak\{color:var\(--danger\)/);
@@ -572,7 +618,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.quick-control-widget \.quick-card\{min-height:44px;padding:5px 12px\}/);
   assert.match(dashboard, /class="quick-device-icon"/);
   assert.match(dashboard, /\.quick-toggle\{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:26px minmax\(0,1fr\) auto/);
-  assert.match(dashboard, /<button class="quick-toggle \$\{action\?\.active\?"on":""\}\$\{pending\?" pending":""\}" \$\{actionAttributes\}[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
+  assert.match(dashboard, /<button class="quick-toggle \$\{action\?\.active\?"on":""\}\$\{pending\?" pending":""\}" \$\{actionAttributes\}[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{preparing\|\|pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
   assert.match(dashboard, /\.quick-grid\.grid-view\{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto/);
   assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start\}/);
   assert.match(dashboard, /\.quick-grid \.device-name\{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:11px\}/);
@@ -696,6 +742,20 @@ test("perde, iklim, kilit, fan ve siren günlük kullanıcıya görsel kontrolle
   assert.match(dashboard, /control\.kind==="cover"/);
   assert.match(dashboard, /control\.kind==="lock"/);
   assert.match(dashboard, /\["switch","fan","siren"\]\.includes\(control\.kind\)/);
+  assert.match(dashboard, /const binaryControlActive=control=>/);
+  assert.match(
+    dashboard,
+    /if\(\["switch","fan","siren"\]\.includes\(control\.kind\)\)return Boolean\(active\)/
+  );
+  assert.match(dashboard, /data-command-value="\$\{commandValue\(!active\)\}"/);
+  assert.match(
+    dashboard,
+    /lightPower"\)\.onclick=\(\)=>power&&command\(device\.id,power\.property,!binaryControlActive\(power\)\)/
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /data-command-value="\$\{commandValue\(active\?\(control\.valueOff\?\?false\):\(control\.valueOn\?\?true\)\)\}"/
+  );
   assert.match(dashboard, /data-command-value=/);
   assert.match(dashboard, /data-select=/);
   assert.match(dashboard, /class="control-command stop"/);

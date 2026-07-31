@@ -73,7 +73,7 @@ test("shared runtime arguments use safe defaults", () => {
   );
   assert.equal(parseArguments(["--mqtt-host=0.0.0.0"]).mqttHost, "0.0.0.0");
   assert.equal(parseArguments(["--core-host=0.0.0.0"]).coreHost, "0.0.0.0");
-  assert.equal(parseArguments(["--core-host=192.168.0.61"]).coreHost, "127.0.0.1");
+  assert.equal(parseArguments(["--core-host=192.0.2.61"]).coreHost, "127.0.0.1");
   assert.equal(parseArguments(["--platform=linux"]).platform, "linux");
   assert.equal(parseArguments(["--platform=unknown"]).platform, "android");
   assert.equal(parseArguments(["--control-token=secret-token"]).controlToken, "secret-token");
@@ -82,7 +82,7 @@ test("shared runtime arguments use safe defaults", () => {
 test("standalone runtime validates bind addresses and TCP probe targets", () => {
   assert.equal(validBindAddress("0.0.0.0"), "0.0.0.0");
   assert.equal(validBindAddress("127.0.0.1"), "127.0.0.1");
-  assert.equal(validBindAddress("192.168.0.61"), null);
+  assert.equal(validBindAddress("192.0.2.61"), null);
   assert.deepEqual(validProbe({ host: "192.168.0.248", port: 6638 }), {
     host: "192.168.0.248",
     port: 6638
@@ -244,8 +244,8 @@ test("readiness endpoint distinguishes unprovisioned and fully ready states", as
   runtime.monitor = {
     status: "ready",
     ready: true,
-    address: "192.168.0.61",
-    dashboardUrl: "http://192.168.0.61:8091/",
+    address: "192.0.2.61",
+    dashboardUrl: "http://192.0.2.61:8091/",
     serverMode: "direct"
   };
   runtime.provisioning = { provisioned: false, reason: "Local config is not needed." };
@@ -255,7 +255,7 @@ test("readiness endpoint distinguishes unprovisioned and fully ready states", as
   const monitor = await getJson(address.port, "/api/ready");
   assert.equal(monitor.status, 200);
   assert.equal(monitor.body.mode, "android-monitor");
-  assert.equal(monitor.body.endpoints.dashboard, "http://192.168.0.61:8091/");
+  assert.equal(monitor.body.endpoints.dashboard, "http://192.0.2.61:8091/");
 });
 
 test("runtime shutdown requires the local bearer token and runs only once", async (context) => {

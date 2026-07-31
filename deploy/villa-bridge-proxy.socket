@@ -1,9 +1,0 @@
-[Unit]
-Description=Villa Bridge temporary migration panel proxy
-
-[Socket]
-ListenStream=0.0.0.0:8091
-NoDelay=true
-
-[Install]
-WantedBy=sockets.target

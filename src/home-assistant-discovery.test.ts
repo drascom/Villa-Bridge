@@ -20,6 +20,7 @@ const light: DeviceView = {
   description: null,
   supported: true,
   interviewCompleted: true,
+  preparing: false,
   availability: "online",
   lastSeen: null,
   stateUpdatedAt: null,
