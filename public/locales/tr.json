@@ -253,6 +253,7 @@
     "settingsLead": "Zigbee, MQTT ve Matter tarafından kullanılan ağ adreslerini güncelleyin.",
     "serverSettingsTitle": "Aktif sunucu ayarlarını değiştiriyorsunuz",
     "serverSettingsLead": "Zigbee, MQTT ve Matter değişiklikleri bu tarayıcıda açık olan Villa Bridge sunucusuna kaydedilir; tablet veya tarayıcıya yerel olarak uygulanmaz.",
+    "serverAddress": "Sunucu IP",
     "zigbeeSettingsLead": "Cihaz kaynağı olarak kullanılan Zigbee koordinatörü bağlantısı.",
     "adapterUrl": "Koordinatör adresi",
     "mqttSettingsLead": "Villa Bridge ve Zigbee2MQTT tarafından paylaşılan broker ve temel konu.",

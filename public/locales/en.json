@@ -253,6 +253,7 @@
     "settingsLead": "Update the network endpoints used by Zigbee, MQTT and Matter.",
     "serverSettingsTitle": "You are editing the active server",
     "serverSettingsLead": "Zigbee, MQTT and Matter changes are saved on the Villa Bridge server shown in this browser, not locally on this tablet or browser.",
+    "serverAddress": "Server IP",
     "zigbeeSettingsLead": "Connection to the Zigbee coordinator used as the device source.",
     "adapterUrl": "Coordinator URL",
     "mqttSettingsLead": "Broker and base topic shared by Villa Bridge and Zigbee2MQTT.",

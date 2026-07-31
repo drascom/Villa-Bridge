@@ -91,6 +91,9 @@ test("Home Assistant kartı LAN IP ve EN/TR sabitleme rehberi sunar", async () =
 
   assert.match(dashboard, /state\.network\?\.preferredAddress/);
   assert.doesNotMatch(dashboard, /location\.hostname/);
+  assert.match(dashboard, /id="tabletIpGuide" class="ha-network-guide connection-network-guide"/);
+  assert.match(dashboard, /\$\("#tabletIpGuide"\)\.hidden=state\.androidMonitor/);
+  assert.match(dashboard, /\.connection-network-guide\[hidden\]\{display:none\}/);
   assert.match(dashboard, /id="haProtocol"/);
   assert.match(dashboard, /id="haUsername"/);
   assert.match(dashboard, /id="haPassword"/);
@@ -356,11 +359,15 @@ test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla
   assert.ok(settings.indexOf('id="settingsForm"') < settings.indexOf('id="androidRuntimeCard"'));
   assert.match(settings, /class="settings-security-grid"/);
   assert.match(settings, /class="settings-server-notice"/);
+  assert.match(settings, /id="connectedServerAddress"/);
   assert.ok(settings.indexOf('class="settings-server-notice"') < settings.indexOf('class="setting-card onboarding-settings-card"'));
   assert.match(dashboard, /serverSettingsTitle:"You are editing the active server"/);
   assert.match(dashboard, /serverSettingsTitle:"Aktif sunucu ayarlarını değiştiriyorsunuz"/);
   assert.match(dashboard, /serverSettingsLead:"Zigbee, MQTT and Matter changes are saved on the Villa Bridge server/);
   assert.match(dashboard, /serverSettingsLead:"Zigbee, MQTT ve Matter değişiklikleri bu tarayıcıda açık olan Villa Bridge sunucusuna kaydedilir/);
+  assert.match(dashboard, /serverAddress:"Server IP"/);
+  assert.match(dashboard, /serverAddress:"Sunucu IP"/);
+  assert.match(dashboard, /const address=state\.network\?\.preferredAddress\|\|state\.network\?\.addresses\?\.\[0\]\|\|t\("ipUnavailable"\)/);
   assert.match(settings, /class="setting-card security-card"/);
   assert.match(settings, /id="adminPasswordForm"/);
   assert.doesNotMatch(settings, /id="currentAdminPassword"/);
