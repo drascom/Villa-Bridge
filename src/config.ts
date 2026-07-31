@@ -23,6 +23,9 @@ interface FileConfig {
   homeAssistant?: {
     discoveryEnabled?: boolean;
   };
+  alerts?: {
+    lowBatteryThreshold?: number;
+  };
   debug?: {
     enabled?: boolean;
   };
@@ -112,6 +115,9 @@ export interface AppConfig {
   homeAssistant: {
     discoveryEnabled: boolean;
   };
+  alerts: {
+    lowBatteryThreshold: number;
+  };
   debug: {
     enabled: boolean;
   };
@@ -169,6 +175,13 @@ export async function loadConfig(): Promise<AppConfig> {
         ? process.env.VILLA_BRIDGE_HOME_ASSISTANT_DISCOVERY === "true"
         : file.homeAssistant?.discoveryEnabled === true
     },
+    alerts: {
+      lowBatteryThreshold: Number(
+        process.env.VILLA_BRIDGE_LOW_BATTERY_THRESHOLD
+        ?? file.alerts?.lowBatteryThreshold
+        ?? 15
+      )
+    },
     debug: {
       enabled: process.env.VILLA_BRIDGE_DEBUG
         ? process.env.VILLA_BRIDGE_DEBUG === "true"
@@ -179,6 +192,13 @@ export async function loadConfig(): Promise<AppConfig> {
       port
     }
   };
+  if (
+    !Number.isInteger(result.alerts.lowBatteryThreshold)
+    || result.alerts.lowBatteryThreshold < 5
+    || result.alerts.lowBatteryThreshold > 50
+  ) {
+    throw new Error("Düşük pil eşiği 5-50 arasında olmalıdır.");
+  }
   if (requestedMode === "direct") {
     const serial = z2m.serial;
     const advanced = z2m.advanced;

@@ -297,6 +297,27 @@ export class AuthStore {
     });
   }
 
+  async updateAdminPassword(
+    usernameValue: string,
+    newPasswordValue: unknown
+  ): Promise<void> {
+    const username = normalizeUsername(usernameValue);
+    const newPassword = validateAdminPassword(newPasswordValue);
+    await this.exclusive(async () => {
+      const state = await this.load();
+      const admin = state.users.find((user) =>
+        user.role === "admin" && user.username === username
+      );
+      if (!admin) throw new Error("Yönetici hesabı bulunamadı.");
+      if (await this.verifySecret(admin, newPassword)) {
+        throw new Error("Yeni yönetici parolası mevcut paroladan farklı olmalıdır.");
+      }
+      Object.assign(admin, await this.hashSecret(newPassword));
+      state.sessions = this.activeSessions(state.sessions).filter((session) => session.role !== "admin");
+      await this.save(state);
+    });
+  }
+
   async updateResidentPin(pinValue: unknown): Promise<void> {
     const pin = validateResidentPin(pinValue);
     await this.exclusive(async () => {

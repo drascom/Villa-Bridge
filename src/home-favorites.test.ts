@@ -3,7 +3,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { HomeFavoritesStore, validateHomeFavorites } from "./home-favorites.js";
+import {
+  HomeFavoritesStore,
+  isHomeFavoriteControlKind,
+  validateHomeFavorites
+} from "./home-favorites.js";
 
 test("ana ekran favorileri cihaz UID ve kontrol kimliğiyle saklanır", () => {
   assert.deepEqual(validateHomeFavorites([
@@ -16,6 +20,15 @@ test("ana ekran favorileri cihaz UID ve kontrol kimliğiyle saklanır", () => {
 
 test("geçersiz favori cihaz kimliği reddedilir", () => {
   assert.throws(() => validateHomeFavorites([{ deviceId: "kitchen", controlId: "main" }]));
+});
+
+test("ana ekran favorileri günlük kullanılan kontrol türlerini kabul eder", () => {
+  for (const kind of ["switch", "fan", "siren", "cover", "position", "lock", "climate"]) {
+    assert.equal(isHomeFavoriteControlKind(kind), true, kind);
+  }
+  for (const kind of ["temperature", "number", "select"]) {
+    assert.equal(isHomeFavoriteControlKind(kind), false, kind);
+  }
 });
 
 test("cihaz kaldırıldığında UID'ye bağlı tüm ana ekran favorileri silinir", async (context) => {

@@ -1,4 +1,5 @@
 export type JsonObject = Record<string, unknown>;
+export type JsonScalar = string | number | boolean;
 
 export interface BridgeDeviceDefinition {
   model?: string;
@@ -6,6 +7,8 @@ export interface BridgeDeviceDefinition {
   description?: string;
   exposes?: unknown[];
   options?: unknown[];
+  ota?: boolean;
+  supports_ota?: boolean;
 }
 
 export interface BridgeDevice {
@@ -25,6 +28,11 @@ export interface BridgeDevice {
   manufacturer?: string;
   power_source?: string;
   software_build_id?: string;
+  configured_options?: {
+    transition?: number;
+    debounce?: number;
+    retain?: boolean;
+  };
 }
 
 export interface BridgeGroup {
@@ -48,9 +56,40 @@ export interface DeviceView {
   availability: "online" | "offline" | "unknown";
   lastSeen: string | null;
   stateUpdatedAt: string | null;
+  otaSupported: boolean;
+  options: {
+    transition: number;
+    debounce: number;
+    retain: boolean;
+  };
+  endpoints?: DeviceEndpointView[];
   features: string[];
+  actionTypes?: string[];
+  alerts: DeviceAlertView[];
   controls: DeviceControlView[];
   state: JsonObject;
+}
+
+export interface DeviceAlertView {
+  code: "low_battery" | "smoke" | "carbon_monoxide";
+  severity: "warning" | "critical";
+  value?: number;
+  threshold?: number;
+}
+
+export interface DeviceEndpointBindingView {
+  cluster: string;
+  targetType: "device" | "group";
+  targetId: string;
+  targetEndpoint: number | null;
+}
+
+export interface DeviceEndpointView {
+  id: number;
+  name: string;
+  inputClusters: Array<string | number>;
+  outputClusters: Array<string | number>;
+  bindings: DeviceEndpointBindingView[];
 }
 
 export interface DeviceImageCandidate {
@@ -70,10 +109,29 @@ export interface DeviceControlView {
   id: string;
   property: string;
   name: string;
-  kind: "switch" | "level" | "temperature" | "color";
+  kind:
+    | "switch"
+    | "level"
+    | "temperature"
+    | "color"
+    | "cover"
+    | "position"
+    | "climate"
+    | "lock"
+    | "fan"
+    | "siren"
+    | "number"
+    | "select";
   value: boolean | number | string | null;
   min?: number;
   max?: number;
+  step?: number;
+  unit?: string;
+  values?: JsonScalar[];
+  valueOn?: JsonScalar;
+  valueOff?: JsonScalar;
+  valueToggle?: JsonScalar;
+  adminOnly?: boolean;
 }
 
 export interface GroupView {
@@ -81,5 +139,14 @@ export interface GroupView {
   sourceName: string;
   name: string;
   members: number;
+  memberIds: string[];
+  scenes: Array<{ id: number; name: string }>;
   state: JsonObject;
+}
+
+export interface DeviceEventView {
+  sourceName: string;
+  property: string;
+  value: JsonScalar;
+  at: string;
 }

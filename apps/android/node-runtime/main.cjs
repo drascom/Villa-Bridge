@@ -9,6 +9,7 @@ const os = require("node:os");
 const path = require("node:path");
 const Aedes = require("aedes");
 const mqtt = require("mqtt");
+const { discoverVillaBridgeServer } = require("./lan-discovery.cjs");
 const {
   loadProvisioning,
   matterbridgeReady,
@@ -18,6 +19,7 @@ const {
 
 const runtime = {
   startedAt: new Date().toISOString(),
+  monitor: null,
   mqtt: { listening: false, selfTest: false, error: null },
   core: { status: "unprovisioned", ready: false, error: null },
   matter: { status: "unprovisioned", ready: false, error: null },
@@ -80,23 +82,34 @@ function networkAddresses() {
 }
 
 function diagnostics(config) {
-  const ready =
+  const monitorReady = runtime.monitor?.ready === true;
+  const standaloneReady =
     runtime.provisioning.provisioned &&
     runtime.mqtt.listening &&
     runtime.mqtt.selfTest &&
     !runtime.mqtt.error &&
     runtime.core.ready &&
     runtime.matter.ready;
+  const ready = monitorReady || standaloneReady;
+  const mode = monitorReady
+    ? "android-monitor"
+    : runtime.provisioning.provisioned
+      ? "android-standalone"
+      : "android-unprovisioned";
+  const dashboard = monitorReady
+    ? runtime.monitor.dashboardUrl
+    : `http://${config.coreHost}:${config.corePort}/`;
   return {
     ok: ready,
     ready,
-    mode: runtime.provisioning.provisioned ? "android-standalone" : "android-unprovisioned",
+    mode,
     node: process.versions.node,
     architecture: process.arch,
     platform: process.platform,
     uptimeSeconds: Math.floor(process.uptime()),
     startedAt: runtime.startedAt,
     addresses: networkAddresses(),
+    monitor: runtime.monitor,
     provisioning: runtime.provisioning,
     mqtt: runtime.mqtt,
     core: runtime.core,
@@ -104,7 +117,8 @@ function diagnostics(config) {
     multicast: runtime.multicast,
     lastProbe: runtime.lastProbe,
     endpoints: {
-      core: `http://${config.coreHost}:${config.corePort}`,
+      dashboard,
+      core: dashboard,
       diagnostics: `http://${config.diagnosticsHost}:${config.diagnosticsPort}`,
       mqtt: `mqtt://${config.mqttHost}:${config.mqttPort}`,
       matterbridge: "ws://127.0.0.1:8283"
@@ -390,12 +404,6 @@ async function start() {
       : null,
     matterEnabled: provision.matterEnabled
   };
-  const mqttServer = startMqttBroker({
-    ...config,
-    mqttAuthRequired: provision.mqttAuthRequired === true,
-    mqttUsername: provision.mqttUsername,
-    mqttPassword: provision.mqttPassword
-  });
   let shutdownRequestedEarly = false;
   const runtimeHooks = {
     shutdown: () => {
@@ -409,72 +417,115 @@ async function start() {
     );
   });
   httpServer.on("error", (error) => console.error("HTTP server error:", error));
-  const mqttReady = await mqttServer.ready;
-  if (mqttReady.ok) {
-    console.log(`Embedded MQTT self-test passed on ${mqttReady.host}:${mqttReady.port}`);
-  } else {
-    console.error("Embedded MQTT self-test failed:", mqttReady.error);
-  }
-  await probeMulticast();
 
+  let mqttServer = null;
   let coreService = null;
   let matterService = null;
   let matterMonitor = null;
-  if (!provision.provisioned) {
-    runtime.core = { status: "unprovisioned", ready: false, error: provision.reason };
-    runtime.matter = { status: "unprovisioned", ready: false, error: provision.reason };
-    console.warn(`Villa Bridge Android runtime is unprovisioned: ${provision.reason}`);
-  } else if (!mqttReady.ok) {
-    runtime.core = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
-    runtime.matter = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
+  const peer = await discoverVillaBridgeServer().catch((error) => {
+    console.warn(`Villa Bridge LAN discovery failed: ${error.message}`);
+    return null;
+  });
+  if (peer) {
+    runtime.monitor = {
+      status: "ready",
+      ready: true,
+      address: peer.address,
+      dashboardUrl: peer.dashboardUrl,
+      serverMode: peer.mode
+    };
+    runtime.mqtt = {
+      status: "disabled",
+      listening: false,
+      selfTest: false,
+      error: null,
+      reason: "A Villa Bridge server is active on the LAN."
+    };
+    runtime.core = {
+      status: "remote",
+      ready: true,
+      error: null,
+      endpoint: peer.dashboardUrl
+    };
+    runtime.matter = {
+      status: "remote",
+      ready: true,
+      error: null
+    };
+    console.log(
+      `Villa Bridge server found at ${peer.dashboardUrl}; Android is running in monitor-only mode.`
+    );
   } else {
-    runtime.core = { status: "starting", ready: false, error: null };
-    try {
-      coreService = await startVillaBridgeCore(config, provision);
-      runtime.core = {
-        status: "ready",
-        ready: true,
-        error: null,
-        endpoint: `http://${config.coreHost}:${config.corePort}`
-      };
-    } catch (error) {
-      runtime.core = { status: "failed", ready: false, error: error.message };
-      console.error("Villa Bridge direct core failed:", error);
-    }
-
-    if (!provision.matterEnabled) {
-      runtime.matter = { status: "disabled", ready: true, error: null };
-    } else if (!runtime.core.ready) {
-      runtime.matter = {
-        status: "blocked",
-        ready: false,
-        error: "Matterbridge waits for the Villa Bridge core."
-      };
+    mqttServer = startMqttBroker({
+      ...config,
+      mqttAuthRequired: provision.mqttAuthRequired === true,
+      mqttUsername: provision.mqttUsername,
+      mqttPassword: provision.mqttPassword
+    });
+    const mqttReady = await mqttServer.ready;
+    if (mqttReady.ok) {
+      console.log(`Embedded MQTT self-test passed on ${mqttReady.host}:${mqttReady.port}`);
     } else {
-      runtime.matter = { status: "starting", ready: false, error: null };
+      console.error("Embedded MQTT self-test failed:", mqttReady.error);
+    }
+    await probeMulticast();
+
+    if (!provision.provisioned) {
+      runtime.core = { status: "unprovisioned", ready: false, error: provision.reason };
+      runtime.matter = { status: "unprovisioned", ready: false, error: provision.reason };
+      console.warn(`Villa Bridge Android runtime is unprovisioned: ${provision.reason}`);
+    } else if (!mqttReady.ok) {
+      runtime.core = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
+      runtime.matter = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
+    } else {
+      runtime.core = { status: "starting", ready: false, error: null };
       try {
-        matterService = await startMatterbridge(config, provision);
-        const updateMatterState = () => {
-          const ready = matterbridgeReady(matterService);
-          const plugin = matterService.plugin;
-          runtime.matter = {
-            status: plugin?.error ? "failed" : ready ? "ready" : "starting",
-            ready,
-            error: plugin?.error ? "Matterbridge Zigbee2MQTT plugin reported an error." : null,
-            plugin: {
-              loaded: plugin?.loaded === true,
-              started: plugin?.started === true,
-              configured: plugin?.configured === true
-            },
-            commissioningPort: matterService.instance?.serverNode ? 5540 : null
-          };
+        coreService = await startVillaBridgeCore(config, provision);
+        runtime.core = {
+          status: "ready",
+          ready: true,
+          error: null,
+          endpoint: `http://${config.coreHost}:${config.corePort}`
         };
-        updateMatterState();
-        matterMonitor = setInterval(updateMatterState, 1000);
-        matterMonitor.unref();
       } catch (error) {
-        runtime.matter = { status: "failed", ready: false, error: error.message };
-        console.error("Matterbridge failed:", error);
+        runtime.core = { status: "failed", ready: false, error: error.message };
+        console.error("Villa Bridge direct core failed:", error);
+      }
+
+      if (!provision.matterEnabled) {
+        runtime.matter = { status: "disabled", ready: true, error: null };
+      } else if (!runtime.core.ready) {
+        runtime.matter = {
+          status: "blocked",
+          ready: false,
+          error: "Matterbridge waits for the Villa Bridge core."
+        };
+      } else {
+        runtime.matter = { status: "starting", ready: false, error: null };
+        try {
+          matterService = await startMatterbridge(config, provision);
+          const updateMatterState = () => {
+            const ready = matterbridgeReady(matterService);
+            const plugin = matterService.plugin;
+            runtime.matter = {
+              status: plugin?.error ? "failed" : ready ? "ready" : "starting",
+              ready,
+              error: plugin?.error ? "Matterbridge Zigbee2MQTT plugin reported an error." : null,
+              plugin: {
+                loaded: plugin?.loaded === true,
+                started: plugin?.started === true,
+                configured: plugin?.configured === true
+              },
+              commissioningPort: matterService.instance?.serverNode ? 5540 : null
+            };
+          };
+          updateMatterState();
+          matterMonitor = setInterval(updateMatterState, 1000);
+          matterMonitor.unref();
+        } catch (error) {
+          runtime.matter = { status: "failed", ready: false, error: error.message };
+          console.error("Matterbridge failed:", error);
+        }
       }
     }
   }
@@ -488,7 +539,7 @@ async function start() {
         .catch((error) => console.error("Matter shutdown failed:", error));
       await Promise.resolve(coreService?.stop?.())
         .catch((error) => console.error("Core shutdown failed:", error));
-      await mqttServer.close()
+      await Promise.resolve(mqttServer?.close?.())
         .catch((error) => console.error("MQTT shutdown failed:", error));
       await new Promise((resolve) => {
         if (!httpServer.listening) {

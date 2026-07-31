@@ -131,6 +131,7 @@ test("embedded core receives loopback-only service configuration", async (contex
   assert.match(imported, /^file:/);
   assert.equal(environment.VILLA_BRIDGE_HOST, "127.0.0.1");
   assert.equal(environment.VILLA_BRIDGE_PORT, "8091");
+  assert.equal(environment.VILLA_BRIDGE_NODE_ROLE, "android");
   assert.equal(environment.VILLA_BRIDGE_MQTT_URL, "mqtt://127.0.0.1:1883");
   assert.equal(environment.VILLA_BRIDGE_MQTT_USERNAME, "home-assistant");
   assert.equal(environment.VILLA_BRIDGE_MQTT_PASSWORD, "test-only-password");

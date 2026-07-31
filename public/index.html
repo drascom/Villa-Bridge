@@ -66,18 +66,20 @@
     .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:18px}.toolbar-actions{display:flex;align-items:center;gap:8px}.search{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:white;color:var(--ink);outline:0}.search:focus{border-color:var(--forest)}
     .pull-refresh{height:0;display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;color:var(--forest);font-size:12px;font-weight:780;opacity:0;transition:height .2s ease,opacity .15s ease;will-change:height,opacity}.pull-refresh.visible{opacity:1}.pull-refresh-spinner{width:19px;height:19px;flex:none;border:2px solid #bdd0c7;border-top-color:var(--forest);border-radius:50%;transform:rotate(var(--pull-rotation,0deg))}.pull-refresh.refreshing .pull-refresh-spinner{animation:pull-refresh-spin .75s linear infinite}@keyframes pull-refresh-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.pull-refresh{transition:none}.pull-refresh.refreshing .pull-refresh-spinner{animation-duration:1.5s}}
     .connection-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.connection-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;min-height:220px;box-shadow:var(--card-shadow)}.connection-card h2{font:700 25px/1.1 system-ui,sans-serif;margin:16px 0 8px}.connection-card p{color:var(--muted);margin:0 0 20px}.fabric-list{display:grid;gap:8px;margin:18px 0}.fabric{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}.home-assistant-card{min-height:220px}.ha-connect-button{min-width:190px}.ha-setup-details{grid-column:1/-1;padding:24px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--card-shadow)}.ha-setup-details[hidden]{display:none}.ha-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px}.ha-steps{margin:0;padding-left:20px;color:var(--muted)}.ha-steps li{margin:0 0 9px;padding-left:4px}.ha-values{display:grid;gap:9px}.ha-value{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 12px;border-radius:10px;background:var(--surface-soft)}.ha-value span{color:var(--muted);font-size:12px}.ha-value code{color:var(--ink);font:700 12px/1.3 ui-monospace,monospace;overflow-wrap:anywhere;text-align:right}.ha-secret{display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0}.ha-secret button{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:7px;color:var(--forest);background:var(--forest-soft);font-size:14px}.ha-actions{display:flex;justify-content:flex-end;margin-top:3px}.ha-actions button{min-width:180px}.ha-network-guide{grid-column:1/-1;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}.ha-network-guide h3{margin:0 0 8px;font:700 17px/1.2 system-ui,sans-serif}.ha-network-guide p{margin:0 0 10px;font-size:13px}.ha-network-guide ol{margin:10px 0 12px;padding-left:22px;color:var(--muted);font-size:13px}.ha-network-guide li{margin:0 0 8px}.ha-network-guide code{color:var(--ink);font-weight:800}.ha-guide-actions{display:flex;justify-content:flex-end;margin-top:14px}.ha-guide-actions button[hidden]{display:none}
-    .settings-form{display:grid;gap:16px}.settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.setting-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--card-shadow)}.setting-card h2{margin:0 0 7px;font:700 23px/1.1 system-ui,sans-serif}.setting-card p{min-height:42px;margin:0 0 18px;color:var(--muted);font-size:13px}.setting-field{display:grid;gap:7px;margin-top:14px}.setting-field label{font-size:12px;font-weight:780}.setting-field input{width:100%;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);background:var(--surface-soft);outline:0}.setting-field input:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.settings-actions{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--card-shadow)}.settings-note{max-width:680px;color:var(--muted);font-size:13px}.runtime-card{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:16px}.runtime-card[hidden]{display:none}.runtime-card p{min-height:0;margin-bottom:0}.runtime-state{display:inline-flex;align-items:center;gap:8px;margin-top:12px;color:var(--forest);font-size:12px;font-weight:800}.runtime-state::before{content:"";width:8px;height:8px;border-radius:50%;background:#2c9a68}
+    .settings-form{display:grid;gap:16px}.settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}.setting-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--card-shadow)}.setting-card h2{margin:0 0 7px;font:700 23px/1.1 system-ui,sans-serif}.setting-card p{min-height:42px;margin:0 0 18px;color:var(--muted);font-size:13px}.setting-field{display:grid;gap:7px;margin-top:14px}.setting-field label{font-size:12px;font-weight:780}.setting-field input,.setting-field select{width:100%;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);background:var(--surface-soft);font:inherit;outline:0}.setting-field input:focus,.setting-field select:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.setting-field small{color:var(--muted);font-size:11px;line-height:1.45}.settings-actions{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--card-shadow)}.settings-note{max-width:680px;color:var(--muted);font-size:13px}.runtime-card{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:16px}.runtime-card[hidden]{display:none}.runtime-card p{min-height:0;margin-bottom:0}.runtime-state{display:inline-flex;align-items:center;gap:8px;margin-top:12px;color:var(--forest);font-size:12px;font-weight:800}.runtime-state::before{content:"";width:8px;height:8px;border-radius:50%;background:#2c9a68}
+    .settings-security-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px}.security-card{min-width:0;display:flex;flex-direction:column}.security-card p{min-height:0}.security-card form{margin-top:auto}.security-card .auth-account-actions{grid-template-columns:1fr 1fr}.security-card .auth-account-actions input{grid-column:1/-1}.admin-password-form{display:grid;gap:10px}.admin-password-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.admin-password-form input{width:100%;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);background:var(--surface-soft);font:inherit;outline:0}.admin-password-form input:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.admin-password-form .auth-error{margin:0}.admin-password-form button{justify-self:end}.connection-settings-card{display:block;padding:0;overflow:hidden;margin-bottom:16px}.connection-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.connection-settings-section{min-width:0;padding:22px}.connection-settings-section+.connection-settings-section{border-left:1px solid var(--line)}.connection-settings-section h2{margin:0 0 7px}.connection-settings-section p{min-height:42px}.connection-settings-card .settings-actions{border-width:1px 0 0;border-radius:0;box-shadow:none}
     .debug-card{margin-top:16px}.debug-head{display:flex;align-items:center;justify-content:space-between;gap:24px}.debug-head p{min-height:0;margin-bottom:0}.debug-toggle-wrap{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;font-weight:750}.debug-log-panel{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.debug-log-panel[hidden]{display:none}.debug-log-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px}.debug-log-toolbar strong{font-size:15px}.debug-log-actions{display:flex;gap:8px}.debug-log-actions button{padding:8px 11px}.debug-error-list{display:grid;gap:8px;margin-top:14px}.debug-error-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 16px;padding:12px 14px;border:1px solid var(--line);border-radius:11px;background:var(--surface-soft)}.debug-error-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.debug-error-row time{color:var(--muted);font-size:11px}.debug-error-row p{grid-column:1/-1;min-height:0;margin:0;color:var(--muted);font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.debug-empty{padding:18px;border:1px dashed var(--line);border-radius:11px;color:var(--muted);text-align:center;font-size:12px}
     #home h1{font-family:system-ui,sans-serif;font-weight:750;letter-spacing:-.025em}.home-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.widget-board{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}.dashboard-widget{position:relative;min-width:0}.widget-wide{grid-column:1/-1}.widget-card{grid-column:span 4;min-height:170px;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--card-shadow)}.widget-card h2{margin:0;font:700 22px/1.1 system-ui,sans-serif}.widget-card p{margin:6px 0 0;color:var(--muted);font-size:13px}.widget-value{display:flex;align-items:end;gap:8px;margin-top:22px}.widget-value strong{font:750 36px/1 system-ui,sans-serif}.widget-value span{padding-bottom:3px;color:var(--muted);font-size:12px}.widget-facts{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}.widget-list{display:grid;gap:8px;margin-top:16px}.widget-list-row{display:flex;justify-content:space-between;gap:12px;padding-top:8px;border-top:1px solid var(--line);font-size:12px}.widget-list-row span{color:var(--muted)}.widget-edit-controls{position:absolute;z-index:7;right:10px;top:10px;display:none;gap:6px;padding:5px;border:1px solid var(--line);border-radius:13px;background:var(--surface);box-shadow:0 8px 22px #0003}.widget-edit-controls button{width:44px;height:44px;border:0;border-radius:9px;color:var(--forest);background:var(--forest-soft);font-size:23px;font-weight:850;line-height:1;touch-action:manipulation}.widget-edit-controls button:disabled{opacity:.3}.widget-edit-controls [data-widget-remove]{color:var(--danger);background:#f8e9e7;font-size:21px}.widget-board.editing .dashboard-widget{outline:2px dashed var(--forest);outline-offset:4px;animation:widget-jiggle .72s ease-in-out infinite alternate}.widget-board.editing .dashboard-widget:nth-child(even){animation-delay:-.28s}.widget-board.editing .widget-edit-controls{display:flex}.widget-board.editing .quick-card,.widget-board.editing .group-control-tile{pointer-events:none}.dashboard-widget.widget-moved,.widget-board.editing .dashboard-widget.widget-moved{animation:widget-moved-pulse .46s ease-out}.widget-empty{grid-column:1/-1;padding:45px 20px;text-align:center;border:1px dashed var(--line);border-radius:16px;color:var(--muted);background:var(--surface)}.widget-empty[hidden]{display:none}.widget-catalog{display:grid;gap:10px;margin-top:18px}.widget-catalog-item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:16px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}.widget-catalog-item strong{display:block}.widget-catalog-item span{display:block;margin-top:3px;color:var(--muted);font-size:12px}.widget-catalog-item button{min-width:88px}.widget-catalog-item button:disabled{color:var(--forest);background:var(--forest-soft);opacity:1}@keyframes widget-jiggle{from{transform:rotate(-.18deg)}to{transform:rotate(.18deg)}}@keyframes widget-moved-pulse{0%{box-shadow:0 0 0 0 rgba(44,154,104,.5)}100%{box-shadow:0 0 0 9px rgba(44,154,104,0)}}@media(prefers-reduced-motion:reduce){.widget-board.editing .dashboard-widget,.dashboard-widget.widget-moved{animation:none}}
     .widget-board{position:relative;display:block}.quick-control-widget{margin-top:18px;padding:12px 10px 4px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--card-shadow)}.quick-control-widget .quick-card{min-height:44px;padding:5px 12px}.widget-rail{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px;margin-top:14px}.widget-scroll-hint,.quick-scroll-hint{display:none}.dashboard-widget,.group-control-tile{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.widget-board.editing>[data-widget]{outline:0;animation:none}.widget-board.editing>[data-widget]>.widget-edit-controls{display:none}.widget-board.editing #widgetRail>.dashboard-widget{padding-top:78px}
     .clock-rows{display:grid;gap:9px;margin-top:18px}.clock-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding-top:9px;border-top:1px solid var(--line)}.clock-row:first-child{padding-top:0;border-top:0}.clock-row span{color:var(--ink);font:750 18px/1 system-ui,sans-serif;letter-spacing:.015em}.clock-row strong{font:750 19px/1 system-ui,sans-serif}.clock-row small{display:block;margin-top:4px;color:var(--muted);font-size:11px}.weather-content{min-height:96px;display:grid;align-content:center;margin-top:14px}.weather-current{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:14px}.weather-icon{width:52px;height:52px;display:grid;place-items:center;border-radius:50%;background:var(--forest-soft);font-size:27px}.weather-temperature{font:750 34px/1 system-ui,sans-serif}.weather-condition{margin-top:4px;color:var(--muted);font-size:12px}.weather-facts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.weather-facts span{padding:6px 9px;border-radius:8px;color:var(--ink);background:var(--surface-soft);font-size:12px;font-weight:700}.weather-location-button{justify-self:start;padding:9px 12px}.weather-error{color:var(--danger);font-size:12px}
     .widget-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.widget-title-row>div{min-width:0}.widget-config-button{width:40px;height:40px;display:grid;place-items:center;flex:none;padding:0;border:0;border-radius:12px;color:var(--forest);background:var(--home-control,var(--forest-soft));box-shadow:var(--home-float-shadow);touch-action:manipulation}.widget-config-button svg,.location-action-icon{width:21px;height:21px;display:block;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.widget-board.editing .widget-config-button{visibility:hidden}.clock-empty{margin-top:18px;color:var(--muted);font-size:12px}.weather-empty-actions{display:flex;gap:8px;flex-wrap:wrap}.location-modal{max-height:min(86vh,720px);overflow:auto}.location-modal h3{margin:22px 0 8px;font:750 15px/1.2 system-ui,sans-serif}.location-search-field{position:relative;margin:18px 0 10px}.location-search-field svg{position:absolute;left:13px;top:50%;width:20px;height:20px;transform:translateY(-50%);fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round}.location-search-field input{width:100%;min-height:48px;padding:11px 14px 11px 43px;border:1px solid var(--line);border-radius:12px;color:var(--ink);background:var(--surface-soft);outline:0}.location-search-field input:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.location-search-status{min-height:20px;color:var(--muted);font-size:12px}.location-search-status.error{color:var(--danger)}.location-results,.selected-locations{display:grid;gap:8px}.location-result,.selected-location{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}.location-result strong,.selected-location strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.location-result small,.selected-location small{display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px}.location-result button,.selected-location button{width:38px;height:38px;display:grid;place-items:center;padding:0;border:0;border-radius:10px;color:var(--forest);background:var(--forest-soft)}.selected-location button{color:var(--danger);background:#f8e9e7}.location-result button:disabled{opacity:.42}.location-current{width:100%;justify-content:center;margin-top:8px}.location-empty{padding:16px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;font-size:12px}
     .widget-catalog-actions{display:flex;align-items:center;gap:8px}.widget-catalog-actions .icon-button{min-width:40px}.create-group-card{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:18px;padding:15px;border:1px dashed #aabdb3;background:var(--forest-soft)}.create-group-card strong{display:block}.create-group-card span{display:block;margin-top:3px;color:var(--muted);font-size:12px}.group-widget{grid-column:span 6;padding:22px;transition:border-color .2s,background .2s,box-shadow .2s}.group-widget.on{border-color:#e1a33f;background:linear-gradient(145deg,var(--surface) 0,#fff5d8 100%);box-shadow:0 8px 24px rgba(225,153,46,.12)}.group-widget-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.group-widget-actions{display:flex;gap:8px}.group-widget-actions button,.icon-button{width:42px;height:42px;display:grid;place-items:center;border:0;border-radius:12px;color:var(--forest);background:var(--forest-soft);font-size:18px;font-weight:850}.group-action-svg{width:22px;height:22px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.group-widget-actions .group-power.on{color:#70470e;background:#ffe9ac;box-shadow:0 0 0 3px rgba(226,161,55,.14)}.widget-board.editing .group-widget-actions{visibility:hidden}.group-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px}.group-control-tile{min-width:0;min-height:100px;display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;gap:14px;padding:15px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--paper);text-align:left}.group-control-tile strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.group-control-visual,.group-control-visual .device-visual{width:54px;height:54px}.group-control-visual .device-visual{border-radius:12px}.device-type-svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.group-control-tile.on{border-color:#e1a33f;color:#70470e;background:#fff0c7}.group-control-tile.on .group-control-visual .device-visual{border-color:#e1a33f;box-shadow:0 0 0 4px rgba(226,161,55,.13)}.group-control-tile.active{border-color:#4b9a74;color:#18583d;background:#e3f3eb}.group-control-tile.active .group-control-visual .device-visual{border-color:#4b9a74;box-shadow:0 0 0 4px rgba(44,154,104,.12)}.group-control-tile.alert{border-color:#c94b43;color:#842d28;background:#fce7e4}.group-control-tile.alert .group-control-visual .device-visual{border-color:#c94b43;box-shadow:0 0 0 4px rgba(201,75,67,.12)}.group-control-tile.offline{opacity:.55}.group-empty{margin-top:18px;padding:18px;border:1px dashed var(--line);color:var(--muted);font-size:12px;text-align:center}.group-device-choices{max-height:320px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;overflow:auto}.group-device-choice{display:grid;grid-template-columns:auto 12px minmax(0,1fr);align-items:center;gap:9px;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}.group-device-choice:has(input:checked){border-color:var(--forest);background:var(--forest-soft)}.group-device-choice input{width:18px;height:18px;accent-color:var(--forest)}.group-choice-state{width:9px;height:9px;border-radius:50%;background:#aeb8b2}.group-choice-state.on{background:#e2a137;box-shadow:0 0 0 4px rgba(226,161,55,.14)}.group-choice-state.active{background:#2c9a68;box-shadow:0 0 0 4px rgba(44,154,104,.12)}.group-choice-state.alert{background:var(--danger);box-shadow:0 0 0 4px rgba(201,75,67,.12)}.group-device-choice strong,.group-device-choice small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-device-choice strong{font-size:13px}.group-device-choice small{margin-top:2px;color:var(--muted);font-size:11px}.group-picker-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:18px}.group-picker-head span{color:var(--muted);font-size:12px}.group-modal-actions{justify-content:space-between}.group-modal-actions>div{display:flex;gap:9px}
+    .zigbee-tools{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px}.zigbee-tools>div>p{min-height:0;margin-bottom:12px}.zigbee-tools-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:15px;color:var(--forest);background:var(--forest-soft);font-size:24px}.zigbee-tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.zigbee-tool{display:flex;gap:8px;align-items:center;min-width:0}.zigbee-tool input,.zigbee-tool select,.zigbee-group-panel input,.zigbee-group-panel select,.zigbee-binding-panel select{min-width:0;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--ink);background:var(--surface-soft);font:inherit;outline:0}.zigbee-tool input:focus,.zigbee-tool select:focus,.zigbee-group-panel input:focus,.zigbee-group-panel select:focus,.zigbee-binding-panel select:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.zigbee-tool input,.zigbee-tool select{flex:1}.zigbee-tool button{min-height:44px}.zigbee-tool-actions{grid-column:1/-1;justify-content:flex-start}.touchlink-results{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}.touchlink-device{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:var(--paper);font-size:11px}.touchlink-device button{padding:6px 8px}.network-graph-host{grid-column:1/-1}.network-graph-host:empty{display:none}.network-map-loading,.network-map-empty{padding:18px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);background:var(--surface-soft);text-align:center;font-size:12px;font-weight:700}.network-graph{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--surface-soft),var(--paper))}.network-graph-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:16px 18px 12px;border-bottom:1px solid var(--line)}.network-graph-copy{display:grid;gap:3px}.network-graph-copy strong{font-size:15px}.network-graph-copy span{color:var(--muted);font-size:11px}.network-legend{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:10px;font-weight:750}.network-legend span{display:inline-flex;align-items:center;gap:5px}.network-legend i{width:9px;height:9px;display:block;border:2px solid var(--forest);background:var(--surface);transform:rotate(45deg)}.network-legend .coordinator i{background:var(--forest)}.network-legend .end-device i{width:8px;height:8px;border:0;border-radius:50%;background:#8ea099;transform:none}.network-legend .link i{width:18px;height:0;border:0;border-top:3px solid #2c9a68;background:transparent;transform:none}.network-legend .link.weak i{border-top-color:#c96961;border-top-style:dashed}.network-graph-scroll{overflow-x:auto;overscroll-behavior-inline:contain}.network-graph-svg{display:block;width:100%;min-width:760px;height:auto;min-height:330px}.network-edge{fill:none;stroke-linecap:round;opacity:.62}.network-edge.strong{stroke:#2c9a68}.network-edge.good{stroke:#c89b45}.network-edge.weak{stroke:#c96961;stroke-dasharray:6 5}.network-node .node-halo{fill:var(--paper);stroke:var(--line);stroke-width:2}.network-node.coordinator .node-halo{fill:var(--forest);stroke:var(--forest)}.network-node.router .node-halo{fill:var(--forest-soft);stroke:var(--forest)}.network-node.end-device .node-halo{fill:var(--surface-soft);stroke:#8ea099}.network-node .node-symbol{fill:var(--forest);font:800 14px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central}.network-node.coordinator .node-symbol{fill:var(--on-forest)}.network-node .node-name{fill:var(--ink);font:700 12px system-ui,sans-serif;text-anchor:middle}.network-node .node-quality{fill:var(--muted);font:800 10px system-ui,sans-serif;text-anchor:middle}.zigbee-group-manager{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.85fr);gap:12px;margin-top:8px;padding-top:18px;border-top:1px solid var(--line)}.zigbee-group-panel,.zigbee-binding-panel{min-width:0;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.zigbee-panel-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}.zigbee-panel-icon{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;color:var(--forest);background:var(--forest-soft);font-size:17px;font-weight:800}.zigbee-panel-head strong{display:block;font-size:14px}.zigbee-panel-head p{min-height:0;margin:3px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.zigbee-group-create,.zigbee-group-actions,.zigbee-binding-actions{display:flex;align-items:center;gap:8px}.zigbee-group-create input{flex:1}.zigbee-group-create button,.zigbee-binding-actions button{width:44px;height:44px;flex:none;padding:0}.zigbee-group-list{display:grid;gap:10px;margin-top:12px}.zigbee-group-empty{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;padding:13px;border:1px dashed var(--line);border-radius:11px;background:var(--paper)}.zigbee-group-empty span:first-child{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:var(--forest);background:var(--forest-soft)}.zigbee-group-empty strong{display:block;font-size:12px}.zigbee-group-empty p{min-height:0;margin:3px 0 0;color:var(--muted);font-size:10px;line-height:1.4}.zigbee-group-row{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.zigbee-group-row-head{display:grid;grid-template-columns:minmax(140px,1fr) auto auto;align-items:center;gap:8px}.zigbee-member-count{color:var(--muted);font-size:10px;font-weight:750}.zigbee-group-actions{flex-wrap:wrap}.zigbee-group-actions select{min-width:150px;flex:1}.zigbee-group-actions input[type=number]{width:64px}.zigbee-group-actions input[type=text]{min-width:120px;flex:1}.zigbee-group-actions button{width:38px;height:38px;padding:0}.zigbee-member-list,.zigbee-scene-list{display:flex;flex-wrap:wrap;gap:7px}.zigbee-scene{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);font-size:10px;font-weight:700}.zigbee-scene button{width:28px;height:28px;padding:0}.zigbee-binding-actions{display:grid;grid-template-columns:1fr 1fr}.zigbee-binding-actions select{width:100%}.zigbee-binding-actions button{width:42px;height:42px}.zigbee-binding-flow,.zigbee-binding-list{grid-column:1/-1}.zigbee-binding-flow{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:10px;font-weight:750}.zigbee-binding-list{display:grid;gap:6px;margin-top:4px}.zigbee-binding-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);font-size:10px}.zigbee-binding-row span{min-width:0;overflow-wrap:anywhere}
     body[data-active-view="home"] aside{color:#f4f8f5;background:rgba(23,65,54,.9);border-color:rgba(255,255,255,.17);box-shadow:0 5px 20px rgba(13,38,31,.22)}body[data-active-view="home"] .nav-button,body[data-active-view="home"] .nav-utility{color:rgba(246,251,248,.76)}body[data-active-view="home"] .nav-button.active,body[data-active-view="home"] .nav-button:hover,body[data-active-view="home"] .nav-button:focus-visible,body[data-active-view="home"] .nav-utility:hover,body[data-active-view="home"] .nav-utility:focus-visible{color:#fff;background:rgba(255,255,255,.16)}body[data-active-view="home"] .nav-utilities{border-color:rgba(255,255,255,.22)}body[data-active-view="home"] #home .quick-control-widget,body[data-active-view="home"] #home .widget-card{border-color:var(--home-border);background:var(--home-glass);box-shadow:0 12px 30px rgba(26,43,35,.12)}body[data-active-view="home"] #home .group-widget.on{background:rgba(255,241,200,.3)}body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .weather-facts span,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}body[data-active-view="home"] #home .quick-card.on,body[data-active-view="home"] #home .group-control-tile.on{border-color:rgba(225,163,63,.74);background:rgba(255,239,191,.88)}body[data-active-view="home"] #home .group-control-tile.active{border-color:rgba(75,154,116,.72);background:rgba(227,243,235,.88)}body[data-active-view="home"] #home .group-control-tile.alert{border-color:rgba(201,75,67,.72);background:rgba(252,231,228,.9)}body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button,body[data-active-view="home"] #home .home-actions button{box-shadow:var(--home-float-shadow)}body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button{background:var(--home-control)}body[data-active-view="home"] #home .home-title-line,body[data-active-view="home"] #home .widget-card>h2,body[data-active-view="home"] #home .widget-card>.group-widget-head{text-shadow:0 1px 2px rgba(255,255,255,.34)}:root[data-theme="dark"] body[data-active-view="home"] #home .group-widget.on{background:rgba(73,57,28,.4)}:root[data-theme="dark"] body[data-active-view="home"] #home .quick-card.on,:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.on{color:#ffdc96;background:rgba(73,57,28,.86)}:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.active{color:#a8e3c6;background:rgba(29,57,44,.88)}:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.alert{color:#ffc0ba;background:rgba(67,38,34,.9)}:root[data-theme="dark"] body[data-active-view="home"] #home .home-title-line,:root[data-theme="dark"] body[data-active-view="home"] #home .widget-card>h2,:root[data-theme="dark"] body[data-active-view="home"] #home .widget-card>.group-widget-head{text-shadow:0 1px 3px rgba(0,0,0,.5)}
     .empty{padding:50px 20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:16px;background:var(--surface)}.toast{position:fixed;right:24px;bottom:24px;z-index:20;max-width:380px;padding:13px 16px;border-radius:12px;color:white;background:#20362c;box-shadow:var(--shadow);transform:translateY(120px);opacity:0;transition:.25s}.toast.show{transform:none;opacity:1}.toast.error{background:var(--danger)}
     dialog{width:min(92vw,560px);border:0;border-radius:18px;padding:0;background:var(--surface);color:var(--ink);box-shadow:0 30px 100px #0a201855}dialog::backdrop{background:rgba(15,30,23,.5);backdrop-filter:blur(4px)}.modal{padding:26px}.modal h2{font:700 28px/1.1 system-ui,sans-serif;margin:0 0 8px}.modal p{color:var(--muted)}.device-action-modal{text-align:center}.device-action-icon{width:58px;height:58px;display:grid;place-items:center;margin:0 auto 14px;border-radius:50%;color:var(--forest);background:var(--forest-soft)}.device-action-icon svg{width:29px;height:29px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.device-action-modal .modal-actions{justify-content:center}.device-action-modal .primary{min-width:170px}.danger-copy{padding:12px 14px;border-left:4px solid var(--danger);color:#7d2925!important;background:#fdf1ef}.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}.field{display:grid;gap:7px;margin:18px 0}.field label{font-size:12px;font-weight:750}.field input{border:1px solid var(--line);padding:12px;border-radius:8px}.qr{display:grid;place-items:center;margin:18px auto;width:290px;max-width:100%;background:white}.code{text-align:center;font:700 21px/1.2 ui-monospace,monospace;letter-spacing:.08em}
     .auth-modal{padding:30px}.auth-hero{display:grid;grid-template-columns:64px minmax(0,1fr);align-items:center;gap:16px;margin-bottom:22px}.auth-icon{width:64px;height:64px;display:grid;place-items:center;border-radius:20px;color:var(--forest);background:var(--forest-soft)}.auth-icon svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.auth-hero h2{margin:0}.auth-hero p{margin:6px 0 0;font-size:13px}.auth-fields{display:grid;gap:13px}.auth-fields .field{margin:0}.auth-fields input{width:100%;min-height:48px;color:var(--ink);background:var(--surface-soft)}.auth-help{margin:2px 0 0;color:var(--muted);font-size:11px}.auth-error{margin:16px 0 0;padding:11px 13px;border:1px solid rgba(184,58,53,.3);border-radius:10px;color:#842d28;background:#fce7e4;font-size:13px;font-weight:700;line-height:1.4}.auth-error[hidden]{display:none}:root[data-theme="dark"] .auth-error{color:#ffc0ba;background:#432622;border-color:#6f3732}.auth-mode-toggle{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:0 0 18px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}.auth-mode-toggle button{padding:10px;border:0;border-radius:9px;color:var(--muted);background:transparent;font-weight:800}.auth-mode-toggle button.active{color:var(--on-forest);background:var(--forest)}.auth-submit{width:100%;margin-top:20px}.auth-account-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,420px);align-items:center;gap:24px;margin-bottom:16px}.auth-account-card p{min-height:0;margin-bottom:0}.auth-account-meta{display:flex;align-items:center;gap:8px;margin-top:12px}.auth-role-badge{padding:4px 8px;border-radius:999px;color:var(--forest);background:var(--forest-soft);font-size:11px;font-weight:850}.auth-account-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}.auth-account-actions input{min-width:0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);background:var(--surface-soft)}.session-utility svg{pointer-events:none}body.resident-session [data-admin-only]{display:none!important}body.auth-locked .shell{filter:blur(6px);pointer-events:none;user-select:none}
-    dialog.onboarding-dialog{width:min(94vw,760px);max-height:min(92vh,760px);overflow:auto}.onboarding-shell{padding:26px 30px}.onboarding-progress{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:22px}.onboarding-progress span{height:5px;border-radius:99px;background:var(--line)}.onboarding-progress span.active{background:var(--forest)}.onboarding-hero{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:18px}.onboarding-icon{width:72px;height:72px;display:grid;place-items:center;border-radius:22px;color:var(--forest);background:var(--forest-soft)}.onboarding-icon svg{width:38px;height:38px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.onboarding-copy h2{margin:0;font:750 30px/1.08 system-ui,sans-serif}.onboarding-copy p{margin:8px 0 0;color:var(--muted)}.onboarding-content{margin-top:24px}.onboarding-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.onboarding-choice{min-height:70px;padding:15px;border:2px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface-soft);text-align:left;font-weight:780}.onboarding-choice small{display:block;margin-top:3px;color:var(--muted);font-weight:600}.onboarding-choice.selected{border-color:var(--forest);background:var(--forest-soft)}.onboarding-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.onboarding-feature{padding:16px;border:1px solid var(--line);border-radius:13px;background:var(--surface-soft)}.onboarding-feature strong{display:block}.onboarding-feature span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.onboarding-fields{display:grid;gap:12px}.onboarding-field{display:grid;gap:6px}.onboarding-field label{font-size:12px;font-weight:800}.onboarding-field input{width:100%;min-height:48px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface-soft);outline:0}.onboarding-field input:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.onboarding-help{margin:12px 0 0;color:var(--muted);font-size:12px}.onboarding-ip{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.onboarding-ip code{font:800 18px/1 ui-monospace,monospace}.onboarding-summary{display:grid;gap:8px}.onboarding-summary-row{display:flex;justify-content:space-between;gap:16px;padding:11px 13px;border-radius:10px;background:var(--surface-soft)}.onboarding-summary-row span{color:var(--muted);font-size:12px}.onboarding-summary-row code{font:750 12px/1.3 ui-monospace,monospace;text-align:right;overflow-wrap:anywhere}.onboarding-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:26px}.onboarding-actions.final{justify-content:flex-end}.onboarding-actions button[hidden],.coach-actions button[hidden]{display:none}.onboarding-actions-right{display:flex;gap:9px}.onboarding-step-count{color:var(--muted);font-size:12px}.onboarding-settings-card{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:16px}.onboarding-settings-card p{min-height:0;margin-bottom:0}.onboarding-settings-actions{display:flex;gap:9px;flex-wrap:wrap}.device-empty-guide{display:grid;justify-items:center;gap:10px;padding:44px 20px}.device-empty-icon{width:62px;height:62px;display:grid;place-items:center;border-radius:20px;color:var(--forest);background:var(--forest-soft);font-size:34px;font-weight:400}.device-empty-guide h2{margin:4px 0 0;color:var(--ink);font:750 23px/1.1 system-ui,sans-serif}.device-empty-guide p{max-width:480px;margin:0}.coach-layer[hidden]{display:none}.coach-blocker{position:fixed;z-index:60;inset:0;background:transparent}.coach-spotlight{position:fixed;z-index:61;border:3px solid #fff;border-radius:14px;box-shadow:0 0 0 9999px rgba(10,23,17,.68),0 0 0 6px rgba(113,198,162,.55);pointer-events:none;transition:.18s}.coach-tooltip{position:fixed;z-index:62;width:min(340px,calc(100vw - 28px));padding:18px;border:1px solid rgba(255,255,255,.4);border-radius:16px;color:var(--ink);background:var(--surface);box-shadow:0 18px 60px rgba(0,0,0,.34)}.coach-step{color:var(--forest);font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.coach-tooltip h2{margin:7px 0 6px;font:750 20px/1.15 system-ui,sans-serif}.coach-tooltip p{margin:0;color:var(--muted);font-size:13px}.coach-actions{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:16px}.coach-actions-right{display:flex;gap:8px}.coach-actions button{padding:9px 12px}.coach-skip{border:0;color:var(--muted);background:transparent;font-size:12px;font-weight:750}
+    dialog.onboarding-dialog{width:min(94vw,760px);max-height:min(92vh,760px);overflow:auto}.onboarding-shell{padding:26px 30px}.onboarding-progress{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:22px}.onboarding-progress span{height:5px;border-radius:99px;background:var(--line)}.onboarding-progress span.active{background:var(--forest)}.onboarding-hero{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:18px}.onboarding-icon{width:72px;height:72px;display:grid;place-items:center;border-radius:22px;color:var(--forest);background:var(--forest-soft)}.onboarding-icon svg{width:38px;height:38px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.onboarding-copy h2{margin:0;font:750 30px/1.08 system-ui,sans-serif}.onboarding-copy p{margin:8px 0 0;color:var(--muted)}.onboarding-content{margin-top:24px}.onboarding-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.onboarding-choice{min-height:70px;padding:15px;border:2px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface-soft);text-align:left;font-weight:780}.onboarding-choice small{display:block;margin-top:3px;color:var(--muted);font-weight:600}.onboarding-choice.selected{border-color:var(--forest);background:var(--forest-soft)}.onboarding-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.onboarding-feature{padding:16px;border:1px solid var(--line);border-radius:13px;background:var(--surface-soft)}.onboarding-feature strong{display:block}.onboarding-feature span{display:block;margin-top:5px;color:var(--muted);font-size:12px}.onboarding-fields{display:grid;gap:12px}.onboarding-field{display:grid;gap:6px}.onboarding-field label{font-size:12px;font-weight:800}.onboarding-field input{width:100%;min-height:48px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface-soft);outline:0}.onboarding-field input:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.onboarding-help{margin:12px 0 0;color:var(--muted);font-size:12px}.onboarding-ip{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.onboarding-ip code{font:800 18px/1 ui-monospace,monospace}.onboarding-summary{display:grid;gap:8px}.onboarding-summary-row{display:flex;justify-content:space-between;gap:16px;padding:11px 13px;border-radius:10px;background:var(--surface-soft)}.onboarding-summary-row span{color:var(--muted);font-size:12px}.onboarding-summary-row code{font:750 12px/1.3 ui-monospace,monospace;text-align:right;overflow-wrap:anywhere}.onboarding-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:26px}.onboarding-actions.final{justify-content:flex-end}.onboarding-actions button[hidden],.coach-actions button[hidden]{display:none}.onboarding-actions-right{display:flex;gap:9px}.onboarding-step-count{color:var(--muted);font-size:12px}.onboarding-settings-card{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:16px}.onboarding-settings-card p{min-height:0;margin-bottom:0}.onboarding-settings-actions{display:flex;gap:9px;flex-wrap:wrap}.device-empty-guide{display:grid;justify-items:center;gap:10px;padding:44px 20px}.device-empty-icon{width:62px;height:62px;display:grid;place-items:center;border-radius:20px;color:var(--forest);background:var(--forest-soft);font-size:34px;font-weight:400}.device-empty-guide h2{margin:4px 0 0;color:var(--ink);font:750 23px/1.1 system-ui,sans-serif}.device-empty-guide p{max-width:480px;margin:0}.coach-layer[hidden]{display:none}.coach-blocker{position:fixed;z-index:60;inset:0;background:transparent}.coach-spotlight{position:fixed;z-index:61;border:3px solid #fff;border-radius:14px;box-shadow:0 0 0 9999px rgba(10,23,17,.68),0 0 0 6px rgba(113,198,162,.55);pointer-events:none;transition:.18s}.coach-tooltip{position:fixed;z-index:62;width:min(340px,calc(100vw - 28px));padding:18px;border:1px solid rgba(255,255,255,.4);border-radius:16px;color:var(--ink);background:var(--surface);box-shadow:0 18px 60px rgba(0,0,0,.34)}.coach-step{color:var(--forest);font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.coach-tooltip h2{margin:7px 0 6px;font:750 20px/1.15 system-ui,sans-serif}.coach-tooltip p{margin:0;color:var(--muted);font-size:13px}.coach-actions{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:16px}.coach-actions-right{display:flex;gap:8px}.coach-actions button{padding:9px 12px}.coach-skip{border:0;color:var(--muted);background:transparent;font-size:12px;font-weight:750}
     .light-modal{padding:24px}.light-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.light-modal-head h2{margin:0;font:600 30px/1.1 Georgia,serif}.light-modal-head button{width:38px;height:38px;border:0;border-radius:50%;background:#f1f2ef;color:var(--ink)}.light-hero{display:grid;place-items:center;padding:20px 0 24px}.light-power{width:112px;height:112px;display:grid;place-items:center;border:0;border-radius:50%;color:var(--muted);background:#edf0ed;box-shadow:inset 0 0 0 1px var(--line);transition:.25s}.light-power.on{color:var(--forest);background:#fff3c9;box-shadow:0 0 0 12px rgba(241,181,84,.12),0 14px 38px rgba(225,153,46,.25)}.power-glyph{width:34px;height:34px;border:3px solid currentColor;border-top-color:transparent;border-radius:50%;position:relative}.power-glyph::before{content:"";position:absolute;left:50%;top:-8px;width:3px;height:19px;border-radius:3px;background:currentColor;transform:translateX(-50%)}.light-controls{display:grid;gap:18px}.light-control{display:grid;gap:9px}.light-control-head{display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:750}.light-control output{color:var(--muted);font-weight:650}.light-control input[type=range]{width:100%;height:38px}.brightness-slider{accent-color:#e9a23b}.temperature-slider{appearance:none;height:12px!important;border-radius:99px;background:linear-gradient(90deg,#c5dcff,#fff3d2,#ffb45f)}.temperature-slider::-webkit-slider-thumb{appearance:none;width:28px;height:28px;border:3px solid white;border-radius:50%;background:var(--forest);box-shadow:0 2px 8px #0003}.color-picker{width:100%;height:52px;border:0;border-radius:12px;padding:0;background:transparent}.color-picker::-webkit-color-swatch-wrapper{padding:0}.color-picker::-webkit-color-swatch{border:0;border-radius:12px}.light-modal-actions{display:flex;justify-content:flex-end;margin-top:22px}
     .pairing-banner{display:none;align-items:center;justify-content:space-between;gap:16px;background:#fff3d9;border-left:4px solid var(--sun);padding:15px 18px;margin-bottom:20px}.pairing-banner.show{display:flex}.pairing-banner-actions{display:flex;gap:8px}.pairing-banner-actions button[hidden],.modal-actions button[hidden]{display:none}
     .pairing-modal{text-align:center}.pairing-visual{position:relative;width:128px;height:128px;margin:2px auto 22px;display:grid;place-items:center}.pairing-core{position:relative;z-index:3;width:48px;height:48px;border-radius:50%;background:var(--forest);box-shadow:0 8px 20px rgba(24,77,59,.2)}.pairing-core::before,.pairing-core::after{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:white;transform:translate(-13px,-50%);box-shadow:13px 0 white,26px 0 white}.pairing-ring{position:absolute;inset:0;border:2px solid rgba(24,77,59,.24);border-radius:50%;animation:pairing-scan 2s ease-out infinite}.pairing-ring:nth-child(2){inset:18px;animation-delay:.45s}.pairing-ring:nth-child(3){inset:36px;animation-delay:.9s}.pairing-visual.found .pairing-ring{border-color:rgba(44,154,104,.45);animation-duration:1.15s}.pairing-visual.ready .pairing-ring{animation:none;opacity:0}.pairing-visual.timed-out .pairing-ring{animation:none;opacity:.12}.pairing-visual.ready .pairing-core::before{width:20px;height:10px;border:0;border-left:3px solid white;border-bottom:3px solid white;border-radius:0;background:transparent;box-shadow:none;transform:translate(-50%,-65%) rotate(-45deg)}.pairing-visual.ready .pairing-core::after{display:none}.pairing-device{margin:18px 0 2px;padding:14px;border:1px solid var(--line);background:#f7f9f6}.pairing-device span{display:block;color:var(--muted);font-size:12px}.pairing-device strong{display:block;margin-top:3px;font-size:18px}.pairing-device[hidden]{display:none}@keyframes pairing-scan{0%{opacity:.7;transform:scale(.62)}75%,100%{opacity:0;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.pairing-ring{animation:none}.pairing-ring:first-child{opacity:.4}}
@@ -107,7 +109,7 @@
     :root[data-theme="dark"] .fact{color:#becbc4;background:#26312c}
     :root[data-theme="dark"] .remove{background:#452724}
     :root[data-theme="dark"] .search,:root[data-theme="dark"] .connection-card,:root[data-theme="dark"] .setting-card,:root[data-theme="dark"] .settings-actions,:root[data-theme="dark"] dialog{background:var(--surface)}
-    :root[data-theme="dark"] .ha-value,:root[data-theme="dark"] .ha-network-guide,:root[data-theme="dark"] .setting-field input,:root[data-theme="dark"] .empty,:root[data-theme="dark"] .pairing-device,:root[data-theme="dark"] .image-choice,:root[data-theme="dark"] .field input{background:#202c26;color:var(--ink)}
+    :root[data-theme="dark"] .ha-value,:root[data-theme="dark"] .ha-network-guide,:root[data-theme="dark"] .setting-field input,:root[data-theme="dark"] .setting-field select,:root[data-theme="dark"] .zigbee-tool input,:root[data-theme="dark"] .zigbee-tool select,:root[data-theme="dark"] .zigbee-group-panel input,:root[data-theme="dark"] .zigbee-group-panel select,:root[data-theme="dark"] .zigbee-binding-panel select,:root[data-theme="dark"] .empty,:root[data-theme="dark"] .pairing-device,:root[data-theme="dark"] .image-choice,:root[data-theme="dark"] .field input{background:#202c26;color:var(--ink)}
     :root[data-theme="dark"] .empty{border-color:#46564e}
     :root[data-theme="dark"] .danger-copy{color:#ffc0ba!important;background:#3d2422}
     :root[data-theme="dark"] .light-power{background:#25312b}
@@ -116,7 +118,7 @@
     :root[data-theme="dark"] .image-choice.selected{background:var(--forest-soft);box-shadow:0 0 0 3px rgba(113,198,162,.12)}
     :root[data-theme="dark"] .toast{background:#294637}
     :root[data-theme="dark"] .onboarding-choice,:root[data-theme="dark"] .onboarding-feature,:root[data-theme="dark"] .onboarding-field input,:root[data-theme="dark"] .onboarding-ip,:root[data-theme="dark"] .onboarding-summary-row{background:#202c26;color:var(--ink)}:root[data-theme="dark"] .onboarding-choice.selected{background:var(--forest-soft)}
-    @media(max-width:900px){.shell{grid-template-columns:1fr}aside{position:fixed;z-index:10;top:auto;bottom:0;width:100%;height:auto;padding:8px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));border:0;border-top:1px solid var(--line);box-shadow:0 -3px 14px rgba(35,45,41,.07)}.brand,.aside-state{display:none}nav{margin:0;display:grid;grid-template-columns:repeat(4,1fr)}.nav-button{justify-content:center;flex-direction:column;gap:3px;padding:6px;font-size:11px}.nav-button .icon{width:20px;height:20px}main{padding:14px 18px 105px}.device-grid,.connection-grid,.settings-grid{grid-template-columns:1fr}.quick-grid.grid-view{grid-template-columns:repeat(2,minmax(0,1fr))}.setting-card p{min-height:0}.ha-layout{grid-template-columns:1fr}.widget-card{grid-column:span 6}}
+    @media(max-width:900px){.shell{grid-template-columns:1fr}aside{position:fixed;z-index:10;top:auto;bottom:0;width:100%;height:auto;padding:8px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));border:0;border-top:1px solid var(--line);box-shadow:0 -3px 14px rgba(35,45,41,.07)}.brand,.aside-state{display:none}nav{margin:0;display:grid;grid-template-columns:repeat(4,1fr)}.nav-button{justify-content:center;flex-direction:column;gap:3px;padding:6px;font-size:11px}.nav-button .icon{width:20px;height:20px}main{padding:14px 18px 105px}.device-grid,.connection-grid,.settings-grid{grid-template-columns:1fr}.quick-grid.grid-view{grid-template-columns:repeat(2,minmax(0,1fr))}.setting-card p{min-height:0}.zigbee-tool-grid,.zigbee-group-manager{grid-template-columns:1fr}.zigbee-tool{grid-column:1}.ha-layout{grid-template-columns:1fr}.widget-card{grid-column:span 6}}
     @media(max-width:560px){.topbar{justify-content:space-between}.theme-switch{flex:1}.theme-switch button{flex:1;min-width:0}.page-head{display:block}.page-head>.primary{width:100%;margin-top:18px}.home-title-line{display:flex;align-items:baseline;justify-content:center}.home-title-line::after{display:none}.home-title-line h1{width:100%;text-align:center}.home-metrics{width:100%;justify-content:center}.home-actions{justify-content:stretch;margin-top:18px}.home-actions button{flex:1}.device-grid{gap:10px}.device-card{padding:15px}.quick-grid.grid-view{grid-template-columns:1fr}.quick-grid.grid-view .quick-card{width:144px}.toolbar{grid-template-columns:1fr}.toolbar .secondary{display:none}.pairing-banner{align-items:flex-start;flex-direction:column}.pairing-banner button{width:100%}input[type=range]{width:125px}.settings-actions{align-items:stretch;flex-direction:column}.settings-actions button{width:100%}.light-dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:20px 20px 0 0}.light-modal{padding:22px 20px calc(22px + env(safe-area-inset-bottom))}.widget-card{grid-column:1/-1}.onboarding-shell{padding:22px 18px}.onboarding-hero{grid-template-columns:56px minmax(0,1fr)}.onboarding-icon{width:56px;height:56px;border-radius:17px}.onboarding-icon svg{width:30px;height:30px}.onboarding-copy h2{font-size:24px}.onboarding-choices,.onboarding-features{grid-template-columns:1fr}.onboarding-actions{align-items:stretch;flex-direction:column}.onboarding-actions-right{display:grid;grid-template-columns:1fr 1fr}.onboarding-actions-right button{width:100%}.onboarding-settings-card{align-items:stretch;flex-direction:column}.onboarding-settings-actions{display:grid;grid-template-columns:1fr}.onboarding-ip{align-items:flex-start;flex-direction:column}}
     @media(orientation:landscape) and (min-width:901px) and (max-height:900px){.shell{grid-template-columns:1fr}aside{position:fixed;z-index:10;top:0;bottom:auto;width:100%;height:68px;padding:7px 20px;border:0;border-bottom:1px solid var(--line);box-shadow:0 3px 14px rgba(35,45,41,.07)}.brand,.aside-state{display:none}nav{width:100%;max-width:1180px;height:100%;margin:0 auto;display:grid;grid-template-columns:repeat(4,minmax(120px,1fr)) auto;align-items:center;gap:8px}.nav-button{height:46px;justify-content:center;padding:9px 14px}.nav-button .icon{width:20px;height:20px}.nav-utilities{display:flex;align-items:center;gap:4px;padding-left:8px;border-left:1px solid var(--line)}.nav-utility{display:flex}.topbar{display:none}main{max-width:none;padding:82px 20px 20px}#home .page-head{align-items:center;margin-bottom:10px}#home .page-head .eyebrow,#home .page-head .lead,#home .page-head .add-device{display:none}#home h1{margin:0;font-size:28px}#home .section-head{margin:10px 0}#home .section-head h2{font-size:21px}#home .section-head p{display:none}#home .quick-grid.grid-view{gap:10px}.widget-board{gap:10px}.widget-card{min-height:145px;padding:16px}}
     @media(orientation:landscape) and (max-width:900px) and (max-height:700px){aside{top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line);box-shadow:0 3px 14px rgba(35,45,41,.07)}nav{grid-template-columns:repeat(4,1fr) auto}.nav-utilities{display:flex;align-items:center;gap:2px}.nav-utility{display:flex}.topbar{display:none}main{padding-top:76px;padding-bottom:20px}#home .page-head{margin-bottom:8px}#home .page-head .eyebrow,#home .page-head .lead,#home .page-head .add-device{display:none}#home h1{margin:0;font-size:26px}#home .section-head{margin:8px 0}#home .section-head p{display:none}#home .quick-grid.grid-view{gap:8px}}
@@ -126,7 +128,7 @@
     @media(max-width:560px){.quick-grid.grid-view .quick-card{flex-basis:144px}.group-device-choices{grid-template-columns:1fr}.create-group-card{align-items:stretch;flex-direction:column}.create-group-card button{width:100%}.group-modal-actions{align-items:stretch;flex-direction:column-reverse}.group-modal-actions>div{display:grid;grid-template-columns:1fr 1fr}.group-modal-actions button{width:100%}}
     @media(max-width:900px){.shell{grid-template-columns:minmax(0,1fr)}aside{left:0;right:0;width:auto}main,.view,.page-head,.home-heading,.widget-board,.widget-rail{min-width:0}#home .page-head{display:block;margin-bottom:18px}#home .home-title-line{display:flex;align-items:baseline;justify-content:space-between;gap:14px}#home .home-title-line::after{display:none}#home .home-title-line h1{width:auto;flex:none}#home .home-metrics{width:auto;justify-content:flex-end}#home .home-actions{justify-content:flex-start;margin-top:14px}#home .group-control-grid{grid-template-columns:1fr}}
     @media(orientation:portrait){.topbar{justify-content:flex-end}.theme-switch,.language-switch{display:none}.mobile-topbar-actions{display:flex;align-items:center;gap:4px}#home .home-actions{display:flex;justify-content:flex-end;gap:4px}#home .home-actions button,body[data-active-view="home"] #home .home-actions button,#devices .page-head>.add-device,#refreshButton{width:46px;height:46px;flex:none;padding:0;border-radius:50%;color:var(--ink);background:transparent;box-shadow:none}#home .home-actions button:hover,#home .home-actions button:focus-visible,#devices .page-head>.add-device:hover,#devices .page-head>.add-device:focus-visible,#refreshButton:hover,#refreshButton:focus-visible{color:var(--forest);background:transparent;outline:2px solid var(--forest-soft);outline-offset:1px}#home #editDashboard.secondary{color:var(--forest)}#home .home-action-glyph,#devices .page-action-glyph{display:block}#home .home-action-label,#devices .page-action-label{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}#devices .page-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px}#devices .page-head>.add-device{margin-top:32px}#refreshButton{display:grid}}
-    @media(orientation:portrait) and (max-width:560px){main{padding:12px 14px 96px}.topbar{margin-bottom:14px}.page-head{margin-bottom:22px}#home .home-title-line{align-items:flex-start;justify-content:flex-start;flex-wrap:wrap;gap:8px}#home .home-title-line h1{width:100%;text-align:left}#home .home-metrics{width:100%;justify-content:flex-start}.toolbar-actions{justify-content:flex-end}.connection-card,.ha-setup-details,.setting-card{padding:18px}.connection-card>.primary,.ha-connect-button,.ha-actions button,.ha-guide-actions button{width:100%;min-width:0}.ha-value{align-items:flex-start;flex-direction:column}.ha-value code{text-align:left}.runtime-card{align-items:stretch;flex-direction:column}.runtime-card button{width:100%}.group-control-tile{grid-template-columns:48px minmax(0,1fr) auto;padding:12px}.group-control-visual,.group-control-visual .device-visual{width:46px;height:46px}}
+    @media(orientation:portrait) and (max-width:560px){main{padding:12px 14px 96px}.topbar{margin-bottom:14px}.page-head{margin-bottom:22px}#home .home-title-line{align-items:flex-start;justify-content:flex-start;flex-wrap:wrap;gap:8px}#home .home-title-line h1{width:100%;text-align:left}#home .home-metrics{width:100%;justify-content:flex-start}.toolbar-actions{justify-content:flex-end}.connection-card,.ha-setup-details,.setting-card{padding:18px}.connection-card>.primary,.ha-connect-button,.ha-actions button,.ha-guide-actions button{width:100%;min-width:0}.ha-value{align-items:flex-start;flex-direction:column}.ha-value code{text-align:left}.runtime-card{align-items:stretch;flex-direction:column}.runtime-card button{width:100%}.zigbee-tools{grid-template-columns:1fr}.zigbee-tools-icon{width:42px;height:42px}.zigbee-tool{align-items:stretch;flex-direction:column}.zigbee-tool button{width:100%}.zigbee-tool-actions{display:grid;grid-template-columns:1fr 1fr}.zigbee-group-create{align-items:stretch;flex-direction:column}.zigbee-group-create button{width:100%}.zigbee-group-row-head{grid-template-columns:1fr auto}.zigbee-group-row-head input{grid-column:1/-1}.zigbee-binding-actions{grid-template-columns:1fr 1fr}.zigbee-binding-actions select{grid-column:1/-1}.network-graph-head{align-items:stretch;flex-direction:column}.network-legend{justify-content:flex-start}.group-control-tile{grid-template-columns:48px minmax(0,1fr) auto;padding:12px}.group-control-visual,.group-control-visual .device-visual{width:46px;height:46px}}
     body[data-active-view="home"] #home [data-widget="recent"] .widget-list-row{background:transparent;box-shadow:none}
     .quick-grid.grid-view .quick-card{width:max-content;min-width:144px;flex-basis:auto}
     #quickDevices{cursor:grab}#quickDevices.mouse-dragging,#quickDevices.mouse-dragging *{cursor:grabbing!important}
@@ -134,8 +136,12 @@
     @media(max-width:900px){body.resident-session nav{grid-template-columns:repeat(2,1fr)}.auth-account-card{grid-template-columns:1fr}.auth-account-actions{grid-template-columns:minmax(0,1fr) auto}}
     @media(orientation:landscape) and (min-width:901px) and (max-height:900px){body.resident-session nav{grid-template-columns:repeat(2,minmax(120px,1fr)) auto}}
     @media(orientation:landscape) and (max-width:900px) and (max-height:700px){body.resident-session nav{grid-template-columns:repeat(2,1fr) auto}}
+    .control-icon-actions{display:flex;align-items:center;gap:6px}.control-command{width:40px;height:40px;display:grid;place-items:center;padding:0;border:0;border-radius:12px;color:var(--forest);background:var(--forest-soft);font-size:18px;font-weight:850}.control-command.stop{color:#8a610e;background:#fff0cd}.control-command.close-action{color:#315f79;background:#e5f1f7}.control-command.active{color:#fff;background:var(--forest);box-shadow:0 0 0 3px rgba(44,154,104,.18)}.control-select{min-width:130px;max-width:220px;padding:9px 34px 9px 11px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface-soft)}.control-unit{margin-left:4px}.admin-control{padding:12px;border:1px dashed var(--line);border-radius:12px;background:var(--surface-soft)}.admin-control .control-name::before{content:"⚙";margin-right:6px;color:var(--forest)}.zigbee-settings-card{padding:0;overflow:hidden}.zigbee-settings-section{padding:22px}.zigbee-settings-section+.zigbee-settings-section{border-top:1px solid var(--line)}.backup-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:18px}.backup-shield{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;color:#16734d;background:#dff3e8}.backup-shield svg{width:31px;height:31px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.backup-actions{display:flex;gap:9px}.backup-actions button{min-width:126px;display:inline-flex;align-items:center;justify-content:center;gap:8px}.backup-actions .button-icon{font-size:20px;line-height:1}
     .auth-gate{position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:22px;background:rgba(15,30,23,.5);backdrop-filter:blur(4px)}.auth-gate[hidden]{display:none}.auth-gate>.auth-modal{width:min(92vw,560px);max-height:calc(100vh - 44px);overflow:auto;border-radius:18px;color:var(--ink);background:var(--surface);box-shadow:0 30px 100px #0a201855}
+    @media(max-width:700px){.backup-card{grid-template-columns:auto minmax(0,1fr)}.backup-actions{grid-column:1/-1}.backup-actions button{flex:1;min-width:0}}
     @media(max-width:560px){.auth-modal{padding:24px 20px}.auth-hero{grid-template-columns:52px minmax(0,1fr)}.auth-icon{width:52px;height:52px;border-radius:16px}.auth-account-actions{grid-template-columns:1fr}.auth-account-actions button{width:100%}}
+    @media(max-width:900px){.settings-security-grid,.connection-settings-grid{grid-template-columns:1fr}.connection-settings-section+.connection-settings-section{border-left:0;border-top:1px solid var(--line)}}
+    @media(max-width:560px){.admin-password-fields{grid-template-columns:1fr}.admin-password-form button{width:100%;justify-self:stretch}.zigbee-settings-card{padding:0}.zigbee-settings-section{padding:18px}}
   </style>
 </head>
 <body>
@@ -191,6 +197,10 @@
             <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
             <h2 data-i18n="recentWidget">Recently updated</h2><p data-i18n="recentWidgetLead">Devices with the newest state messages.</p><div id="recentDevices" class="widget-list"></div>
           </article>
+          <article class="dashboard-widget widget-card" data-widget="activity" hidden>
+            <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
+            <h2 data-i18n="activityWidget">Home activity</h2><p data-i18n="activityWidgetLead">Recent button presses and safety changes.</p><div id="activityEvents" class="widget-list"></div>
+          </article>
           <article class="dashboard-widget widget-card" data-widget="clock" hidden>
             <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
             <div class="widget-title-row"><div><h2 data-i18n="worldClock">World clock</h2><p data-i18n="worldClockLead">Your chosen cities at a glance.</p></div><button id="manageWorldClock" class="widget-config-button" type="button" aria-label="Manage cities"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M11 4a11 11 0 0 1 0 14M11 4a11 11 0 0 0 0 14M4 11h14M20 15v6m-3-3h6"/></svg></button></div><div id="worldClockRows" class="clock-rows"></div>
@@ -213,7 +223,7 @@
       <section id="allDevices" class="device-grid devices-grid-view"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></section>
     </section>
 
-    <section id="connections" class="view">
+    <section id="connections" class="view" data-admin-only>
       <header class="page-head"><div><div class="eyebrow" data-i18n="phonesAssistants">Matter controllers</div><h1 data-i18n="navConnections">Connections</h1><p class="lead" data-i18n="connectionsLead">Connect Matter-compatible systems such as Alexa and Apple Home.</p></div></header>
       <div class="connection-grid">
         <section class="ha-network-guide connection-network-guide">
@@ -234,19 +244,26 @@
       </div>
     </section>
 
-    <section id="settings" class="view">
+    <section id="settings" class="view" data-admin-only>
       <header class="page-head"><div><div class="eyebrow" data-i18n="systemConnections">System connections</div><h1 data-i18n="navSettings">Settings</h1><p class="lead" data-i18n="settingsLead">Update the network endpoints used by Zigbee, MQTT and Matter.</p></div></header>
-      <article class="setting-card auth-account-card"><div><h2 data-i18n="accessControl">Access control</h2><p data-i18n="accessControlLead">Admin protects setup while the home account keeps daily controls simple.</p><div class="auth-account-meta"><strong id="authAccountName">—</strong><span id="authRoleBadge" class="auth-role-badge">Admin</span></div></div><form id="residentPinForm" class="auth-account-actions"><input id="residentPinInput" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" data-i18n-placeholder="newResidentPin" placeholder="New 6-digit home PIN" required><button class="secondary" type="submit" data-i18n="changePin">Change PIN</button><button class="quiet" type="button" data-auth-logout data-i18n="signOut">Sign out</button></form></article>
-      <article id="androidRuntimeCard" class="setting-card runtime-card" hidden><div><h2 data-i18n="runtimeTitle">Villa Bridge runtime</h2><p data-i18n="runtimeLead">Stop Zigbee, MQTT and Matter together when this tablet must release the home network.</p><span id="runtimeStatusText" class="runtime-state" data-i18n="runtimeRunning">System running</span></div><button id="stopRuntime" class="danger-button" type="button" data-i18n="runtimeStop">Stop entire system</button></article>
-      <form id="settingsForm" class="settings-form">
-        <div class="settings-grid">
-          <article class="setting-card"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div></article>
-          <article class="setting-card"><h2>MQTT</h2><p data-i18n="mqttSettingsLead">Broker and base topic shared by Villa Bridge and Zigbee2MQTT.</p><div class="setting-field"><label for="mqttUrl" data-i18n="mqttUrl">Broker URL</label><input id="mqttUrl" name="mqttUrl" type="url" placeholder="mqtt://127.0.0.1:1883" required></div><div class="setting-field"><label for="mqttBaseTopic" data-i18n="baseTopic">Base topic</label><input id="mqttBaseTopic" name="mqttBaseTopic" spellcheck="false" required></div></article>
-          <article class="setting-card"><h2>Matter</h2><p data-i18n="matterSettingsLead">WebSocket connection used to publish devices to Matterbridge.</p><div class="setting-field"><label for="matterWsUrl" data-i18n="matterUrl">Matterbridge URL</label><input id="matterWsUrl" name="matterWsUrl" type="url" placeholder="ws://127.0.0.1:8283" required></div></article>
+      <article class="setting-card onboarding-settings-card"><div><h2 data-i18n="guidesTitle">Setup and guides</h2><p data-i18n="guidesLead">Run the simple setup again or replay the dashboard tour at any time.</p></div><div class="onboarding-settings-actions"><button id="restartOnboarding" class="secondary" type="button" data-i18n="runSetupAgain">Run setup again</button><button id="restartDashboardTour" class="quiet" type="button" data-i18n="showDashboardGuide">Show dashboard guide</button></div></article>
+      <div class="settings-security-grid">
+        <article class="setting-card security-card"><div><h2 data-i18n="accessControl">Access control</h2><p data-i18n="accessControlLead">Admin protects setup while the home account keeps daily controls simple.</p><div class="auth-account-meta"><strong id="authAccountName">—</strong><span id="authRoleBadge" class="auth-role-badge">Admin</span></div></div><form id="residentPinForm" class="auth-account-actions"><input id="residentPinInput" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" data-i18n-placeholder="newResidentPin" placeholder="New 6-digit home PIN" required><button class="secondary" type="submit" data-i18n="changePin">Change PIN</button><button class="quiet" type="button" data-auth-logout data-i18n="signOut">Sign out</button></form></article>
+        <article class="setting-card security-card"><div><h2 data-i18n="adminPassword">Admin passphrase</h2><p data-i18n="changeAdminPasswordLead">Choose and confirm a new admin passphrase. You will sign in again afterward.</p></div><form id="adminPasswordForm" class="admin-password-form"><div class="admin-password-fields"><input id="newAdminPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" data-i18n-placeholder="newAdminPassword" placeholder="New admin passphrase" required><input id="confirmAdminPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" data-i18n-placeholder="confirmAdminPassword" placeholder="Confirm new passphrase" required></div><div id="adminPasswordError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button class="secondary" type="submit" data-i18n="changeAdminPassword">Change password</button></form></article>
+      </div>
+      <form id="settingsForm" class="setting-card connection-settings-card">
+        <div class="connection-settings-grid">
+          <section class="connection-settings-section"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div><div class="setting-field"><label for="zigbeeChannel" data-i18n="zigbeeChannel">Zigbee channel</label><select id="zigbeeChannel"><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option></select><small data-i18n="zigbeeChannelLead">Changing the channel can disconnect devices and requires a service restart.</small></div><div class="setting-field"><label for="lowBatteryThreshold" data-i18n="lowBatteryThreshold">Low battery warning</label><input id="lowBatteryThreshold" type="number" min="5" max="50" step="1" required><small data-i18n="lowBatteryThresholdLead">Create an alert when a battery reaches this percentage.</small></div></section>
+          <section class="connection-settings-section"><h2>MQTT</h2><p data-i18n="mqttSettingsLead">Broker and base topic shared by Villa Bridge and Zigbee2MQTT.</p><div class="setting-field"><label for="mqttUrl" data-i18n="mqttUrl">Broker URL</label><input id="mqttUrl" name="mqttUrl" type="url" placeholder="mqtt://127.0.0.1:1883" required></div><div class="setting-field"><label for="mqttBaseTopic" data-i18n="baseTopic">Base topic</label><input id="mqttBaseTopic" name="mqttBaseTopic" spellcheck="false" required></div></section>
+          <section class="connection-settings-section"><h2>Matter</h2><p data-i18n="matterSettingsLead">WebSocket connection used to publish devices to Matterbridge.</p><div class="setting-field"><label for="matterWsUrl" data-i18n="matterUrl">Matterbridge URL</label><input id="matterWsUrl" name="matterWsUrl" type="url" placeholder="ws://127.0.0.1:8283" required></div></section>
         </div>
         <div class="settings-actions"><div><strong data-i18n="restartNoticeTitle">A restart is required</strong><div class="settings-note" data-i18n="restartNotice">Saving creates recoverable backups and restarts Villa Bridge. Device names and Zigbee network keys are not changed.</div></div><button id="saveSettings" class="primary" type="submit" data-i18n="saveAndRestart">Save and restart</button></div>
       </form>
-      <article class="setting-card onboarding-settings-card"><div><h2 data-i18n="guidesTitle">Setup and guides</h2><p data-i18n="guidesLead">Run the simple setup again or replay the dashboard tour at any time.</p></div><div class="onboarding-settings-actions"><button id="restartOnboarding" class="secondary" type="button" data-i18n="runSetupAgain">Run setup again</button><button id="restartDashboardTour" class="quiet" type="button" data-i18n="showDashboardGuide">Show dashboard guide</button></div></article>
+      <article id="androidRuntimeCard" class="setting-card runtime-card" hidden><div><h2 data-i18n="runtimeTitle">Villa Bridge runtime</h2><p data-i18n="runtimeLead">Stop Zigbee, MQTT and Matter together when this tablet must release the home network.</p><span id="runtimeStatusText" class="runtime-state" data-i18n="runtimeRunning">System running</span></div><button id="stopRuntime" class="danger-button" type="button" data-i18n="runtimeStop">Stop entire system</button></article>
+      <article class="setting-card zigbee-settings-card" data-admin-only>
+        <section class="backup-card zigbee-settings-section"><div class="backup-shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5l-8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></div><div><h2 data-i18n="networkProtection">Zigbee network protection</h2><p data-i18n="networkProtectionLead">Keep one recovery file in a safe place.</p></div><div class="backup-actions"><button id="downloadZigbeeBackup" class="primary" type="button"><span class="button-icon" aria-hidden="true">↓</span><span data-i18n="downloadBackup">Download backup</span></button><button id="chooseZigbeeRestore" class="secondary" type="button"><span class="button-icon" aria-hidden="true">↻</span><span data-i18n="restoreBackup">Restore backup</span></button><input id="zigbeeRestoreFile" type="file" accept="application/json,.json" hidden></div></section>
+        <section class="zigbee-tools zigbee-settings-section"><div class="zigbee-tools-icon" aria-hidden="true">⌁</div><div><h2 data-i18n="zigbeeTools">Zigbee setup tools</h2><p data-i18n="zigbeeToolsLead">Advanced pairing and recovery tools stay here for administrators.</p><div class="zigbee-tool-grid"><div class="zigbee-tool"><select id="pairingRouter" aria-label="Pair through router"><option value="" data-i18n="coordinator">Coordinator</option></select></div><div class="zigbee-tool"><input id="installCode" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="installCodePlaceholder" placeholder="Install code or Zigbee QR value"><button id="addInstallCode" class="secondary" type="button" data-i18n="add">Add</button></div><div class="zigbee-tool zigbee-tool-actions"><button id="scanTouchlink" class="secondary" type="button" data-i18n="findNearby">Find nearby devices</button><button id="scanNetworkMap" class="secondary" type="button" data-i18n="networkMap">Network map</button></div><div id="touchlinkResults" class="touchlink-results"></div><div id="networkMapResults" class="network-graph-host"></div><section class="zigbee-group-manager"><div class="zigbee-group-panel"><div class="zigbee-panel-head"><span class="zigbee-panel-icon" aria-hidden="true">◇</span><div><strong data-i18n="zigbeeGroups">Zigbee groups</strong><p data-i18n="zigbeeGroupsLead">Create a real Zigbee group so several lights react together with one radio command.</p></div></div><div class="zigbee-group-create"><input id="zigbeeGroupName" maxlength="64" data-i18n-placeholder="groupNamePlaceholder" placeholder="Living room"><button id="createZigbeeGroup" class="secondary" type="button" aria-label="Create group">＋</button></div><div id="zigbeeGroupList" class="zigbee-group-list"></div></div><div class="zigbee-binding-panel"><div class="zigbee-panel-head"><span class="zigbee-panel-icon" aria-hidden="true">⌁</span><div><strong data-i18n="directBinding">Direct binding</strong><p data-i18n="directBindingLead">Connect a button directly to a light or group. It keeps working even when Villa Bridge is offline.</p></div></div><div class="zigbee-binding-actions"><select id="bindSource"></select><select id="bindSourceEndpoint"></select><select id="bindTarget"></select><select id="bindTargetEndpoint"></select><button id="bindDevices" class="secondary" type="button" title="Bind">⌁</button><button id="unbindDevices" class="quiet" type="button" title="Unbind">×</button><div class="zigbee-binding-flow"><span data-i18n="sourceDevice">Button or remote</span><span aria-hidden="true">→</span><span data-i18n="targetDevice">Light or group</span></div><div id="zigbeeBindingList" class="zigbee-binding-list"></div></div></div></section></div></div></section>
+      </article>
       <article id="debugCard" class="setting-card debug-card">
         <div class="debug-head"><div><h2 data-i18n="debugMode">Debug mode</h2><p data-i18n="debugModeLead">Keep a short, privacy-safe list of recent system errors while testing.</p></div><div class="debug-toggle-wrap"><span id="debugModeStatus" data-i18n="enabled">Enabled</span><button id="toggleDebug" class="switch" type="button" aria-pressed="true" aria-label="Debug mode"><span></span></button></div></div>
         <div id="debugLogPanel" class="debug-log-panel" hidden><div class="debug-log-toolbar"><strong id="debugLogTitle">Recent errors</strong><div class="debug-log-actions"><button id="refreshDebugErrors" class="quiet" type="button" data-i18n="refreshErrors">Refresh</button><button id="clearDebugErrors" class="secondary" type="button" data-i18n="clearErrors">Clear</button></div></div><div id="debugErrorList" class="debug-error-list"></div></div>
@@ -258,6 +275,8 @@
 <div id="authSetupDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authSetupTitle" hidden><form id="authSetupForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><div><h2 id="authSetupTitle" data-i18n="secureHomeTitle">Protect your home controls</h2><p data-i18n="secureHomeLead">Create one admin login and a simpler PIN for household members.</p></div></div><div class="auth-fields"><div class="field"><label for="authSetupUsername" data-i18n="adminUsername">Admin username</label><input id="authSetupUsername" value="admin" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_-]{2,31}" autocomplete="username" required></div><div class="field"><label for="authSetupPassword" data-i18n="adminPassword">Admin passphrase</label><input id="authSetupPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required><small class="auth-help" data-i18n="adminPasswordHelp">Use at least 8 characters. A memorable passphrase works well.</small></div><div class="field"><label for="authSetupPin" data-i18n="residentPin">Home user PIN</label><input id="authSetupPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required><small class="auth-help" data-i18n="residentPinHelp">Choose six non-obvious digits for everyday household access.</small></div></div><div id="authSetupError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authSetupSubmit" class="primary auth-submit" type="submit" data-i18n="createSecureHome">Create secure home</button></form></div>
 <div id="authLoginDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authLoginTitle" hidden><form id="authLoginForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><div><h2 id="authLoginTitle" data-i18n="welcomeBack">Welcome home</h2><p data-i18n="signInLead">Sign in as a home user or administrator.</p></div></div><div class="auth-mode-toggle" role="group"><button id="loginResidentMode" class="active" type="button" data-login-mode="resident" data-i18n="homeUser">Home user</button><button id="loginAdminMode" type="button" data-login-mode="admin" data-i18n="administrator">Administrator</button></div><div class="auth-fields"><div id="loginUsernameField" class="field" hidden><label for="authLoginUsername" data-i18n="adminUsername">Admin username</label><input id="authLoginUsername" autocomplete="username"></div><div class="field"><label id="authLoginSecretLabel" for="authLoginSecret" data-i18n="residentPin">Home user PIN</label><input id="authLoginSecret" type="password" inputmode="numeric" autocomplete="current-password" required></div></div><div id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authLoginSubmit" class="primary auth-submit" type="submit" data-i18n="signIn">Sign in</button></form></div>
 <dialog id="nameDialog"><form id="nameForm" class="modal" method="dialog"><h2 id="nameDialogTitle" data-i18n="changeDisplayName">Change display name</h2><p id="nameDialogLead" data-i18n="displayNameLead">This name will be shared across all home connections.</p><div class="field"><label for="nameInput" data-i18n="newName">New name</label><input id="nameInput" minlength="2" maxlength="32" autocomplete="off" required></div><div class="modal-actions"><button id="cancelName" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveName" class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
+<dialog id="noteDialog"><form id="noteForm" class="modal"><h2 data-i18n="deviceNote">Device note</h2><p id="noteDeviceName"></p><div class="field"><label for="noteInput" data-i18n="note">Note</label><textarea id="noteInput" rows="5" maxlength="500" data-i18n-placeholder="notePlaceholder" placeholder="e.g. Left wall switch"></textarea></div><div class="modal-actions"><button id="cancelNote" class="quiet" type="button" data-i18n="cancel">Cancel</button><button class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
+<dialog id="deviceOptionsDialog"><form id="deviceOptionsForm" class="modal"><h2 data-i18n="deviceOptions">Device options</h2><p id="deviceOptionsName"></p><div class="settings-grid"><div class="field"><label for="deviceTransition" data-i18n="transition">Smooth transition (seconds)</label><input id="deviceTransition" type="number" min="0" max="60" step=".1" value="0"></div><div class="field"><label for="deviceDebounce" data-i18n="debounce">Ignore repeats (seconds)</label><input id="deviceDebounce" type="number" min="0" max="60" step=".1" value="0"></div></div><label class="image-family"><input id="deviceRetain" type="checkbox"><span data-i18n="retainState">Keep the last MQTT state</span></label><div class="modal-actions"><button id="cancelDeviceOptions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
 <dialog id="imageDialog"><form id="imageForm" class="modal" method="dialog"><h2 data-i18n="chooseDeviceImage">Which one looks like your device?</h2><p id="imageDialogLead"></p><div id="imageChoices" class="image-choices"></div><label class="image-family"><input id="applyImageToModel" type="checkbox"><span data-i18n="useForSameModel">Use this picture automatically for devices with the same model.</span></label><div class="modal-actions"><button id="cancelImage" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveImage" class="primary" type="submit" data-i18n="saveImage">Save picture</button></div></form></dialog>
 <dialog id="pairingDialog"><div class="modal pairing-modal"><div id="pairingVisual" class="pairing-visual" aria-hidden="true"><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-core"></span></div><div class="eyebrow" id="pairingPhase" data-i18n="pairingSearching">Searching</div><h2 id="pairingModalTitle" data-i18n="pairingTitle">Searching for new devices</h2><p id="pairingModalText" data-i18n="pairingHint">Put the nearby device into pairing mode.</p><div id="pairingDevice" class="pairing-device" hidden><span data-i18n="deviceFound">Device found</span><strong id="pairingDeviceName">—</strong></div><div class="modal-actions"><button id="hidePairing" class="quiet" type="button" data-i18n="hidePairing">Hide</button><button id="cancelPairing" class="secondary" type="button" data-i18n="stopSearch">Stop searching</button></div></div></dialog>
 <dialog id="removeDialog"><div class="modal"><h2 data-i18n="removeDeviceTitle">Remove from Zigbee network?</h2><p id="removeDeviceWarning" class="danger-copy"></p><p class="force-remove-copy" data-i18n="forceRemoveLead">If the device no longer responds, force delete removes only its stale coordinator record.</p><div class="field"><label id="removeDeviceInstruction" for="removeConfirmation"></label><input id="removeConfirmation" autocomplete="off" autocapitalize="none" spellcheck="false"></div><div class="modal-actions remove-actions"><button id="cancelRemove" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmRemove" class="danger-button" type="button" data-i18n="removePermanently" disabled>Remove permanently</button><button id="forceRemove" class="danger-button force-delete-button" type="button" data-i18n="forceRemove" disabled>Force delete record</button></div></div></dialog>
@@ -296,10 +315,11 @@
     quick:{title:"quickControl",lead:"quickLead"},
     availability:{title:"availabilityWidget",lead:"availabilityWidgetLead"},
     recent:{title:"recentWidget",lead:"recentWidgetLead"},
+    activity:{title:"activityWidget",lead:"activityWidgetLead"},
     clock:{title:"worldClock",lead:"worldClockLead"},
     weather:{title:"weather",lead:"weatherLead"}
   };
-  const defaultDashboardWidgets=["quick","clock","weather","recent"];
+  const defaultDashboardWidgets=["quick","clock","weather","recent","activity"];
   const fixedDashboardWidgets=new Set(["quick"]);
   const savedGroups=(()=>{try{
     const value=JSON.parse(localStorage.getItem("villa-dashboard-groups")||"[]");
@@ -316,7 +336,7 @@
     return[...new Set(value.filter(id=>Object.hasOwn(dashboardWidgetTypes,id)||savedGroups.some(group=>groupWidgetId(group.id)===id)))];
   }catch{return[...defaultDashboardWidgets]}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],favorites:[],editing:null,imageEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,onboardingStep:0,onboardingDraft:null,coach:null,imageFormats:{},openDevices:new Set(),pendingCommands:new Set(),pendingGroups:new Set(),usage:savedUsage,quickOrder:null,deviceLayout:savedDeviceLayout==="list"?"list":"grid",widgets:savedWidgets,groups:savedGroups,dashboardEditing:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],favorites:[],editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,onboardingStep:0,onboardingDraft:null,coach:null,imageFormats:{},openDevices:new Set(),pendingCommands:new Set(),pendingGroups:new Set(),usage:savedUsage,quickOrder:null,deviceLayout:savedDeviceLayout==="list"?"list":"grid",widgets:savedWidgets,groups:savedGroups,dashboardEditing:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   const weatherState={location:savedWeatherLocation,data:null,error:null,loading:false,updatedAt:0};
   const defaultWorldClockZones=[
@@ -400,7 +420,8 @@
     $("#authLoginSecretLabel").textContent=t(admin?"adminPassword":"residentPin");
     const secret=$("#authLoginSecret");
     secret.inputMode=admin?"text":"numeric";
-    secret.pattern=admin?"":"[0-9]{6}";
+    if(admin)secret.removeAttribute("pattern");
+    else secret.setAttribute("pattern","[0-9]{6}");
     secret.maxLength=admin?128:6;
     secret.value="";
     setAuthFormError("authLoginError");
@@ -451,6 +472,28 @@
     }catch(error){showToast(error.message,true)}
     finally{button.disabled=false}
   }
+  async function updateAdminPassword(event){
+    event.preventDefault();
+    const next=$("#newAdminPassword");
+    const confirmation=$("#confirmAdminPassword");
+    const button=event.currentTarget.querySelector('button[type="submit"]');
+    setAuthFormError("adminPasswordError");
+    if(next.value!==confirmation.value){
+      setAuthFormError("adminPasswordError",t("adminPasswordMismatch"));
+      confirmation.focus();
+      return;
+    }
+    button.disabled=true;
+    try{
+      await api("/api/auth/admin-password",{method:"PUT",body:JSON.stringify({newPassword:next.value})});
+      next.value="";confirmation.value="";
+      showToast(t("adminPasswordChanged"));
+      setAuthState({configured:true,authenticated:false,user:null,csrfToken:null,expiresAt:null});
+      setLoginMode("admin");
+      openAuthGate();
+    }catch(error){setAuthFormError("adminPasswordError",error.message)}
+    finally{button.disabled=false}
+  }
   async function loadInstallationOnboarding(){
     const localComplete=locallyCompletedOnboarding();
     try{
@@ -470,13 +513,30 @@
     if(!installationOnboardingComplete)throw new Error(t("operationFailed"));
     try{localStorage.setItem(onboardingStorageKey,"true")}catch{}
   }
-  const isAlert=device=>device.state.smoke===true||device.state.carbon_monoxide===true||device.state.battery_low===true||(typeof device.state.battery==="number"&&device.state.battery<15);
-  const deviceKind=device=>device.controls.some(control=>control.kind==="switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
-  const deviceGlyph=device=>device.controls.some(control=>control.kind==="switch")?"◉":device.features.includes("contact")?"⌑":device.features.some(x=>x==="presence"||x==="occupancy")?"⌁":device.features.includes("smoke")?"△":"•";
+  const isAlert=device=>Array.isArray(device.alerts)&&device.alerts.length>0;
+  const eventPresentation=event=>{
+    const enabled=event.value===true||String(event.value).toUpperCase()==="ON";
+    if(event.property==="action")return{icon:"◉",label:String(event.value).replaceAll("_"," ")};
+    if(event.property==="contact")return{icon:"⌑",label:event.value?t("doorClosed"):t("doorOpen")};
+    if(event.property==="occupancy"||event.property==="presence")return{icon:"⌁",label:event.value?t("motionDetected"):t("motionClear")};
+    if(event.property==="smoke")return{icon:"△",label:event.value?t("smokeDetected"):t("noSmoke")};
+    if(event.property==="carbon_monoxide")return{icon:"△",label:event.value?t("coDetected"):t("coClear")};
+    if(event.property==="battery_low")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
+    if(event.property==="battery_threshold")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
+    if(event.property==="availability")return{icon:"●",label:event.value==="online"?t("ready"):t("unreachable")};
+    if(event.property==="state")return{icon:"◉",label:enabled?t("on"):t("off")};
+    return{icon:"•",label:String(event.value).replaceAll("_"," ")};
+  };
+  const deviceKind=device=>device.controls.some(control=>control.kind==="cover"||control.kind==="position")?t("coverDevice"):device.controls.some(control=>control.kind==="climate")?t("climateDevice"):device.controls.some(control=>control.kind==="lock")?t("lockDevice"):device.controls.some(control=>control.kind==="fan")?t("fanDevice"):device.controls.some(control=>control.kind==="siren")?t("sirenDevice"):device.controls.some(control=>control.kind==="switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
+  const deviceGlyph=device=>device.controls.some(control=>control.kind==="cover"||control.kind==="position")?"▤":device.controls.some(control=>control.kind==="climate")?"♨":device.controls.some(control=>control.kind==="lock")?"⌑":device.controls.some(control=>control.kind==="fan")?"✣":device.controls.some(control=>control.kind==="siren")?"△":device.controls.some(control=>control.kind==="switch")?"◉":device.features.includes("contact")?"⌑":device.features.some(x=>x==="presence"||x==="occupancy")?"⌁":device.features.includes("smoke")?"△":"•";
   const deviceIconKind=device=>{
     const features=device.features||[];
     const identity=`${device.name||""} ${device.model||""}`.toLowerCase();
     if(features.includes("smoke")||features.includes("carbon_monoxide"))return"smoke";
+    if(device.controls.some(control=>control.kind==="cover"||control.kind==="position"))return"cover";
+    if(device.controls.some(control=>control.kind==="lock"))return"lock";
+    if(device.controls.some(control=>control.kind==="fan"))return"fan";
+    if(device.controls.some(control=>control.kind==="siren"))return"siren";
     if(features.includes("contact"))return"door";
     if(features.some(feature=>feature==="presence"||feature==="occupancy"))return"motion";
     if(features.some(feature=>["brightness","color","color_temp"].includes(feature))||/\b(light|lamp|bulb|led|ışık|lamba)\b/.test(identity))return"light";
@@ -496,6 +556,10 @@
       motion:'<circle cx="12" cy="6" r="2.2"/><path d="m9 21 1-6-2-3 2-2 4 1 2 4m-1 6-3-6m6-7c1.5 1 2.5 2.4 3 4M6 8c-1.5 1-2.5 2.4-3 4"/>',
       smoke:'<path d="M12 3 3 20h18L12 3Z"/><path d="M12 9v5m0 3v.1"/>',
       climate:'<path d="M10 14.8V5a2 2 0 1 1 4 0v9.8a4 4 0 1 1-4 0Z"/><path d="M12 8v8"/>',
+      cover:'<path d="M5 4h14v16H5zM5 8h14M5 12h14M5 16h14"/><path d="m9 2 3 3 3-3"/>',
+      lock:'<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
+      fan:'<circle cx="12" cy="12" r="2"/><path d="M12 10c-1-5 1-7 3-7 3 1 3 5-1 8M14 12c5-1 7 1 7 3-1 3-5 3-8-1M12 14c1 5-1 7-3 7-3-1-3-5 1-8M10 12c-5 1-7-1-7-3 1-3 5-3 8 1"/>',
+      siren:'<path d="M8 18v-7a4 4 0 0 1 8 0v7M5 21h14M4 10H2m20 0h-2M6 4 4.5 2.5M18 4l1.5-1.5M12 3V1"/>',
       sensor:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>'
     };
     return`<svg class="device-type-svg" viewBox="0 0 24 24" aria-hidden="true">${icons[deviceIconKind(device)]}</svg>`;
@@ -533,6 +597,7 @@
     if(device.state.carbon_monoxide!==undefined)list.push(device.state.carbon_monoxide?t("coDetected"):t("coClear"));
     if(typeof device.state.illuminance==="number")list.push(`${device.state.illuminance} lux`);
     if(typeof device.state.power==="number")list.push(`${device.state.power} W`);
+    if(typeof device.state.action==="string")list.push(`◉ ${String(device.state.action).replaceAll("_"," ")}`);
     return list.slice(0,5);
   };
   const isFavorite=(deviceId,controlId)=>state.favorites.some(item=>item.deviceId===deviceId&&item.controlId===controlId);
@@ -541,42 +606,111 @@
     const label=active?t("removeFromHome"):t("showOnHome");
     return`<button class="${main?"favorite-main":"favorite-toggle"} ${active?"active":""}" data-favorite-device="${esc(device.id)}" data-favorite-control="${esc(control.id)}" aria-label="${label}: ${esc(control.name)}" title="${label}">${main?label:active?"★":"☆"}</button>`;
   };
-  const controlHtml=(device,control)=>{
-    if(control.kind==="switch"){
-      const known=typeof control.value==="boolean";
-      const valueLabel=known?(control.value?t("on"):t("off")):t("unknownState");
-      const pending=commandPending(device.id,control.property);
-      return`<div class="control-row"><div><div class="control-name">${esc(control.name)}${control.id!=="main"?`<button class="channel-rename" data-admin-only data-rename-channel="${esc(device.id)}" data-channel="${esc(control.id)}">${t("nameChannel")}</button>`:""}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${control.id!=="main"?favoriteButton(device,control):""}<button class="switch ${control.value===true?"on":""}${pending?" pending":""}" data-command="${esc(device.id)}" data-property="${esc(control.property)}" data-value="${control.value===true?"false":"true"}" aria-label="${esc(control.name)} ${pending?t("sendingCommand"):control.value===true?t("off"):t("on")}"${pending?" disabled":""}><span></span></button></div></div>`;
+  const commandValue=value=>esc(JSON.stringify(value));
+  const optionValue=(values,pattern,fallback)=>values?.find(value=>pattern.test(String(value).toUpperCase()))??fallback;
+  const dashboardControlKinds=new Set(["switch","fan","siren","cover","position","lock","climate"]);
+  const isDashboardControl=control=>dashboardControlKinds.has(control.kind)&&control.adminOnly!==true;
+  const dashboardControlForDevice=device=>device.controls.find(control=>isDashboardControl(control)&&control.id==="main")
+    ||device.controls.find(control=>isDashboardControl(control)&&["switch","fan","siren","cover","lock"].includes(control.kind))
+    ||device.controls.find(isDashboardControl);
+  const dashboardControlValueForState=(control,active)=>{
+    if(["switch","fan","siren"].includes(control.kind))return active?(control.valueOn??true):(control.valueOff??false);
+    if(control.kind==="cover"){
+      const values=control.values||[];
+      return active?optionValue(values,/OPEN|UP/,"OPEN"):optionValue(values,/CLOSE|DOWN/,"CLOSE");
     }
-    if(control.kind==="color")return`<div class="control-row"><div><div class="control-name">${t("color")}</div><div class="control-value">${esc(control.value)}</div></div><input type="color" value="${esc(control.value||"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("color")}"></div>`;
+    if(control.kind==="lock"){
+      const values=control.values||[];
+      return active?optionValue(values,/^LOCK(?:ED)?$/,"LOCK"):optionValue(values,/UNLOCK/,"UNLOCK");
+    }
+    return undefined;
+  };
+  const dashboardControlAction=control=>{
+    if(!control)return null;
+    if(["switch","fan","siren"].includes(control.kind)){
+      const active=control.value===true||String(control.value).toUpperCase()===String(control.valueOn??"ON").toUpperCase();
+      return{active,value:dashboardControlValueForState(control,!active)};
+    }
+    if(control.kind==="cover"){
+      const active=/OPEN|OPENING|UP/.test(String(control.value??"").toUpperCase());
+      return{active,value:dashboardControlValueForState(control,!active)};
+    }
+    if(control.kind==="lock"){
+      const active=/^LOCK(?:ED)?$/.test(String(control.value??"").toUpperCase());
+      return{active,value:dashboardControlValueForState(control,!active)};
+    }
+    return null;
+  };
+  const groupPowerControl=control=>["switch","fan","siren","cover"].includes(control.kind);
+  const controlHtml=(device,control)=>{
+    const adminClass=control.adminOnly?" admin-control":"";
+    const adminAttr=control.adminOnly?" data-admin-only":"";
+    if(["switch","fan","siren"].includes(control.kind)){
+      const active=control.value===true||String(control.value).toUpperCase()===String(control.valueOn??"ON").toUpperCase();
+      const known=typeof control.value==="boolean";
+      const valueLabel=control.value===null?t("unknownState"):active?t("on"):t("off");
+      const pending=commandPending(device.id,control.property);
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}${control.kind==="switch"&&control.id!=="main"?`<button class="channel-rename" data-admin-only data-rename-channel="${esc(device.id)}" data-channel="${esc(control.id)}">${t("nameChannel")}</button>`:""}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${isDashboardControl(control)&&dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<button class="switch ${active?"on":""}${pending?" pending":""}" data-command-value="${commandValue(active?(control.valueOff??false):(control.valueOn??true))}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)} ${pending?t("sendingCommand"):active?t("off"):t("on")}"${pending?" disabled":""}><span></span></button></div></div>`;
+    }
+    if(control.kind==="cover"){
+      const values=control.values||[];
+      const openValue=optionValue(values,/OPEN|UP/,"OPEN");
+      const stopValue=optionValue(values,/STOP/,"STOP");
+      const closeValue=optionValue(values,/CLOSE|DOWN/,"CLOSE");
+      const current=String(control.value??"").toUpperCase();
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("cover"))}</div><div class="control-value">${esc(control.value??t("unknownState"))}</div></div><div class="control-icon-actions">${dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<button class="control-command ${current===String(openValue).toUpperCase()?"active":""}" data-command-value="${commandValue(openValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("open")}" title="${t("open")}">↑</button><button class="control-command stop" data-command-value="${commandValue(stopValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("stop")}" title="${t("stop")}">■</button><button class="control-command close-action ${current===String(closeValue).toUpperCase()?"active":""}" data-command-value="${commandValue(closeValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("close")}" title="${t("close")}">↓</button></div></div>`;
+    }
+    if(control.kind==="lock"){
+      const values=control.values||[];
+      const lockValue=optionValue(values,/^LOCK(?:ED)?$/,"LOCK");
+      const unlockValue=optionValue(values,/UNLOCK/,"UNLOCK");
+      const locked=/^LOCK(?:ED)?$/.test(String(control.value??"").toUpperCase());
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("lockDevice"))}</div><div class="control-value">${locked?t("lock"):t("unlock")}</div></div><div class="control-icon-actions">${dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<button class="control-command ${locked?"active":""}" data-command-value="${commandValue(lockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("lock")}" title="${t("lock")}">▣</button><button class="control-command ${!locked?"active":""}" data-command-value="${commandValue(unlockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("unlock")}" title="${t("unlock")}">□</button></div></div>`;
+    }
+    if(control.kind==="select"){
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}</div>${control.adminOnly?`<div class="control-value">${t("deviceSetting")}</div>`:""}</div><select class="control-select" data-select="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)}">${(control.values||[]).map(value=>`<option value="${esc(value)}"${String(value)===String(control.value)?" selected":""}>${esc(String(value).replaceAll("_"," "))}</option>`).join("")}</select></div>`;
+    }
+    if(control.kind==="color")return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${t("color")}</div><div class="control-value">${esc(control.value)}</div></div><input type="color" value="${esc(control.value||"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("color")}"></div>`;
     const known=typeof control.value==="number";
-    return`<div class="control-row"><div><div class="control-name">${esc(control.name)}</div><div class="control-value">${known?esc(control.value):t("unknownState")}</div></div><input type="range" min="${control.min}" max="${control.max}" value="${known?control.value:control.min}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)}"></div>`;
+    const label=control.kind==="position"?t("position"):control.kind==="climate"?t("targetTemperature"):control.name;
+    return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(label)}</div><div class="control-value">${known?esc(control.value):t("unknownState")}${control.unit?`<span class="control-unit">${esc(control.unit)}</span>`:""}</div></div><div class="control-actions">${isDashboardControl(control)&&dashboardControlForDevice(device)?.id!==control.id?favoriteButton(device,control):""}<input type="range" min="${control.min??0}" max="${control.max??100}" step="${control.step??1}" value="${known?control.value:control.min??0}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(label)}"></div></div>`;
   };
   const deviceCardHtml=device=>{
     const deviceFacts=facts(device);
-    const mainControl=device.controls.find(control=>control.kind==="switch"&&control.id==="main")||device.controls.find(control=>control.kind==="switch");
+    const mainControl=dashboardControlForDevice(device);
+    const updateState=device.state.update&&typeof device.state.update==="object"?device.state.update:{};
+    const updateRunning=updateState.state==="updating";
+    const updateScheduled=updateState.state==="scheduled";
+    const updateLabel=updateRunning?t("updatingFirmware",{progress:Math.round(Number(updateState.progress)||0)}):t(updateScheduled?"cancelScheduledUpdate":"scheduleUpdate");
+    const otaButton=device.otaSupported?`<button class="secondary" data-admin-only data-ota-check="${esc(device.id)}"${updateRunning?" disabled":""}>↻ ${t("checkForUpdate")}</button><button class="secondary" data-admin-only data-ota="${esc(device.id)}" data-ota-enabled="${updateScheduled?"false":"true"}"${updateRunning?" disabled":""}>⇧ ${esc(updateLabel)}</button>`:"";
     return`<details class="device-card"${state.openDevices.has(device.id)?" open":""} data-device-card="${esc(device.id)}" data-name="${esc(device.name.toLowerCase())}">
       <summary class="device-card-header"><div class="device-title">${deviceVisual(device)}<div><div class="device-name-row"><div class="device-name">${esc(device.name)}</div>${linkQualityBadge(device)}</div><div class="device-meta">${deviceKind(device)} · <span class="${device.availability==="online"?"online-text":device.availability==="offline"?"offline-text":"unknown-text"}">${device.availability==="online"?t("ready"):device.availability==="offline"?t("unreachable"):t("standby")}</span></div></div></div></summary>
       <div class="device-card-body">
         ${device.controls.length?`<div class="controls">${device.controls.map(control=>controlHtml(device,control)).join("")}</div>`:""}
         ${deviceFacts.length?`<div class="facts">${deviceFacts.map(fact=>`<span class="fact">${esc(fact)}</span>`).join("")}</div>`:""}
         <details class="technical-details"><summary>${t("technicalDetails")}</summary><div class="technical">${t("uid")}: ${esc(device.id)}<br>${t("source")}: ${esc(device.sourceName)}<br>${t("model")}: ${esc(device.model||"—")}<br>${t("rawSignal")}: ${typeof device.state.linkquality==="number"?esc(device.state.linkquality):"—"} LQI</div></details>
-        <div class="card-actions">${mainControl?favoriteButton(device,mainControl,true):""}<button class="change-image" data-admin-only data-change-image="${esc(device.id)}">${t("changeImage")}</button><button class="rename" data-admin-only data-rename="${esc(device.id)}">${t("changeName")}</button><button class="remove" data-admin-only data-remove="${esc(device.id)}">${t("removeDevice")}</button></div>
+        <div class="card-actions">${mainControl?favoriteButton(device,mainControl,true):""}<button class="secondary" data-note="${esc(device.id)}">📝 ${t("note")}</button><button class="change-image" data-admin-only data-change-image="${esc(device.id)}">${t("changeImage")}</button><button class="rename" data-admin-only data-rename="${esc(device.id)}">${t("changeName")}</button><button class="secondary" data-admin-only data-options="${esc(device.id)}">⚙ ${t("options")}</button><button class="secondary" data-admin-only data-reconfigure="${esc(device.id)}">${t("repairDevice")}</button>${otaButton}<button class="remove" data-admin-only data-remove="${esc(device.id)}">${t("removeDevice")}</button></div>
       </div>
     </details>`;
   };
   const quickDeviceHtml=(device,selectedControl=null)=>{
-    const control=selectedControl||device.controls.find(item=>item.kind==="switch"&&item.id==="main")||device.controls.find(item=>item.kind==="switch");
+    const control=selectedControl||dashboardControlForDevice(device);
     if(!control)return"";
     const mainControl=control.id==="main";
     const displayName=mainControl?device.name:control.name;
     const availability=device.availability==="online"?t("ready"):device.availability==="offline"?t("unreachable"):t("standby");
-    const visualState=device.availability==="offline"?"offline":control.value===true?"on":"off";
-    const pending=commandPending(device.id,control.property);
+    const action=dashboardControlAction(control);
+    const visualState=device.availability==="offline"?"offline":action?.active?"on":"off";
+    const pending=Boolean(action&&commandPending(device.id,control.property));
     const battery=typeof device.state.battery==="number"?Math.round(Math.max(0,Math.min(100,device.state.battery))):null;
-    const batteryPill=battery===null?"":`<span class="quick-battery${battery<15?" low":""}" aria-label="${t("battery")} ${battery}%"><span class="battery-glyph" aria-hidden="true"><i style="width:${battery}%"></i></span>${battery}%</span>`;
+    const batteryThreshold=state.settings?.alerts?.lowBatteryThreshold??15;
+    const batteryPill=battery===null?"":`<span class="quick-battery${battery<=batteryThreshold?" low":""}" aria-label="${t("battery")} ${battery}%"><span class="battery-glyph" aria-hidden="true"><i style="width:${battery}%"></i></span>${battery}%</span>`;
+    const actionAttributes=action
+      ?`data-command-value="${commandValue(action.value)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}"`
+      :`data-quick-show="${esc(device.id)}"`;
+    const actionLabel=action?(action.active?t("off"):t("on")):t("showInDevices");
     return`<article class="device-card quick-card ${visualState}" data-name="${esc(displayName.toLowerCase())}" data-quick-controls="${esc(device.id)}">
-      <button class="quick-toggle ${control.value===true?"on":""}${pending?" pending":""}" data-command="${esc(device.id)}" data-property="${esc(control.property)}" data-value="${control.value===true?"false":"true"}" aria-label="${esc(displayName)} ${pending?t("sendingCommand"):device.availability==="offline"?availability:control.value===true?t("off"):t("on")}"${device.availability==="offline"||pending?" disabled":""}><span class="quick-device-icon" aria-hidden="true">${deviceTypeIcon(device)}</span><span class="device-name">${esc(displayName)}</span>${pending?'<span class="command-spinner" aria-hidden="true"></span>':batteryPill}</button>
+      <button class="quick-toggle ${action?.active?"on":""}${pending?" pending":""}" ${actionAttributes} aria-label="${esc(displayName)} ${pending?t("sendingCommand"):device.availability==="offline"?availability:actionLabel}"${(device.availability==="offline"&&Boolean(action))||pending?" disabled":""}><span class="quick-device-icon" aria-hidden="true">${deviceTypeIcon(device)}</span><span class="device-name">${esc(displayName)}</span>${pending?'<span class="command-spinner" aria-hidden="true"></span>':batteryPill}</button>
     </article>`;
   };
   function bindDeviceImages(){
@@ -704,14 +838,16 @@
       if(details.open)state.openDevices.add(details.dataset.deviceCard);
       else state.openDevices.delete(details.dataset.deviceCard);
     });
-    $$("[data-command]").forEach(button=>button.onclick=()=>command(button.dataset.command,button.dataset.property,button.dataset.value==="true"));
+    $$("[data-command-value]").forEach(button=>button.onclick=()=>command(button.dataset.device,button.dataset.property,JSON.parse(button.dataset.commandValue)));
+    $$("[data-quick-show]").forEach(button=>button.onclick=()=>showDevice(button.dataset.quickShow));
     $$("[data-level]").forEach(input=>input.onchange=()=>command(input.dataset.level,input.dataset.property,Number(input.value)));
+    $$("[data-select]").forEach(input=>input.onchange=()=>command(input.dataset.select,input.dataset.property,input.value));
     $$("[data-color]").forEach(input=>input.onchange=()=>command(input.dataset.color,input.dataset.property,input.value));
     $$("[data-quick-controls]").forEach(card=>{
       const toggle=()=>{
-        const button=card.querySelector("[data-command]");
+        const button=card.querySelector("[data-command-value],[data-quick-show]");
         if(!button||button.disabled)return;
-        command(button.dataset.command,button.dataset.property,button.dataset.value==="true");
+        button.click();
       };
       card.onclick=event=>{if(!event.target.closest("button,input"))toggle()};
       card.onkeydown=event=>{if((event.key==="Enter"||event.key===" ")&&!event.target.closest("button,input")){event.preventDefault();toggle()}};
@@ -721,7 +857,47 @@
     $$("[data-change-image]").forEach(button=>button.onclick=()=>openImageChooser(button.dataset.changeImage));
     $$("[data-rename]").forEach(button=>button.onclick=()=>openRename(button.dataset.rename));
     $$("[data-rename-channel]").forEach(button=>button.onclick=()=>openRename(button.dataset.renameChannel,button.dataset.channel));
+    $$("[data-reconfigure]").forEach(button=>button.onclick=()=>reconfigureDevice(button.dataset.reconfigure));
+    $$("[data-note]").forEach(button=>button.onclick=()=>openDeviceNote(button.dataset.note));
+    $$("[data-ota-check]").forEach(button=>button.onclick=()=>checkOta(button.dataset.otaCheck));
+    $$("[data-ota]").forEach(button=>button.onclick=()=>scheduleOta(button.dataset.ota,button.dataset.otaEnabled!=="false"));
+    $$("[data-options]").forEach(button=>button.onclick=()=>openDeviceOptions(button.dataset.options));
     $$("[data-remove]").forEach(button=>button.onclick=()=>removeDevice(button.dataset.remove));
+  }
+  function renderPairingRouters(){
+    const select=$("#pairingRouter");
+    if(!select)return;
+    const selected=select.value;
+    const routers=state.devices.filter(device=>device.type==="Router"&&device.availability!=="offline");
+    select.innerHTML=`<option value="">${t("coordinator")}</option>`+routers.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("");
+    if([...select.options].some(option=>option.value===selected))select.value=selected;
+  }
+  function renderZigbeeGroups(){
+    const container=$("#zigbeeGroupList");
+    if(!container)return;
+    container.innerHTML=state.zigbeeGroups.length?state.zigbeeGroups.map(group=>{
+      const available=state.devices.filter(device=>!group.memberIds?.includes(device.id));
+      const members=(group.memberIds||[]).map(id=>{
+        const device=state.devices.find(item=>item.id===id);
+        return`<span class="touchlink-device">${esc(device?.name||id)}<button class="danger-button" type="button" data-zgroup-remove-member="${esc(group.id)}" data-device="${esc(id)}">×</button></span>`;
+      }).join("");
+      const scenes=(group.scenes||[]).map(scene=>`<span class="zigbee-scene"><span>${esc(scene.name)} · ${scene.id}</span><button class="secondary" type="button" data-zgroup-existing-scene="recall" data-group="${esc(group.id)}" data-scene="${scene.id}" title="${t("recallScene")}">▶</button><button class="danger-button" type="button" data-zgroup-existing-scene="remove" data-group="${esc(group.id)}" data-scene="${scene.id}" title="${t("removeScene")}">×</button></span>`).join("");
+      return`<div class="zigbee-group-row"><div class="zigbee-group-row-head"><input value="${esc(group.name)}" maxlength="64" data-zgroup-name="${esc(group.id)}"><span class="zigbee-member-count">${t("groupMembers",{count:group.members})}</span><button class="secondary" type="button" data-zgroup-rename="${esc(group.id)}" title="${t("changeName")}">✓</button></div><div class="zigbee-group-actions"><select data-zgroup-device="${esc(group.id)}"><option value="">＋ ${t("device")}</option>${available.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("")}</select><button class="secondary" type="button" data-zgroup-add-member="${esc(group.id)}" title="${t("add")}">＋</button><input type="number" min="1" max="255" value="1" data-zgroup-scene="${esc(group.id)}" aria-label="${t("scene")}"><input type="text" maxlength="64" data-zgroup-scene-name="${esc(group.id)}" placeholder="${t("sceneName")}"><button class="secondary" type="button" data-zgroup-scene-action="store" data-group="${esc(group.id)}" title="${t("storeScene")}">●</button><button class="danger-button" type="button" data-zgroup-delete="${esc(group.id)}" title="${t("deleteGroup")}">×</button></div>${members?`<div class="zigbee-member-list">${members}</div>`:""}${scenes?`<div class="zigbee-scene-list">${scenes}</div>`:""}</div>`;
+    }).join(""):`<div class="zigbee-group-empty"><span aria-hidden="true">＋</span><div><strong>${t("noZigbeeGroups")}</strong><p>${t("noZigbeeGroupsLead")}</p></div></div>`;
+    $$("[data-zgroup-rename]").forEach(button=>button.onclick=()=>renameZigbeeGroup(button.dataset.zgroupRename));
+    $$("[data-zgroup-add-member]").forEach(button=>button.onclick=()=>addZigbeeGroupMember(button.dataset.zgroupAddMember));
+    $$("[data-zgroup-remove-member]").forEach(button=>button.onclick=()=>setZigbeeGroupMember(button.dataset.zgroupRemoveMember,button.dataset.device,false));
+    $$("[data-zgroup-scene-action]").forEach(button=>button.onclick=()=>zigbeeGroupScene(button.dataset.group,button.dataset.zgroupSceneAction));
+    $$("[data-zgroup-existing-scene]").forEach(button=>button.onclick=()=>zigbeeGroupScene(button.dataset.group,button.dataset.zgroupExistingScene,Number(button.dataset.scene)));
+    $$("[data-zgroup-delete]").forEach(button=>button.onclick=()=>deleteZigbeeGroup(button.dataset.zgroupDelete));
+    const source=$("#bindSource"),target=$("#bindTarget");
+    const sourceValue=source.value,targetValue=target.value;
+    source.innerHTML=`<option value="">${t("sourceDevice")}</option>`+state.devices.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("");
+    target.innerHTML=`<option value="">${t("targetDevice")}</option>`+state.devices.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("")+state.zigbeeGroups.map(group=>`<option value="${esc(group.id)}">◇ ${esc(group.name)}</option>`).join("");
+    if([...source.options].some(option=>option.value===sourceValue))source.value=sourceValue;
+    if([...target.options].some(option=>option.value===targetValue))target.value=targetValue;
+    renderBindingEndpoints();
+    renderBindingList();
   }
   function renderSystemAlertBar(){
     const alertDevice=state.devices.find(isAlert);
@@ -747,20 +923,29 @@
     const offlineDevices=devices.filter(device=>device.availability==="offline").length;
     $("#onlineDeviceCount").textContent=String(onlineDevices);
     $("#offlineDeviceCount").textContent=t("offlineDevices",{count:offlineDevices});
+    $("#chooseZigbeeRestore").hidden=state.health?.mode!=="direct";
+    renderPairingRouters();
+    renderZigbeeGroups();
     const recent=[...devices].filter(device=>device.stateUpdatedAt).sort((a,b)=>new Date(b.stateUpdatedAt)-new Date(a.stateUpdatedAt)).slice(0,3);
     $("#recentDevices").innerHTML=recent.length?recent.map(device=>`<div class="widget-list-row"><strong>${esc(device.name)}</strong><span>${ago(device.stateUpdatedAt)}</span></div>`).join(""):`<div class="device-meta">${t("noRecentDevices")}</div>`;
-    const controllable=devices.filter(device=>device.controls.some(control=>control.kind==="switch"));
+    const events=(state.events||[]).slice(0,5);
+    $("#activityEvents").innerHTML=events.length?events.map(event=>{
+      const device=devices.find(item=>item.sourceName===event.sourceName);
+      const presentation=eventPresentation(event);
+      return`<div class="widget-list-row"><strong>${esc(device?.name||event.sourceName)}</strong><span>${presentation.icon} ${esc(presentation.label)} · ${ago(event.at)}</span></div>`;
+    }).join(""):`<div class="device-meta">${t("noActivity")}</div>`;
+    const controllable=devices.filter(device=>Boolean(dashboardControlForDevice(device)));
     if(!state.quickOrder&&controllable.length)state.quickOrder=[...controllable].sort((a,b)=>(state.usage[b.id]||0)-(state.usage[a.id]||0)).map(device=>device.id);
     const orderedIds=[...(state.quickOrder||[]),...controllable.map(device=>device.id).filter(id=>!state.quickOrder?.includes(id))];
     const quick=[];
     for(const favorite of state.favorites){
       const device=controllable.find(item=>item.id===favorite.deviceId);
-      const control=device?.controls.find(item=>item.id===favorite.controlId&&item.kind==="switch");
+      const control=device?.controls.find(item=>item.id===favorite.controlId&&isDashboardControl(item));
       if(device&&control)quick.push({device,control});
     }
     for(const id of orderedIds){
       const device=controllable.find(item=>item.id===id);
-      const control=device?.controls.find(item=>item.kind==="switch"&&item.id==="main")||device?.controls.find(item=>item.kind==="switch");
+      const control=device?dashboardControlForDevice(device):null;
       if(!device||!control||quick.some(item=>item.device.id===device.id&&item.control.id===control.id))continue;
       if(quick.length>=Math.max(8,state.favorites.length))break;
       quick.push({device,control});
@@ -791,7 +976,7 @@
     return group.items.map(item=>{
       const device=state.devices.find(candidate=>candidate.id===item.deviceId);
       if(device&&item.controlId===groupDeviceControlId)return{device,control:null};
-      const control=device?.controls.find(candidate=>candidate.id===item.controlId&&candidate.kind==="switch");
+      const control=device?.controls.find(candidate=>candidate.id===item.controlId&&isDashboardControl(candidate));
       return device&&control?{device,control}:null;
     }).filter(Boolean);
   }
@@ -805,16 +990,17 @@
   const groupEditIcon=()=>'<svg class="group-action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>';
   function groupWidgetHtml(group){
     const entries=groupControlEntries(group);
-    const anyOn=entries.some(({device,control})=>control?.value===true||["active","alert"].includes(groupDeviceVisualState(device)));
-    const available=entries.filter(({device,control})=>control&&device.availability!=="offline");
-    const allOn=available.length>0&&available.every(({control})=>control.value===true);
+    const anyOn=entries.some(({device,control})=>dashboardControlAction(control)?.active===true||["active","alert"].includes(groupDeviceVisualState(device)));
+    const available=entries.filter(({device,control})=>control&&groupPowerControl(control)&&device.availability!=="offline");
+    const allOn=available.length>0&&available.every(({control})=>dashboardControlAction(control)?.active===true);
     const controls=entries.map(({device,control})=>{
       const name=control?(control.id==="main"?device.name:control.name):device.name;
-      const visualState=control?(device.availability==="offline"?"offline":control.value===true?"on":"off"):groupDeviceVisualState(device);
-      const pending=Boolean(control&&commandPending(device.id,control.property));
-      const action=control?`data-group-device="${esc(device.id)}" data-group-property="${esc(control.property)}" data-group-value="${control.value===true?"false":"true"}"`:`data-group-show-device="${esc(device.id)}"`;
-      const label=control?`${name} ${pending?t("sendingCommand"):control.value===true?t("off"):t("on")}`:`${t("showInDevices")}: ${name}`;
-      return`<button class="group-control-tile ${visualState}${pending?" pending":""}" type="button" ${action} aria-label="${esc(label)}"${(device.availability==="offline"&&control)||pending?" disabled":""}><div class="group-control-visual" aria-hidden="true">${deviceVisual(device)}</div><strong>${esc(name)}</strong>${pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</button>`;
+      const controlAction=dashboardControlAction(control);
+      const visualState=control?(device.availability==="offline"?"offline":controlAction?.active?"on":"off"):groupDeviceVisualState(device);
+      const pending=Boolean(controlAction&&commandPending(device.id,control.property));
+      const action=controlAction?`data-group-device="${esc(device.id)}" data-group-property="${esc(control.property)}" data-group-command-value="${commandValue(controlAction.value)}"`:`data-group-show-device="${esc(device.id)}"`;
+      const label=controlAction?`${name} ${pending?t("sendingCommand"):controlAction.active?t("off"):t("on")}`:`${t("showInDevices")}: ${name}`;
+      return`<button class="group-control-tile ${visualState}${pending?" pending":""}" type="button" ${action} aria-label="${esc(label)}"${(device.availability==="offline"&&Boolean(controlAction))||pending?" disabled":""}><div class="group-control-visual" aria-hidden="true">${deviceVisual(device)}</div><strong>${esc(name)}</strong>${pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</button>`;
     }).join("");
     const widgetId=groupWidgetId(group.id);
     const groupPending=state.pendingGroups.has(group.id);
@@ -1204,24 +1390,43 @@
   }
   function bindGroupControls(){
     bindDeviceImages();
-    $$("[data-group-device]").forEach(button=>button.onclick=()=>command(button.dataset.groupDevice,button.dataset.groupProperty,button.dataset.groupValue==="true"));
+    $$("[data-group-device]").forEach(button=>button.onclick=()=>command(button.dataset.groupDevice,button.dataset.groupProperty,JSON.parse(button.dataset.groupCommandValue)));
     $$("[data-group-show-device]").forEach(button=>button.onclick=()=>showDevice(button.dataset.groupShowDevice));
     $$("[data-group-power]").forEach(button=>button.onclick=()=>commandDashboardGroup(button.dataset.groupPower));
     $$("[data-edit-group]").forEach(button=>button.onclick=()=>openGroupEditor(button.dataset.editGroup));
     bindDashboardDeviceActions();
   }
+  function matchingZigbeePowerGroup(entries){
+    if(!entries.length||entries.some(({control})=>!["switch","fan","siren"].includes(control.kind)||control.property!=="state"))return null;
+    const memberIds=[...new Set(entries.map(({device})=>device.id.toLowerCase()))].sort();
+    return state.zigbeeGroups.find(group=>{
+      const zigbeeMemberIds=[...new Set((group.memberIds||[]).map(id=>id.toLowerCase()))].sort();
+      return memberIds.length===zigbeeMemberIds.length&&memberIds.every((id,index)=>id===zigbeeMemberIds[index]);
+    })||null;
+  }
   async function commandDashboardGroup(groupId){
     const group=state.groups.find(candidate=>candidate.id===groupId);
     if(!group||state.pendingGroups.has(groupId))return;
-    const entries=groupControlEntries(group).filter(({device,control})=>control&&device.availability!=="offline");
+    const entries=groupControlEntries(group).filter(({device,control})=>control&&groupPowerControl(control)&&device.availability!=="offline");
     if(!entries.length)return;
-    const value=!entries.every(({control})=>control.value===true);
+    const activate=!entries.every(({control})=>dashboardControlAction(control)?.active===true);
+    const zigbeeGroup=matchingZigbeePowerGroup(entries);
     state.pendingGroups.add(groupId);
     for(const {device,control} of entries)state.pendingCommands.add(commandKey(device.id,control.property));
     render();
     try{
-      await Promise.all(entries.map(({device,control})=>api(`/api/devices/${encodeURIComponent(device.id)}/command`,{method:"POST",body:JSON.stringify({property:control.property,value})})));
-      for(const {control} of entries)control.value=value;
+      if(zigbeeGroup){
+        await api(`/api/groups/${encodeURIComponent(zigbeeGroup.id)}/command`,{
+          method:"POST",
+          body:JSON.stringify({property:"state",value:activate})
+        });
+      }else{
+        await Promise.all(entries.map(({device,control})=>{
+          const value=dashboardControlValueForState(control,activate);
+          return api(`/api/devices/${encodeURIComponent(device.id)}/command`,{method:"POST",body:JSON.stringify({property:control.property,value})});
+        }));
+      }
+      for(const {control} of entries)control.value=dashboardControlValueForState(control,activate);
     }catch(error){showToast(error.message,true)}
     finally{
       state.pendingGroups.delete(groupId);
@@ -1234,7 +1439,7 @@
     const editing=state.groupEditing;
     if(!editing)return;
     const choices=state.devices.flatMap(device=>{
-      const controls=device.controls.filter(control=>control.kind==="switch");
+      const controls=device.controls.filter(isDashboardControl);
       return controls.length?controls.map(control=>({device,control})):[{device,control:null}];
     });
     $("#groupDeviceChoices").innerHTML=choices.length?choices.map(({device,control})=>{
@@ -1242,7 +1447,7 @@
       const checked=editing.selected.has(key);
       const name=control?(control.id==="main"?device.name:control.name):device.name;
       const detail=control?(control.id==="main"?deviceKind(device):device.name):deviceKind(device);
-      const visualState=control?(device.availability==="offline"?"offline":control.value===true?"on":"off"):groupDeviceVisualState(device);
+      const visualState=control?(device.availability==="offline"?"offline":dashboardControlAction(control)?.active?"on":"off"):groupDeviceVisualState(device);
       return`<label class="group-device-choice"><input type="checkbox" data-group-choice="${esc(key)}"${checked?" checked":""}><span class="group-choice-state ${visualState}" aria-hidden="true"></span><span><strong>${esc(name)}</strong><small>${esc(detail)}</small></span></label>`;
     }).join(""):`<div class="group-empty">${t("groupNoAvailableControls")}</div>`;
     $$("[data-group-choice]").forEach(input=>input.onchange=()=>{
@@ -1321,7 +1526,7 @@
     if(addButton)addButton.onclick=()=>startPairing(true);
   }
   async function refresh(){
-    try{const data=await api("/api/overview");const signature=JSON.stringify([data.devices,data.health,data.pairing]);state.connectionError=null;state.devices=data.devices;state.health=data.health;state.pairing=data.pairing;state.overviewLoaded=true;trackPairingProgress();if(signature!==state.overviewSignature){state.overviewSignature=signature;render()}else renderSystemAlertBar();return true;}
+    try{const data=await api("/api/overview");const signature=JSON.stringify([data.devices,data.health,data.pairing,data.events,data.groups]);state.connectionError=null;state.devices=data.devices;state.zigbeeGroups=data.groups||[];state.events=data.events||[];state.health=data.health;state.pairing=data.pairing;state.overviewLoaded=true;trackPairingProgress();if(signature!==state.overviewSignature){state.overviewSignature=signature;render()}else renderSystemAlertBar();return true;}
     catch(error){state.connectionError=error.message;$("#sideDot").className="status-dot bad";$("#sideStatus").textContent=t("serverUnreachable");renderSystemAlertBar();showToast(error.message,true);return false}
   }
   const pullRefreshState={tracking:false,refreshing:false,startX:0,startY:0,distance:0};
@@ -1453,7 +1658,8 @@
       renderPairingProgress();$("#pairingDialog").showModal();
     }
     try{
-      const data=await api(open?"/api/pairing/start":"/api/pairing/stop",{method:"POST",body:open?JSON.stringify({seconds:180}):undefined});
+      const routerId=$("#pairingRouter")?.value||undefined;
+      const data=await api(open?"/api/pairing/start":"/api/pairing/stop",{method:"POST",body:open?JSON.stringify({seconds:180,routerId}):undefined});
       state.pairing=open?data.pairing:{open:false};
       if(open)trackPairingProgress();
       if(!open){if($("#pairingDialog").open)$("#pairingDialog").close();state.pairingSession=null;}
@@ -1639,6 +1845,8 @@
       state.network=data.network||null;
       state.mqttAccess=data.mqttAccess||null;
       $("#zigbeeAdapterUrl").value=state.settings.zigbee.adapterUrl;
+      $("#zigbeeChannel").value=String(state.settings.zigbee.channel);
+      $("#lowBatteryThreshold").value=String(state.settings.alerts?.lowBatteryThreshold??15);
       $("#mqttUrl").value=state.settings.mqtt.url;
       $("#mqttBaseTopic").value=state.settings.mqtt.baseTopic;
       $("#matterWsUrl").value=state.settings.matter.wsUrl;
@@ -1664,12 +1872,22 @@
   }
   function onboardingSettingsFromDraft(){
     return{
-      zigbee:{adapterUrl:state.onboardingDraft.zigbeeAdapterUrl},
+      zigbee:{adapterUrl:state.onboardingDraft.zigbeeAdapterUrl,channel:state.onboardingDraft.zigbeeChannel},
       mqtt:{url:state.onboardingDraft.mqttUrl,baseTopic:state.onboardingDraft.mqttBaseTopic},
       matter:{wsUrl:state.onboardingDraft.matterWsUrl},
       homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true},
+      alerts:{lowBatteryThreshold:state.settings?.alerts?.lowBatteryThreshold??15},
       debug:{enabled:state.settings?.debug?.enabled!==false}
     };
+  }
+  function settingsWithChannelConfirmation(settings){
+    const previous=Number(state.settings?.zigbee?.channel);
+    const next=Number(settings.zigbee?.channel);
+    if(Number.isInteger(previous)&&previous!==next){
+      if(!confirm(t("zigbeeChannelConfirm",{from:previous,to:next})))return null;
+      return{...settings,zigbeeChannelConfirmation:"CHANGE"};
+    }
+    return settings;
   }
   function renderOnboarding(){
     const draft=state.onboardingDraft;
@@ -1724,6 +1942,7 @@
     state.onboardingDraft={
       language:state.language,
       zigbeeAdapterUrl:state.settings.zigbee.adapterUrl,
+      zigbeeChannel:state.settings.zigbee.channel,
       mqttUrl:state.settings.mqtt.url,
       mqttBaseTopic:state.settings.mqtt.baseTopic,
       matterWsUrl:state.settings.matter.wsUrl
@@ -1747,10 +1966,13 @@
         mqtt:state.settings.mqtt,
         matter:state.settings.matter,
         homeAssistant:state.settings.homeAssistant,
+        alerts:state.settings.alerts,
         debug:state.settings.debug
       };
       if(JSON.stringify(settings)!==JSON.stringify(current)){
-        const data=await api("/api/settings",{method:"PUT",body:JSON.stringify(settings)});
+        const payload=settingsWithChannelConfirmation(settings);
+        if(!payload)return;
+        const data=await api("/api/settings",{method:"PUT",body:JSON.stringify(payload)});
         state.settings=data.settings;
         showToast(t("setupSavedRestart"));
       }
@@ -1943,9 +2165,9 @@
       typeof window.VillaAndroid?.stopRuntime==="function"&&
       typeof window.VillaAndroid?.runtimeStatus==="function";
     document.body.classList.toggle("android-app",runtimeAvailable);
-    $("#androidRuntimeCard").hidden=!runtimeAvailable;
+    const status=runtimeAvailable?window.VillaAndroid.runtimeStatus():"";
+    $("#androidRuntimeCard").hidden=!runtimeAvailable||status==="android-monitor";
     if(runtimeAvailable){
-      const status=window.VillaAndroid.runtimeStatus();
       $("#runtimeStatusText").textContent=t(status==="stopped"?"runtimeStopped":"runtimeRunning");
     }
   }
@@ -1998,6 +2220,333 @@
     try{const data=await api("/api/favorites",{method:"PUT",body:JSON.stringify({favorites})});state.favorites=data.favorites;render();}
     catch(error){showToast(error.message,true)}
   }
+  async function reconfigureDevice(id){
+    const button=$$("[data-reconfigure]").find(item=>item.dataset.reconfigure===id);
+    if(button)button.disabled=true;
+    try{
+      await api(`/api/devices/${encodeURIComponent(id)}/reconfigure`,{method:"POST"});
+      showToast(t("repairComplete"));
+      await refresh();
+    }catch(error){showToast(error.message,true)}
+    finally{if(button)button.disabled=false}
+  }
+  async function openDeviceNote(id){
+    const device=state.devices.find(item=>item.id===id);
+    if(!device)return;
+    state.noteEditing=id;
+    $("#noteDeviceName").textContent=device.name;
+    $("#noteInput").value="";
+    $("#noteDialog").showModal();
+    try{
+      const data=await api(`/api/devices/${encodeURIComponent(id)}/note`);
+      if(state.noteEditing===id)$("#noteInput").value=data.note||"";
+    }catch(error){showToast(error.message,true)}
+  }
+  async function scheduleOta(id,enabled=true){
+    const button=$$("[data-ota]").find(item=>item.dataset.ota===id);
+    if(button)button.disabled=true;
+    try{
+      await api(`/api/devices/${encodeURIComponent(id)}/ota-schedule`,{method:"PUT",body:JSON.stringify({enabled})});
+      showToast(t(enabled?"updateScheduled":"updateUnscheduled"));
+    }catch(error){showToast(error.message,true)}
+    finally{if(button)button.disabled=false}
+  }
+  async function checkOta(id){
+    const button=$$("[data-ota-check]").find(item=>item.dataset.otaCheck===id);
+    if(button)button.disabled=true;
+    try{
+      const data=await api(`/api/devices/${encodeURIComponent(id)}/ota-check`,{method:"POST"});
+      showToast(t(data.ota?.available?"updateAvailable":"noUpdateAvailable"));
+      await refresh();
+    }catch(error){showToast(error.message,true)}
+    finally{if(button)button.disabled=false}
+  }
+  function openDeviceOptions(id){
+    const device=state.devices.find(item=>item.id===id);
+    if(!device)return;
+    state.optionsDevice=id;
+    $("#deviceOptionsName").textContent=device.name;
+    $("#deviceTransition").value=String(device.options?.transition??0);
+    $("#deviceDebounce").value=String(device.options?.debounce??0);
+    $("#deviceRetain").checked=device.options?.retain===true;
+    $("#deviceOptionsDialog").showModal();
+  }
+  async function saveDeviceOptions(event){
+    event.preventDefault();
+    const id=state.optionsDevice;
+    if(!id)return;
+    try{
+      const data=await api(`/api/devices/${encodeURIComponent(id)}/options`,{method:"PUT",body:JSON.stringify({
+        transition:Number($("#deviceTransition").value),
+        debounce:Number($("#deviceDebounce").value),
+        retain:$("#deviceRetain").checked
+      })});
+      const device=state.devices.find(item=>item.id===id);
+      if(device)device.options={...device.options,...data.options};
+      $("#deviceOptionsDialog").close();
+      showToast(t("optionsSaved"));
+    }catch(error){showToast(error.message,true)}
+  }
+  async function saveDeviceNote(event){
+    event.preventDefault();
+    const id=state.noteEditing;
+    if(!id)return;
+    try{
+      await api(`/api/devices/${encodeURIComponent(id)}/note`,{method:"PUT",body:JSON.stringify({note:$("#noteInput").value})});
+      $("#noteDialog").close();
+      showToast(t("noteSaved"));
+    }catch(error){showToast(error.message,true)}
+  }
+  async function addInstallCode(){
+    const input=$("#installCode");
+    const value=input.value.trim();
+    if(!value)return;
+    const button=$("#addInstallCode");
+    button.disabled=true;
+    try{
+      await api("/api/zigbee/install-code",{method:"POST",body:JSON.stringify({value})});
+      input.value="";
+      showToast(t("installCodeAdded"));
+    }catch(error){showToast(error.message,true)}
+    finally{button.disabled=false}
+  }
+  async function scanTouchlink(){
+    const button=$("#scanTouchlink");
+    const results=$("#touchlinkResults");
+    button.disabled=true;
+    results.innerHTML=`<span class="device-meta">${t("searching")}</span>`;
+    try{
+      const data=await api("/api/zigbee/touchlink/scan",{method:"POST"});
+      results.innerHTML=data.devices?.length
+        ?data.devices.map(device=>`<span class="touchlink-device">⌁ ${esc(device.ieeeAddress)} · ${esc(device.channel)}<button class="danger-button" type="button" data-touchlink-reset="${esc(device.ieeeAddress)}" data-channel="${esc(device.channel)}">${t("reset")}</button></span>`).join("")
+        :`<span class="device-meta">${t("noNearbyDevices")}</span>`;
+      $$("[data-touchlink-reset]").forEach(reset=>reset.onclick=()=>resetTouchlink(reset.dataset.touchlinkReset,Number(reset.dataset.channel)));
+    }catch(error){results.innerHTML="";showToast(error.message,true)}
+    finally{button.disabled=false}
+  }
+  const networkQualityPercent=value=>Math.round(Math.max(0,Math.min(255,Number(value)||0))/255*100);
+  const networkQualityTone=quality=>quality>=55?"strong":quality>=25?"good":"weak";
+  function networkGraphLabel(value){
+    const label=String(value||"—");
+    return label.length>19?`${label.slice(0,17)}…`:label;
+  }
+  function renderNetworkGraph(map){
+    const nodes=Array.isArray(map.nodes)?map.nodes:[];
+    const links=Array.isArray(map.links)?map.links:[];
+    if(!nodes.length)return`<div class="network-map-empty">${t("noNetworkMap")}</div>`;
+    const nodeById=new Map(nodes.map(node=>[String(node.id).toLowerCase(),node]));
+    const columns=[[],[],[]];
+    nodes.forEach(node=>{
+      const type=String(node.type||"").toLowerCase();
+      columns[type==="coordinator"?0:type==="router"?1:2].push(node);
+    });
+    columns.forEach(column=>column.sort((left,right)=>String(left.name||left.id).localeCompare(String(right.name||right.id),state.language)));
+    const height=Math.max(360,Math.max(...columns.map(column=>column.length))*72+96);
+    const xPositions=[110,500,890];
+    const positions=new Map();
+    columns.forEach((column,columnIndex)=>column.forEach((node,index)=>{
+      const y=column.length===1?height/2:64+index*(height-128)/(column.length-1);
+      positions.set(String(node.id).toLowerCase(),{x:xPositions[columnIndex],y});
+    }));
+    const edgeMarkup=links.map(link=>{
+      const fromId=String(link.from).toLowerCase(),toId=String(link.to).toLowerCase();
+      const fromPosition=positions.get(fromId),toPosition=positions.get(toId);
+      if(!fromPosition||!toPosition)return"";
+      const quality=networkQualityPercent(link.quality);
+      const tone=networkQualityTone(quality);
+      const controlX=fromPosition.x===toPosition.x?fromPosition.x+46:(fromPosition.x+toPosition.x)/2;
+      const path=`M ${fromPosition.x} ${fromPosition.y} C ${controlX} ${fromPosition.y}, ${controlX} ${toPosition.y}, ${toPosition.x} ${toPosition.y}`;
+      const from=nodeById.get(fromId),to=nodeById.get(toId);
+      return`<path class="network-edge ${tone}" d="${path}" stroke-width="${(1.4+quality/28).toFixed(1)}"><title>${esc(from?.name||link.from)} → ${esc(to?.name||link.to)} · ${quality}%</title></path>`;
+    }).join("");
+    const nodeMarkup=nodes.map(node=>{
+      const nodeId=String(node.id).toLowerCase();
+      const position=positions.get(nodeId);
+      if(!position)return"";
+      const attached=links.filter(link=>String(link.from).toLowerCase()===nodeId||String(link.to).toLowerCase()===nodeId);
+      const quality=attached.length?Math.round(attached.reduce((sum,link)=>sum+networkQualityPercent(link.quality),0)/attached.length):null;
+      const type=String(node.type||"").toLowerCase();
+      const typeClass=type==="coordinator"?"coordinator":type==="router"?"router":"end-device";
+      const symbol=typeClass==="coordinator"?"◆":typeClass==="router"?"◇":"•";
+      return`<g class="network-node ${typeClass}" transform="translate(${position.x} ${position.y})"><title>${esc(node.name||node.id)}${quality===null?"":` · ${quality}%`}</title><circle class="node-halo" r="21"></circle><text class="node-symbol" x="0" y="0">${symbol}</text><text class="node-name" x="0" y="36">${esc(networkGraphLabel(node.name||node.id))}</text><text class="node-quality" x="0" y="51">${quality===null?"—":`${quality}%`}</text></g>`;
+    }).join("");
+    return`<section class="network-graph"><div class="network-graph-head"><div class="network-graph-copy"><strong>${t("networkMap")}</strong><span>${t("networkGraphLead")}</span></div><div class="network-legend"><span class="coordinator"><i></i>${t("coordinator")}</span><span class="router"><i></i>${t("networkRouter")}</span><span class="end-device"><i></i>${t("networkEndDevice")}</span><span class="link strong"><i></i>${t("networkStrongLink")}</span><span class="link weak"><i></i>${t("networkWeakLink")}</span></div></div><div class="network-graph-scroll"><svg class="network-graph-svg" viewBox="0 0 1000 ${height}" role="img" aria-label="${esc(t("networkMap"))}" preserveAspectRatio="xMidYMid meet">${edgeMarkup}${nodeMarkup}</svg></div></section>`;
+  }
+  async function scanNetworkMap(){
+    const button=$("#scanNetworkMap");
+    const results=$("#networkMapResults");
+    button.disabled=true;
+    results.innerHTML=`<div class="network-map-loading">${t("mappingNetwork")}</div>`;
+    try{
+      const data=await api("/api/zigbee/network-map");
+      const map=data.map||{nodes:[],links:[]};
+      results.innerHTML=renderNetworkGraph(map);
+    }catch(error){results.innerHTML="";showToast(error.message,true)}
+    finally{button.disabled=false}
+  }
+  async function createZigbeeGroup(){
+    const input=$("#zigbeeGroupName");
+    const name=input.value.trim();
+    if(name.length<2)return;
+    try{
+      const data=await api("/api/groups",{method:"POST",body:JSON.stringify({name})});
+      state.zigbeeGroups=data.groups||[];
+      input.value="";
+      renderZigbeeGroups();
+    }catch(error){showToast(error.message,true)}
+  }
+  async function renameZigbeeGroup(id){
+    const input=$$("[data-zgroup-name]").find(item=>item.dataset.zgroupName===id);
+    const name=input?.value.trim();
+    if(!name||name.length<2)return;
+    try{
+      const data=await api(`/api/groups/${encodeURIComponent(id)}`,{method:"PUT",body:JSON.stringify({name})});
+      state.zigbeeGroups=data.groups||[];
+      renderZigbeeGroups();
+    }catch(error){showToast(error.message,true)}
+  }
+  function addZigbeeGroupMember(id){
+    const select=$$("[data-zgroup-device]").find(item=>item.dataset.zgroupDevice===id);
+    if(select?.value)setZigbeeGroupMember(id,select.value,true);
+  }
+  async function setZigbeeGroupMember(id,deviceId,add){
+    try{
+      const data=await api(`/api/groups/${encodeURIComponent(id)}/member`,{method:"PUT",body:JSON.stringify({deviceId,add})});
+      state.zigbeeGroups=data.groups||[];
+      renderZigbeeGroups();
+    }catch(error){showToast(error.message,true)}
+  }
+  async function zigbeeGroupScene(id,action,sceneId=null){
+    const input=$$("[data-zgroup-scene]").find(item=>item.dataset.zgroupScene===id);
+    const nameInput=$$("[data-zgroup-scene-name]").find(item=>item.dataset.zgroupSceneName===id);
+    const selectedScene=sceneId??Number(input?.value||1);
+    const name=action==="store"?(nameInput?.value.trim()||`Scene ${selectedScene}`):undefined;
+    try{
+      const data=await api(`/api/groups/${encodeURIComponent(id)}/scene`,{method:"POST",body:JSON.stringify({sceneId:selectedScene,action,name})});
+      state.zigbeeGroups=data.groups||state.zigbeeGroups;
+      const group=state.zigbeeGroups.find(candidate=>candidate.id===id);
+      if(group&&action==="store"&&!group.scenes?.some(scene=>scene.id===selectedScene)){
+        group.scenes=[...(group.scenes||[]),{id:selectedScene,name}].sort((left,right)=>left.id-right.id);
+      }
+      if(group&&action==="remove")group.scenes=(group.scenes||[]).filter(scene=>scene.id!==selectedScene);
+      renderZigbeeGroups();
+      showToast(t(action==="store"?"sceneStored":action==="remove"?"sceneRemoved":"sceneRecalled"));
+    }catch(error){showToast(error.message,true)}
+  }
+  async function deleteZigbeeGroup(id){
+    if(!confirm(t("deleteZigbeeGroupConfirm")))return;
+    try{
+      const data=await api(`/api/groups/${encodeURIComponent(id)}`,{method:"DELETE"});
+      state.zigbeeGroups=data.groups||[];
+      renderZigbeeGroups();
+    }catch(error){showToast(error.message,true)}
+  }
+  function renderBindingEndpoints(){
+    const source=state.devices.find(device=>device.id===$("#bindSource").value);
+    const target=state.devices.find(device=>device.id===$("#bindTarget").value);
+    const sourceEndpoint=$("#bindSourceEndpoint"),targetEndpoint=$("#bindTargetEndpoint");
+    const previousSource=sourceEndpoint.value,previousTarget=targetEndpoint.value;
+    const sourceEndpoints=(source?.endpoints||[]).filter(endpoint=>endpoint.outputClusters.length);
+    const targetEndpoints=(target?.endpoints||[]).filter(endpoint=>endpoint.inputClusters.length);
+    sourceEndpoint.innerHTML=`<option value="">${t("automaticEndpoint")}</option>`+sourceEndpoints.map(endpoint=>`<option value="${endpoint.id}">${esc(endpoint.name)}</option>`).join("");
+    targetEndpoint.innerHTML=`<option value="">${target?t("automaticEndpoint"):t("groupTarget")}</option>`+targetEndpoints.map(endpoint=>`<option value="${endpoint.id}">${esc(endpoint.name)}</option>`).join("");
+    targetEndpoint.disabled=!target;
+    if([...sourceEndpoint.options].some(option=>option.value===previousSource))sourceEndpoint.value=previousSource;
+    if([...targetEndpoint.options].some(option=>option.value===previousTarget))targetEndpoint.value=previousTarget;
+  }
+  function renderBindingList(){
+    const bindingTarget=binding=>binding.targetType==="group"
+      ?state.zigbeeGroups.find(group=>group.id===binding.targetId)
+      :state.devices.find(device=>device.id===binding.targetId);
+    const rows=state.devices
+      .flatMap(device=>(device.endpoints||[]).flatMap(endpoint=>(endpoint.bindings||[]).map(binding=>({device,endpoint,binding}))))
+      .filter(({binding})=>Boolean(bindingTarget(binding)));
+    $("#zigbeeBindingList").innerHTML=rows.length?rows.map(({device,endpoint,binding})=>{
+      const target=bindingTarget(binding);
+      const targetEndpoint=binding.targetEndpoint?` · EP ${binding.targetEndpoint}`:"";
+      return`<div class="zigbee-binding-row"><span><strong>${esc(device.name)} · ${esc(endpoint.name)}</strong><br>${esc(binding.cluster)} → ${esc(target?.name||binding.targetId)}${targetEndpoint}</span><button class="danger-button" type="button" data-remove-binding="${esc(device.id)}" data-from-endpoint="${endpoint.id}" data-binding-target="${esc(binding.targetId)}" data-to-endpoint="${binding.targetEndpoint??""}" data-binding-cluster="${esc(binding.cluster)}" title="${t("removeBinding")}">×</button></div>`;
+    }).join(""):`<div class="zigbee-group-empty"><span aria-hidden="true">⌁</span><div><strong>${t("noBindings")}</strong><p>${t("noBindingsLead")}</p></div></div>`;
+    $$("[data-remove-binding]").forEach(button=>button.onclick=()=>removeExistingBinding(button));
+  }
+  async function removeExistingBinding(button){
+    const fromEndpoint=Number(button.dataset.fromEndpoint);
+    const toEndpoint=button.dataset.toEndpoint?Number(button.dataset.toEndpoint):undefined;
+    try{
+      const data=await api("/api/zigbee/bind",{method:"POST",body:JSON.stringify({
+        fromId:button.dataset.removeBinding,
+        toId:button.dataset.bindingTarget,
+        bind:false,
+        clusters:[button.dataset.bindingCluster],
+        fromEndpoint,
+        toEndpoint
+      })});
+      state.devices=data.devices||state.devices;
+      renderZigbeeGroups();
+      showToast(t("bindingRemoved"));
+    }catch(error){showToast(error.message,true)}
+  }
+  async function bindZigbeeDevices(bind){
+    const fromId=$("#bindSource").value,toId=$("#bindTarget").value;
+    if(!fromId||!toId||fromId===toId)return;
+    const fromEndpoint=$("#bindSourceEndpoint").value?Number($("#bindSourceEndpoint").value):undefined;
+    const toEndpoint=$("#bindTargetEndpoint").value?Number($("#bindTargetEndpoint").value):undefined;
+    try{
+      const data=await api("/api/zigbee/bind",{method:"POST",body:JSON.stringify({fromId,toId,bind,fromEndpoint,toEndpoint})});
+      state.devices=data.devices||state.devices;
+      renderZigbeeGroups();
+      showToast(t(bind?"bindingSaved":"bindingRemoved"));
+    }catch(error){showToast(error.message,true)}
+  }
+  async function resetTouchlink(ieeeAddress,channel){
+    if(!confirm(t("touchlinkResetConfirm")))return;
+    try{
+      await api("/api/zigbee/touchlink/reset",{method:"POST",body:JSON.stringify({ieeeAddress,channel,confirmation:"RESET"})});
+      showToast(t("touchlinkResetComplete"));
+      await scanTouchlink();
+    }catch(error){showToast(error.message,true)}
+  }
+  async function downloadZigbeeBackup(){
+    const button=$("#downloadZigbeeBackup");
+    button.disabled=true;
+    try{
+      const response=await fetch("/api/zigbee/backup",{cache:"no-store"});
+      if(!response.ok){
+        const data=await response.json().catch(()=>({}));
+        throw new Error(data.error||t("operationFailed"));
+      }
+      const blob=await response.blob();
+      const disposition=response.headers.get("content-disposition")||"";
+      const filename=/filename="([^"]+)"/.exec(disposition)?.[1]||"villa-bridge-zigbee-backup.json";
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");
+      link.href=url;
+      link.download=filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1_000);
+      showToast(t("backupReady"));
+    }catch(error){showToast(error.message,true)}
+    finally{button.disabled=false}
+  }
+  async function restoreZigbeeBackup(event){
+    const input=event.currentTarget;
+    const file=input.files?.[0];
+    input.value="";
+    if(!file)return;
+    try{
+      if(file.size>30*1024*1024)throw new Error(t("invalidBackupFile"));
+      const backup=JSON.parse(await file.text());
+      if(!confirm(t("restoreConfirm")))return;
+      $("#chooseZigbeeRestore").disabled=true;
+      await api("/api/zigbee/restore",{method:"POST",body:JSON.stringify({confirmation:"RESTORE",backup})});
+      showToast(t("restoreStarting"));
+      waitForRestart();
+    }catch(error){
+      $("#chooseZigbeeRestore").disabled=false;
+      showToast(error instanceof SyntaxError?t("invalidBackupFile"):error.message,true);
+    }
+  }
   function waitForRestart(){
     let observedOffline=false;
     let attempts=0;
@@ -2014,18 +2563,20 @@
   }
   async function saveSettings(event){
     event.preventDefault();
-    if(!confirm(t("restartConfirm")))return;
-    const button=$("#saveSettings");
-    button.disabled=true;
-    try{
-      const settings={
-        zigbee:{adapterUrl:$("#zigbeeAdapterUrl").value.trim()},
+    const settings={
+        zigbee:{adapterUrl:$("#zigbeeAdapterUrl").value.trim(),channel:Number($("#zigbeeChannel").value)},
         mqtt:{url:$("#mqttUrl").value.trim(),baseTopic:$("#mqttBaseTopic").value.trim()},
         matter:{wsUrl:$("#matterWsUrl").value.trim()},
         homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true},
+        alerts:{lowBatteryThreshold:Number($("#lowBatteryThreshold").value)},
         debug:{enabled:state.settings?.debug?.enabled!==false}
       };
-      await api("/api/settings",{method:"PUT",body:JSON.stringify(settings)});
+    const payload=settingsWithChannelConfirmation(settings);
+    if(!payload||!confirm(t("restartConfirm")))return;
+    const button=$("#saveSettings");
+    button.disabled=true;
+    try{
+      await api("/api/settings",{method:"PUT",body:JSON.stringify(payload)});
       showToast(t("settingsSaved"));
       await api("/api/settings/apply",{method:"POST",body:JSON.stringify({confirmation:"APPLY"})});
       waitForRestart();
@@ -2223,6 +2774,12 @@
   $("#nameForm").onsubmit=event=>{event.preventDefault();saveName()};
   $("#cancelName").onclick=cancelName;
   $("#nameDialog").onclose=()=>{const editing=state.editing;state.editing=null;if(editing?.afterPairing)continuePairingFlow(editing.id)};
+  $("#noteForm").onsubmit=saveDeviceNote;
+  $("#cancelNote").onclick=()=>$("#noteDialog").close();
+  $("#noteDialog").onclose=()=>{state.noteEditing=null};
+  $("#deviceOptionsForm").onsubmit=saveDeviceOptions;
+  $("#cancelDeviceOptions").onclick=()=>$("#deviceOptionsDialog").close();
+  $("#deviceOptionsDialog").onclose=()=>{state.optionsDevice=null};
   $("#imageForm").onsubmit=event=>{event.preventDefault();saveImage()};
   $("#cancelImage").onclick=()=>$("#imageDialog").close();
   $("#imageDialog").onclose=()=>{const editing=state.imageEditing;state.imageEditing=null;$("#saveImage").disabled=false;if(editing?.afterPairing)finishPairingFlow(editing.id)};
@@ -2246,11 +2803,24 @@
   $$("[data-login-mode]").forEach(button=>button.onclick=()=>setLoginMode(button.dataset.loginMode));
   $$("[data-auth-logout]").forEach(button=>button.onclick=signOut);
   $("#residentPinForm").onsubmit=updateResidentPin;
+  $("#adminPasswordForm").onsubmit=updateAdminPassword;
+  $("#adminPasswordForm").addEventListener("input",()=>setAuthFormError("adminPasswordError"));
   $("#coachNext").onclick=nextCoachStep;
   $("#coachBack").onclick=previousCoachStep;
   $("#coachSkip").onclick=finishCoach;
   $("#restartOnboarding").onclick=openOnboarding;
   $("#restartDashboardTour").onclick=restartDashboardGuide;
+  $("#downloadZigbeeBackup").onclick=downloadZigbeeBackup;
+  $("#chooseZigbeeRestore").onclick=()=>$("#zigbeeRestoreFile").click();
+  $("#zigbeeRestoreFile").onchange=restoreZigbeeBackup;
+  $("#addInstallCode").onclick=addInstallCode;
+  $("#scanTouchlink").onclick=scanTouchlink;
+  $("#scanNetworkMap").onclick=scanNetworkMap;
+  $("#createZigbeeGroup").onclick=createZigbeeGroup;
+  $("#bindDevices").onclick=()=>bindZigbeeDevices(true);
+  $("#unbindDevices").onclick=()=>bindZigbeeDevices(false);
+  $("#bindSource").onchange=renderBindingEndpoints;
+  $("#bindTarget").onchange=renderBindingEndpoints;
   window.addEventListener("resize",()=>{if(state.coach)positionCoach();updateWidgetScrollHint()});
   $$(".add-device").forEach(button=>button.onclick=()=>startPairing(true));$("#stopPairing").onclick=()=>startPairing(false);$("#refreshButton").onclick=refresh;$("#search").oninput=()=>{filterDevices();bindCards()};$("#removeConfirmation").oninput=()=>{const disabled=!state.removing||!validRemovalConfirmation($("#removeConfirmation").value);$("#confirmRemove").disabled=disabled;$("#forceRemove").disabled=disabled};$("#cancelRemove").onclick=()=>{$("#removeDialog").close();state.removing=null};$("#confirmRemove").onclick=()=>confirmDeviceRemoval(false);$("#forceRemove").onclick=()=>confirmDeviceRemoval(true);$("#openMatter").onclick=()=>loadMatter(true);$("#closeMatter").onclick=async()=>{try{await api("/api/matter/commissioning",{method:"POST",body:JSON.stringify({open:false})})}catch{}$("#matterDialog").close()};$("#closeLight").onclick=()=>$("#lightDialog").close();$("#showLightDevice").onclick=()=>{const id=state.lightDevice;$("#lightDialog").close();if(id)showDevice(id)};$("#settingsForm").onsubmit=saveSettings;$("#toggleHaSetup").onclick=toggleHomeAssistantSetup;$("#toggleHaDiscovery").onclick=toggleHomeAssistantDiscovery;$("#toggleHaPassword").onclick=()=>{state.mqttPasswordVisible=!state.mqttPasswordVisible;renderHomeAssistant()};$("#toggleDebug").onclick=toggleDebugMode;$("#refreshDebugErrors").onclick=loadDebugErrors;$("#clearDebugErrors").onclick=clearDebugErrors;$("#openWifiSettings").onclick=openWifiSettings;$("#stopRuntime").onclick=stopAndroidRuntime;$("#cancelRuntimeStop").onclick=()=>$("#runtimeStopDialog").close();$("#confirmRuntimeStop").onclick=confirmAndroidRuntimeStop;$("#addWidget").onclick=openWidgetCatalog;$("#editDashboard").onclick=()=>setDashboardEditing(!state.dashboardEditing);$("#closeWidgetDialog").onclick=()=>$("#widgetDialog").close();$("#manageWorldClock").onclick=openClockManager;$("#manageWeatherLocation").onclick=openWeatherLocationManager;$("#closeClockDialog").onclick=()=>$("#clockDialog").close();$("#closeWeatherLocationDialog").onclick=()=>$("#weatherLocationDialog").close();$("#clockCitySearch").oninput=()=>scheduleLocationSearch("clock");$("#weatherLocationSearch").oninput=()=>scheduleLocationSearch("weather");$("#useCurrentWeatherLocation").onclick=requestWeatherLocation;$("#widgetScrollLeft").onclick=()=>scrollWidgetRail(-1);$("#widgetScrollHint").onclick=scrollWidgetRailForward;$("#quickScrollLeft").onclick=()=>scrollQuickControls(-1);$("#quickScrollRight").onclick=()=>scrollQuickControls(1);$("#widgetRail").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$("#quickDevices").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$$("[data-open-widget-catalog]").forEach(button=>button.onclick=openWidgetCatalog);
   async function startAuthenticatedApplication(){

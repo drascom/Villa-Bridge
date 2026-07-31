@@ -58,7 +58,7 @@ flowchart LR
         C -->|"Shadow mode"| Z2M["Zigbee2MQTT"]
     end
 
-    subgraph Android["Android tablet — standalone alpha"]
+    subgraph Android["Android tablet — standalone or monitor"]
         AND["Native Android host"]
         AMQTT["Embedded MQTT"]
         AMB["Matterbridge / Matter"]
@@ -80,6 +80,7 @@ flowchart LR
         L["Node.js service"]
     end
     L <--> V
+    L -. "LAN discovery: Android uses remote dashboard" .-> AND
 
     C -->|"Direct mode"| V
     Z2M <--> MQTT["MQTT broker"]
@@ -144,9 +145,10 @@ back up Zigbee network data first.
 
 The Android build is an alpha validated on a Nokia T10. It can host the local
 MQTT broker, direct TCP Zigbee core, Matterbridge/Matter services, and dashboard
-without a separate server. This validation is device-specific and is not yet a
-general production-readiness claim. Linux and Raspberry Pi remain supported
-deployment targets.
+without a separate server. If a Villa Bridge Linux/Raspberry Pi host is found
+and verified on the LAN, Android automatically becomes a dashboard-only monitor
+and leaves the service stack disabled. This validation is device-specific and
+is not yet a general production-readiness claim.
 
 ## Contributing
 

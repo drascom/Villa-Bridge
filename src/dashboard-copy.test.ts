@@ -139,7 +139,7 @@ test("aç/kapat komutları sonuçlanana kadar kontrolü kilitler ve spinner gös
   assert.match(dashboard, /class="command-spinner"/);
   assert.match(dashboard, /\.switch\.pending::after/);
   assert.match(dashboard, /\.light-power\.pending::after/);
-  assert.match(dashboard, /device\.availability==="offline"\|\|pending\?" disabled":""/);
+  assert.match(dashboard, /\(device\.availability==="offline"&&Boolean\(action\)\)\|\|pending\?" disabled":""/);
 });
 
 test("cihaz kaldırma Android WebView uyumlu ve açıkça yıkıcı bir diyalog kullanır", async () => {
@@ -316,6 +316,9 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
   assert.match(dashboard, /id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden/);
   assert.match(dashboard, /id="authSetupPassword" type="password" minlength="8"/);
   assert.match(dashboard, /id="authSetupPin" type="password" inputmode="numeric" pattern="\[0-9\]\{6\}"/);
+  assert.match(dashboard, /if\(admin\)secret\.removeAttribute\("pattern"\)/);
+  assert.match(dashboard, /else secret\.setAttribute\("pattern","\[0-9\]\{6\}"\)/);
+  assert.doesNotMatch(dashboard, /secret\.pattern=admin\?"":/);
   assert.match(dashboard, /api\("\/api\/auth\/session"\)/);
   assert.match(dashboard, /api\("\/api\/auth\/setup",\{method:"POST"/);
   assert.match(dashboard, /api\("\/api\/auth\/login",\{method:"POST"/);
@@ -330,6 +333,36 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
   assert.match(dashboard, /data-view="settings" data-admin-only/);
   assert.match(dashboard, /data-admin-only data-remove=/);
   assert.match(dashboard, /if\(!state\.auth\.authenticated\)\{openAuthGate\(\);return\}/);
+});
+
+test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla sıralanır", async () => {
+  const dashboard = await readDashboardBundle();
+  const settingsStart = dashboard.indexOf('<section id="settings"');
+  const settings = dashboard.slice(
+    settingsStart,
+    dashboard.indexOf("</section>\n  </main>", settingsStart) + 10
+  );
+
+  assert.ok(settings.indexOf("onboarding-settings-card") < settings.indexOf("settings-security-grid"));
+  assert.ok(settings.indexOf("settings-security-grid") < settings.indexOf('id="settingsForm"'));
+  assert.ok(settings.indexOf('id="settingsForm"') < settings.indexOf('id="androidRuntimeCard"'));
+  assert.match(settings, /class="settings-security-grid"/);
+  assert.match(settings, /class="setting-card security-card"/);
+  assert.match(settings, /id="adminPasswordForm"/);
+  assert.doesNotMatch(settings, /id="currentAdminPassword"/);
+  assert.match(settings, /id="newAdminPassword"[\s\S]*id="confirmAdminPassword"/);
+  assert.match(settings, /id="settingsForm" class="setting-card connection-settings-card"/);
+  assert.match(settings, /class="connection-settings-grid"/);
+  assert.match(settings, /class="connection-settings-section"><h2>Zigbee2MQTT/);
+  assert.match(settings, /class="connection-settings-section"><h2>MQTT/);
+  assert.match(settings, /class="connection-settings-section"><h2>Matter/);
+  assert.match(settings, /class="settings-actions"[\s\S]*id="saveSettings"/);
+  assert.match(dashboard, /\.settings-security-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(dashboard, /\.connection-settings-section\+\.connection-settings-section\{border-left:1px solid var\(--line\)\}/);
+  assert.match(dashboard, /api\("\/api\/auth\/admin-password",\{method:"PUT",body:JSON\.stringify\(\{newPassword:next\.value\}\)\}/);
+  assert.match(settings, /class="setting-card zigbee-settings-card" data-admin-only/);
+  assert.match(settings, /class="backup-card zigbee-settings-section"[\s\S]*class="zigbee-tools zigbee-settings-section"/);
+  assert.match(dashboard, /\.zigbee-settings-section\+\.zigbee-settings-section\{border-top:1px solid var\(--line\)\}/);
 });
 
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
@@ -363,6 +396,7 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /id="runtimeStopDialog"/);
   assert.match(dashboard, /VillaAndroid\?\.stopRuntime/);
   assert.match(dashboard, /VillaAndroid\.stopRuntime\(\)/);
+  assert.match(dashboard, /status==="android-monitor"/);
   assert.match(dashboard, /runtimeStopDialog"\)\.showModal\(\)/);
   assert.match(dashboard, /runtimeStopConfirm:"Stop Zigbee, MQTT and Matter/);
   assert.match(dashboard, /runtimeStopConfirm:"Bu tablette Zigbee, MQTT ve Matter/);
@@ -434,7 +468,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /data-widget="recent"/);
   assert.match(dashboard, /data-widget="clock"[\s\S]*id="worldClockRows"/);
   assert.match(dashboard, /data-widget="weather"[\s\S]*id="weatherContent"/);
-  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","clock","weather","recent"\]/);
+  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","clock","weather","recent","activity"\]/);
   assert.match(dashboard, /if\(!Array\.isArray\(value\)\)return\[\.\.\.defaultDashboardWidgets\]/);
   assert.match(dashboard, /catch\{return\[\.\.\.defaultDashboardWidgets\]\}/);
   assert.doesNotMatch(dashboard, /data-widget="signal"/);
@@ -496,7 +530,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /id="showLightDevice"/);
   assert.match(dashboard, /class="device-card quick-card \$\{visualState\}"/);
   assert.doesNotMatch(dashboard, /class="quick-state /);
-  assert.match(dashboard, /class="quick-battery\$\{battery<15\?" low":""\}"/);
+  assert.match(dashboard, /const batteryThreshold=state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
+  assert.match(dashboard, /class="quick-battery\$\{battery<=batteryThreshold\?" low":""\}"/);
   assert.match(dashboard, /class="battery-glyph"/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
   assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div>\$\{linkQualityBadge\(device\)\}/);
@@ -507,7 +542,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.quick-control-widget \.quick-card\{min-height:44px;padding:5px 12px\}/);
   assert.match(dashboard, /class="quick-device-icon"/);
   assert.match(dashboard, /\.quick-toggle\{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:26px minmax\(0,1fr\) auto/);
-  assert.match(dashboard, /<button class="quick-toggle \$\{control\.value===true\?"on":""\}\$\{pending\?" pending":""\}" data-command="[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
+  assert.match(dashboard, /<button class="quick-toggle \$\{action\?\.active\?"on":""\}\$\{pending\?" pending":""\}" \$\{actionAttributes\}[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
   assert.match(dashboard, /\.quick-grid\.grid-view\{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto/);
   assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start\}/);
   assert.match(dashboard, /\.quick-grid \.device-name\{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:11px\}/);
@@ -568,9 +603,9 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /function scrollWidgetRail\(direction\)\{scrollDashboardRow\(\$\("#widgetRail"\),direction,220,\.72\)\}/);
   assert.match(dashboard, /function scrollQuickControls\(direction\)\{scrollDashboardRow\(\$\("#quickDevices"\),direction,120,\.55\)\}/);
   assert.match(dashboard, /#home \.quick-scroll-hint\{top:calc\(50% - 16px\);width:28px;height:32px/);
-  assert.match(dashboard, /const button=card\.querySelector\("\[data-command\]"\)/);
+  assert.match(dashboard, /const button=card\.querySelector\("\[data-command-value\],\[data-quick-show\]"\)/);
   assert.match(dashboard, /if\(!button\|\|button\.disabled\)return/);
-  assert.match(dashboard, /command\(button\.dataset\.command,button\.dataset\.property,button\.dataset\.value==="true"\)/);
+  assert.match(dashboard, /const button=card\.querySelector\("\[data-command-value\],\[data-quick-show\]"\);[\s\S]*?button\.click\(\)/);
   assert.match(dashboard, /if\(!event\.target\.closest\("button,input"\)\)toggle\(\)/);
   assert.doesNotMatch(dashboard, /if\(!event\.target\.closest\("button,input"\)\)openLightControls/);
   assert.match(dashboard, /id="deviceActionDialog"/);
@@ -620,6 +655,107 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /addWidgetTitle:"Add a dashboard widget"/);
   assert.match(dashboard, /addWidgetTitle:"Dashboard widget’ı ekle"/);
   assert.doesNotMatch(dashboard, /draggable="true"/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});
+
+test("perde, iklim, kilit, fan ve siren günlük kullanıcıya görsel kontrollerle sunulur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /control\.kind==="cover"/);
+  assert.match(dashboard, /control\.kind==="lock"/);
+  assert.match(dashboard, /\["switch","fan","siren"\]\.includes\(control\.kind\)/);
+  assert.match(dashboard, /data-command-value=/);
+  assert.match(dashboard, /data-select=/);
+  assert.match(dashboard, /class="control-command stop"/);
+  assert.match(dashboard, /control\.adminOnly\?" data-admin-only":""/);
+});
+
+test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellikler ev kullanıcısına açıktır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /<section id="connections" class="view" data-admin-only>/);
+  assert.match(dashboard, /<section id="settings" class="view" data-admin-only>/);
+  assert.match(dashboard, /body\.resident-session \[data-admin-only\]\{display:none!important\}/);
+  assert.match(dashboard, /id="devicesAddDevice"[^>]*data-admin-only/);
+  assert.match(dashboard, /class="setting-card zigbee-settings-card" data-admin-only/);
+  assert.match(dashboard, /data-admin-only data-options=/);
+  assert.match(dashboard, /data-admin-only data-reconfigure=/);
+  assert.match(dashboard, /data-admin-only data-ota=/);
+  assert.match(dashboard, /data-admin-only data-remove=/);
+
+  assert.match(dashboard, /data-widget="activity"/);
+  assert.match(dashboard, /defaultDashboardWidgets=\["quick","clock","weather","recent","activity"\]/);
+  assert.match(dashboard, /<button class="secondary" data-note=/);
+  assert.doesNotMatch(dashboard, /data-admin-only data-note=/);
+});
+
+test("kanal değişikliği ve düşük pil eşiği güvenli ayar akışında sunulur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="lowBatteryThreshold" type="number" min="5" max="50"/);
+  assert.match(dashboard, /function settingsWithChannelConfirmation\(settings\)/);
+  assert.match(dashboard, /zigbeeChannelConfirmation:"CHANGE"/);
+  assert.match(dashboard, /alerts:\{lowBatteryThreshold:Number\(\$\("#lowBatteryThreshold"\)\.value\)\}/);
+  assert.match(dashboard, /const isAlert=device=>Array\.isArray\(device\.alerts\)&&device\.alerts\.length>0/);
+});
+
+test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla gösterilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="networkMapResults" class="network-graph-host"/);
+  assert.match(dashboard, /function renderNetworkGraph\(map\)/);
+  assert.match(dashboard, /class="network-graph-svg"/);
+  assert.match(dashboard, /class="network-edge \$\{tone\}"/);
+  assert.match(dashboard, /columns\[type==="coordinator"\?0:type==="router"\?1:2\]/);
+  assert.match(dashboard, /networkGraphLead:"Devices are arranged by their role/);
+  assert.match(dashboard, /networkGraphLead:"Cihazlar ağdaki rollerine göre dizilir/);
+  assert.doesNotMatch(dashboard, /class="touchlink-device network-map-link"/);
+
+  assert.match(dashboard, /class="zigbee-group-panel"/);
+  assert.match(dashboard, /class="zigbee-binding-panel"/);
+  assert.match(dashboard, /data-i18n="zigbeeGroupsLead"/);
+  assert.match(dashboard, /data-i18n="directBindingLead"/);
+  assert.match(dashboard, /id="bindSourceEndpoint"/);
+  assert.match(dashboard, /id="bindTargetEndpoint"/);
+  assert.match(dashboard, /id="zigbeeBindingList"/);
+  assert.match(dashboard, /function renderBindingEndpoints\(\)/);
+  assert.match(dashboard, /function renderBindingList\(\)/);
+  assert.match(dashboard, /const bindingTarget=binding=>binding\.targetType==="group"/);
+  assert.match(dashboard, /\.filter\(\(\{binding\}\)=>Boolean\(bindingTarget\(binding\)\)\)/);
+  assert.match(dashboard, /directBindingLead:"Connect a button directly[\s\S]*Automatic reporting links to the coordinator stay hidden\."/);
+  assert.match(dashboard, /directBindingLead:"Bir düğmeyi doğrudan[\s\S]*otomatik raporlama bağlantıları gizlenir\."/);
+  assert.match(dashboard, /data-zgroup-existing-scene=/);
+  assert.match(dashboard, /data-zgroup-scene-name=/);
+  assert.match(dashboard, /class="zigbee-group-empty"/);
+  assert.match(dashboard, /groupMembers:"\{count\} devices"/);
+  assert.match(dashboard, /groupMembers:"\{count\} cihaz"/);
+  assert.match(dashboard, /\.setting-field input,\.setting-field select\{/);
+  assert.match(dashboard, /\.zigbee-tool input,\.zigbee-tool select/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});
+
+test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kullanılabilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /dashboardControlKinds=new Set\(\["switch","fan","siren","cover","position","lock","climate"\]\)/);
+  assert.match(dashboard, /const dashboardControlForDevice=/);
+  assert.match(dashboard, /const dashboardControlAction=/);
+  assert.match(dashboard, /const mainControl=dashboardControlForDevice\(device\)/);
+  assert.match(dashboard, /device\?\.controls\.find\(item=>item\.id===favorite\.controlId&&isDashboardControl\(item\)\)/);
+  assert.match(dashboard, /const controls=device\.controls\.filter\(isDashboardControl\)/);
+  assert.match(dashboard, /data-group-command-value=/);
+  assert.match(dashboard, /JSON\.parse\(button\.dataset\.groupCommandValue\)/);
+  assert.match(dashboard, /groupPowerControl=control=>\["switch","fan","siren","cover"\]\.includes\(control\.kind\)/);
+  assert.match(dashboard, /function matchingZigbeePowerGroup\(entries\)/);
+  assert.match(dashboard, /api\(`\/api\/groups\/\$\{encodeURIComponent\(zigbeeGroup\.id\)\}\/command`/);
+  assert.match(dashboard, /data-ota-check=/);
+  assert.match(dashboard, /function checkOta\(id\)/);
+  assert.match(dashboard, /\/ota-check`/);
+  assert.doesNotMatch(dashboard, /const controllable=devices\.filter\(device=>device\.controls\.some\(control=>control\.kind==="switch"\)\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
