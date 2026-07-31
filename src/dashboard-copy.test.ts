@@ -329,6 +329,8 @@ test("yerel admin ve ev kullanıcısı rolleri arayüzde güvenli giriş ve yetk
   assert.match(dashboard, /authLoginForm"\)\.addEventListener\("input",\(\)=>setAuthFormError\("authLoginError"\)\)/);
   assert.match(dashboard, /"x-villa-csrf":state\.auth\.csrfToken/);
   assert.match(dashboard, /body\.resident-session \[data-admin-only\]\{display:none!important\}/);
+  assert.match(dashboard, /#loginUsernameField\[hidden\]\{display:none\}/);
+  assert.match(dashboard, /username:state\.loginMode==="admin"\?\$\("#authLoginUsername"\)\.value:""/);
   assert.match(dashboard, /data-view="connections" data-admin-only/);
   assert.match(dashboard, /data-view="settings" data-admin-only/);
   assert.match(dashboard, /data-admin-only data-remove=/);
@@ -487,6 +489,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{[^}]*background:rgba\(23,65,54,.76\)/);
   assert.match(dashboard, /\.clock-row span\{color:var\(--ink\);font:750 18px\/1 system-ui,sans-serif/);
   assert.match(dashboard, /\.weather-facts span\{padding:6px 9px[^}]*font-size:12px;font-weight:700\}/);
+  assert.match(dashboard, /\[data-widget="activity"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
   assert.doesNotMatch(dashboard, /id="homeAddDevice"/);
   assert.match(dashboard, /\$\("#editDashboardLabel"\)\.textContent=editDashboardText/);
   assert.match(dashboard, /data-home-metric="devices"[\s\S]*id="deviceCount"/);
