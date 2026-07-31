@@ -366,6 +366,10 @@ class MainActivity : Activity() {
             }
 
         @android.webkit.JavascriptInterface
+        fun connectedServerAddress(): String =
+            if (runtimeMode == "android-monitor") trustedDashboardOrigin.host.orEmpty() else ""
+
+        @android.webkit.JavascriptInterface
         fun startRuntime() {
             runOnUiThread { this@MainActivity.startRuntime() }
         }

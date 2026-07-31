@@ -367,7 +367,9 @@ test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla
   assert.match(dashboard, /serverSettingsLead:"Zigbee, MQTT ve Matter değişiklikleri bu tarayıcıda açık olan Villa Bridge sunucusuna kaydedilir/);
   assert.match(dashboard, /serverAddress:"Server IP"/);
   assert.match(dashboard, /serverAddress:"Sunucu IP"/);
-  assert.match(dashboard, /const address=state\.network\?\.preferredAddress\|\|state\.network\?\.addresses\?\.\[0\]\|\|t\("ipUnavailable"\)/);
+  assert.match(dashboard, /VillaAndroid\?\.connectedServerAddress/);
+  assert.match(dashboard, /String\(window\.VillaAndroid\.connectedServerAddress\(\)\|\|""\)\.trim\(\)/);
+  assert.match(dashboard, /const address=discoveredAddress\|\|state\.network\?\.preferredAddress\|\|state\.network\?\.addresses\?\.\[0\]\|\|t\("ipUnavailable"\)/);
   assert.match(settings, /class="setting-card security-card"/);
   assert.match(settings, /id="adminPasswordForm"/);
   assert.doesNotMatch(settings, /id="currentAdminPassword"/);

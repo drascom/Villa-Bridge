@@ -2171,7 +2171,9 @@
     $("#toggleHaSetup").setAttribute("aria-expanded",String(setupExpanded));
   }
   function renderConnectedServerAddress(){
-    const address=state.network?.preferredAddress||state.network?.addresses?.[0]||t("ipUnavailable");
+    const discoveredAddress=state.androidMonitor&&typeof window.VillaAndroid?.connectedServerAddress==="function"
+      ?String(window.VillaAndroid.connectedServerAddress()||"").trim():"";
+    const address=discoveredAddress||state.network?.preferredAddress||state.network?.addresses?.[0]||t("ipUnavailable");
     $("#connectedServerAddress").textContent=address;
   }
   function configureAndroidActions(){
