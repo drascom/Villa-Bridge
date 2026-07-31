@@ -37,6 +37,12 @@ test("bağlantılar ekranı yalnız Matter sistemlerini tarif eder", async () =>
   assert.match(dashboard, /connectPlatform:"Matter sistemi bağla"/);
   assert.doesNotMatch(dashboard, /data-i18n="oneNameSystem"/);
   assert.match(dashboard, /id="toggleHaSetup"[^>]*aria-expanded="false"[^>]*aria-controls="haSetupDetails"/);
+  assert.match(dashboard, /class="connection-card-head"[\s\S]*class="matter-logo"/);
+  assert.match(dashboard, /class="connection-card-head"[\s\S]*class="home-assistant-logo"/);
+  assert.match(dashboard, /class="secondary connection-action" data-i18n="connectPlatform"/);
+  assert.match(dashboard, /class="secondary connection-action ha-connect-button"/);
+  assert.match(dashboard, /\.connection-action\{[^}]*border:1px solid var\(--forest\)[^}]*background:transparent[^}]*box-shadow:none/);
+  assert.doesNotMatch(dashboard, /class="device-icon">(?:⌁|HA)<\/div><h2/);
   assert.match(dashboard, /id="haSetupDetails" class="ha-setup-details" hidden/);
   assert.match(dashboard, /connectHomeAssistant:"Connect Home Assistant"/);
   assert.match(dashboard, /connectHomeAssistant:"Home Assistant’a bağlan"/);
@@ -349,6 +355,12 @@ test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla
   assert.ok(settings.indexOf("settings-security-grid") < settings.indexOf('id="settingsForm"'));
   assert.ok(settings.indexOf('id="settingsForm"') < settings.indexOf('id="androidRuntimeCard"'));
   assert.match(settings, /class="settings-security-grid"/);
+  assert.match(settings, /class="settings-server-notice"/);
+  assert.ok(settings.indexOf('class="settings-server-notice"') < settings.indexOf('class="setting-card onboarding-settings-card"'));
+  assert.match(dashboard, /serverSettingsTitle:"You are editing the active server"/);
+  assert.match(dashboard, /serverSettingsTitle:"Aktif sunucu ayarlarını değiştiriyorsunuz"/);
+  assert.match(dashboard, /serverSettingsLead:"Zigbee, MQTT and Matter changes are saved on the Villa Bridge server/);
+  assert.match(dashboard, /serverSettingsLead:"Zigbee, MQTT ve Matter değişiklikleri bu tarayıcıda açık olan Villa Bridge sunucusuna kaydedilir/);
   assert.match(settings, /class="setting-card security-card"/);
   assert.match(settings, /id="adminPasswordForm"/);
   assert.doesNotMatch(settings, /id="currentAdminPassword"/);
@@ -399,6 +411,12 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /VillaAndroid\?\.stopRuntime/);
   assert.match(dashboard, /VillaAndroid\.stopRuntime\(\)/);
   assert.match(dashboard, /status==="android-monitor"/);
+  assert.match(dashboard, /id="serverConnectionMetric" class="server-connection-metric" hidden/);
+  assert.match(dashboard, /state\.androidMonitor=status==="android-monitor"/);
+  assert.match(dashboard, /serverMetric\.hidden=!state\.androidMonitor/);
+  assert.match(dashboard, /const serverConnected=state\.overviewLoaded&&!state\.connectionError/);
+  assert.match(dashboard, /serverConnected:"Server connected"/);
+  assert.match(dashboard, /serverDisconnected:"Sunucu bağlantısı kesildi"/);
   assert.match(dashboard, /runtimeStopDialog"\)\.showModal\(\)/);
   assert.match(dashboard, /runtimeStopConfirm:"Stop Zigbee, MQTT and Matter/);
   assert.match(dashboard, /runtimeStopConfirm:"Bu tablette Zigbee, MQTT ve Matter/);
