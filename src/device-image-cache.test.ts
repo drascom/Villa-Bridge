@@ -151,6 +151,57 @@ test("dosya uzantısı istenen değil gerçek content type ile belirlenir", asyn
   assert.deepEqual(await readdir(directory), ["TS0002_basic.png"]);
 });
 
+test("ısıtma yalnız eksik ve geçerli modelleri indirir", async () => {
+  const directory = await createDirectory();
+  await writeFile(resolve(directory, "WHD02.jpg"), Buffer.from([1]));
+  const cache = new DeviceImageCache(directory, 2, 0);
+  const requested: string[] = [];
+
+  await withFetch(async (input) => {
+    requested.push(String(input));
+    return imageResponse(Buffer.from([2, 3]), "image/jpeg");
+  }, async () => {
+    await cache.warm(["WHD02", "TS0011", "TS0011", "../../etc/passwd", "a/b", ""]);
+  });
+
+  assert.deepEqual(requested, ["https://www.zigbee2mqtt.io/images/devices/TS0011.jpg"]);
+  assert.deepEqual((await readdir(directory)).sort(), ["TS0011.jpg", "WHD02.jpg"]);
+});
+
+test("ısıtmada bir modelin hatası diğerlerini durdurmaz", async () => {
+  const directory = await createDirectory();
+  const cache = new DeviceImageCache(directory, 2, 0);
+
+  await withFetch(async (input) => {
+    const url = String(input);
+    if (url.includes("TS0012")) throw new Error("bağlantı yok");
+    if (url.includes("TS0013")) return notFoundResponse();
+    return imageResponse(Buffer.from([7]), "image/jpeg");
+  }, async () => {
+    await cache.warm(["TS0012", "TS0013", "TS0011", "TS0002_basic"]);
+  });
+
+  assert.deepEqual(
+    (await readdir(directory)).sort(),
+    ["TS0002_basic.jpg", "TS0011.jpg"]
+  );
+});
+
+test("ısıtma negatif önbellekteki modeller için ağa çıkmaz", async () => {
+  const cache = new DeviceImageCache(await createDirectory(), 2, 0);
+  let calls = 0;
+
+  await withFetch(async () => {
+    calls += 1;
+    return notFoundResponse();
+  }, async () => {
+    assert.equal(await cache.get("TS9998"), null);
+    assert.equal(calls, 2);
+    await cache.warm(["TS9998"]);
+    assert.equal(calls, 2);
+  });
+});
+
 test("ağ hatası yutulur ve null döner", async () => {
   const cache = new DeviceImageCache(await createDirectory());
 

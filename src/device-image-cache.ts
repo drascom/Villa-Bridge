@@ -26,8 +26,43 @@ const extensionForContentType = (header: string | null): string | null => {
 
 export class DeviceImageCache {
   private readonly missing = new Set<string>();
+  private warming = false;
 
-  constructor(private readonly directory: string) {}
+  constructor(
+    private readonly directory: string,
+    private readonly warmConcurrency = 2,
+    private readonly warmPauseMs = 250
+  ) {}
+
+  /**
+   * Verilen modelleri arka planda önden indirir. Aynı anda tek tur çalışır,
+   * upstream'i yormamak için küçük gruplar hâlinde ve aralarında bekleyerek ilerler.
+   * Hatalar yutulur; ısıtma başarısız olsa da servis etkilenmez.
+   */
+  async warm(models: string[]): Promise<void> {
+    if (this.warming) return;
+    this.warming = true;
+    try {
+      const pending = [...new Set(models)].filter(
+        (model) => safeModelPattern.test(model) && !this.missing.has(model)
+      );
+      for (let index = 0; index < pending.length; index += this.warmConcurrency) {
+        const batch = pending.slice(index, index + this.warmConcurrency);
+        await Promise.all(batch.map(async (model) => {
+          try {
+            await this.get(model);
+          } catch (error) {
+            console.error(`Cihaz görseli ön belleğe alınamadı (${model}): ${String(error)}`);
+          }
+        }));
+        if (index + this.warmConcurrency < pending.length) {
+          await new Promise((resolveDelay) => setTimeout(resolveDelay, this.warmPauseMs));
+        }
+      }
+    } finally {
+      this.warming = false;
+    }
+  }
 
   async get(model: string): Promise<DeviceImage | null> {
     if (!safeModelPattern.test(model) || model === "." || model === "..") return null;

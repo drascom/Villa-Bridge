@@ -847,6 +847,8 @@ let discoveryResponder: Awaited<ReturnType<typeof startLanDiscoveryResponder>> =
 const shutdown = async (): Promise<void> => {
   if (!embeddedGlobal.__villaBridgeReady) return;
   embeddedGlobal.__villaBridgeReady = false;
+  clearInterval(imageWarmTimer);
+  clearTimeout(imageWarmStartTimer);
   await discoveryResponder?.close();
   await source.stop();
   await app.close();
@@ -859,6 +861,20 @@ if (!embeddedRuntime) {
 }
 
 await source.start();
+const warmDeviceImages = (): void => {
+  const models = store.getDevices()
+    .map((device) => device.image.model?.trim())
+    .filter((model): model is string => Boolean(model));
+  if (models.length === 0) return;
+  void imageCache.warm(models).catch((error) => {
+    console.error(`Cihaz görselleri önden indirilemedi: ${String(error)}`);
+  });
+};
+const imageWarmTimer = setInterval(warmDeviceImages, 5 * 60_000);
+imageWarmTimer.unref();
+const imageWarmStartTimer = setTimeout(warmDeviceImages, 5_000);
+imageWarmStartTimer.unref();
+
 await app.listen({ host: config.http.host, port: config.http.port });
 try {
   discoveryResponder = await startLanDiscoveryResponder(discoveryRecord);
