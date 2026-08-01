@@ -236,6 +236,9 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /const deviceDetailBodyHtml=device=>\{/);
   assert.match(dashboard, /class="device-name-edit"[^>]*data-rename=/);
   assert.match(dashboard, /class="device-meta-text">\$\{deviceKind\(device\)\} · /);
+  assert.match(dashboard, /class="device-card-lead">\$\{deviceStatusIcon\(device,primaryStatus\)\}\$\{cardSignalBadge\(device\)\}<\/div>/);
+  assert.match(dashboard, /\.device-card-lead\{width:46px;flex:none;display:flex;flex-direction:column/);
+  assert.match(dashboard, /class="device-detail-topline">\$\{linkQualityBadge\(device\)\}/);
   assert.match(dashboard, /const primaryStatusForDevice=/);
   assert.match(dashboard, /value\.smoke!==undefined/);
   assert.match(dashboard, /value\.carbon_monoxide!==undefined/);
