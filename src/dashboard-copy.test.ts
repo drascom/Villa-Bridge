@@ -230,16 +230,21 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /const deviceNeedsAttention=device=>device\.availability==="offline"/);
   assert.match(dashboard, /attention\.hidden=attentionDevices\.length===0/);
   assert.match(dashboard, /const regularDevices=devices\.filter\(device=>!deviceNeedsAttention\(device\)\)/);
-  assert.match(dashboard, /class="device-card-layout"><aside class="device-image-panel"/);
+  assert.match(dashboard, /<article class="device-card\$\{preparing\?" preparing":""\}"/);
+  assert.doesNotMatch(dashboard, /class="device-card-layout"/);
   assert.match(dashboard, /class="image-edit-overlay"[^>]*data-change-image=/);
-  assert.match(dashboard, /class="device-exposed-panel"/);
+  assert.match(dashboard, /const deviceDetailBodyHtml=device=>\{/);
   assert.match(dashboard, /class="device-name-edit"[^>]*data-rename=/);
   assert.match(dashboard, /class="device-header-status">\$\{linkQualityBadge\(device\)\}/);
   assert.match(dashboard, /const primaryStatusForDevice=/);
   assert.match(dashboard, /value\.smoke!==undefined/);
   assert.match(dashboard, /value\.carbon_monoxide!==undefined/);
   assert.match(dashboard, /value\.occupancy!==undefined\?value\.occupancy:value\.presence/);
-  assert.match(dashboard, /\.device-card-layout\{display:grid;grid-template-columns:minmax\(180px,.72fr\) minmax\(0,1.55fr\)/);
+  assert.doesNotMatch(dashboard, /\.device-grid>\.device-card\[open\]/);
+  assert.match(dashboard, /\.device-card,\.device-card-body,\.device-detail-body\{min-width:0\}/);
+  assert.doesNotMatch(dashboard, /details\.style\.gridColumn/);
+  assert.match(dashboard, /\.device-image-stage\{position:relative;width:100%;max-width:100%/);
+  assert.match(dashboard, /\.device-grid\{display:grid;grid-template-columns:repeat\(auto-fill,minmax\(240px,1fr\)\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
@@ -254,7 +259,7 @@ test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async 
   assert.match(dashboard, /minlength="2"/);
   assert.match(dashboard, /openPairingName\(session\.foundId,session\.reconnected\)/);
   assert.match(dashboard, /const preparing=device\.preparing===true/);
-  assert.match(dashboard, /class="device-card\$\{preparing\?" preparing":""\}"/);
+  assert.match(dashboard, /<dialog id="deviceDetailDialog" class="device-detail-dialog"/);
   assert.match(dashboard, /preparing\?' inert aria-busy="true"'/);
   assert.match(dashboard, /preparing\|\|\(device\.availability==="offline"&&Boolean\(action\)\)\|\|pending/);
   assert.match(dashboard, /pairingReconnectComplete:"Known device reconnected successfully\."/);
@@ -609,8 +614,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /class="quick-battery\$\{battery<=batteryThreshold\?" low":""\}"/);
   assert.match(dashboard, /class="battery-glyph"/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
-  assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div><button class="device-name-edit"/);
-  assert.match(dashboard, /class="device-header-status">\$\{linkQualityBadge\(device\)\}<\/div><\/summary>/);
+  assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div><\/div>/);
+  assert.match(dashboard, /class="device-header-status">\$\{linkQualityBadge\(device\)\}\$\{deviceCardToggle\(device,preparing\)\}<\/div>/);
   assert.match(dashboard, /class="device-link-level\$\{tone\?`\ \$\{tone\}`:""\}"/);
   assert.match(dashboard, /\.device-link-level\.strong\{color:#24805a/);
   assert.match(dashboard, /\.device-link-level\.weak\{color:var\(--danger\)/);

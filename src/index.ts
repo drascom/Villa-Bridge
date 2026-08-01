@@ -7,6 +7,7 @@ import { loadAliases, saveAliases } from "./aliases.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { hexToXy } from "./device-controls.js";
+import { DeviceImageCache } from "./device-image-cache.js";
 import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
 import { DeviceNotesStore } from "./device-notes.js";
@@ -45,6 +46,7 @@ if (config.zigbee && await applyPendingZigbeeNetworkRestore(config.zigbee.dataDi
 const aliases = await loadAliases(config.aliasesFile);
 const configPath = resolve(process.env.VILLA_BRIDGE_CONFIG ?? "config/default.yaml");
 const imagesStore = new DeviceImagesStore(resolve(dirname(configPath), "device-images.json"));
+const imageCache = new DeviceImageCache(resolve(dirname(configPath), "device-image-cache"));
 let imagePreferences = await imagesStore.get();
 const deviceEventsStore = new DeviceEventsStore(resolve(dirname(configPath), "device-events.json"));
 const store = new DeviceStore(
@@ -170,6 +172,16 @@ app.put<{ Params: { id: string }; Body?: { note?: unknown } }>("/api/devices/:id
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
+});
+app.get<{ Params: { model: string } }>("/api/device-image/:model", async (request, reply) => {
+  const image = await imageCache.get(request.params.model);
+  if (!image) {
+    return reply.code(404).send({ ok: false, code: "DEVICE_IMAGE_NOT_FOUND" });
+  }
+  return reply
+    .header("Cache-Control", "public, max-age=604800, immutable")
+    .type(image.contentType)
+    .send(image.body);
 });
 app.get("/api/groups", async () => ({ groups: store.getGroups() }));
 app.post<{ Body?: { name?: unknown } }>("/api/groups", async (request, reply) => {
