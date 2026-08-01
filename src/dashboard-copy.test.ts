@@ -916,7 +916,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /event\.stopImmediatePropagation\(\)/);
   assert.match(dashboard, /setupPullToRefresh\(\);setupQuickMouseScrolling\(\);configureAndroidActions\(\);bindScreensaver\(\)/);
   assert.match(dashboard, /id="screensaver" class="screensaver" role="dialog" aria-modal="true" tabindex="-1" hidden/);
-  assert.match(dashboard, /const screensaverDelay=600000/);
+  assert.match(dashboard, /const screensaverDelay=120000/);
   assert.match(dashboard, /function screensaverAllowed\(\)\{\s*return document\.body\.dataset\.activeView==="home"\s*&&!document\.querySelector\("dialog\[open\]"\)/);
   assert.match(dashboard, /if\(screensaverAllowed\(\)\)openScreensaver\(\);\s*else scheduleScreensaver\(\)/);
   assert.match(dashboard, /\},\(60-now\.getSeconds\(\)\)\*1000-now\.getMilliseconds\(\)\+40\)/);
@@ -980,10 +980,10 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.clock-primary strong\{display:block;color:var\(--ink\);font:750 52px\/1 system-ui,sans-serif/);
   assert.match(dashboard, /#home \.clock-primary strong\{font-size:58px\}/);
   assert.match(dashboard, /#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}/);
-  assert.match(dashboard, /#home \.widget-list-row\{padding-top:9px;font-size:17px\}/);
+  assert.match(dashboard, /#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}/);
   assert.match(dashboard, /function widgetListCapacity\(selector,fallback\)\{/);
   assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/44\)\)\)/);
-  assert.match(dashboard, /\.slice\(0,widgetListCapacity\("#activityEvents",5\)\)/);
+  assert.match(dashboard, /const runs=collapseEventRuns\(state\.events\|\|\[\],widgetListCapacity\("#activityEvents",5\)\)/);
   assert.match(dashboard, /applyWidgetLayout\(\);\s*renderWidgetLists\(\);\s*bindCards\(\)/);
   assert.match(dashboard, /refreshWeatherIfNeeded\(\)/);
   assert.match(dashboard, /id="widgetScrollLeft" class="widget-scroll-hint scroll-hint-left"/);
@@ -1215,4 +1215,64 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
+});
+
+test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yatay bloktadır", async () => {
+  const dashboard = await readDashboardBundle();
+  // Grup (b): her yatay ekranda (tablet + bilgisayar) geçerli olan tipografi/genişlik kuralları.
+  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 8\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}\}/);
+  // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
+  const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
+  const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"]{overflow:hidden}");
+  assert.ok(landscapeBlock > 0 && shortBlock > landscapeBlock);
+  // Grup (a): tam ekran yerleşim, rail sığdırma ve sıkışık boşluklar yükseklik koşuluna bağlı kalır.
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\]\{overflow:hidden\}body\[data-active-view="home"\] main\{height:100vh;overflow:hidden\}#home\.active\{height:100%/);
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
+  assert.match(dashboard, /#home \.clock-primary\{margin-top:10px\}#home \.clock-rows\{gap:7px;margin-top:14px\}/);
+  assert.match(dashboard, /#home \.group-summary\{margin-top:7px\}#home \.home-summary\{gap:14px;margin-top:12px\}#home \.widget-value\{margin-top:14px\}/);
+  // Yükseklik koşullu blok artık tipografi kurallarını içermemeli.
+  const shortBlockBody = dashboard.slice(shortBlock, dashboard.indexOf("\n", shortBlock));
+  assert.doesNotMatch(shortBlockBody, /#home \.widget-list-row\{/);
+  assert.doesNotMatch(shortBlockBody, /#home \.clock-primary strong\{/);
+  assert.doesNotMatch(shortBlockBody, /#home \.summary-row strong\{/);
+  assert.doesNotMatch(shortBlockBody, /#home \.widget-value strong\{/);
+  assert.doesNotMatch(shortBlockBody, /#home \.widget-card:not\(\.group-widget\) h2\{/);
+});
+
+test("ana ekran hareket listesi ardışık aynı olayları tek satırda birleştirir", async () => {
+  const dashboard = await readDashboardBundle();
+  assert.match(dashboard, /function collapseEventRuns\(events,limit\)\{/);
+  // Birleştirme ölçütü: ardışık + aynı cihaz + aynı ikon ve etiket.
+  assert.match(dashboard, /if\(previous&&previous\.event\.sourceName===event\.sourceName&&previous\.presentation\.icon===presentation\.icon&&previous\.presentation\.label===presentation\.label\)\{previous\.count\+=1;continue\}/);
+  // Önce birleştir, sonra kapasiteye göre kırp.
+  assert.match(dashboard, /if\(runs\.length>=limit\)break;\s*runs\.push\(\{event,presentation,count:1\}\)/);
+  assert.match(dashboard, /const runs=collapseEventRuns\(state\.events\|\|\[\],widgetListCapacity\("#activityEvents",5\)\)/);
+  // Grup en yeni olayın zaman damgasıyla gösterilir ve tekrar sayısı gizlenmez.
+  assert.match(dashboard, /const repeat=run\.count>1\?`<b class="widget-list-repeat">\$\{esc\(t\("eventRepeatCount",\{count:run\.count\}\)\)\}<\/b>`:""/);
+  assert.match(dashboard, /· \$\{ago\(run\.event\.at\)\}\$\{repeat\}<\/span><\/div>/);
+  assert.match(dashboard, /\.widget-list-repeat\{margin-left:8px;padding:1px 7px;border-radius:999px;color:var\(--forest\);background:var\(--forest-soft\)/);
+  assert.equal(dashboard.split('eventRepeatCount:"×{count}"').length - 1, 2);
+  // Sunucu tarafı olay üretimi değişmedi: ham olaylar hâlâ kırpılmadan geliyor.
+  assert.doesNotMatch(dashboard, /\.slice\(0,widgetListCapacity\("#activityEvents",5\)\)/);
+});
+
+test("Ana Sayfa dışında 5 dakika boşta kalınca panel Ana Sayfa'ya döner", async () => {
+  const dashboard = await readDashboardBundle();
+  assert.match(dashboard, /const idleHomeReturnDelay=300000/);
+  assert.match(dashboard, /if\(idleHomeReturnAllowed\(\)\)activateView\("home"\);\s*else scheduleIdleHomeReturn\(\)/);
+  assert.match(dashboard, /\},idleHomeReturnDelay\)/);
+  // Ana Sayfa'dayken zamanlayıcı hiç kurulmaz.
+  assert.match(dashboard, /function scheduleIdleHomeReturn\(\)\{\s*clearIdleHomeReturn\(\);\s*if\(document\.body\.dataset\.activeView==="home"\)return;/);
+  // Dönmemesi gereken durumlar: açık dialog, pairing, onboarding, metin alanı.
+  assert.match(dashboard, /function idleHomeReturnAllowed\(\)\{\s*return document\.body\.dataset\.activeView!=="home"\s*&&!document\.querySelector\("dialog\[open\]"\)\s*&&!state\.pairingSession\s*&&!\$\("#onboardingDialog"\)\.open\s*&&!typingInField\(\);/);
+  assert.match(dashboard, /return element\?\.tagName==="INPUT"\|\|element\?\.tagName==="TEXTAREA"/);
+  // Ekran koruyucuyla aynı boşta kalma takibi; ikinci bir mekanizma yok.
+  assert.match(dashboard, /\["pointerdown","keydown","wheel"\]\.forEach\(type=>document\.addEventListener\(type,\(\)=>\{if\(!state\.screensaverOpen\)\{scheduleScreensaver\(\);scheduleIdleHomeReturn\(\)\}\},\{capture:true,passive:true\}\)\)/);
+  assert.doesNotMatch(dashboard, /setInterval\([^)]*idleHomeReturn/);
+  // Görünüm değişince sıfırlanır ve Ana Sayfa'ya dönünce ekran koruyucu kendi süresini sayar.
+  assert.match(dashboard, /closeScreensaver\(\);\s*scheduleScreensaver\(\);\s*scheduleIdleHomeReturn\(\);\s*\}\s*function showDevice\(id\)\{/);
+  // Tek zamanlayıcı, sızıntısız.
+  assert.match(dashboard, /function clearIdleHomeReturn\(\)\{if\(idleHomeReturnTimer!==null\)\{clearTimeout\(idleHomeReturnTimer\);idleHomeReturnTimer=null\}\}/);
+  // Düzenleme modunun 60 saniyelik otomatik çıkışı ayrı ve değişmedi.
+  assert.match(dashboard, /const dashboardEditingIdleDelay=60000/);
 });
