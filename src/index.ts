@@ -17,6 +17,7 @@ import {
   isHomeFavoriteControlKind,
   validateHomeFavorites
 } from "./home-favorites.js";
+import { HomeGroupsStore, homeGroupDeviceControlId, validateHomeGroups } from "./home-groups.js";
 import { InstallationStateStore } from "./installation-state.js";
 import {
   createVillaBridgeDiscoveryRecord,
@@ -60,6 +61,7 @@ const store = new DeviceStore(
 store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
+const homeGroupsStore = new HomeGroupsStore(resolve(dirname(configPath), "home-groups.json"));
 const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
 const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
@@ -546,6 +548,39 @@ app.put<{ Body?: { favorites?: unknown } }>("/api/favorites", async (request, re
   }
 });
 
+app.get("/api/home-groups", async (_request, reply) => {
+  try {
+    return { ok: true, groups: await homeGroupsStore.get() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{ Body?: { groups?: unknown } }>("/api/home-groups", async (request, reply) => {
+  try {
+    const groups = validateHomeGroups(request.body?.groups);
+    const devices = store.getDevices();
+    for (const group of groups) {
+      for (const groupItem of group.items) {
+        const device = devices.find((item) => item.id === groupItem.deviceId);
+        if (!device) {
+          return reply.code(400).send({ ok: false, error: "Grup cihazı veya kontrolü bulunamadı." });
+        }
+        if (groupItem.controlId === homeGroupDeviceControlId) continue;
+        const control = device.controls.find((item) =>
+          item.id === groupItem.controlId && isHomeFavoriteControlKind(item.kind)
+        );
+        if (!control) {
+          return reply.code(400).send({ ok: false, error: "Grup cihazı veya kontrolü bulunamadı." });
+        }
+      }
+    }
+    return { ok: true, groups: await homeGroupsStore.save(groups) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 app.put<{
   Params: { id: string };
   Body?: { imageModel?: unknown; applyToModel?: unknown };
@@ -684,8 +719,9 @@ app.delete<{
     imagePreferences = await imagesStore.removeDevice(imagePreferences, id).catch(() => imagePreferences);
     store.setImagePreferences(imagePreferences);
     const favorites = await favoritesStore.removeDevice(id);
+    const groups = await homeGroupsStore.removeDevice(id);
     await deviceNotesStore.removeDevice(id);
-    return { ok: true, force, favorites };
+    return { ok: true, force, favorites, groups };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }

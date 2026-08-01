@@ -28,6 +28,8 @@ const residentRoutes = new Set([
   "GET /api/onboarding",
   "GET /api/favorites",
   "PUT /api/favorites",
+  "GET /api/home-groups",
+  "PUT /api/home-groups",
   "GET /api/device-image/:model",
   "GET /api/devices/:id/note",
   "PUT /api/devices/:id/note",
