@@ -234,6 +234,9 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.doesNotMatch(dashboard, /class="device-card-layout"/);
   assert.match(dashboard, /class="image-edit-overlay"[^>]*data-change-image=/);
   assert.match(dashboard, /class="device-detail-photo" data-device-photo hidden/);
+  assert.doesNotMatch(dashboard, /class="device-detail-photo"[\s\S]{0,400}?loading="lazy"/);
+  assert.doesNotMatch(dashboard, /loading="lazy"/);
+  assert.match(dashboard, /const succeed=\(\)=>\{if\(photo\)photo\.hidden=false\}/);
   assert.match(dashboard, /\$\{deviceDetailPhoto\(device\)\}/);
   assert.doesNotMatch(dashboard, /technical-body"><div class="device-image-stage"/);
   assert.match(dashboard, /target\.innerHTML=levelValueHtml\(input\.value,input\.dataset\.unit\)/);

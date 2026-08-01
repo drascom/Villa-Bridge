@@ -587,13 +587,13 @@
     const fallback=`<span class="device-fallback"${imageModel?" hidden":""}>${deviceTypeIcon(device)}</span>`;
     if(!imageModel)return`<div class="device-visual">${fallback.replace(" hidden","")}</div>`;
     const source=`/api/device-image/${encodeURIComponent(imageModel)}`;
-    return`<div class="device-visual"><img class="device-photo" src="${esc(source)}" alt="" loading="lazy" data-device-image data-model="${esc(imageModel)}">${fallback}</div>`;
+    return`<div class="device-visual"><img class="device-photo" src="${esc(source)}" alt="" data-device-image data-model="${esc(imageModel)}">${fallback}</div>`;
   };
   const deviceVisual=device=>deviceVisualFor(device,device.image?device.image.model:device.model);
   const deviceDetailPhoto=device=>{
     const imageModel=device.image?device.image.model:device.model;
     if(!imageModel)return"";
-    return`<div class="device-detail-photo" data-device-photo hidden><img class="device-photo" src="/api/device-image/${encodeURIComponent(imageModel)}" alt="" loading="lazy" data-device-image data-model="${esc(imageModel)}"><button class="image-edit-overlay" type="button" data-admin-only data-change-image="${esc(device.id)}" aria-label="${esc(t("changeImage"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h4l2-2h4l2 2h4v15H4V5Z"/><circle cx="12" cy="12" r="4"/></svg><span>${t("changeImage")}</span></button></div>`;
+    return`<div class="device-detail-photo" data-device-photo hidden><img class="device-photo" src="/api/device-image/${encodeURIComponent(imageModel)}" alt="" data-device-image data-model="${esc(imageModel)}"><button class="image-edit-overlay" type="button" data-admin-only data-change-image="${esc(device.id)}" aria-label="${esc(t("changeImage"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h4l2-2h4l2 2h4v15H4V5Z"/><circle cx="12" cy="12" r="4"/></svg><span>${t("changeImage")}</span></button></div>`;
   };
   const linkQualityPercent=device=>{
     const value=Number(device.state?.linkquality);
