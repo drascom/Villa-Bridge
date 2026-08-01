@@ -123,6 +123,7 @@
     "gridView": "Kare görünüm",
     "listView": "Liste görünümü",
     "deviceLayout": "Cihaz görünümü",
+    "devicesPerRow": "Satır başına kart",
     "showInDevices": "Cihazlar bölümünde göster",
     "devicesPreparing": "Cihazlar hazırlanıyor…",
     "allEquipment": "Tüm ekipmanlar",

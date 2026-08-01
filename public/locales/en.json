@@ -123,6 +123,7 @@
     "gridView": "Grid view",
     "listView": "List view",
     "deviceLayout": "Device layout",
+    "devicesPerRow": "Cards per row",
     "showInDevices": "Show in Devices",
     "devicesPreparing": "Preparing devices…",
     "allEquipment": "All equipment",

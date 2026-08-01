@@ -235,7 +235,7 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /class="image-edit-overlay"[^>]*data-change-image=/);
   assert.match(dashboard, /const deviceDetailBodyHtml=device=>\{/);
   assert.match(dashboard, /class="device-name-edit"[^>]*data-rename=/);
-  assert.match(dashboard, /class="device-header-status">\$\{linkQualityBadge\(device\)\}/);
+  assert.match(dashboard, /class="device-meta-text">\$\{deviceKind\(device\)\} · /);
   assert.match(dashboard, /const primaryStatusForDevice=/);
   assert.match(dashboard, /value\.smoke!==undefined/);
   assert.match(dashboard, /value\.carbon_monoxide!==undefined/);
@@ -244,7 +244,7 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /\.device-card,\.device-card-body,\.device-detail-body\{min-width:0\}/);
   assert.doesNotMatch(dashboard, /details\.style\.gridColumn/);
   assert.match(dashboard, /\.device-image-stage\{position:relative;width:100%;max-width:100%/);
-  assert.match(dashboard, /\.device-grid\{display:grid;grid-template-columns:repeat\(auto-fill,minmax\(240px,1fr\)\)/);
+  assert.match(dashboard, /\.device-grid\{display:grid;grid-template-columns:repeat\(var\(--device-columns,3\),minmax\(0,1fr\)\)/);
   assert.doesNotThrow(() => new Function(
     dashboardScripts(dashboard)
   ));
@@ -606,6 +606,11 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\[\$\("#allDevices"\),\$\("#attentionDevices"\)\]\.forEach\(container=>/);
   assert.match(dashboard, /container\.classList\.toggle\("devices-list-view",state\.deviceLayout==="list"\)/);
   assert.match(dashboard, /\.device-grid\.devices-list-view\{grid-template-columns:1fr\}/);
+  assert.match(dashboard, /id="deviceColumns" type="range" min="1" max="8" step="1"/);
+  assert.match(dashboard, /localStorage\.setItem\("villa-device-columns",String\(columns\)\)/);
+  assert.match(dashboard, /\$\("\[data-device-columns-field\]"\)\.hidden=!gridMode/);
+  assert.match(dashboard, /devicesPerRow:"Cards per row"/);
+  assert.match(dashboard, /devicesPerRow:"Satır başına kart"/);
   assert.match(dashboard, /deviceLayout:"Cihaz görünümü"/);
   assert.match(dashboard, /id="showLightDevice"/);
   assert.match(dashboard, /class="device-card quick-card \$\{visualState\}"/);
@@ -615,7 +620,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /class="battery-glyph"/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
   assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div><\/div>/);
-  assert.match(dashboard, /class="device-header-status">\$\{linkQualityBadge\(device\)\}\$\{deviceCardToggle\(device,preparing\)\}<\/div>/);
+  assert.match(dashboard, /class="device-header-status">\$\{deviceCardToggle\(device,preparing\)\}<\/div>/);
   assert.match(dashboard, /class="device-link-level\$\{tone\?`\ \$\{tone\}`:""\}"/);
   assert.match(dashboard, /\.device-link-level\.strong\{color:#24805a/);
   assert.match(dashboard, /\.device-link-level\.weak\{color:var\(--danger\)/);
