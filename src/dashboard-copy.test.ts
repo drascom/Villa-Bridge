@@ -609,9 +609,12 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\[\$\("#allDevices"\),\$\("#attentionDevices"\)\]\.forEach\(container=>/);
   assert.match(dashboard, /container\.classList\.toggle\("devices-list-view",state\.deviceLayout==="list"\)/);
   assert.match(dashboard, /\.device-grid\.devices-list-view\{grid-template-columns:1fr\}/);
-  assert.match(dashboard, /id="deviceColumns" type="range" min="1" max="8" step="1"/);
+  assert.match(dashboard, /id="deviceColumns" type="range" min="1" max="6" step="1"/);
   assert.match(dashboard, /localStorage\.setItem\("villa-device-columns",String\(columns\)\)/);
   assert.match(dashboard, /\$\("\[data-device-columns-field\]"\)\.hidden=!gridMode/);
+  assert.match(dashboard, /container\.dataset\.deviceColumns=String\(columns\)/);
+  assert.match(dashboard, /\.device-grid\.devices-grid-view\[data-device-columns="5"\] \.device-card-header \.device-name,\.device-grid\.devices-grid-view\[data-device-columns="6"\] \.device-card-header \.device-name\{font-weight:600/);
+  assert.match(dashboard, /:root\[data-theme="dark"\] \.device-grid\.devices-grid-view\[data-device-columns="5"\] \.device-card-header \.device-name,:root\[data-theme="dark"\] \.device-grid\.devices-grid-view\[data-device-columns="6"\] \.device-card-header \.device-name\{font-weight:650/);
   assert.match(dashboard, /devicesPerRow:"Cards per row"/);
   assert.match(dashboard, /devicesPerRow:"Satır başına kart"/);
   assert.match(dashboard, /deviceLayout:"Cihaz görünümü"/);
