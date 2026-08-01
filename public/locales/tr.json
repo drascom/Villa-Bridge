@@ -443,6 +443,7 @@
     "findNearby": "Yakındaki cihazları bul",
     "repairDevice": "Kurulumu onar",
     "repairComplete": "Cihaz kurulumu yenilendi.",
+    "repairInProgress": "Cihaz onarılıyor…",
     "installCodeAdded": "Güvenli eşleştirme kodu eklendi.",
     "searching": "Aranıyor…",
     "reset": "Sıfırla",

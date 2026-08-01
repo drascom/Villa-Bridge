@@ -443,6 +443,7 @@
     "findNearby": "Find nearby devices",
     "repairDevice": "Repair setup",
     "repairComplete": "Device setup refreshed.",
+    "repairInProgress": "Repairing device…",
     "installCodeAdded": "Secure pairing code added.",
     "searching": "Searching…",
     "reset": "Reset",

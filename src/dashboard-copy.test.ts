@@ -803,6 +803,16 @@ test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellik
   assert.match(dashboard, /class="setting-card zigbee-settings-card" data-admin-only/);
   assert.match(dashboard, /data-admin-only data-options=/);
   assert.match(dashboard, /data-admin-only data-reconfigure=/);
+  assert.match(dashboard, /<dialog id="repairDialog" class="repair-dialog"/);
+  assert.match(dashboard, /closeDeviceDetail\(\);\s*openRepairProgress\(device\?\.name\|\|id\)/);
+  assert.match(dashboard, /finally\{closeRepairProgress\(\);if\(button\)button\.disabled=false\}/);
+  assert.match(dashboard, /openRepairProgress\.timer=setTimeout\(closeRepairProgress,20000\)/);
+  assert.match(dashboard, /\$\("#repairDialog"\)\.addEventListener\("cancel",event=>event\.preventDefault\(\)\)/);
+  assert.doesNotMatch(dashboard, /bindBackdropClose\("#repairDialog"/);
+  assert.match(dashboard, /repairInProgress:"Repairing device…"/);
+  assert.match(dashboard, /repairInProgress:"Cihaz onarılıyor…"/);
+  assert.match(dashboard, /showToast\.timer=setTimeout\(\(\)=>toast\.className="toast",error\?6000:3200\)/);
+  assert.doesNotMatch(dashboard, /toastHost|appendChild\(toast\)/);
   assert.match(dashboard, /data-admin-only data-ota=/);
   assert.match(dashboard, /data-admin-only data-remove=/);
 
