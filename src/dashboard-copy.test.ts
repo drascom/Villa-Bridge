@@ -233,6 +233,11 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /<article class="device-card\$\{preparing\?" preparing":""\}"/);
   assert.doesNotMatch(dashboard, /class="device-card-layout"/);
   assert.match(dashboard, /class="image-edit-overlay"[^>]*data-change-image=/);
+  assert.match(dashboard, /class="device-detail-photo" data-device-photo hidden/);
+  assert.match(dashboard, /\$\{deviceDetailPhoto\(device\)\}/);
+  assert.doesNotMatch(dashboard, /technical-body"><div class="device-image-stage"/);
+  assert.match(dashboard, /target\.innerHTML=levelValueHtml\(input\.value,input\.dataset\.unit\)/);
+  assert.match(dashboard, /select,textarea,input:not\(\[type="range"\]\)/);
   assert.match(dashboard, /const deviceDetailBodyHtml=device=>\{/);
   assert.match(dashboard, /class="device-name-edit"[^>]*data-rename=/);
   assert.match(dashboard, /class="device-meta-text">\$\{deviceKind\(device\)\} · /);
@@ -619,6 +624,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /devicesPerRow:"Satır başına kart"/);
   assert.match(dashboard, /deviceLayout:"Cihaz görünümü"/);
   assert.match(dashboard, /id="showLightDevice"/);
+  assert.match(dashboard, /if\(lightControlsBusy\(\)\)return/);
+  assert.match(dashboard, /\$\("#lightControls"\)\.addEventListener\("pointerdown"/);
   assert.match(dashboard, /class="device-card quick-card \$\{visualState\}"/);
   assert.doesNotMatch(dashboard, /class="quick-state /);
   assert.match(dashboard, /const batteryThreshold=state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
