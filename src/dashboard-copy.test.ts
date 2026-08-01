@@ -642,10 +642,27 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /class="dashboard-widget widget-wide quick-control-widget" data-widget="quick"[\s\S]*?id="quickDevices"/);
   assert.doesNotMatch(dashboard, /data-widget="quick"[\s\S]*?<h2[\s\S]*?id="quickDevices"/);
   assert.match(dashboard, /data-widget="availability"/);
-  assert.match(dashboard, /data-widget="recent"/);
+  assert.doesNotMatch(dashboard, /data-widget="recent"/);
+  assert.doesNotMatch(dashboard, /id="recentDevices"|recentWidgetLead|noRecentDevices/);
   assert.match(dashboard, /data-widget="clock"[\s\S]*id="worldClockRows"/);
   assert.match(dashboard, /data-widget="weather"[\s\S]*id="weatherContent"/);
-  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","summary","clock","weather","recent","activity"\]/);
+  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","summary","clock","weather","activity"\]/);
+  assert.match(dashboard, /known\.some\(id=>!fixedDashboardWidgets\.has\(id\)\)\?known:\[\.\.\.defaultDashboardWidgets\]/);
+  assert.match(dashboard, /const fixed=fixedDashboardWidgets\.has\(id\)/);
+  assert.match(dashboard, /class="secondary" type="button" data-add-widget="\$\{esc\(id\)\}">\$\{widgetAddIcon\(\)\}\$\{t\("addWidgetAction"\)\}/);
+  assert.match(dashboard, /class="danger-soft" type="button" data-remove-widget="\$\{esc\(id\)\}">\$\{widgetRemoveIcon\(\)\}\$\{t\("removeWidgetAction"\)\}/);
+  assert.match(dashboard, /class="quiet" type="button" disabled>\$\{t\("widgetAlwaysOn"\)\}/);
+  assert.match(dashboard, /\$\$\("#widgetCatalog \[data-remove-widget\]"\)\.forEach\(button=>button\.onclick=\(\)=>removeDashboardWidget\(button\.dataset\.removeWidget\)\)/);
+  assert.doesNotMatch(dashboard, /widgetAdded/);
+  assert.match(dashboard, /removeWidgetAction:"Remove"/);
+  assert.match(dashboard, /removeWidgetAction:"Kaldır"/);
+  assert.match(dashboard, /widgetAlwaysOn:"Always on"/);
+  assert.match(dashboard, /widgetAlwaysOn:"Her zaman açık"/);
+  assert.match(dashboard, /--danger-soft:#f8e9e7/);
+  assert.match(dashboard, /--danger-soft:#40211f/);
+  assert.match(dashboard, /\.danger-soft\{color:var\(--danger\);background:var\(--danger-soft\);box-shadow:inset 0 0 0 1px var\(--danger\)\}/);
+  assert.match(dashboard, /const widgetAddIcon=\(\)=>'<svg class="widget-catalog-glyph"/);
+  assert.match(dashboard, /const widgetRemoveIcon=\(\)=>'<svg class="widget-catalog-glyph"/);
   assert.match(dashboard, /summary:\{title:"summaryWidget",lead:"summaryWidgetLead"\}/);
   assert.match(dashboard, /data-widget="summary"[\s\S]*?id="homeSummary"/);
   assert.match(dashboard, /function renderHomeSummary\(\)\{/);
@@ -888,7 +905,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.room-membership\.active\{border-color:var\(--forest\);color:var\(--on-forest\);background:var\(--forest\)\}/);
   assert.doesNotMatch(dashboard, /data-toggle-room[^>]*data-admin-only/);
   assert.match(dashboard, /\.quick-empty\{display:flex/);
-  assert.match(dashboard, /body\[data-active-view="home"\] #home \[data-widget="recent"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \[data-widget="activity"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
   assert.match(dashboard, /#quickDevices\{cursor:grab\}#quickDevices\.mouse-dragging,#quickDevices\.mouse-dragging \*\{cursor:grabbing!important\}/);
   assert.match(dashboard, /function setupQuickMouseScrolling\(\)\{/);
   assert.match(dashboard, /if\(event\.pointerType!=="mouse"\|\|event\.button!==0\)return/);
@@ -922,6 +939,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-rail\{min-height:0;flex:1;display:grid;grid-template-columns:repeat\(3,calc\(33\.333vw - 27px\)\)/);
   assert.match(dashboard, /grid-auto-columns:calc\(33\.333vw - 27px\)/);
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2\}/);
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
   assert.match(dashboard, /const rail=\$\("#widgetRail"\)/);
   assert.match(dashboard, /rail\.insertBefore\(widget,\$\("#widgetEmpty"\)\)/);
   assert.match(dashboard, /\$\$\("#widgetRail \[data-widget\]"\)/);
@@ -965,7 +983,6 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-list-row\{padding-top:9px;font-size:17px\}/);
   assert.match(dashboard, /function widgetListCapacity\(selector,fallback\)\{/);
   assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/44\)\)\)/);
-  assert.match(dashboard, /\.slice\(0,widgetListCapacity\("#recentDevices",3\)\)/);
   assert.match(dashboard, /\.slice\(0,widgetListCapacity\("#activityEvents",5\)\)/);
   assert.match(dashboard, /applyWidgetLayout\(\);\s*renderWidgetLists\(\);\s*bindCards\(\)/);
   assert.match(dashboard, /refreshWeatherIfNeeded\(\)/);
@@ -1119,7 +1136,7 @@ test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellik
   assert.match(dashboard, /data-admin-only data-remove=/);
 
   assert.match(dashboard, /data-widget="activity"/);
-  assert.match(dashboard, /defaultDashboardWidgets=\["quick","summary","clock","weather","recent","activity"\]/);
+  assert.match(dashboard, /defaultDashboardWidgets=\["quick","summary","clock","weather","activity"\]/);
   assert.match(dashboard, /<button class="secondary" data-note=/);
   assert.doesNotMatch(dashboard, /data-admin-only data-note=/);
 });
