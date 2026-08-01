@@ -626,6 +626,11 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /id="showLightDevice"/);
   assert.match(dashboard, /if\(lightControlsBusy\(\)\)return/);
   assert.match(dashboard, /\$\("#lightControls"\)\.addEventListener\("pointerdown"/);
+  assert.match(dashboard, /bindBackdropClose\("#deviceDetailDialog","\.device-detail-modal",closeDeviceDetail\)/);
+  assert.match(dashboard, /bindBackdropClose\("#lightDialog","\.light-modal"/);
+  assert.match(dashboard, /bindBackdropClose\("#matterDialog","\.modal",closeMatterDialog\)/);
+  assert.match(dashboard, /startedOutside=event\.target===dialog&&outside\(event\)/);
+  assert.doesNotMatch(dashboard, /bindBackdropClose\("#(nameDialog|noteDialog|deviceOptionsDialog|removeDialog|imageDialog|widgetDialog|clockDialog|weatherLocationDialog|runtimeStopDialog|onboardingDialog|pairingDialog)"/);
   assert.match(dashboard, /class="device-card quick-card \$\{visualState\}"/);
   assert.doesNotMatch(dashboard, /class="quick-state /);
   assert.match(dashboard, /const batteryThreshold=state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
