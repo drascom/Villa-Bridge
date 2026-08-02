@@ -983,7 +983,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}/);
   assert.match(dashboard, /function widgetListCapacity\(selector,fallback\)\{/);
   assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/62\)\)\)/);
-  assert.match(dashboard, /const runs=collapseEventRuns\(state\.events\|\|\[\],widgetListCapacity\("#activityEvents",5\)\)/);
+  assert.match(dashboard, /const rows=latestEventPerDevice\(state\.events\|\|\[\],widgetListCapacity\("#activityEvents",5\)\)/);
   assert.match(dashboard, /applyWidgetLayout\(\);\s*renderWidgetLists\(\);\s*bindCards\(\)/);
   assert.match(dashboard, /refreshWeatherIfNeeded\(\)/);
   assert.match(dashboard, /id="widgetScrollLeft" class="widget-scroll-hint scroll-hint-left"/);
@@ -1220,7 +1220,7 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
 test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yatay bloktadır", async () => {
   const dashboard = await readDashboardBundle();
   // Grup (b): her yatay ekranda (tablet + bilgisayar) geçerli olan tipografi/genişlik kuralları.
-  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row\{display:grid;justify-items:start;gap:2px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row span\{font-size:14px\}\}/);
+  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row\{display:grid;gap:2px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row span\{min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row em\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal\}#home \[data-widget="activity"\] \.widget-list-row time\{flex:none\}\}/);
   // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
   const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
   const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"]{overflow:hidden}");
@@ -1239,19 +1239,21 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   assert.doesNotMatch(shortBlockBody, /#home \.widget-card:not\(\.group-widget\) h2\{/);
 });
 
-test("ana ekran hareket listesi ardışık aynı olayları tek satırda birleştirir", async () => {
+test("ana ekran hareket listesi cihaz başına yalnız en son olayı gösterir", async () => {
   const dashboard = await readDashboardBundle();
-  assert.match(dashboard, /function collapseEventRuns\(events,limit\)\{/);
-  // Birleştirme ölçütü: ardışık + aynı cihaz + aynı ikon ve etiket.
-  assert.match(dashboard, /if\(previous&&previous\.event\.sourceName===event\.sourceName&&previous\.presentation\.icon===presentation\.icon&&previous\.presentation\.label===presentation\.label\)\{previous\.count\+=1;continue\}/);
-  // Önce birleştir, sonra kapasiteye göre kırp.
-  assert.match(dashboard, /if\(runs\.length>=limit\)break;\s*runs\.push\(\{event,presentation,count:1\}\)/);
-  assert.match(dashboard, /const runs=collapseEventRuns\(state\.events\|\|\[\],widgetListCapacity\("#activityEvents",5\)\)/);
-  // Grup en yeni olayın zaman damgasıyla gösterilir ve tekrar sayısı gizlenmez.
-  assert.match(dashboard, /const repeat=run\.count>1\?`<b class="widget-list-repeat">\$\{esc\(t\("eventRepeatCount",\{count:run\.count\}\)\)\}<\/b>`:""/);
-  assert.match(dashboard, /· \$\{ago\(run\.event\.at\)\}\$\{repeat\}<\/span><\/div>/);
-  assert.match(dashboard, /\.widget-list-repeat\{margin-left:8px;padding:1px 7px;border-radius:999px;color:var\(--forest\);background:var\(--forest-soft\)/);
-  assert.equal(dashboard.split('eventRepeatCount:"×{count}"').length - 1, 2);
+  assert.match(dashboard, /function latestEventPerDevice\(events,limit\)\{/);
+  // Her cihaz bir kez: olaylar en yeniden eskiye geldiği için ilk görülen o cihazın en son olayı.
+  assert.match(dashboard, /const seen=new Set\(\);\s*const rows=\[\];\s*for\(const event of events\)\{\s*if\(seen\.has\(event\.sourceName\)\)continue;\s*seen\.add\(event\.sourceName\);/);
+  // Önce tekilleştir, sonra kapasiteye göre kes: tekrarlar limite sayılmaz.
+  assert.match(dashboard, /rows\.push\(\{event,presentation:eventPresentation\(event\)\}\);\s*if\(rows\.length>=limit\)break;/);
+  assert.match(dashboard, /const rows=latestEventPerDevice\(state\.events\|\|\[\],widgetListCapacity\("#activityEvents",5\)\)/);
+  // Alt satır iki uçlu: durum solda, süre sağda, ayıraç yok.
+  assert.match(dashboard, /<span><em>\$\{row\.presentation\.icon\} \$\{esc\(row\.presentation\.label\)\}<\/em><time>\$\{ago\(row\.event\.at\)\}<\/time><\/span><\/div>/);
+  assert.doesNotMatch(dashboard, /esc\(row\.presentation\.label\)\} · /);
+  // Ardışık tekrar birleştirme ve ×N sayacı tamamen kaldırıldı.
+  assert.doesNotMatch(dashboard, /collapseEventRuns/);
+  assert.doesNotMatch(dashboard, /widget-list-repeat/);
+  assert.doesNotMatch(dashboard, /eventRepeatCount/);
   // Sunucu tarafı olay üretimi değişmedi: ham olaylar hâlâ kırpılmadan geliyor.
   assert.doesNotMatch(dashboard, /\.slice\(0,widgetListCapacity\("#activityEvents",5\)\)/);
 });
@@ -1370,12 +1372,11 @@ test("dar sütunda hareket satırları dikey yığılır ve kapasite yeni satır
   // Geniş ekran değeri span 5'te kaldı.
   assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}/);
   // Cihaz adı üstte, durum+zaman altta; yalnız activity listesi etkileniyor.
-  assert.match(dashboard, /#home \[data-widget="activity"\] \.widget-list-row\{display:grid;justify-items:start;gap:2px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row span\{font-size:14px\}/);
+  assert.match(dashboard, /#home \[data-widget="activity"\] \.widget-list-row\{display:grid;gap:2px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row span\{min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row em\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal\}#home \[data-widget="activity"\] \.widget-list-row time\{flex:none\}/);
   // Diğer widget listeleri yan yana düzenini koruyor.
   assert.match(dashboard, /\.widget-list-row\{display:flex;justify-content:space-between;gap:12px/);
   // ×N sayacı hâlâ üretiliyor ve stili duruyor.
-  assert.match(dashboard, /<b class="widget-list-repeat">\$\{esc\(t\("eventRepeatCount",\{count:run\.count\}\)\)\}<\/b>/);
-  assert.match(dashboard, /\.widget-list-repeat\{margin-left:8px/);
+  assert.match(dashboard, /<time>\$\{ago\(row\.event\.at\)\}<\/time>/);
   // Satır yüksekliği ~57px + 6px boşluk; bölen buna göre büyütüldü.
   assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/62\)\)\)/);
   assert.doesNotMatch(dashboard, /Math\.floor\(available\/44\)/);

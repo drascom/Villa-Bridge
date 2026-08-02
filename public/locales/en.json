@@ -511,7 +511,6 @@
     "noteSaved": "Note saved.",
     "activityWidget": "Home activity",
     "activityWidgetLead": "Recent button presses and safety changes.",
-    "eventRepeatCount": "×{count}",
     "noActivity": "No recent activity.",
     "zigbeeChannel": "Zigbee channel",
     "zigbeeChannelLead": "Changing the channel can disconnect devices and requires a service restart.",

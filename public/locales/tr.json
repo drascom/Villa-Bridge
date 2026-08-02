@@ -511,7 +511,6 @@
     "noteSaved": "Not kaydedildi.",
     "activityWidget": "Ev hareketleri",
     "activityWidgetLead": "Son düğme basışları ve güvenlik değişimleri.",
-    "eventRepeatCount": "×{count}",
     "noActivity": "Yakın zamanda hareket yok.",
     "zigbeeChannel": "Zigbee kanalı",
     "zigbeeChannelLead": "Kanal değişikliği cihazların bağlantısını kesebilir ve servisin yeniden başlatılmasını gerektirir.",
