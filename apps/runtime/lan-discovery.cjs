@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("node:crypto");
 const dgram = require("node:dgram");
 const http = require("node:http");
 const os = require("node:os");
@@ -8,6 +9,8 @@ const DISCOVERY_PROTOCOL = "villa-bridge-lan";
 const DISCOVERY_VERSION = 1;
 const DISCOVERY_QUERY = "VILLA_BRIDGE_DISCOVER_V1";
 const DISCOVERY_PORT = 8093;
+const OWNERSHIP_STATES = new Set(["owner", "standby", "claiming", "releasing"]);
+const NODE_ROLES = new Set(["server", "android", "disabled"]);
 
 function validPort(value) {
   const port = Number(value);
@@ -50,23 +53,56 @@ function localIpv4Addresses(interfaces = os.networkInterfaces()) {
   return addresses;
 }
 
-function parseDiscoveryRecord(message) {
+function nodePriority(role) {
+  return role === "server" ? 0 : 1;
+}
+
+function shortDigest(value, length) {
+  return crypto.createHash("sha256").update(value).digest("hex").slice(0, length);
+}
+
+// Bu düğümün kalıcı kimliği; src/lan-discovery.ts ile aynı türetme kuralını kullanır.
+function resolveVillaBridgeNodeId(role = "android", value = process.env.VILLA_BRIDGE_NODE_ID, host = os.hostname()) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (normalized) return normalized.slice(0, 64);
+  const prefix = role === "server" ? "srv" : role === "android" ? "tab" : "node";
+  return `${prefix}-${shortDigest(`${role}:${host}`, 10)}`;
+}
+
+// Herhangi bir düğümün duyurusunu okur. Eksik yeni alanlar "bilinmiyor" (null) olur;
+// yokluktan asla "sahipsiz" veya "taze" sonucu çıkarılmaz.
+function normalizeDiscoveryRecord(message) {
   try {
     const value = JSON.parse(Buffer.isBuffer(message) ? message.toString("utf8") : String(message));
     const dashboardPort = validPort(value?.dashboardPort);
     if (
       value?.protocol !== DISCOVERY_PROTOCOL ||
       value?.version !== DISCOVERY_VERSION ||
-      value?.role !== "server" ||
+      !NODE_ROLES.has(value?.role) ||
       typeof value?.mode !== "string" ||
       !dashboardPort
     ) {
       return null;
     }
-    return { ...value, dashboardPort };
+    return {
+      ...value,
+      dashboardPort,
+      nodeId: typeof value.nodeId === "string" && value.nodeId.trim() ? value.nodeId.trim() : null,
+      state: OWNERSHIP_STATES.has(value.state) ? value.state : null,
+      epoch: Number.isInteger(value.epoch) && value.epoch >= 0 ? value.epoch : 0,
+      coordinatorId: typeof value.coordinatorId === "string" && value.coordinatorId ? value.coordinatorId : null,
+      priority: Number.isInteger(value.priority) ? value.priority : nodePriority(value.role),
+      sentAt: Number.isInteger(value.sentAt) && value.sentAt > 0 ? value.sentAt : null
+    };
   } catch {
     return null;
   }
+}
+
+// Sunucu seçimi için: yalnızca `server` rolündeki düğümler panel sunucusu sayılır.
+function parseDiscoveryRecord(message) {
+  const record = normalizeDiscoveryRecord(message);
+  return record && record.role === "server" ? record : null;
 }
 
 function verifyVillaBridgeServer(address, record, timeoutMs = 700) {
@@ -97,7 +133,8 @@ function verifyVillaBridgeServer(address, record, timeoutMs = 700) {
         resolve(
           verified !== null &&
           verified.dashboardPort === record.dashboardPort &&
-          verified.mode === record.mode
+          verified.mode === record.mode &&
+          (verified.nodeId === null || record.nodeId === null || verified.nodeId === record.nodeId)
         );
       });
     });
@@ -117,6 +154,9 @@ function discoverVillaBridgeServer(options = {}) {
   const localAddresses = localIpv4Addresses(options.interfaces);
   const allowLoopback = options.allowLoopback === true;
   const verify = options.verify || verifyVillaBridgeServer;
+  const selfNodeId = typeof options.selfNodeId === "string" && options.selfNodeId.trim()
+    ? options.selfNodeId.trim()
+    : null;
 
   return new Promise((resolve) => {
     const socket = dgram.createSocket("udp4");
@@ -138,6 +178,7 @@ function discoverVillaBridgeServer(options = {}) {
       if (
         !record ||
         pending.has(remote.address) ||
+        (selfNodeId !== null && record.nodeId === selfNodeId) ||
         (!allowLoopback && (localAddresses.has(remote.address) || remote.address.startsWith("127.")))
       ) {
         return;
@@ -179,6 +220,8 @@ module.exports = {
   DISCOVERY_VERSION,
   broadcastTargets,
   discoverVillaBridgeServer,
+  normalizeDiscoveryRecord,
   parseDiscoveryRecord,
+  resolveVillaBridgeNodeId,
   verifyVillaBridgeServer
 };

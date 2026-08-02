@@ -9,7 +9,7 @@ const os = require("node:os");
 const path = require("node:path");
 const Aedes = require("aedes");
 const mqtt = require("mqtt");
-const { discoverVillaBridgeServer } = require("./lan-discovery.cjs");
+const { discoverVillaBridgeServer, resolveVillaBridgeNodeId } = require("./lan-discovery.cjs");
 const {
   loadProvisioning,
   matterbridgeReady,
@@ -441,7 +441,7 @@ async function start() {
   let matterService = null;
   let matterMonitor = null;
   const peer = config.platform === "android"
-    ? await discoverVillaBridgeServer().catch((error) => {
+    ? await discoverVillaBridgeServer({ selfNodeId: resolveVillaBridgeNodeId("android") }).catch((error) => {
       console.warn(`Villa Bridge LAN discovery failed: ${error.message}`);
       return null;
     })
@@ -452,7 +452,10 @@ async function start() {
       ready: true,
       address: peer.address,
       dashboardUrl: peer.dashboardUrl,
-      serverMode: peer.mode
+      serverMode: peer.mode,
+      serverNodeId: peer.nodeId ?? null,
+      serverState: peer.state ?? null,
+      serverEpoch: peer.epoch ?? 0
     };
     runtime.mqtt = {
       status: "disabled",

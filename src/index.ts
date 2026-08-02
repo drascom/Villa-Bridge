@@ -23,8 +23,10 @@ import { HomeGroupsStore, homeGroupDeviceControlId, validateHomeGroups } from ".
 import { InstallationStateStore } from "./installation-state.js";
 import {
   createVillaBridgeDiscoveryRecord,
+  resolveVillaBridgeNodeId,
   resolveVillaBridgeNodeRole,
   startLanDiscoveryResponder,
+  villaBridgeCoordinatorId,
   villaBridgeDiscoveryPort
 } from "./lan-discovery.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
@@ -87,11 +89,29 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
 ) : null;
 const recentErrors = new RecentErrorLog(50, config.debug.enabled);
 const nodeRole = resolveVillaBridgeNodeRole();
+const nodeId = resolveVillaBridgeNodeId(nodeRole);
 const discoveryRecord = createVillaBridgeDiscoveryRecord(
   nodeRole,
   config.mode,
-  config.http.port
+  config.http.port,
+  {
+    nodeId,
+    state: "standby",
+    coordinatorId: villaBridgeCoordinatorId(config.zigbee?.serial.path)
+  }
 );
+/** Koordinatör oturumunun durumu; `source.start()` sonucuna göre güncellenir. */
+let coordinatorStatus: "starting" | "ready" | "coordinator-unavailable" = "starting";
+let coordinatorError: string | null = null;
+const nodeStatus = (): JsonObject => ({
+  nodeId,
+  role: nodeRole,
+  state: discoveryRecord.state,
+  epoch: discoveryRecord.epoch,
+  priority: discoveryRecord.priority,
+  coordinatorStatus,
+  coordinatorError
+});
 store.setMode(config.mode);
 let source: ZigbeeSource;
 if (config.mode === "direct") {
@@ -156,8 +176,8 @@ app.get("/api/locales", async (_request, reply) => {
   }
 });
 
-app.get("/api/health", async () => store.getHealth());
-app.get("/api/discovery", async () => discoveryRecord);
+app.get("/api/health", async () => ({ ...store.getHealth(), node: nodeStatus() }));
+app.get("/api/discovery", async () => ({ ...discoveryRecord, sentAt: Date.now() }));
 const visibleDevices = (role: "admin" | "resident" | undefined) => store.getDevices().map((device) => ({
   ...device,
   controls: role === "resident"
@@ -493,7 +513,7 @@ app.post("/api/pairing/stop", async (_request, reply) => {
   }
 });
 app.get("/api/overview", async (request) => ({
-  health: store.getHealth(),
+  health: { ...store.getHealth(), node: nodeStatus() },
   devices: visibleDevices(request.villaSession?.role),
   groups: store.getGroups(),
   pairing: store.getPairing(),
@@ -935,8 +955,39 @@ if (!embeddedRuntime) {
   process.on("SIGTERM", shutdown);
 }
 
-await source.start();
-automationEngine.start();
+// Sıra önemli: düğüm koordinatöre bağlanmadan ÖNCE ağda görünür olmalı (§1.5/5).
+await app.listen({ host: config.http.host, port: config.http.port });
+try {
+  discoveryResponder = await startLanDiscoveryResponder(discoveryRecord);
+  if (discoveryResponder) {
+    console.log(
+      `Villa Bridge LAN keşfi UDP ${villaBridgeDiscoveryPort} portunda hazır (düğüm ${nodeId}).`
+    );
+  }
+} catch (error) {
+  console.warn(`Villa Bridge LAN keşfi başlatılamadı: ${String(error)}`);
+}
+
+try {
+  await source.start();
+  coordinatorStatus = "ready";
+  coordinatorError = null;
+  if (nodeRole === "server") discoveryRecord.state = "owner";
+  automationEngine.start();
+} catch (error) {
+  // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
+  coordinatorStatus = "coordinator-unavailable";
+  coordinatorError = error instanceof Error ? error.message : String(error);
+  discoveryRecord.state = "standby";
+  recentErrors.record({
+    operation: "source.start",
+    statusCode: 503,
+    message: coordinatorError
+  });
+  console.error(
+    `Zigbee kaynağı başlatılamadı, düğüm koordinatörsüz sürüyor: ${coordinatorError}`
+  );
+}
 const warmDeviceImages = (): void => {
   const models = store.getDevices()
     .map((device) => device.image.model?.trim())
@@ -951,16 +1002,5 @@ imageWarmTimer.unref();
 const imageWarmStartTimer = setTimeout(warmDeviceImages, 5_000);
 imageWarmStartTimer.unref();
 
-await app.listen({ host: config.http.host, port: config.http.port });
-try {
-  discoveryResponder = await startLanDiscoveryResponder(discoveryRecord);
-  if (discoveryResponder) {
-    console.log(
-      `Villa Bridge LAN keşfi UDP ${villaBridgeDiscoveryPort} portunda hazır.`
-    );
-  }
-} catch (error) {
-  console.warn(`Villa Bridge LAN keşfi başlatılamadı: ${String(error)}`);
-}
 embeddedGlobal.__villaBridgeReady = true;
 console.log(`Villa Bridge paneli ${config.http.host}:${config.http.port} adresinde hazır.`);

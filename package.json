@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "test": "npm run build && node --test dist/**/*.test.js",
-    "runtime:test": "node --test apps/runtime/main.test.cjs apps/runtime/orchestration.test.cjs",
+    "runtime:test": "node --test apps/runtime/lan-discovery.test.cjs apps/runtime/main.test.cjs apps/runtime/orchestration.test.cjs",
     "linux:doctor": "apps/linux/doctor.sh",
     "android:prepare": "node scripts/prepare-android-node.mjs",
     "android:build": "node scripts/android-build.mjs",
