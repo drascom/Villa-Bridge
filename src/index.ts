@@ -4,6 +4,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerAccessControl } from "./access-control.js";
 import { loadAliases, saveAliases } from "./aliases.js";
+import { AutomationEngine } from "./automation-engine.js";
+import { AutomationsStore } from "./automations.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { hexToXy } from "./device-controls.js";
@@ -62,6 +64,10 @@ store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
 const homeGroupsStore = new HomeGroupsStore(resolve(dirname(configPath), "home-groups.json"));
+const automationsStore = new AutomationsStore(
+  resolve(dirname(configPath), "automations.json"),
+  (deviceId) => store.getDevice(deviceId)
+);
 const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
 const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
@@ -101,6 +107,7 @@ if (config.mode === "direct") {
 } else {
   source = new MqttShadowSource(config.mqtt, store);
 }
+const automationEngine = new AutomationEngine({ store: automationsStore, source });
 const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
   secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true"
@@ -581,6 +588,34 @@ app.put<{ Body?: { groups?: unknown } }>("/api/home-groups", async (request, rep
   }
 });
 
+app.get("/api/automations", async (_request, reply) => {
+  try {
+    return { ok: true, automations: await automationsStore.get() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{ Body?: { automations?: unknown } }>("/api/automations", async (request, reply) => {
+  try {
+    return { ok: true, automations: await automationsStore.save(request.body?.automations) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post<{ Params: { id: string } }>("/api/automations/:id/run", async (request, reply) => {
+  const result = await automationEngine.run(request.params.id);
+  if (result === "missing") return reply.code(404).send({ ok: false, error: "Otomasyon bulunamadı." });
+  if (result === "busy") {
+    return reply.code(503).send({ ok: false, error: "Otomasyon şu anda çalışıyor. Birazdan yeniden deneyin." });
+  }
+  if (result === "failed") {
+    return reply.code(503).send({ ok: false, error: "Otomasyon çalıştırılamadı." });
+  }
+  return { ok: true };
+});
+
 app.put<{
   Params: { id: string };
   Body?: { imageModel?: unknown; applyToModel?: unknown };
@@ -720,6 +755,9 @@ app.delete<{
     store.setImagePreferences(imagePreferences);
     const favorites = await favoritesStore.removeDevice(id);
     const groups = await homeGroupsStore.removeDevice(id);
+    await automationsStore.removeDevice(id).catch((error) => {
+      console.error(`Otomasyonlardan cihaz düşürülemedi: ${String(error)}`);
+    });
     await deviceNotesStore.removeDevice(id);
     return { ok: true, force, favorites, groups };
   } catch (error) {
@@ -885,6 +923,7 @@ const shutdown = async (): Promise<void> => {
   embeddedGlobal.__villaBridgeReady = false;
   clearInterval(imageWarmTimer);
   clearTimeout(imageWarmStartTimer);
+  automationEngine.stop();
   await discoveryResponder?.close();
   await source.stop();
   await app.close();
@@ -897,6 +936,7 @@ if (!embeddedRuntime) {
 }
 
 await source.start();
+automationEngine.start();
 const warmDeviceImages = (): void => {
   const models = store.getDevices()
     .map((device) => device.image.model?.trim())

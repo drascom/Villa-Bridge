@@ -199,6 +199,15 @@ Otomasyon 2 — "Akşam salon"
   Ne yapsın: Salon lambası → Aç
 ```
 
+### 5.1.1 Alt varlık kuralı — otomasyon cihaza değil, cihaz+özellik çiftine bağlanır
+
+Hedef **`deviceId` + `property`** ikilisidir. Çok gangli anahtarların her kanalı (`state_l1`,
+`state_l2`) ve sensörlerin her özelliği ayrı bir hedeftir.
+
+- `property` **kanonik ve kalıcıdır** — MQTT özellik anahtarı; motor bunu kullanır.
+- `controlId` (`DeviceControlView.id`) ve `name` yalnızca **sunum** verisidir.
+- Cihaz veya kanal yeniden adlandırılınca otomasyon **bozulmaz** (proje UID kuralı).
+
 ### 5.2 Tetikleyici türleri
 
 | Tür | Alanlar | Mevcut veriyle mümkün mü |
@@ -399,6 +408,13 @@ endpoint yok, kalıcı dosya yok — mevcut `POST /api/zigbee/bind` kullanıldı
 `automations.ts` + `automation-engine.ts` + `GET/PUT /api/automations` + 3 adımlı sihirbaz.
 **Yalnızca `time` tetikleyicisi ve `device` eylemi.** Koşul yok, gecikme yok, güneş yok.
 → Kullanıcının kendi örneği çalışır. **İlk sürüm bu kadar dar olmalı.**
+
+**Sunucu tarafı tamam** ✅ — `src/automations.ts` (depo, atomik yazma, kilit/siren reddi,
+`removeDevice`, `markRun`), `src/automation-engine.ts` (20 sn tur, dakika kilidi, yeniden giriş
+koruması, enjekte edilebilir saat), `GET/PUT /api/automations` + `POST /api/automations/:id/run`,
+`GET` resident yetkisinde. Motor `src/index.ts`'te başlatılıp kapanışta durduruluyor — böylece
+`apps/runtime` üzerinden çalışan tablet/Pi kurulumunda da otomasyonlar işler. Kalan: 3 adımlı
+sihirbaz (`public/index.html`).
 
 ### Faz 2 — Sensör ve düğme tetikleyicileri
 `deviceState` + `deviceAction` (olay akışına bağlanma), `group` eylemi, `delay` eylemi,
