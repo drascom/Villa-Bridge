@@ -577,6 +577,10 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /orientation:landscape/);
   assert.match(dashboard, /aside\{position:fixed;z-index:10;top:0;bottom:auto/);
   assert.match(dashboard, /grid-template-columns:repeat\(5,minmax\(104px,1fr\)\) auto/);
+  assert.match(
+    dashboard,
+    /@media\(orientation:landscape\) and \(max-width:900px\) and \(max-height:700px\)\{aside\{[^}]*\}nav\{grid-template-columns:repeat\(5,1fr\) auto\}/,
+  );
   assert.match(dashboard, /\.nav-utilities\{display:flex/);
   assert.match(dashboard, /\.topbar\{display:none\}main\{max-width:none;padding:82px 20px 20px\}/);
   assert.match(dashboard, /id="landscapeTheme"/);
