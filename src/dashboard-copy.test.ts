@@ -825,7 +825,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const widgetSlideDuration=220/);
   assert.match(dashboard, /function playWidgetSlide\(positions\)\{\s*if\(reducedMotion\(\)\)return/);
   assert.match(dashboard, /widget\.style\.setProperty\("--widget-slide-x",`\$\{offsetX\}px`\)/);
-  assert.match(dashboard, /const positions=captureWidgetPositions\(\);\s*saveWidgetLayout\(\);\s*applyWidgetLayout\(\);\s*touchDashboardEditing\(\);\s*playWidgetSlide\(positions\)/);
+  assert.match(dashboard, /const positions=captureWidgetPositions\(\);\s*saveWidgetLayout\(\);\s*applyWidgetLayout\(\);\s*touchDashboardEditing\(\);\s*scrollMovedWidgetIntoView\(id\);\s*playWidgetSlide\(positions\)/);
   assert.match(dashboard, /function moveDashboardWidget\(id,direction\)\{\s*if\(fixedDashboardWidgets\.has\(id\)\)return;\s*endWidgetSlide\(\)/);
   assert.match(dashboard, /behavior:reducedMotion\(\)\?"auto":"smooth"/);
   assert.match(dashboard, /#home \.widget-board\.editing \[data-widget="quick"\]\{height:84px;flex-basis:84px\}/);
@@ -1220,7 +1220,7 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
 test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yatay bloktadır", async () => {
   const dashboard = await readDashboardBundle();
   // Grup (b): her yatay ekranda (tablet + bilgisayar) geçerli olan tipografi/genişlik kuralları.
-  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 8\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}\}/);
+  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 6\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}\}/);
   // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
   const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
   const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"]{overflow:hidden}");
@@ -1275,4 +1275,65 @@ test("Ana Sayfa dışında 5 dakika boşta kalınca panel Ana Sayfa'ya döner", 
   assert.match(dashboard, /function clearIdleHomeReturn\(\)\{if\(idleHomeReturnTimer!==null\)\{clearTimeout\(idleHomeReturnTimer\);idleHomeReturnTimer=null\}\}/);
   // Düzenleme modunun 60 saniyelik otomatik çıkışı ayrı ve değişmedi.
   assert.match(dashboard, /const dashboardEditingIdleDelay=60000/);
+});
+
+test("Groups sekmesine geçince cihaz listesi döngüsüz şekilde dolu gelir", async () => {
+  const dashboard = await readDashboardBundle();
+  // Durum kurulumu sekme değiştirmeyen ayrı bir fonksiyona alındı.
+  assert.match(dashboard, /function prepareGroupEditor\(groupId=null\)\{/);
+  assert.match(dashboard, /function openGroupEditor\(groupId=null\)\{\s*prepareGroupEditor\(groupId\);\s*renderWidgetCatalog\(\);\s*setAddDialogTab\("groups"\);/);
+  // Sekme geçişi yalnız durum yoksa kurar; prepareGroupEditor setAddDialogTab çağırmaz (sonsuz döngü yok).
+  assert.match(dashboard, /if\(tab==="groups"&&!state\.groupEditing\)prepareGroupEditor\(null\);/);
+  const prepareBody = dashboard.slice(
+    dashboard.indexOf("function prepareGroupEditor(groupId=null){"),
+    dashboard.indexOf("function openGroupEditor(groupId=null){")
+  );
+  assert.ok(prepareBody.length > 0);
+  assert.doesNotMatch(prepareBody, /setAddDialogTab/);
+  assert.doesNotMatch(prepareBody, /openGroupEditor/);
+  assert.match(prepareBody, /renderGroupDeviceChoices\(\)/);
+  // Kapanışta temizlik korunuyor; sonraki açılışta sekme geçişi listeyi yeniden kuruyor.
+  assert.match(dashboard, /function resetAddDialog\(\)\{\s*state\.groupEditing=null;/);
+  assert.match(dashboard, /\$\("#groupDeviceChoices"\)\.innerHTML="";/);
+});
+
+test("widget kataloğu bilgi kutuları ve kullanıcı grupları olarak ayrılır", async () => {
+  const dashboard = await readDashboardBundle();
+  assert.match(dashboard, /function widgetCatalogSectionHtml\(headingId,labelKey,entries\)\{\s*if\(!entries\.length\)return"";/);
+  assert.match(dashboard, /<div class="widget-catalog-section" role="group" aria-labelledby="\$\{headingId\}"><h3 id="\$\{headingId\}" class="widget-catalog-heading">\$\{esc\(t\(labelKey\)\)\}<\/h3>/);
+  assert.match(dashboard, /widgetCatalogSectionHtml\("widgetCatalogInfoHeading","widgetCatalogInfoBoxes",infoBoxes\)\+widgetCatalogSectionHtml\("widgetCatalogGroupsHeading","widgetCatalogYourGroups",groupBoxes\)/);
+  assert.match(dashboard, /const infoBoxes=Object\.entries\(dashboardWidgetTypes\)/);
+  assert.match(dashboard, /const groupBoxes=state\.groups\.map\(group=>/);
+  // Ekle/Kaldır, "Her zaman açık" ve grup düzenle ikonu aynı öğe şablonunda kaldı.
+  assert.match(dashboard, /function widgetCatalogItemHtml\(entry\)\{/);
+  assert.match(dashboard, /\$\{t\("widgetAlwaysOn"\)\}<\/button>/);
+  assert.match(dashboard, /data-remove-widget="\$\{esc\(id\)\}"/);
+  assert.match(dashboard, /data-add-widget="\$\{esc\(id\)\}"/);
+  assert.match(dashboard, /data-edit-group="\$\{esc\(groupId\)\}"/);
+  assert.match(dashboard, /\$\$\("\[data-edit-group\]"\)\.forEach\(button=>button\.onclick=\(\)=>openGroupEditor\(button\.dataset\.editGroup\)\)/);
+  assert.match(dashboard, /\.widget-catalog-heading\{margin:0;color:var\(--muted\);font:750 12px\/1\.2 system-ui,sans-serif;letter-spacing:\.08em;text-transform:uppercase\}/);
+  assert.equal(dashboard.split('widgetCatalogInfoBoxes:"').length - 1, 2);
+  assert.equal(dashboard.split('widgetCatalogYourGroups:"').length - 1, 2);
+});
+
+test("taşınan widget rayda ortalanır ve FLIP transformundan önce kaydırılır", async () => {
+  const dashboard = await readDashboardBundle();
+  // Yatayda ortala, sayfayı dikey kaydırma; reduced-motion altında anında.
+  assert.match(dashboard, /widget\.scrollIntoView\(\{behavior:reducedMotion\(\)\?"auto":"smooth",block:"nearest",inline:"center"\}\)/);
+  // Kaydırma, FLIP transformu uygulanmadan ÖNCE olmalı: aksi halde scrollIntoView
+  // widget'ın eski (transform edilmiş) kutusunu ölçer ve hiç kaydırmaz.
+  assert.match(dashboard, /touchDashboardEditing\(\);\s*scrollMovedWidgetIntoView\(id\);\s*playWidgetSlide\(positions\);/);
+  const moveBody = dashboard.slice(
+    dashboard.indexOf("function moveDashboardWidget(id,direction){"),
+    dashboard.indexOf("const dashboardEditingIdleDelay=")
+  );
+  assert.ok(moveBody.length > 0);
+  assert.ok(moveBody.indexOf("scrollMovedWidgetIntoView(id)") < moveBody.indexOf("playWidgetSlide(positions)"));
+  assert.doesNotMatch(moveBody, /scrollIntoView/);
+  // Taşıma hâlâ 60 sn boşta kalma sayacını sıfırlıyor ve FLIP temizliği önde.
+  assert.ok(moveBody.indexOf("touchDashboardEditing()") > 0);
+  assert.match(moveBody, /if\(fixedDashboardWidgets\.has\(id\)\)return;\s*endWidgetSlide\(\);/);
+  // Hızlı basmalarda ipucu zamanlayıcısı yığılmaz.
+  assert.match(dashboard, /if\(widgetScrollHintTimer!==null\)clearTimeout\(widgetScrollHintTimer\);\s*widgetScrollHintTimer=setTimeout\(\(\)=>\{widgetScrollHintTimer=null;updateWidgetScrollHint\(\)\},420\)/);
+  assert.match(dashboard, /function scrollMovedWidgetIntoView\(id\)\{\s*const widget=railWidgets\(\)\.find\(candidate=>candidate\.dataset\.widget===id\);\s*if\(!widget\)return;/);
 });

@@ -400,6 +400,8 @@
     "addWidgetAction": "Add",
     "addWidgetLead": "Choose compact widgets for the information you want to see at a glance.",
     "addToDashboard": "Add to dashboard",
+    "widgetCatalogInfoBoxes": "Info boxes",
+    "widgetCatalogYourGroups": "Your groups",
     "addWidgetsTab": "Widgets",
     "addGroupsTab": "Device groups",
     "editDashboard": "✎ Edit",
