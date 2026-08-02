@@ -1220,7 +1220,7 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
 test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yatay bloktadır", async () => {
   const dashboard = await readDashboardBundle();
   // Grup (b): her yatay ekranda (tablet + bilgisayar) geçerli olan tipografi/genişlik kuralları.
-  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 6\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}\}/);
+  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}\}/);
   // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
   const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
   const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"]{overflow:hidden}");
@@ -1336,4 +1336,28 @@ test("taşınan widget rayda ortalanır ve FLIP transformundan önce kaydırıl�
   // Hızlı basmalarda ipucu zamanlayıcısı yığılmaz.
   assert.match(dashboard, /if\(widgetScrollHintTimer!==null\)clearTimeout\(widgetScrollHintTimer\);\s*widgetScrollHintTimer=setTimeout\(\(\)=>\{widgetScrollHintTimer=null;updateWidgetScrollHint\(\)\},420\)/);
   assert.match(dashboard, /function scrollMovedWidgetIntoView\(id\)\{\s*const widget=railWidgets\(\)\.find\(candidate=>candidate\.dataset\.widget===id\);\s*if\(!widget\)return;/);
+});
+
+test("yeni oluşturulan grup widget'ı görünüme alınır, düzenlenen grup alınmaz", async () => {
+  const dashboard = await readDashboardBundle();
+  // Yalnızca yeni grup: editing.id doluysa createdId null kalır.
+  assert.match(dashboard, /let createdId=null;\s*if\(editing\.id\)\{\s*groups=state\.groups\.map\(group=>group\.id===editing\.id\?\{id:group\.id,name,items\}:group\);\s*\}else\{/);
+  assert.match(dashboard, /createdId=id;\s*groups=\[\.\.\.state\.groups,\{id,name,items\}\];\s*state\.widgets\.push\(groupWidgetId\(id\)\);/);
+  // Kaydırma, modal kapandıktan ve düzen uygulandıktan SONRA; mevcut yardımcı yeniden kullanılıyor.
+  assert.match(dashboard, /closeAddDialog\(\);\s*await persistHomeGroups\(groups,editing\.id\?"groupUpdated":"groupCreated"\);\s*if\(createdId\)requestAnimationFrame\(\(\)=>scrollMovedWidgetIntoView\(groupWidgetId\(createdId\)\)\);/);
+  const saveBody = dashboard.slice(
+    dashboard.indexOf("async function saveDashboardGroup(){"),
+    dashboard.indexOf("function syncGroupWidgetOrder(groups){")
+  );
+  assert.ok(saveBody.length > 0);
+  // Yeni bir kaydırma yolu yazılmadı ve sıralama doğru.
+  assert.doesNotMatch(saveBody, /scrollIntoView/);
+  assert.ok(saveBody.indexOf("await persistHomeGroups") < saveBody.indexOf("scrollMovedWidgetIntoView"));
+  assert.ok(saveBody.indexOf("closeAddDialog()") < saveBody.indexOf("scrollMovedWidgetIntoView"));
+  // persistHomeGroups kaydırmadan önce düzeni uyguluyor, yani eleman DOM'da.
+  assert.match(dashboard, /async function persistHomeGroups\(groups,successKey\)\{\s*state\.groups=groups;\s*saveDashboardGroups\(\);\s*applyWidgetLayout\(\);\s*render\(\);/);
+  // Yardımcı hâlâ reduced-motion ve ipucu güncellemesini kendisi hallediyor.
+  assert.match(dashboard, /function scrollMovedWidgetIntoView\(id\)\{/);
+  assert.match(dashboard, /widget\.scrollIntoView\(\{behavior:reducedMotion\(\)\?"auto":"smooth",block:"nearest",inline:"center"\}\)/);
+  assert.match(dashboard, /widgetScrollHintTimer=setTimeout\(\(\)=>\{widgetScrollHintTimer=null;updateWidgetScrollHint\(\)\},420\)/);
 });
