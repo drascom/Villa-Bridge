@@ -1543,6 +1543,41 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /api\("\/api\/automations",\{method:"PUT",body:JSON\.stringify\(\{automations\}\)\}\)/);
   assert.match(dashboard, /api\(`\/api\/automations\/\$\{encodeURIComponent\(id\)\}\/run`,\{method:"POST"\}\)/);
 
+  // Sihirbaz gezinmesi: sabit ileri/geri şeridi, adım göstergesi, otomatik ilerleme.
+  assert.match(dashboard, /<div class="modal-actions automation-actions"><button id="automationBack" class="secondary" type="button" data-i18n="back">/);
+  assert.match(dashboard, /id="automationBack"[\s\S]*?id="automationNext" class="primary"/);
+  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px;z-index:2;justify-content:space-between/);
+  assert.match(dashboard, /\.automation-actions button\{min-width:132px;min-height:52px/);
+  assert.match(dashboard, /\$\("#automationBack"\)\.textContent=t\("back"\)/);
+  assert.match(dashboard, /back:"Geri"/);
+  assert.match(dashboard, /next:"İleri"/);
+
+  // "İleri" yalnızca o adımda seçim yapıldıysa aktif.
+  assert.match(
+    dashboard,
+    /const automationStepReady=wizard=>wizard\.step===1\?Boolean\(wizard\.triggerKind\):wizard\.step===2\?Boolean\(wizard\.action\):true/
+  );
+  assert.match(dashboard, /next\.disabled=!automationStepReady\(wizard\)/);
+  assert.match(dashboard, /if\(!wizard\|\|!automationStepReady\(wizard\)\)return;/);
+  assert.match(dashboard, /\.automation-actions button\[disabled\]\{opacity:\.45\}/);
+
+  // Adım göstergesi: metin + üç nokta.
+  assert.match(dashboard, /<div id="automationDots" class="automation-dots" aria-hidden="true"><span><\/span><span><\/span><span><\/span><\/div>/);
+  assert.match(dashboard, /\$\$\("#automationDots span"\)\.forEach\(\(dot,index\)=>\{/);
+  assert.match(dashboard, /dot\.className=index\+1===wizard\.step\?"active":index\+1<wizard\.step\?"done":""/);
+  assert.match(dashboard, /\.automation-dots span\.active\{width:24px/);
+
+  // Tek dokunuşluk seçimler ~200 ms sonra kendiliğinden ilerler.
+  assert.match(dashboard, /automationAdvanceTimer=setTimeout\(\(\)=>\{automationAdvanceTimer=null;run\(\)\},200\)/);
+  assert.match(dashboard, /data-automation-trigger\]"\)\.forEach\(button=>button\.onclick=\(\)=>chooseAutomationTrigger\(button\.dataset\.automationTrigger\)\)/);
+  assert.match(dashboard, /wizard\.triggerKind=kind;\s*renderAutomationWizard\(\);\s*afterAutomationChoice\(/);
+  assert.match(dashboard, /afterAutomationChoice\(\(\)=>\{nextAutomationStep\(\)\}\)/);
+  // Ayar isteyen dokunuşlarda (saat, gün, oda) otomatik ilerleme yok: yalnız iki çağrı yeri var.
+  assert.equal((dashboard.match(/afterAutomationChoice\(/g) ?? []).length, 3);
+  // Geri gidildiğinde seçimler durur: sihirbaz durumu yalnızca modal kapanınca sıfırlanır.
+  assert.match(dashboard, /addEventListener\("close",\(\)=>\{cancelAutomationAdvance\(\);state\.automationWizard=null\}\)/);
+  assert.match(dashboard, /triggerKind:trigger\?"time":null/);
+
   // Faz 1 sınırı: tek tetikleyici, tek eylem, koşul yok.
   assert.match(dashboard, /triggers:\[automationWizardTrigger\(wizard\)\],\s*conditions:\[\],\s*actions:\[wizard\.action\],/);
   assert.doesNotMatch(dashboard, /data-automation-condition/);
