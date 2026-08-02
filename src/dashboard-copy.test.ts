@@ -939,7 +939,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-rail\{min-height:0;flex:1;display:grid;grid-template-columns:repeat\(3,calc\(33\.333vw - 27px\)\)/);
   assert.match(dashboard, /grid-auto-columns:calc\(33\.333vw - 27px\)/);
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2\}/);
-  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
   assert.match(dashboard, /const rail=\$\("#widgetRail"\)/);
   assert.match(dashboard, /rail\.insertBefore\(widget,\$\("#widgetEmpty"\)\)/);
   assert.match(dashboard, /\$\$\("#widgetRail \[data-widget\]"\)/);
@@ -982,7 +982,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}/);
   assert.match(dashboard, /#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}/);
   assert.match(dashboard, /function widgetListCapacity\(selector,fallback\)\{/);
-  assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/44\)\)\)/);
+  assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/62\)\)\)/);
   assert.match(dashboard, /const runs=collapseEventRuns\(state\.events\|\|\[\],widgetListCapacity\("#activityEvents",5\)\)/);
   assert.match(dashboard, /applyWidgetLayout\(\);\s*renderWidgetLists\(\);\s*bindCards\(\)/);
   assert.match(dashboard, /refreshWeatherIfNeeded\(\)/);
@@ -1220,14 +1220,14 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
 test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yatay bloktadır", async () => {
   const dashboard = await readDashboardBundle();
   // Grup (b): her yatay ekranda (tablet + bilgisayar) geçerli olan tipografi/genişlik kuralları.
-  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}\}/);
+  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p,#home \[data-widget="clock"\] \.widget-title-row p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.clock-primary strong\{font-size:58px\}#home \.clock-primary span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact,#home \.weather-facts span\{font-size:14px\}#home \.quick-battery\{font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row\{display:grid;justify-items:start;gap:2px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row span\{font-size:14px\}\}/);
   // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
   const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
   const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"]{overflow:hidden}");
   assert.ok(landscapeBlock > 0 && shortBlock > landscapeBlock);
   // Grup (a): tam ekran yerleşim, rail sığdırma ve sıkışık boşluklar yükseklik koşuluna bağlı kalır.
   assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\]\{overflow:hidden\}body\[data-active-view="home"\] main\{height:100vh;overflow:hidden\}#home\.active\{height:100%/);
-  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
   assert.match(dashboard, /#home \.clock-primary\{margin-top:10px\}#home \.clock-rows\{gap:7px;margin-top:14px\}/);
   assert.match(dashboard, /#home \.group-summary\{margin-top:7px\}#home \.home-summary\{gap:14px;margin-top:12px\}#home \.widget-value\{margin-top:14px\}/);
   // Yükseklik koşullu blok artık tipografi kurallarını içermemeli.
@@ -1360,4 +1360,23 @@ test("yeni oluşturulan grup widget'ı görünüme alınır, düzenlenen grup al
   assert.match(dashboard, /function scrollMovedWidgetIntoView\(id\)\{/);
   assert.match(dashboard, /widget\.scrollIntoView\(\{behavior:reducedMotion\(\)\?"auto":"smooth",block:"nearest",inline:"center"\}\)/);
   assert.match(dashboard, /widgetScrollHintTimer=setTimeout\(\(\)=>\{widgetScrollHintTimer=null;updateWidgetScrollHint\(\)\},420\)/);
+});
+
+test("dar sütunda hareket satırları dikey yığılır ve kapasite yeni satır yüksekliğine uyar", async () => {
+  const dashboard = await readDashboardBundle();
+  // Activity widget'ı artık tablette de diğer kartlarla aynı genişlikte.
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
+  assert.doesNotMatch(dashboard, /\[data-widget="activity"\]\{grid-column:span 2\}/);
+  // Geniş ekran değeri span 5'te kaldı.
+  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}/);
+  // Cihaz adı üstte, durum+zaman altta; yalnız activity listesi etkileniyor.
+  assert.match(dashboard, /#home \[data-widget="activity"\] \.widget-list-row\{display:grid;justify-items:start;gap:2px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row span\{font-size:14px\}/);
+  // Diğer widget listeleri yan yana düzenini koruyor.
+  assert.match(dashboard, /\.widget-list-row\{display:flex;justify-content:space-between;gap:12px/);
+  // ×N sayacı hâlâ üretiliyor ve stili duruyor.
+  assert.match(dashboard, /<b class="widget-list-repeat">\$\{esc\(t\("eventRepeatCount",\{count:run\.count\}\)\)\}<\/b>/);
+  assert.match(dashboard, /\.widget-list-repeat\{margin-left:8px/);
+  // Satır yüksekliği ~57px + 6px boşluk; bölen buna göre büyütüldü.
+  assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/62\)\)\)/);
+  assert.doesNotMatch(dashboard, /Math\.floor\(available\/44\)/);
 });
