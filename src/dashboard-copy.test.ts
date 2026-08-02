@@ -420,7 +420,7 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /if\(localComplete&&!installationOnboardingComplete\)/);
   assert.match(dashboard, /await markOnboardingComplete\(\)/);
   assert.match(dashboard, /if\(!onboardingComplete\(\)\)openOnboarding\(\)/);
-  assert.match(dashboard, /const startup=\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadInstallationOnboarding\(\)\]/);
+  assert.match(dashboard, /const startup=\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadAutomations\(\),loadInstallationOnboarding\(\)\]/);
   assert.match(dashboard, /if\(state\.auth\.user\?\.role==="admin"\)startup\.push\(loadSettings\(\)\)/);
   assert.match(dashboard, /await Promise\.allSettled\(startup\)/);
   assert.match(dashboard, /data-onboarding-language="en"/);
@@ -846,7 +846,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /async function persistHomeGroups\(groups,successKey\)\{/);
   assert.match(dashboard, /await api\("\/api\/home-groups",\{method:"PUT",body:JSON\.stringify\(\{groups\}\)\}\)/);
   assert.match(dashboard, /catch\(error\)\{showToast\(t\("groupSaveFailed",\{error:error\.message\}\),true\)\}/);
-  assert.match(dashboard, /const reload=\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\)\]/);
+  assert.match(dashboard, /const reload=\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadAutomations\(\)\]/);
   assert.match(dashboard, /await Promise\.allSettled\(startup\);\s*await migrateLocalGroups\(\)/);
   assert.match(dashboard, /if\(Array\.isArray\(data\.favorites\)\)state\.favorites=data\.favorites;\s*if\(Array\.isArray\(data\.groups\)\)\{state\.groups=data\.groups;saveDashboardGroups\(\);applyWidgetLayout\(\)\}/);
   assert.match(dashboard, /function saveDashboardGroups\(\)\{\s*try\{localStorage\.setItem\("villa-dashboard-groups"/);
@@ -1407,8 +1407,6 @@ test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
   assert.match(dashboard, /id="newAutomation" class="primary"/);
   assert.match(dashboard, /id="automationPaths" class="automation-paths" hidden/);
   assert.match(dashboard, /data-automation-path="link"/);
-  assert.match(dashboard, /data-automation-path="rule" disabled aria-disabled="true"/);
-  assert.match(dashboard, /class="automation-soon" data-i18n="comingSoon"/);
   assert.match(dashboard, /\.automation-path\{min-height:88px/);
   assert.match(dashboard, /\.simple-link-choice\{min-height:88px/);
   assert.match(dashboard, /comingSoon:"Coming soon"/);
@@ -1419,7 +1417,6 @@ test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
   assert.match(dashboard, /state\.devices\.filter\(isLinkStarter\)\.forEach\(device=>\{/);
   assert.match(dashboard, /if\(!linkClusterNames\.includes\(binding\.cluster\)\)return;/);
   assert.match(dashboard, /function renderAutomations\(\)\{/);
-  assert.doesNotMatch(dashboard, /\/api\/automations/);
 
   // Sihirbaz iki adım; endpoint ve cluster kullanıcıya sorulmuyor.
   assert.match(dashboard, /<dialog id="simpleLinkDialog" class="simple-link-dialog">/);
@@ -1448,6 +1445,108 @@ test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
   assert.ok(catalogs.every((key) => dashboard.includes(key)));
   assert.doesNotMatch(dashboard, /simpleLink[A-Za-z]*:"[^"]*(?:tetikleyici|senaryo|cluster|endpoint)/i);
   assert.doesNotMatch(dashboard, /automations?[A-Za-z]*:"[^"]*(?:tetikleyici|senaryo|cluster|endpoint)/i);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // "Kural kur" yolu artık açık; yerinde "Yakında" rozeti kalmadı.
+  assert.match(dashboard, /<button class="automation-path" type="button" data-automation-path="rule"><span/);
+  assert.doesNotMatch(dashboard, /data-automation-path="rule" disabled/);
+  assert.match(dashboard, /if\(path==="rule"\)openAutomationWizard\(\)/);
+
+  // Üç adımlı sihirbaz kabuğu.
+  assert.match(dashboard, /<dialog id="automationDialog" class="automation-dialog">/);
+  assert.match(dashboard, /id="automationBody"/);
+  assert.match(dashboard, /id="automationNext" class="primary"/);
+  assert.match(dashboard, /t\("automationStepCount",\{step:wizard\.step,total:3\}\)/);
+  assert.match(dashboard, /automationStepCount:"Step \{step\} of \{total\}"/);
+  assert.match(dashboard, /automationStepCount:"Adım \{step\} \/ \{total\}"/);
+  assert.match(dashboard, /const titles=\["automationWhenTitle","automationThenTitle","automationReviewTitle"\]/);
+  assert.match(dashboard, /automationWhenTitle:"Ne zaman çalışsın\?"/);
+  assert.match(dashboard, /automationThenTitle:"Ne yapsın\?"/);
+
+  // Ekran 1: beş dokunma hedefi, yalnızca saat etkin, diğer dördü "Yakında" ve devre dışı.
+  assert.match(dashboard, /\{kind:"time",glyph:"🕐",label:"automationTriggerTime",ready:true\}/);
+  assert.match(dashboard, /\{kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:false\}/);
+  assert.match(dashboard, /\{kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:false\}/);
+  assert.match(dashboard, /\{kind:"sensor",glyph:"🚪",label:"automationTriggerSensor",ready:false\}/);
+  assert.match(dashboard, /\{kind:"deviceState",glyph:"💡",label:"automationTriggerDeviceState",ready:false\}/);
+  assert.match(dashboard, /entry\.ready\?"":' disabled aria-disabled="true"'/);
+  assert.match(dashboard, /entry\.ready\?"":`<span class="automation-soon">\$\{t\("comingSoon"\)\}<\/span>`/);
+  assert.match(dashboard, /\.automation-trigger\{min-height:88px/);
+
+  // Saat seçimi iri artır/azalt düğmeleriyle; sayısal klavye yok, dakika 5'er adım.
+  assert.match(dashboard, /data-automation-time="\$\{name\}:\$\{amount\}"/);
+  assert.match(dashboard, /unit\("hour",wizard\.hour,1,"automationHourUp","automationHourDown"\)/);
+  assert.match(dashboard, /unit\("minute",wizard\.minute,5,"automationMinuteUp","automationMinuteDown"\)/);
+  assert.match(dashboard, /function stepAutomationTime\(unit,amount\)\{/);
+  assert.doesNotMatch(dashboard, /type="time"/);
+
+  // Gün çipleri; varsayılan "Her gün".
+  assert.match(dashboard, /const automationWeekDays=\[1,2,3,4,5,6,7\]/);
+  assert.match(dashboard, /days:trigger\?\[\.\.\.trigger\.days\]:\[\.\.\.automationWeekDays\]/);
+  assert.match(dashboard, /automationEveryDayChip:"Her gün"/);
+  assert.match(dashboard, /automationEveryDayChip:"Every day"/);
+  assert.match(dashboard, /automationDay1:"Pzt"/);
+  assert.match(dashboard, /automationDay7:"Sun"/);
+
+  // Ekran 2: oda çipleri + cihaz kartı; alt varlıklar satır içinde açılır.
+  assert.match(dashboard, /data-automation-room="\$\{esc\(group\.id\)\}"/);
+  assert.match(dashboard, /function toggleAutomationDevice\(deviceId\)\{/);
+  assert.match(dashboard, /const single=controls\.length===1;/);
+  assert.match(dashboard, /\.automation-target\.selected\{border-color:var\(--forest\)\}/);
+
+  // §8.1 güvenlik: kilit ve siren hiç listelenmez, yalnızca switch kontrolleri hedef.
+  assert.match(dashboard, /const isAutomationControl=control=>control\.kind==="switch"&&control\.adminOnly!==true/);
+  assert.match(dashboard, /const automationControls=device=>isProtectedDevice\(device\)\?\[\]:\(device\?\.controls\|\|\[\]\)\.filter\(isAutomationControl\)/);
+
+  // §5.1.1 alt varlık: kaydedilen eylem kanonik property taşır, controlId yalnızca sunum.
+  assert.match(
+    dashboard,
+    /wizard\.action=\{type:"device",deviceId,property:control\.property,controlId:control\.id,value:automationControlValue\(control,mode==="on"\)\}/
+  );
+  assert.match(dashboard, /const automationControl=action=>automationDevice\(action\)\?\.controls\.find\(control=>control\.property===action\?\.property\)/);
+
+  // Ekran 3: özet cümlesi tam şablon anahtarıyla kuruluyor, parça birleştirme yok.
+  assert.match(dashboard, /const automationSentence=\(trigger,action\)=>t\(\s*automationEveryDay\(trigger\.days\)\?"automationSummaryTime":"automationSummaryTimeDays",/);
+  assert.match(dashboard, /<div class="automation-sentence">\$\{esc\(sentence\)\}<\/div>/);
+  assert.match(dashboard, /automationSummaryTime:"Every day at \{time\}, \{device\} will \{action\}\."/);
+  assert.match(dashboard, /automationSummaryTime:"Her gün saat \{time\} olduğunda \{device\} \{action\}\."/);
+  assert.match(dashboard, /automationSummaryTimeDays:"On \{days\} at \{time\}, \{device\} will \{action\}\."/);
+  assert.match(dashboard, /automationSummaryTimeDays:"\{days\} günleri saat \{time\} olduğunda \{device\} \{action\}\."/);
+  assert.match(dashboard, /automationWillTurnOn:"açılacak"/);
+  assert.match(dashboard, /automationWillTurnOn:"turn on"/);
+  assert.match(dashboard, /id="automationName" type="text" maxlength="64"/);
+
+  // Liste: açık/kapalı anahtarı ve §8.2 son çalışma çipi.
+  assert.match(dashboard, /data-automation-toggle="\$\{esc\(automation\.id\)\}"/);
+  assert.match(dashboard, /async function toggleAutomationEnabled\(id\)\{/);
+  assert.match(dashboard, /const automationRunChip=automation=>\{/);
+  assert.match(dashboard, /automationNeverRan:"Henüz çalışmadı"/);
+  assert.match(dashboard, /automationNeverRan:"Has not run yet"/);
+  assert.match(dashboard, /automationLastRunFailed:"Son çalışma yapılamadı · \{time\}"/);
+  assert.match(dashboard, /\.automation-card-chip\.warn\{color:var\(--danger\)\}/);
+
+  // Uzun basma modalı: Düzenle / Şimdi çalıştır / Sil (silme onay ister).
+  assert.match(dashboard, /<dialog id="automationActionDialog">/);
+  assert.match(dashboard, /id="runAutomationNow"/);
+  assert.match(dashboard, /id="editAutomation"/);
+  assert.match(dashboard, /id="deleteAutomation"/);
+  assert.match(dashboard, /bindLongPress\(card,\(\)=>openAutomationActions\(card\.dataset\.automationCard\)/);
+  assert.match(dashboard, /confirm\(t\("automationDeleteConfirm",\{name:automation\.name\}\)\)/);
+
+  // Sunucu sözleşmesi: GET / PUT tüm dizi / POST run.
+  assert.match(dashboard, /async function loadAutomations\(\)\{\s*const data=await api\("\/api\/automations"\);/);
+  assert.match(dashboard, /api\("\/api\/automations",\{method:"PUT",body:JSON\.stringify\(\{automations\}\)\}\)/);
+  assert.match(dashboard, /api\(`\/api\/automations\/\$\{encodeURIComponent\(id\)\}\/run`,\{method:"POST"\}\)/);
+
+  // Faz 1 sınırı: tek tetikleyici, tek eylem, koşul yok.
+  assert.match(dashboard, /triggers:\[automationWizardTrigger\(wizard\)\],\s*conditions:\[\],\s*actions:\[wizard\.action\],/);
+  assert.doesNotMatch(dashboard, /data-automation-condition/);
+  assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:koşul|senaryo|tetikleyici|property|endpoint)/i);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
