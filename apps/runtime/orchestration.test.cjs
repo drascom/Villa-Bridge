@@ -208,6 +208,7 @@ test("Matterbridge bootstrap registers the bundled plugin and reaches ready stat
   };
   const plugins = new Map();
   let startBridgeCalls = 0;
+  let bigIntGuardCalls = 0;
   const instance = {
     plugins,
     startBridge: async () => {
@@ -225,11 +226,16 @@ test("Matterbridge bootstrap registers the bundled plugin and reaches ready stat
     registerPlugin: async () => {
       plugins.set(plugin.name, plugin);
     },
+    installBigIntGuard: async () => {
+      bigIntGuardCalls += 1;
+      return { guarded: ["StorageBackendDiskAsync.set"], entry: "/bundle/@matter/nodejs" };
+    },
     loadMatterbridge: async () => ({
       Matterbridge: {
         loadInstance: async () => {
           assert.equal(process.argv.includes("-test"), false);
           assert.equal(startBridgeCalls, 0);
+          assert.equal(bigIntGuardCalls, 1);
           await instance.startBridge();
           return instance;
         }
@@ -245,6 +251,7 @@ test("Matterbridge bootstrap registers the bundled plugin and reaches ready stat
   assert.equal(pluginConfig.username, "home-assistant");
   assert.equal(pluginConfig.password, "test-only-password");
   assert.equal(startBridgeCalls, 1);
+  assert.equal(bigIntGuardCalls, 1);
   assert.equal(matterbridgeReady(service), true);
 });
 

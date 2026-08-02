@@ -33,6 +33,7 @@ const requiredFiles = [
   "dashboard.html",
   "lan-discovery.cjs",
   "main.cjs",
+  "matter-bigint-guard.cjs",
   "orchestration.cjs",
   "package-lock.json",
   "package.json"

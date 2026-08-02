@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const YAML = require("yaml");
+const { installMatterBigIntGuard } = require("./matter-bigint-guard.cjs");
 
 const PROVISIONING_FILE = "provisioning.json";
 const LEGACY_PROVISIONING_FILE = "android-provisioning.json";
@@ -311,6 +312,10 @@ async function startMatterbridge(config, provision, dependencies = {}) {
   const registerPlugin = dependencies.registerPlugin || preRegisterMatterbridgePlugin;
   await registerPlugin(matterHome, pluginPackage);
   const { Matterbridge } = await loadMatterbridge();
+  // zigbee-herdsman'in BigInt yamasi Matter deposunu bozar; ilk depo yaziminden
+  // once koruma devreye girmeli.
+  const installGuard = dependencies.installBigIntGuard || installMatterBigIntGuard;
+  await installGuard({ log: (message) => console.log(message) });
   const instance = await Matterbridge.loadInstance(true);
   const plugin = instance.plugins.get("matterbridge-zigbee2mqtt");
   if (!plugin) {
