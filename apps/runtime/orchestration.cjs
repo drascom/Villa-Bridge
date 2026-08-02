@@ -9,6 +9,7 @@ const { installMatterBigIntGuard } = require("./matter-bigint-guard.cjs");
 const PROVISIONING_FILE = "provisioning.json";
 const LEGACY_PROVISIONING_FILE = "android-provisioning.json";
 const DEFAULT_CONFIG_FILE = path.join("config", "villa-bridge.yaml");
+const COORDINATOR_BLACKLIST = ["Coordinator"];
 
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
@@ -208,10 +209,43 @@ function appendMatterbridgeArguments(argv, matterHome) {
   return argv;
 }
 
+function readPluginBlackList(file) {
+  try {
+    const existing = JSON.parse(fs.readFileSync(file, "utf8"));
+    return Array.isArray(existing?.blackList) ? existing.blackList : [];
+  } catch {
+    // Bozuk ya da eksik config kara listeyi sifirlar; koordinator yine de disarida kalir.
+    return [];
+  }
+}
+
+function mergeBlackList(...sources) {
+  const merged = [];
+  for (const source of sources) {
+    if (!Array.isArray(source)) continue;
+    for (const entry of source) {
+      if (typeof entry !== "string") continue;
+      const value = entry.trim();
+      if (value && !merged.includes(value)) merged.push(value);
+    }
+  }
+  return merged;
+}
+
 function writeMatterbridgePluginConfig(config, provision, matterHome) {
   const directory = path.join(matterHome, ".matterbridge");
   fs.mkdirSync(directory, { recursive: true });
   const file = path.join(directory, "matterbridge-zigbee2mqtt.config.json");
+  // Eklenti koordinatoru Matter'a kilit olarak sunuyor ve kilidi acmak Zigbee
+  // eslestirme modunu (permit_join) aciyor. Eklentinin kendi kosulu
+  // friendly_name === "Coordinator" esitligine baktigi icin ayni adi kara listeye
+  // aliyoruz; kullanicinin kendi ekledigi girdiler korunur.
+  const blackList = mergeBlackList(
+    readPluginBlackList(file),
+    provision.matterBlackList,
+    config.matterBlackList,
+    COORDINATOR_BLACKLIST
+  );
   const value = {
     name: "matterbridge-zigbee2mqtt",
     type: "DynamicPlatform",
@@ -224,7 +258,7 @@ function writeMatterbridgePluginConfig(config, provision, matterHome) {
     username: provision.mqttAuthRequired ? provision.mqttUsername : "",
     password: provision.mqttAuthRequired ? provision.mqttPassword : "",
     whiteList: [],
-    blackList: [],
+    blackList,
     switchList: [],
     lightList: [],
     outletList: [],

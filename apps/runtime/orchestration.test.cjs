@@ -12,7 +12,8 @@ const {
   loadProvisioning,
   matterbridgeReady,
   startMatterbridge,
-  startVillaBridgeCore
+  startVillaBridgeCore,
+  writeMatterbridgePluginConfig
 } = require("./orchestration.cjs");
 
 function runtimeConfig(dataDir) {
@@ -253,6 +254,45 @@ test("Matterbridge bootstrap registers the bundled plugin and reaches ready stat
   assert.equal(startBridgeCalls, 1);
   assert.equal(bigIntGuardCalls, 1);
   assert.equal(matterbridgeReady(service), true);
+});
+
+test("plugin config keeps the Zigbee coordinator out of the Matter bridge", (context) => {
+  const fixture = provisionedFixture();
+  context.after(() => fs.rmSync(fixture.dataDir, { recursive: true, force: true }));
+  const provision = loadProvisioning(fixture.config);
+  const matterHome = path.join(fixture.dataDir, "matterbridge");
+
+  const file = writeMatterbridgePluginConfig(fixture.config, provision, matterHome);
+  const pluginConfig = JSON.parse(fs.readFileSync(file, "utf8"));
+
+  assert.deepEqual(pluginConfig.blackList, ["Coordinator"]);
+  assert.deepEqual(pluginConfig.whiteList, []);
+});
+
+test("plugin config preserves an existing blacklist instead of overwriting it", (context) => {
+  const fixture = provisionedFixture();
+  context.after(() => fs.rmSync(fixture.dataDir, { recursive: true, force: true }));
+  const provision = loadProvisioning(fixture.config);
+  const matterHome = path.join(fixture.dataDir, "matterbridge");
+  const directory = path.join(matterHome, ".matterbridge");
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(
+    path.join(directory, "matterbridge-zigbee2mqtt.config.json"),
+    JSON.stringify({ blackList: ["Salon Lamba", "Coordinator"] })
+  );
+
+  const file = writeMatterbridgePluginConfig(fixture.config, provision, matterHome);
+  const pluginConfig = JSON.parse(fs.readFileSync(file, "utf8"));
+
+  assert.deepEqual(pluginConfig.blackList, ["Salon Lamba", "Coordinator"]);
+
+  const again = JSON.parse(
+    fs.readFileSync(
+      writeMatterbridgePluginConfig(fixture.config, provision, matterHome),
+      "utf8"
+    )
+  );
+  assert.deepEqual(again.blackList, ["Salon Lamba", "Coordinator"]);
 });
 
 test("missing MQTT credentials preserves anonymous loopback clients", (context) => {
