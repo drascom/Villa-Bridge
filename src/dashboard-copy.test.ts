@@ -1585,3 +1585,46 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
+
+test("Matter modalı eşleştirmenin bittiğini kendisi fark eder", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Modal açıkken sunucu yoklanır; referans olarak açılış anındaki fabric listesi saklanır.
+  assert.match(dashboard, /\$\("#matterDialog"\)\.showModal\(\);startMatterWatch\(\)/);
+  assert.match(dashboard, /const matterWatchIntervalMs=4000/);
+  assert.match(dashboard, /matterWatchBaseline=\{count:fabrics\.length,names:new Set\(fabrics\.map\(item=>item\.name\)\),advertised:state\.matter\?\.advertising===true\}/);
+  assert.match(dashboard, /matterWatchTimer=setInterval\(pollMatterWatch,matterWatchIntervalMs\)/);
+
+  // Yoklama her çıkışta temizlenir: modal kapanınca, sayfa değişince ve yeniden başlarken.
+  assert.match(dashboard, /function stopMatterWatch\(\)\{\s*if\(matterWatchTimer!==null\)\{clearInterval\(matterWatchTimer\);matterWatchTimer=null\}/);
+  assert.match(dashboard, /\$\("#matterDialog"\)\.addEventListener\("close",stopMatterWatch\)/);
+  assert.match(dashboard, /if\(viewName!=="connections"\)stopMatterWatch\(\)/);
+  assert.match(dashboard, /function startMatterWatch\(\)\{\s*stopMatterWatch\(\)/);
+  assert.match(dashboard, /if\(!matterWatchBaseline\|\|!\$\("#matterDialog"\)\.open\)\{stopMatterWatch\(\);return\}/);
+
+  // Fabric sayısı artınca modal kapanır, liste tazelenir ve başarı toast'u çıkar.
+  assert.match(dashboard, /if\(fabrics\.length>baseline\.count\)\{[\s\S]*?await closeMatterDialog\(\);\s*renderFabrics\(\);\s*showToast\(added\?\.name\?t\("matterPairedNamed",\{name:added\.name\}\):t\("matterPaired"\)\)/);
+  // Toast metni tam şablon anahtarıdır; parça birleştirme yok.
+  assert.match(dashboard, /matterPairedNamed:"\{name\} added\."/);
+  assert.match(dashboard, /matterPairedNamed:"\{name\} eklendi\."/);
+  assert.match(dashboard, /matterPaired:"Matter system added\."/);
+  assert.match(dashboard, /matterPaired:"Matter sistemi eklendi\."/);
+  assert.doesNotMatch(dashboard, /t\("matterPaired"\)\+/);
+
+  // Eşleştirme penceresi kapanırsa (advertising false) süre doldu uyarısı verilir.
+  assert.match(dashboard, /if\(status\.advertising===true\)\{baseline\.advertised=true;return\}/);
+  assert.match(dashboard, /showToast\(t\("matterPairingExpired"\),true\)/);
+  assert.match(dashboard, /matterPairingExpired:"The pairing window timed out, please try again\."/);
+  assert.match(dashboard, /matterPairingExpired:"Eşleştirme süresi doldu, tekrar deneyin\."/);
+
+  // Modal içinde bekleme göstergesi ve çoklu ekosistem notu.
+  assert.match(dashboard, /<div id="matterWaiting" class="matter-waiting"><span class="matter-waiting-dot" aria-hidden="true"><\/span><span data-i18n="matterPairingWaiting">/);
+  assert.match(dashboard, /matterPairingWaiting:"Waiting for pairing…"/);
+  assert.match(dashboard, /matterPairingWaiting:"Eşleştirme bekleniyor…"/);
+  assert.match(dashboard, /@keyframes matter-waiting-pulse/);
+  assert.match(dashboard, /<p class="matter-hint" data-i18n="matterEcosystemHint">/);
+  assert.match(dashboard, /matterEcosystemHint:"Each ecosystem needs its own code/);
+  assert.match(dashboard, /matterEcosystemHint:"Her ekosistem için ayrı kod gerekir/);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
