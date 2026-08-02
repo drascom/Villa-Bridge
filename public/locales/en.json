@@ -4,6 +4,7 @@
   "translations": {
     "navHome": "Home",
     "navDevices": "Devices",
+    "navAutomations": "Automations",
     "navConnections": "Connections",
     "navSettings": "Settings",
     "secureHomeTitle": "Protect your home controls",
@@ -563,6 +564,29 @@
     "noBindings": "No direct bindings yet.",
     "noBindingsLead": "Choose the source and target endpoints above to create one.",
     "bindingSaved": "Direct binding created.",
-    "bindingRemoved": "Direct binding removed."
+    "bindingRemoved": "Direct binding removed.",
+    "automationEyebrow": "Home automation",
+    "automationsLead": "Let a button run a light directly, with no technical setup.",
+    "newAutomation": "New automation",
+    "simpleLinkPath": "Simple link",
+    "simpleLinkPathLead": "Let a button run a light directly. It works even when the system is off.",
+    "rulePath": "Build a rule",
+    "rulePathLead": "Run it by time, by a sensor or by a device state.",
+    "comingSoon": "Coming soon",
+    "simpleLinkStepCount": "Step {step} of {total}",
+    "simpleLinkStepOneTitle": "Which button?",
+    "simpleLinkStepOneLead": "Choose the button or remote that should start it.",
+    "simpleLinkStepTwoTitle": "What should it run?",
+    "simpleLinkStepTwoLead": "Pick a room, then choose the light or socket it should run.",
+    "simpleLinkNoStarters": "No buttons or remotes were found yet.",
+    "simpleLinkNoTargets": "No lights or sockets were found here.",
+    "simpleLinkSummary": "{source} → {target}",
+    "simpleLinkDirectNote": "This link is created straight between the devices — it works even when the system is off.",
+    "simpleLinkRemove": "Remove",
+    "simpleLinkRemoveConfirm": "Remove this link?",
+    "simpleLinkSaved": "The link is ready.",
+    "simpleLinkRemoved": "The link was removed.",
+    "automationsEmptyTitle": "No links yet",
+    "automationsEmptyLead": "Connect a button straight to a light. It keeps working even when the system is off."
   }
 }

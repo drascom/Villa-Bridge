@@ -576,7 +576,7 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /runtimeStopConfirm:"Bu tablette Zigbee, MQTT ve Matter/);
   assert.match(dashboard, /orientation:landscape/);
   assert.match(dashboard, /aside\{position:fixed;z-index:10;top:0;bottom:auto/);
-  assert.match(dashboard, /grid-template-columns:repeat\(4,minmax\(120px,1fr\)\) auto/);
+  assert.match(dashboard, /grid-template-columns:repeat\(5,minmax\(104px,1fr\)\) auto/);
   assert.match(dashboard, /\.nav-utilities\{display:flex/);
   assert.match(dashboard, /\.topbar\{display:none\}main\{max-width:none;padding:82px 20px 20px\}/);
   assert.match(dashboard, /id="landscapeTheme"/);
@@ -1382,4 +1382,68 @@ test("dar sütunda hareket satırları dikey yığılır ve kapasite yeni satır
   // Satır yüksekliği ~57px + 6px boşluk; bölen buna göre büyütüldü.
   assert.match(dashboard, /return Math\.max\(fallback,Math\.min\(14,Math\.floor\(available\/62\)\)\)/);
   assert.doesNotMatch(dashboard, /Math\.floor\(available\/44\)/);
+});
+
+test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Nav'da beşinci düğme: Home / Cihazlar / Otomasyon / Bağlantılar / Ayarlar.
+  const automationNav = dashboard.indexOf('data-view="automations"');
+  const devicesNav = dashboard.indexOf('data-view="devices"');
+  const connectionsNav = dashboard.indexOf('data-view="connections"');
+  assert.ok(devicesNav >= 0 && devicesNav < automationNav && automationNav < connectionsNav);
+  assert.match(dashboard, /<button class="nav-button" data-view="automations" data-admin-only>/);
+  assert.match(dashboard, /navAutomations:"Automations"/);
+  assert.match(dashboard, /navAutomations:"Otomasyon"/);
+  assert.match(dashboard, /nav\{margin:0;display:grid;grid-template-columns:repeat\(5,1fr\)\}/);
+  assert.match(dashboard, /grid-template-columns:repeat\(5,minmax\(104px,1fr\)\) auto/);
+
+  // Sayfa ve iki yollu giriş; "Kural kur" yalnızca yer tutuyor.
+  assert.match(dashboard, /<section id="automations" class="view" data-admin-only>/);
+  assert.match(dashboard, /id="newAutomation" class="primary"/);
+  assert.match(dashboard, /id="automationPaths" class="automation-paths" hidden/);
+  assert.match(dashboard, /data-automation-path="link"/);
+  assert.match(dashboard, /data-automation-path="rule" disabled aria-disabled="true"/);
+  assert.match(dashboard, /class="automation-soon" data-i18n="comingSoon"/);
+  assert.match(dashboard, /\.automation-path\{min-height:88px/);
+  assert.match(dashboard, /\.simple-link-choice\{min-height:88px/);
+  assert.match(dashboard, /comingSoon:"Coming soon"/);
+  assert.match(dashboard, /comingSoon:"Yakında"/);
+
+  // Liste gerçek cihaz durumundan üretiliyor, ayrı kopya yok.
+  assert.match(dashboard, /function simpleLinks\(\)\{/);
+  assert.match(dashboard, /state\.devices\.filter\(isLinkStarter\)\.forEach\(device=>\{/);
+  assert.match(dashboard, /if\(!linkClusterNames\.includes\(binding\.cluster\)\)return;/);
+  assert.match(dashboard, /function renderAutomations\(\)\{/);
+  assert.doesNotMatch(dashboard, /\/api\/automations/);
+
+  // Sihirbaz iki adım; endpoint ve cluster kullanıcıya sorulmuyor.
+  assert.match(dashboard, /<dialog id="simpleLinkDialog" class="simple-link-dialog">/);
+  assert.match(dashboard, /const linkSourceEndpoint=device=>\(device\.endpoints\|\|\[\]\)\.find\(endpoint=>endpointClusterNames\(endpoint,"out"\)\.includes\("genOnOff"\)\)/);
+  assert.match(dashboard, /const isLinkStarter=device=>\(device\.actionTypes\|\|\[\]\)\.length>0\|\|Boolean\(linkSourceEndpoint\(device\)\)/);
+  assert.match(dashboard, /const linkClusterNames=\["genOnOff","genLevelCtrl"\]/);
+  assert.match(dashboard, /t\("simpleLinkStepCount",\{step:link\.step,total:2\}\)/);
+
+  // Güvenlik: kilit ve siren hedef listesinde görünmez.
+  assert.match(dashboard, /const isProtectedDevice=device=>\(device\.controls\|\|\[\]\)\.some\(control=>control\.kind==="lock"\|\|control\.kind==="siren"\)/);
+  assert.match(dashboard, /const isLinkTarget=device=>!isProtectedDevice\(device\)&&/);
+
+  // Kaydetme mevcut bind uç noktasını kullanıyor, yeni sunucu yolu yok.
+  assert.match(dashboard, /async function saveSimpleLink\(\)\{[\s\S]*?api\("\/api\/zigbee\/bind",\{method:"POST"/);
+  assert.match(dashboard, /simpleLinkDirectNote:"This link is created straight between the devices/);
+  assert.match(dashboard, /simpleLinkDirectNote:"Bu bağlantı doğrudan cihazların arasına kurulur/);
+  assert.match(dashboard, /simpleLinkRemoveConfirm:"Remove this link\?"/);
+  assert.match(dashboard, /simpleLinkRemoveConfirm:"Bu bağlantı kaldırılsın mı\?"/);
+
+  // Yönetici teknik paneli yerinde kalıyor.
+  assert.match(dashboard, /class="zigbee-binding-panel"/);
+  assert.match(dashboard, /id="zigbeeBindingList"/);
+
+  // Arayüz sözlüğü: teknik kelimeler ev halkına görünmüyor.
+  const catalogs = ["simpleLink", "automation", "rulePath", "comingSoon", "navAutomations"];
+  assert.ok(catalogs.every((key) => dashboard.includes(key)));
+  assert.doesNotMatch(dashboard, /simpleLink[A-Za-z]*:"[^"]*(?:tetikleyici|senaryo|cluster|endpoint)/i);
+  assert.doesNotMatch(dashboard, /automations?[A-Za-z]*:"[^"]*(?:tetikleyici|senaryo|cluster|endpoint)/i);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });

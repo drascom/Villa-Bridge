@@ -3,7 +3,8 @@
 Bu doküman, ev otomasyonu özelliğinin araştırma sonuçlarını, alınan ürün kararlarını ve
 uygulama planını taşır. Araştırma 2026-08-02'de yapıldı; kararlar kullanıcıyla birlikte alındı.
 
-**Durum:** Tasarım tamamlandı, uygulama başlamadı. Bir açık soru var (bkz. §9).
+**Durum:** Tasarım tamamlandı, açık soru kalmadı (bkz. §9 — karar B). Faz 0 uygulanıyor:
+Otomasyon sekmesi ve "Basit bağlantı" yolu arayüze eklendi.
 
 ---
 
@@ -172,7 +173,7 @@ arayüzünün iç API'si. Ve `apps/runtime` (Android tablet / Pi) kurulumunda Ho
   "conditions": [],
   "actions": [
     { "type": "device", "deviceId": "0x00124b0011cc22dd",
-      "property": "state", "value": "ON" }
+      "property": "state", "value": "ON", "revertAfterSeconds": null }
   ],
   "lastRunAt": "2026-08-01T16:00:00.000Z"
 }
@@ -225,6 +226,13 @@ anahtarı sonradan eklenir; veri modelinde `conditionMode: "all" | "any"` alanı
 | `scene` | `groupId`, `sceneId` | `source.groupScene(id, sceneId, "recall")` — **zaten var** |
 | `delay` | `seconds` (1–300) | Alexa'nın "Wait"'i; motor içinde |
 
+Her eylem ayrıca isteğe bağlı **`revertAfterSeconds?: number`** taşır — §9'daki B kararının yer
+tutucusu. Faz 0 ve Faz 1'de alan yazılmaz, motor da okumaz; **Faz 2'de dolar**.
+
+**Zincirleme:** "bu tetiklenince şu, o da başkasını tetiklesin" ihtiyacı **tek kuralda sıralı
+eylemlerle** karşılanır. Kural-kurala tetikleme birincil yol **değildir**; §8.2'deki döngü koruması
+aynen geçerlidir.
+
 ---
 
 ## 6. API ve depolama
@@ -264,7 +272,12 @@ Cihaz silindiğinde `removeDevice(deviceId)` — `home-groups.ts`'deki gibi.
 Home / Cihazlar / **Otomasyon** / Bağlantılar / Ayarlar.
 
 ### Ekran 0 — Liste
-- Üstte tek birincil düğme: **"+ Yeni otomasyon"**.
+- Üstte tek birincil düğme: **"+ Yeni otomasyon"**. Basınca **iki yol kartı** açılır (§4'teki iki
+  katmanın kullanıcıya görünen hâli):
+  - ⚡ **"Basit bağlantı"** — *"Bir düğme doğrudan bir lambayı çalıştırsın. Sistem kapalıyken bile
+    çalışır."* → Katman 1, iki adımlı sihirbaz (Hangi düğme? / Neyi çalıştırsın?).
+  - 🧩 **"Kural kur"** — *"Saate, sensöre veya cihaz durumuna göre çalışsın."* → Katman 2,
+    aşağıdaki Ekran 1–3. **Faz 0'da "yakında" rozetiyle devre dışı.**
 - Mevcut otomasyonlar `.device-card` diliyle kartlar halinde: ad, düz cümle özeti
   ("Her gün 19:00 · Salon Lambası açılır"), sağda **açık/kapalı anahtarı**, altta
   **son çalışma çipi** ("Dün 19:00").
@@ -337,10 +350,10 @@ tetikleyicilerdir** — "duman algılanınca tüm ışıkları yak" hem güvenli
 
 ---
 
-## 9. Açık soru — karar bekliyor
+## 9. Karar — "şu kadar sonra geri al"
 
 Sensör tetikleyicilerinde neredeyse her zaman gereken bir davranış var: **"hareket bitince geri
-kapansın"**. İki yoldan biri seçilmeli, veri modeli buna göre kurulacak:
+kapansın"**. İki seçenek vardı:
 
 **A) Ayrı otomasyon.** Kullanıcı ikinci bir kural yazar:
 *"Koridor sensörü 10 dakika hareket görmezse → lambayı kapat"*.
@@ -349,16 +362,37 @@ Model saf kalır, ama kullanıcı her ışık için iki otomasyon kurar.
 **B) Otomasyonun içinde "şu kadar sonra geri al" seçeneği.**
 Tek kural yeter, ama modele geri-alma kavramı girer.
 
-Kullanıcıya soruldu, henüz cevaplanmadı. **Uygulamaya başlamadan önce netleşmeli.**
+**Seçilen: B.** Gerekçe: tek kural ev halkı için doğal olan ifade biçimi ve zaten ana senaryo bu —
+"ışık yansın, biraz sonra kendi kendine kapansın" iki ayrı otomasyon olarak düşünülmüyor.
+
+**Maliyeti (motorda karşılanacak):**
+- Eylem çalışmadan **önceki durumu sakla** (cihazın ilgili property'sinin son değeri).
+- Süre dolunca önceki duruma dön; **zamanlayıcı otomasyon+cihaz başına tekil** olmalı.
+- Aynı otomasyon süre dolmadan **yeniden tetiklenirse zamanlayıcı sıfırlanır** (geri alma ertelenir),
+  ikinci bir zamanlayıcı açılmaz.
+- Yeniden başlatmada bekleyen geri almalar telafi edilmez.
+
+**Kapsam: Faz 2.** Veri modelinde yeri şimdiden ayrıldı: eylem seviyesinde
+`revertAfterSeconds?: number` (§5.1, §5.4). Faz 0 ve Faz 1'de yazılmaz ve okunmaz.
 
 ---
 
 ## 10. Yol haritası
 
-### Faz 0 — Zigbee binding arayüzü
-En yüksek değer/emek oranı. `bindDevice()` ve `DeviceEndpointView.bindings` **zaten var**;
-yalnızca cihaz detayında "Bu düğme şunu çalıştırsın" akışı yazılır. Sunucu motoru yok, kalıcı dosya
-yok, yeni endpoint şart değil. **Sıfır çalışma zamanı riski.**
+### Faz 0 — Otomasyon sekmesi + "Basit bağlantı" yolu ✅
+Gerçek durum: **teknik binding paneli Ayarlar'da zaten vardı** (`#bindSource/#bindTarget/
+#zigbeeBindingList`) ve yönetici aracı olarak yerinde kaldı. Faz 0'da eksik olan onun **ev halkı
+dilindeki karşılığıydı**.
+
+Yapılan: nav'a beşinci düğme (**Otomasyon**), "+ Yeni otomasyon" → iki yol kartı, ⚡ Basit bağlantı
+sihirbazı (Hangi düğme? → Neyi çalıştırsın?), mevcut bağlantıların düz cümle listesi ve kaldırma.
+Uç nokta/cluster kullanıcıya sorulmaz, arayüz kendisi türetir. Kilit ve siren hedef listesinde
+görünmez (§8.1). Liste **gerçek cihaz durumundan** üretilir (`DeviceEndpointView.bindings`),
+ayrı kopya tutulmaz (§8.2).
+
+Yalnızca `public/index.html` + `public/locales/{tr,en}.json` değişti. Sunucu motoru yok, yeni
+endpoint yok, kalıcı dosya yok — mevcut `POST /api/zigbee/bind` kullanıldı.
+**Sıfır çalışma zamanı riski.**
 → Ev halkı ilk gerçek otomasyonunu kurar ve o otomasyon sistem kapalıyken bile çalışır.
 
 ### Faz 1 — Motorun çekirdeği
@@ -431,5 +465,5 @@ oda özeti, silme onayı, sıralama. Cihazlar sayfasında filtre olarak kullanı
 **Cihaz görselleri** — `/api/device-image/:model` proxy + disk cache, sunucu açılışta tüm cihaz
 modellerinin görsellerini arka planda indiriyor (offline çalışsın diye).
 
-Test sayısı: 139. Testler `src/dashboard-copy.test.ts` içinde markup ve CSS metnini birebir
+Test sayısı: Faz 0 öncesi 139, Faz 0 sonrası 140. Testler `src/dashboard-copy.test.ts` içinde markup ve CSS metnini birebir
 doğruluyor — arayüz değişikliklerinde bu assertion'ları güncellemek işin parçasıdır.

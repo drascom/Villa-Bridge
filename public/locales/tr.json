@@ -4,6 +4,7 @@
   "translations": {
     "navHome": "Ev",
     "navDevices": "Cihazlar",
+    "navAutomations": "Otomasyon",
     "navConnections": "Bağlantılar",
     "navSettings": "Ayarlar",
     "secureHomeTitle": "Ev kontrollerinizi koruyun",
@@ -563,6 +564,29 @@
     "noBindings": "Henüz doğrudan bağlama yok.",
     "noBindingsLead": "Oluşturmak için yukarıdan kaynak ve hedef uç noktalarını seçin.",
     "bindingSaved": "Doğrudan bağlama oluşturuldu.",
-    "bindingRemoved": "Doğrudan bağlama kaldırıldı."
+    "bindingRemoved": "Doğrudan bağlama kaldırıldı.",
+    "automationEyebrow": "Ev otomasyonu",
+    "automationsLead": "Bir düğme doğrudan bir lambayı çalıştırsın; teknik ayar gerekmez.",
+    "newAutomation": "Yeni otomasyon",
+    "simpleLinkPath": "Basit bağlantı",
+    "simpleLinkPathLead": "Bir düğme doğrudan bir lambayı çalıştırsın. Sistem kapalıyken bile çalışır.",
+    "rulePath": "Kural kur",
+    "rulePathLead": "Saate, sensöre veya cihaz durumuna göre çalışsın.",
+    "comingSoon": "Yakında",
+    "simpleLinkStepCount": "Adım {step} / {total}",
+    "simpleLinkStepOneTitle": "Hangi düğme?",
+    "simpleLinkStepOneLead": "Başlatacak düğmeyi veya kumandayı seçin.",
+    "simpleLinkStepTwoTitle": "Neyi çalıştırsın?",
+    "simpleLinkStepTwoLead": "Önce odayı seçin, sonra çalıştıracağı lambayı veya prizi seçin.",
+    "simpleLinkNoStarters": "Henüz düğme veya kumanda bulunamadı.",
+    "simpleLinkNoTargets": "Burada lamba veya priz bulunamadı.",
+    "simpleLinkSummary": "{source} → {target}",
+    "simpleLinkDirectNote": "Bu bağlantı doğrudan cihazların arasına kurulur — sistem kapalıyken bile çalışır.",
+    "simpleLinkRemove": "Kaldır",
+    "simpleLinkRemoveConfirm": "Bu bağlantı kaldırılsın mı?",
+    "simpleLinkSaved": "Bağlantı hazır.",
+    "simpleLinkRemoved": "Bağlantı kaldırıldı.",
+    "automationsEmptyTitle": "Henüz bağlantı yok",
+    "automationsEmptyLead": "Bir düğmeyi doğrudan bir lambaya bağlayın. Sistem kapalıyken bile çalışmaya devam eder."
   }
 }
