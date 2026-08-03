@@ -61,9 +61,20 @@ const store = new DeviceStore(
   aliases,
   imagePreferences,
   await deviceEventsStore.get(),
-  (events) => void deviceEventsStore.save(events).catch((error) => {
-    console.error(`Cihaz olay geçmişi kaydedilemedi: ${String(error)}`);
-  })
+  (events, added) => {
+    void deviceEventsStore.save(events).catch((error) => {
+      console.error(`Cihaz olay geçmişi kaydedilemedi: ${String(error)}`);
+    });
+    // §6 — olay tetikleyicileri mevcut olay akışına takılır, poll yok.
+    const deviceEvents = added.flatMap((event) => {
+      const deviceId = store.getDeviceIdBySourceName(event.sourceName);
+      return deviceId ? [{ deviceId, property: event.property, value: event.value }] : [];
+    });
+    if (deviceEvents.length === 0) return;
+    void automationEngine.handleDeviceEvents(deviceEvents).catch((error) => {
+      console.error(`Otomasyon olayı işlenemedi: ${String(error)}`);
+    });
+  }
 );
 store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);

@@ -421,6 +421,14 @@ sihirbaz (`public/index.html`).
 `timeRange` koşulu, çoklu tetikleyici arayüzü.
 → "Kapı açılınca koridor ışığı yansın", "Hareket 10 dakika yoksa kapansın".
 
+**Düğme ve sensör tetikleyicileri tamam (sunucu tarafı)** ✅ — `deviceAction` ve `deviceState`
+doğrulaması, `DeviceStore` olay akışına bağlı motor (poll yok), `action` için kenar davranışı
+(aynı basış arka arkaya iki kez tetikler), `deviceState` için değer değişimi kontrolü, kaydetme
+anında geri besleme döngüsü reddi. `DeviceView.actionTypes` + `state` sihirbaz için yeterli,
+yeni endpoint açılmadı. Kalan (sonraki tur): `group`/`delay`/`scene` eylemleri, `timeRange`
+koşulu, çoklu tetikleyici arayüzü, `revertAfterSeconds` geri alma, `sun` tetikleyicisi ve
+sihirbazın tetikleyici ekranı (`public/index.html`).
+
 ### Faz 3 — Cila
 `sun` tetikleyicisi (config'e lat/lon), `scene` eylemi, boş ekrandaki 4 hazır şablon çipi,
 otomasyon çalışma günlüğü (`device-events.ts` deseniyle).

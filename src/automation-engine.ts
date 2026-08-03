@@ -1,5 +1,5 @@
 import type { Automation, AutomationsStore } from "./automations.js";
-import type { JsonObject } from "./types.js";
+import type { JsonObject, JsonScalar } from "./types.js";
 
 /** Tur aralığı: dakika kilidi sayesinde aynı dakikada yalnızca bir kez çalışır. */
 export const automationTickIntervalMs = 20_000;
@@ -38,11 +38,42 @@ export const automationDueAt = (automation: Automation, date: Date): boolean => 
     trigger.type === "time" && trigger.at === time && trigger.days.includes(weekday));
 };
 
+/**
+ * `DeviceStore`'un olay akışından gelen tek olay. `action` anlık bir kenar olayıdır;
+ * son-değer karşılaştırmasıyla değil, olay olarak ele alınır (§5.2).
+ */
+export interface AutomationDeviceEvent {
+  /** IEEE adresi. */
+  deviceId: string;
+  property: string;
+  value: JsonScalar;
+}
+
+/** Bir olay bu otomasyonu tetikliyor mu? `deviceState` kenar kontrolü çağırana aittir. */
+export const automationMatchesEvent = (
+  automation: Automation,
+  event: AutomationDeviceEvent
+): boolean => automation.triggers.some((trigger) => {
+  if (trigger.type === "deviceAction") {
+    return event.property === "action"
+      && trigger.deviceId === event.deviceId
+      && trigger.action === event.value;
+  }
+  if (trigger.type === "deviceState") {
+    return trigger.deviceId === event.deviceId
+      && trigger.property === event.property
+      && trigger.equals === event.value;
+  }
+  return false;
+});
+
 export class AutomationEngine {
   private timer: NodeJS.Timeout | null = null;
   private readonly firedMinutes = new Map<string, string>();
   private readonly running = new Set<string>();
   private readonly lastStartedAt = new Map<string, number>();
+  /** `deviceId|property` → son görülen değer; `deviceState` kenar tetiklemesi için. */
+  private readonly lastStateValues = new Map<string, JsonScalar>();
   private readonly now: () => Date;
   private readonly logger: { error(message: string): void };
 
@@ -83,6 +114,40 @@ export class AutomationEngine {
       this.firedMinutes.set(automation.id, stamp);
       await this.execute(automation);
     }
+  }
+
+  /**
+   * `DeviceStore`'un olay geri çağrımına takılır — poll yok (§6).
+   * `action` her seferinde tetikler (kullanıcı iki kez basarsa iki kez çalışır); diğer özellikler
+   * yalnızca değer değiştiğinde, yani kenarda tetikler (§5.2). Gürültü koruması `execute`'taki
+   * otomasyon başına 2 saniyelik aralıktır (§8.2).
+   */
+  async handleDeviceEvents(events: AutomationDeviceEvent[]): Promise<void> {
+    const edges = events.filter((event) => this.isEdge(event));
+    if (edges.length === 0) return;
+    let automations: Automation[];
+    try {
+      automations = await this.options.store.get();
+    } catch (error) {
+      this.logger.error(`Otomasyonlar okunamadı: ${String(error)}`);
+      return;
+    }
+    for (const event of edges) {
+      for (const automation of automations) {
+        if (!automation.enabled) continue;
+        if (!automationMatchesEvent(automation, event)) continue;
+        await this.execute(automation);
+      }
+    }
+  }
+
+  /** `action` anlık kenar olayıdır, hiç bastırılmaz; durum özellikleri değer değişince geçer. */
+  private isEdge(event: AutomationDeviceEvent): boolean {
+    if (event.property === "action") return true;
+    const key = `${event.deviceId}|${event.property}`;
+    if (this.lastStateValues.get(key) === event.value) return false;
+    this.lastStateValues.set(key, event.value);
+    return true;
   }
 
   /** Elle çalıştırma — motorun kullandığı yolun aynısı. */

@@ -726,7 +726,10 @@ export class DirectZigbeeSource implements ZigbeeSource {
     });
     const publish = (payload: JsonObject): void => {
       const merged = { ...(this.states.get(message.device.ieeeAddr) ?? {}), ...payload };
-      this.states.set(message.device.ieeeAddr, merged);
+      // `action` anlık bir kenar olayıdır; yayınlanır ama kalıcı duruma yazılmaz (Zigbee2MQTT ile
+      // aynı davranış). Aksi hâlde her sonraki durum yayını eski tuş basışını tekrar duyururdu.
+      const { action: _action, ...retained } = merged;
+      this.states.set(message.device.ieeeAddr, retained);
       this.store.ingest(friendlyName, Buffer.from(JSON.stringify(merged)));
       const serialized = JSON.stringify(merged);
       const debounce = typeof configured.debounce === "number" ? configured.debounce : 0;

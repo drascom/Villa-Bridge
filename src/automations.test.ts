@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   AutomationsStore,
+  automationTriggerDeviceIds,
   maxAutomationActions,
   maxAutomations,
   removeDeviceFromAutomations,
@@ -15,6 +16,9 @@ import type { DeviceControlView } from "./types.js";
 
 const lampId = "0x00124b0011cc22dd";
 const lockId = "0x00124b0011cc22de";
+/** Kullanıcının TS0043 sahne anahtarı — üç buton, tek IEEE adresi. */
+const switchId = "0x20a716fffe6835f1";
+const sensorId = "0x00124b0022ab34cd";
 
 const automation = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "aksam-salon",
@@ -140,6 +144,105 @@ test("kilit ve siren otomasyon eylemi olamaz", () => {
     actions: [{ type: "device", deviceId: lockId, property: "alarm", value: true }]
   })], lookup), /Kilit ve siren/);
   assert.equal(validateAutomations([automation()], lookup).length, 1);
+});
+
+test("düğme ve sensör tetikleyicileri normalize edilerek kabul edilir", () => {
+  const parsed = validateAutomations([automation({
+    triggers: [
+      { type: "deviceAction", deviceId: switchId.toUpperCase(), action: " 1_single " },
+      { type: "deviceState", deviceId: sensorId, property: " occupancy ", equals: true }
+    ]
+  })]);
+  assert.deepEqual(parsed[0]?.triggers, [
+    { type: "deviceAction", deviceId: switchId, action: "1_single" },
+    { type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true }
+  ]);
+});
+
+test("üç butonlu anahtarın her butonu ayrı tetikleyicidir (alt varlık kuralı)", () => {
+  const parsed = validateAutomations([
+    automation({
+      id: "buton-bir",
+      triggers: [{ type: "deviceAction", deviceId: switchId, action: "1_single" }]
+    }),
+    automation({
+      id: "buton-iki",
+      triggers: [{ type: "deviceAction", deviceId: switchId, action: "2_single" }]
+    }),
+    automation({
+      id: "buton-uc",
+      triggers: [{ type: "deviceAction", deviceId: switchId, action: "3_hold" }]
+    })
+  ]);
+  assert.deepEqual(
+    parsed.flatMap((entry) => automationTriggerDeviceIds(entry)),
+    [switchId, switchId, switchId]
+  );
+});
+
+test("bozuk düğme ve sensör tetikleyicileri reddedilir", () => {
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceAction", deviceId: "salon-butonu", action: "1_single" }]
+  })]), /cihaz UID/);
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceAction", deviceId: switchId, action: "1 single" }]
+  })]), /düğme eylemi/);
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceAction", deviceId: switchId, action: "a".repeat(65) }]
+  })]), /düğme eylemi/);
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceAction", deviceId: switchId }]
+  })]), /düğme eylemi/);
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy alanı", equals: true }]
+  })]), /cihaz özelliği/);
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: { on: true } }]
+  })]), /hedef değeri/);
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy" }]
+  })]), /hedef değeri/);
+});
+
+test("kilit ve duman tetikleyici olarak serbesttir (§8.1 yalnız eylemi kısıtlar)", () => {
+  assert.equal(validateAutomations([automation({
+    triggers: [
+      { type: "deviceState", deviceId: lockId, property: "lock_state", equals: "unlocked" },
+      { type: "deviceState", deviceId: sensorId, property: "smoke", equals: true }
+    ]
+  })], lookup)[0]?.triggers.length, 2);
+});
+
+test("otomasyon kendi çalıştırdığı cihaz tarafından tetiklenemez", () => {
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: lampId, property: "state", equals: "ON" }]
+  })]), /döngü/);
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceAction", deviceId: lampId, action: "on" }]
+  })]), /döngü/);
+  // Farklı cihaz sorunsuz.
+  assert.equal(validateAutomations([automation({
+    triggers: [{ type: "deviceAction", deviceId: switchId, action: "1_single" }]
+  })]).length, 1);
+});
+
+test("cihaz kaldırıldığında olay tetikleyicileri de düşer", () => {
+  const automations = validateAutomations([
+    automation({
+      id: "butonla-lamba",
+      triggers: [
+        { type: "deviceAction", deviceId: switchId, action: "1_single" },
+        { type: "time", at: "19:00", days: [1] }
+      ]
+    }),
+    automation({
+      id: "yalniz-buton",
+      triggers: [{ type: "deviceAction", deviceId: switchId, action: "2_single" }]
+    })
+  ]);
+  const remaining = removeDeviceFromAutomations(automations, switchId.toUpperCase());
+  assert.deepEqual(remaining.map((entry) => entry.id), ["butonla-lamba"]);
+  assert.deepEqual(remaining[0]?.triggers, [{ type: "time", at: "19:00", days: [1] }]);
 });
 
 test("cihaz kaldırıldığında eylemler düşer, eylemsiz otomasyon silinir", () => {

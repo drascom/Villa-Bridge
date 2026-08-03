@@ -199,7 +199,10 @@ export class DeviceStore {
     aliases: Map<string, string>,
     private imagePreferences: DeviceImagePreferences = { devices: {}, models: {} },
     initialEvents: DeviceEventView[] = [],
-    private readonly onEventsChanged?: (events: DeviceEventView[]) => void
+    private readonly onEventsChanged?: (
+      events: DeviceEventView[],
+      added: DeviceEventView[]
+    ) => void
   ) {
     this.aliases = aliases;
     this.events = initialEvents.slice(0, 200);
@@ -299,7 +302,10 @@ export class DeviceStore {
       ]);
       const events: DeviceEventView[] = [];
       for (const [property, value] of Object.entries(parsed)) {
-        if (!interesting.has(property) || previous[property] === value) continue;
+        if (!interesting.has(property)) continue;
+        // `action` anlık bir kenar olayıdır ve kalıcı duruma yazılmaz: aynı düğmeye arka arkaya
+        // basılırsa iki ayrı olay üretilmeli. Diğer özellikler yalnızca değer değişince olay olur.
+        if (property !== "action" && previous[property] === value) continue;
         if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") continue;
         if (property === "action" && typeof value === "string" && value.trim() === "") continue;
         events.push({ sourceName: topic, property, value, at: at.toISOString() });
@@ -330,9 +336,19 @@ export class DeviceStore {
 
   private recordEvents(events: DeviceEventView[]): void {
     if (events.length === 0) return;
+    const added = events.slice();
     this.events.unshift(...events.reverse());
     if (this.events.length > 200) this.events.length = 200;
-    this.onEventsChanged?.(this.events.slice());
+    this.onEventsChanged?.(this.events.slice(), added);
+  }
+
+  /** Olay akışındaki `sourceName` değerini kalıcı IEEE adresine çevirir (UID kuralı). */
+  getDeviceIdBySourceName(sourceName: string): string | undefined {
+    const device = this.devices.find((entry) => entry.friendly_name === sourceName);
+    const id = device?.ieee_address ?? (
+      this.devices.some((entry) => entry.ieee_address === sourceName) ? sourceName : undefined
+    );
+    return id?.toLowerCase();
   }
 
   getDevices(): DeviceView[] {

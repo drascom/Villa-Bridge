@@ -173,6 +173,37 @@ test("önemli cihaz hareketleri kısa geçmişte tutulur, sinyal gürültüsü t
   );
 });
 
+test("aynı düğmeye iki kez basılınca iki olay üretilir ve IEEE adresine çözülür", () => {
+  const added: Array<{ sourceName: string; property: string; value: unknown }> = [];
+  const store = new DeviceStore(new Map(), undefined, [], (_events, batch) => {
+    added.push(...batch.map(({ sourceName, property, value }) => ({ sourceName, property, value })));
+  });
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0x20a716fffe6835f1",
+    friendly_name: "Sahne Anahtari",
+    type: "EndDevice",
+    definition: { model: "TS0043", exposes: [] }
+  }])));
+
+  // `action` kalıcı durumda tutulmaz; her basış ayrı bir kenar olayıdır.
+  store.ingest("Sahne Anahtari", Buffer.from('{"action":"1_single","battery":100}'));
+  store.ingest("Sahne Anahtari", Buffer.from('{"action":"1_single","battery":100}'));
+  // Durum özellikleri ise yalnızca değiştiğinde olay üretir.
+  store.ingest("Sahne Anahtari", Buffer.from('{"occupancy":true}'));
+  store.ingest("Sahne Anahtari", Buffer.from('{"occupancy":true}'));
+
+  assert.deepEqual(added, [
+    { sourceName: "Sahne Anahtari", property: "action", value: "1_single" },
+    { sourceName: "Sahne Anahtari", property: "action", value: "1_single" },
+    { sourceName: "Sahne Anahtari", property: "occupancy", value: true }
+  ]);
+  assert.equal(
+    store.getDeviceIdBySourceName("Sahne Anahtari"),
+    "0x20a716fffe6835f1"
+  );
+  assert.equal(store.getDeviceIdBySourceName("Yok Boyle"), undefined);
+});
+
 test("OTA desteği ve kayıtlı cihaz seçenekleri cihaz görünümüne taşınır", () => {
   const store = new DeviceStore(new Map());
   store.ingest("bridge/devices", Buffer.from(JSON.stringify([{

@@ -9,7 +9,37 @@ export interface AutomationTimeTrigger {
   days: number[];
 }
 
-export type AutomationTrigger = AutomationTimeTrigger;
+/**
+ * Düğme basışı — anlık kenar olayı (§5.2). Alt varlık kuralı (§5.1.1): tetikleyici cihaza değil,
+ * cihaz + buton çiftine bağlanır; üç butonlu anahtarın her butonu ayrı tetikleyicidir.
+ */
+export interface AutomationDeviceActionTrigger {
+  type: "deviceAction";
+  /** IEEE adresi — kanonik bağ. */
+  deviceId: string;
+  /** MQTT `action` değeri, örn. "1_single". */
+  action: string;
+}
+
+/** Sensör/cihaz durumu — yalnızca değer hedefe geçtiğinde tetiklenir. */
+export interface AutomationDeviceStateTrigger {
+  type: "deviceState";
+  /** IEEE adresi — kanonik bağ. */
+  deviceId: string;
+  /** MQTT özellik anahtarı, örn. "occupancy". */
+  property: string;
+  equals: JsonScalar;
+}
+
+export type AutomationTrigger =
+  | AutomationTimeTrigger
+  | AutomationDeviceActionTrigger
+  | AutomationDeviceStateTrigger;
+
+/** Olay akışına bağlanan tetikleyiciler — zaman tetikleyicisi buraya girmez. */
+export type AutomationEventTrigger =
+  | AutomationDeviceActionTrigger
+  | AutomationDeviceStateTrigger;
 
 /** Faz 1'de koşul türü yok; alan veri modelinde yer tutucu olarak duruyor. */
 export type AutomationCondition = never;
@@ -54,6 +84,7 @@ export const forbiddenAutomationControlKinds: ReadonlySet<string> = new Set(["lo
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 const deviceIdPattern = /^0x[0-9a-f]{16}$/;
 const propertyPattern = /^[A-Za-z0-9_]{1,64}$/;
+const actionPattern = /^[A-Za-z0-9_-]{1,64}$/;
 const controlIdPattern = /^[a-z0-9:_@-]{1,64}$/;
 const automationIdPattern = /^[a-z0-9-]{8,32}$/;
 
@@ -61,6 +92,14 @@ const isJsonScalar = (value: unknown): value is JsonScalar =>
   typeof value === "string"
   || typeof value === "boolean"
   || (typeof value === "number" && Number.isFinite(value));
+
+const triggerDeviceId = (value: unknown): string => {
+  const deviceId = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!deviceIdPattern.test(deviceId)) {
+    throw new Error("Otomasyon tetikleyicisi cihaz UID'si geçersiz.");
+  }
+  return deviceId;
+};
 
 const validateTriggers = (value: unknown): AutomationTrigger[] => {
   if (!Array.isArray(value) || value.length === 0 || value.length > maxAutomationTriggers) {
@@ -71,6 +110,31 @@ const validateTriggers = (value: unknown): AutomationTrigger[] => {
       throw new Error("Otomasyon tetikleyicisi geçersiz.");
     }
     const candidate = entry as Record<string, unknown>;
+    // §8.1 — kilit/siren yalnızca EYLEM olarak yasak; tetikleyici olarak serbesttir.
+    if (candidate.type === "deviceAction") {
+      const deviceId = triggerDeviceId(candidate.deviceId);
+      const action = typeof candidate.action === "string" ? candidate.action.trim() : "";
+      if (!actionPattern.test(action)) {
+        throw new Error("Otomasyon tetikleyicisi düğme eylemi geçersiz.");
+      }
+      return { type: "deviceAction", deviceId, action } satisfies AutomationDeviceActionTrigger;
+    }
+    if (candidate.type === "deviceState") {
+      const deviceId = triggerDeviceId(candidate.deviceId);
+      const property = typeof candidate.property === "string" ? candidate.property.trim() : "";
+      if (!propertyPattern.test(property)) {
+        throw new Error("Otomasyon tetikleyicisi cihaz özelliği geçersiz.");
+      }
+      if (!isJsonScalar(candidate.equals)) {
+        throw new Error("Otomasyon tetikleyicisi hedef değeri geçersiz.");
+      }
+      return {
+        type: "deviceState",
+        deviceId,
+        property,
+        equals: candidate.equals
+      } satisfies AutomationDeviceStateTrigger;
+    }
     if (candidate.type !== "time") {
       throw new Error("Otomasyon tetikleyici türü bu sürümde desteklenmiyor.");
     }
@@ -89,6 +153,16 @@ const validateTriggers = (value: unknown): AutomationTrigger[] => {
     days.sort((left, right) => left - right);
     return { type: "time", at, days } satisfies AutomationTimeTrigger;
   });
+};
+
+/** §5.2 — olay tetikleyicilerinin dinlediği cihaz kimlikleri. */
+export const automationTriggerDeviceIds = (automation: Automation): string[] => {
+  const ids: string[] = [];
+  for (const trigger of automation.triggers) {
+    if (trigger.type === "time") continue;
+    if (!ids.includes(trigger.deviceId)) ids.push(trigger.deviceId);
+  }
+  return ids;
 };
 
 const validateActions = (value: unknown, lookup?: AutomationDeviceLookup): AutomationAction[] => {
@@ -165,13 +239,25 @@ export const validateAutomations = (
     if (lastRunOk !== undefined && lastRunOk !== null && typeof lastRunOk !== "boolean") {
       throw new Error("Otomasyon son çalışma sonucu geçersiz.");
     }
+    const triggers = validateTriggers(candidate.triggers);
+    const actions = validateActions(candidate.actions, lookup);
+    // §8.2 — geri besleme döngüsü kaydetme anında reddedilir, çalışma zamanında değil.
+    const actionDeviceIds = new Set(actions.map((action) => action.deviceId));
+    for (const trigger of triggers) {
+      if (trigger.type === "time") continue;
+      if (actionDeviceIds.has(trigger.deviceId)) {
+        throw new Error(
+          "Bir otomasyon kendi çalıştırdığı cihaz tarafından tetiklenemez; döngü oluşur."
+        );
+      }
+    }
     result.push({
       id,
       name,
       enabled: candidate.enabled !== false,
-      triggers: validateTriggers(candidate.triggers),
+      triggers,
       conditions: [],
-      actions: validateActions(candidate.actions, lookup),
+      actions,
       lastRunAt: typeof lastRunAt === "string" ? lastRunAt : null,
       lastRunOk: typeof lastRunOk === "boolean" ? lastRunOk : null
     });
@@ -179,7 +265,10 @@ export const validateAutomations = (
   return result;
 };
 
-/** Cihaz silindiğinde eylemleri düşer; eylemi kalmayan otomasyon da silinir. */
+/**
+ * Cihaz silindiğinde o cihaza bağlı eylemler ve olay tetikleyicileri düşer;
+ * eylemi ya da tetikleyicisi kalmayan otomasyon da silinir.
+ */
 export const removeDeviceFromAutomations = (
   automations: Automation[],
   deviceId: string
@@ -188,9 +277,11 @@ export const removeDeviceFromAutomations = (
   return automations
     .map((automation) => ({
       ...automation,
+      triggers: automation.triggers.filter((trigger) =>
+        trigger.type === "time" || trigger.deviceId !== normalizedId),
       actions: automation.actions.filter((action) => action.deviceId !== normalizedId)
     }))
-    .filter((automation) => automation.actions.length > 0);
+    .filter((automation) => automation.actions.length > 0 && automation.triggers.length > 0);
 };
 
 export class AutomationsStore {
