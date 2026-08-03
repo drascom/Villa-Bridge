@@ -1605,8 +1605,10 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   assert.match(dashboard, /\{type:"deviceState",deviceId:wizard\.triggerDeviceId,property:wizard\.triggerProperty,equals:wizard\.triggerEquals\}/);
   assert.match(dashboard, /token:`action:\$\{value\}`,action:value,label:automationActionLabel\(value\)/);
 
-  // Alt varlık kuralı: her düğme ayrı hedef; liste actionTypes'tan geliyor.
-  assert.match(dashboard, /for\(const action of device\.actionTypes\|\|\[\]\)/);
+  // Alt varlık kuralı: her düğme ayrı hedef; liste sunucunun `buttons` yapısından geliyor.
+  assert.match(dashboard, /for\(const button of device\.buttons\|\|\[\]\)\{\s*for\(const entry of button\.actions\)\{/);
+  // Sunucu düğme türetmediyse ham actionTypes yedeği devrede kalır.
+  assert.match(dashboard, /if\(!\(device\.buttons\|\|\[\]\)\.length\)for\(const action of device\.actionTypes\|\|\[\]\)/);
 
   // Ham `1_single` kullanıcıya basılmaz — sayı + basış eki insan diline çevriliyor.
   assert.match(dashboard, /const numbered=\/\^\(\?:button_\)\?\(\\d\{1,2\}\)_\(\[a-z_\]\+\)\$\/\.exec\(raw\)/);
@@ -1623,7 +1625,7 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
 
   // Kullanıcının hangi düğmeye bastığını görmesi için son basış ipucu — mevcut olay akışından.
   assert.match(dashboard, /const event=\(state\.events\|\|\[\]\)\.find\(item=>item\.sourceName===device\.sourceName&&item\.property==="action"\)/);
-  assert.match(dashboard, /t\("automationLastPress",\{action:automationActionLabel\(event\.value\),time:ago\(event\.at\)\}\)/);
+  assert.match(dashboard, /t\("automationLastPress",\{action:automationButtonLabel\(device,event\.value\),time:ago\(event\.at\)\}\)/);
   assert.match(dashboard, /automationPressToLearn:"Emin değilseniz düğmeye basın; son algılanan basış burada görünür\."/);
   assert.match(dashboard, /function refreshAutomationHint\(\)\{/);
 
@@ -1692,6 +1694,68 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
 
   // Arayüz dili: yeni metinlerde geliştirici sözlüğü yok.
   assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:tetikleyici|koşul|senaryo|kural kur|cluster|endpoint|property)/i);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla gösterir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Bölüm yalnızca sunucu düğme türettiyse çıkar; boş listede hiç render edilmez.
+  assert.match(dashboard, /const deviceButtonsHtml=device=>\{\s*const buttons=device\.buttons\|\|\[\];\s*if\(!buttons\.length\)return"";/);
+  assert.match(dashboard, /<div class="device-buttons"><div class="device-buttons-head">\$\{t\("deviceButtons"\)\}<\/div>\$\{deviceButtonLastLine\(device\)\}\$\{rows\}<\/div>/);
+  assert.match(dashboard, /\$\{deviceButtonsHtml\(device\)\}\s*\$\{deviceRoomsHtml\(device\)\}/);
+
+  // Her düğme kendi satırında: ad + desteklediği basışlar.
+  assert.match(dashboard, /<div class="device-button-row\$\{deviceButtonPressed\(device,button\)\?" pressed":""\}" data-device-button="\$\{esc\(button\.id\)\}">/);
+  assert.match(dashboard, /<div class="device-button-name">\$\{esc\(deviceButtonName\(button\)\)\}\$\{deviceButtonRenameButton\(device,button\)\}<\/div>/);
+  assert.match(dashboard, /<div class="device-button-presses">\$\{esc\(deviceButtonPressList\(button\)\)\}<\/div>/);
+  assert.match(dashboard, /const deviceButtonPressList=button=>\(button\?\.actions\|\|\[\]\)\.map\(entry=>deviceButtonPressLabel\(entry\.press\)\)\.join\(" · "\)/);
+
+  // Yeniden adlandırma mevcut kanal desenini kullanır; yeni diyalog icat edilmedi.
+  assert.match(dashboard, /const deviceButtonRenameButton=\(device,button\)=>`<button class="control-rename" type="button" data-admin-only data-rename-channel="\$\{esc\(device\.id\)\}" data-channel="\$\{esc\(button\.id\)\}"/);
+  assert.match(dashboard, /const button=channel&&!control\?\(device\.buttons\|\|\[\]\)\.find\(item=>item\.id===channel\):null;/);
+  assert.match(dashboard, /\$\("#nameInput"\)\.value=control\?\.name\|\|\(button\?deviceButtonName\(button\):""\)\|\|device\.name;/);
+  assert.match(dashboard, /nameButton:"Düğmeyi adlandır"/);
+  assert.match(dashboard, /nameButton:"Name button"/);
+
+  // Son basılan satırı ve kısa vurgu: 8 sn'lik mevcut yenilemeye takılı, yeni zamanlayıcı yok.
+  assert.match(dashboard, /const deviceButtonPressWindowMs=8000/);
+  assert.match(dashboard, /if\(!last\|\|last\.buttonId!==button\.id\)return false;\s*return Date\.now\(\)-new Date\(last\.at\)\.getTime\(\)<deviceButtonPressWindowMs;/);
+  assert.match(dashboard, /t\("deviceButtonLastPress",\{button:deviceButtonName\(button\),press:deviceButtonPressLabel\(entry\?\.press\?\?last\.action\),time:ago\(last\.at\)\}\)/);
+  assert.match(dashboard, /\.device-button-row\.pressed\{animation:buttonPressed 3s ease-out 1 forwards\}/);
+  assert.match(dashboard, /@keyframes buttonPressed\{0%,55%\{border-color:var\(--forest\);background:var\(--forest-soft\)\}/);
+  assert.match(dashboard, /@media\(prefers-reduced-motion:reduce\)\{\.device-button-row\.pressed\{animation:none;border-color:var\(--forest\)\}\}/);
+  assert.doesNotMatch(dashboard, /setInterval\([^)]*deviceButton/);
+
+  // Basış yoksa kullanıcıya ne yapacağını söyleyen ipucu çıkar.
+  assert.match(dashboard, /if\(!last\|\|!button\)return`<div class="device-buttons-hint">\$\{esc\(t\("deviceButtonLearnHint"\)\)\}<\/div>`/);
+  assert.match(dashboard, /deviceButtonLearnHint:"Hangi düğme olduğunu görmek için cihazdaki bir düğmeye basın\."/);
+  assert.match(dashboard, /deviceButtonLearnHint:"Press a button on the device to see which one it is\."/);
+
+  // Varsayılan ad arayüz dilinden; kullanıcı ad verdiyse o kazanır.
+  assert.match(dashboard, /if\(generated&&localized&&button\?\.name===generated\)return localized;/);
+  assert.match(dashboard, /deviceButtonNumbered:"\{number\}\. düğme"/);
+  assert.match(dashboard, /deviceButtonNumbered:"Button \{number\}"/);
+  assert.match(dashboard, /deviceButtonSingle:"Düğme"/);
+  assert.match(dashboard, /deviceButtonOther:"Other actions"/);
+  assert.match(dashboard, /deviceButtonBrightnessUp:"Parlaklık artırma düğmesi"/);
+  assert.match(dashboard, /deviceButtonBrightnessUp:"Brighten button"/);
+
+  // `ungrouped` kovasında basış ham değerdir; tanınmayan değer olduğu gibi gösterilir.
+  assert.match(dashboard, /const deviceButtonPressLabel=press=>\{const key=automationPressKeys\[press\];return key\?t\(key\):String\(press\?\?""\)\}/);
+  assert.match(dashboard, /automationPressQuintuple:"beş basış"/);
+  assert.match(dashboard, /automationPressMany:"several presses"/);
+
+  // Sihirbaz aynı yapıyı kullanır; kaydedilen tetikleyici hâlâ ham `action`.
+  assert.match(dashboard, /label:t\("automationButtonEvent",\{button:deviceButtonName\(button\),press:deviceButtonPressLabel\(entry\.press\)\}\)/);
+  assert.match(dashboard, /token:`action:\$\{entry\.action\}`,\s*action:entry\.action,/);
+  assert.match(dashboard, /automationButtonEvent:"\{button\} · \{press\}"/);
+  // Yeniden adlandırma otomasyonu bozmaz: özet cümlesinde yeni ad görünür.
+  assert.match(dashboard, /button:automationButtonLabel\(automationTriggerDevice\(trigger\),trigger\.action\),/);
+  assert.match(dashboard, /const automationButtonLabel=\(device,action\)=>\{[\s\S]*?if\(!found\)return automationActionLabel\(action\);/);
+  // Düğmelerde eleme kanonik `action` üzerinden; aynı ada sahip iki düğme birbirini yutmaz.
+  assert.match(dashboard, /const key=kind==="button"\?row\.token:row\.label;/);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
