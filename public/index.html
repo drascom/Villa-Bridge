@@ -192,6 +192,9 @@
     .automation-time{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}.automation-time-unit{display:grid;gap:9px;justify-items:center}.automation-time-value{min-width:88px;font:800 42px/1 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}.automation-time-step{width:88px;min-height:60px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);font-size:27px;font-weight:800;touch-action:manipulation}.automation-time-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-time-colon{font:800 34px/1 system-ui,sans-serif}
     .automation-days{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.automation-day{min-height:44px;padding:9px 15px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;touch-action:manipulation}.automation-day:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-day.active{border-color:var(--forest);background:var(--forest-soft)}
     .automation-targets{display:grid;gap:10px;margin-top:16px}.automation-target{border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);overflow:hidden}.automation-target.selected{border-color:var(--forest)}.automation-target-head{width:100%;min-height:64px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px;border:0;color:var(--ink);background:transparent;text-align:left;touch-action:manipulation}.automation-target-head strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-target-head small{color:var(--muted);font-size:12px}.automation-control-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:0 14px 14px}.automation-control-row span{font-size:13px;font-weight:750;overflow-wrap:anywhere}.automation-control-choice{min-height:48px;padding:10px 18px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:14px;font-weight:800;touch-action:manipulation}.automation-control-choice.active{border-color:var(--forest);background:var(--forest-soft)}
+    .automation-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}.automation-pick{min-height:88px;display:grid;align-content:center;gap:4px;padding:13px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-pick:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-pick.active{border-color:var(--forest);background:var(--forest-soft)}.automation-pick strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.automation-pick small{color:var(--muted);font-size:12px}
+    .automation-events{display:grid;gap:9px;margin-top:14px}.automation-event{display:block;min-height:60px;padding:17px 15px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:15px;font-weight:750;text-align:left;touch-action:manipulation}.automation-event::first-letter{text-transform:uppercase}.automation-event:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-event.active{border-color:var(--forest);background:var(--forest-soft)}
+    .automation-hint{margin:14px 0 0;padding:11px 13px;border-radius:13px;color:var(--muted);background:var(--surface-soft);font-size:13px;line-height:1.4}
     .automation-sentence{margin-top:18px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);font:750 18px/1.45 system-ui,sans-serif}.automation-name-field{display:grid;gap:8px;margin-top:16px}.automation-name-field label{font-size:13px;font-weight:750;color:var(--muted)}
     .automation-card-chip{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:11px;font-weight:800}.automation-card-chip.warn{color:var(--danger)}.automation-card.off{opacity:.62}
     @media(max-width:560px){.simple-link-choices{grid-template-columns:1fr}.automation-card{grid-template-columns:46px minmax(0,1fr);row-gap:12px}.automation-card .danger-button{grid-column:1/-1}.automation-control-row{grid-template-columns:minmax(0,1fr)}}
@@ -1160,6 +1163,7 @@
     renderZigbeeGroups();
     renderHomeSummary();
     renderAutomations();
+    refreshAutomationHint();
     const controllable=devices.filter(device=>Boolean(dashboardControlForDevice(device)));
     if(!state.quickOrder&&controllable.length)state.quickOrder=[...controllable].sort((a,b)=>(state.usage[b.id]||0)-(state.usage[a.id]||0)).map(device=>device.id);
     const orderedIds=[...(state.quickOrder||[]),...controllable.map(device=>device.id).filter(id=>!state.quickOrder?.includes(id))];
@@ -3426,21 +3430,111 @@
     const control=automationControl(action);
     return control&&automationControls(device).length>1?`${device.name} · ${control.name}`:device.name;
   };
+  // Ham `1_single` gibi teknik dizeler kullanıcıya basılmaz; sayı + basış eki insan diline çevrilir.
+  const automationPressKeys={
+    single:"automationPressSingle",double:"automationPressDouble",triple:"automationPressTriple",
+    quadruple:"automationPressQuadruple",hold:"automationPressHold",release:"automationPressRelease",
+    press:"automationPressPress",on:"automationPressOn",off:"automationPressOff",
+    toggle:"automationPressToggle",up:"automationPressUp",down:"automationPressDown"
+  };
+  const automationActionLabel=value=>{
+    const raw=String(value??"").trim();
+    const numbered=/^(?:button_)?(\d{1,2})_([a-z_]+)$/.exec(raw);
+    const press=automationPressKeys[numbered?numbered[2]:raw];
+    // Tanımadığımız kalıpta son çare ham değer — boş liste ya da çökme olmasın.
+    if(!press)return raw;
+    return numbered?t("automationButtonPress",{number:numbered[1],press:t(press)}):t(press);
+  };
+  // Kullanıcı dilinde durum seçenekleri. `contact:true` kapalı demektir — açılma false'a bağlanır.
+  const automationSensorEvents={
+    occupancy:[{value:true,key:"automationEventMotion"},{value:false,key:"automationEventMotionEnds"}],
+    presence:[{value:true,key:"automationEventMotion"},{value:false,key:"automationEventMotionEnds"}],
+    contact:[{value:false,key:"automationEventOpened"},{value:true,key:"automationEventClosed"}],
+    smoke:[{value:true,key:"automationEventSmoke"}],
+    carbon_monoxide:[{value:true,key:"automationEventCo"}],
+    water_leak:[{value:true,key:"automationEventWater"}],
+    battery_low:[{value:true,key:"automationEventBatteryLow"}],
+    alarm:[{value:true,key:"automationEventAlarm"}],
+    lock_state:[{value:"locked",key:"automationEventLocked"},{value:"unlocked",key:"automationEventUnlocked"}]
+  };
+  const automationStateControls=device=>(device?.controls||[]).filter(control=>control.kind==="switch");
+  // §8.1 tersi: kilit ve siren EYLEM olamaz ama tetikleyici olarak serbesttir — burada filtre yok.
+  function automationTriggerEvents(device,kind){
+    if(!device)return[];
+    const rows=[];
+    if(kind==="button"){
+      for(const action of device.actionTypes||[]){
+        const value=String(action??"").trim();
+        if(value)rows.push({token:`action:${value}`,action:value,label:automationActionLabel(value)});
+      }
+    }else if(kind==="sensor"){
+      const keys=new Set([...(device.features||[]),...Object.keys(device.state||{})]);
+      for(const property of Object.keys(automationSensorEvents)){
+        if(!keys.has(property))continue;
+        for(const option of automationSensorEvents[property]){
+          rows.push({token:`${property}=${String(option.value)}`,property,equals:option.value,label:t(option.key)});
+        }
+      }
+    }else if(kind==="deviceState"){
+      const controls=automationStateControls(device);
+      for(const control of controls){
+        for(const on of[true,false]){
+          const value=automationControlValue(control,on);
+          const label=t(on?"automationEventTurnedOn":"automationEventTurnedOff");
+          rows.push({
+            token:`${control.property}=${String(value)}`,
+            property:control.property,
+            equals:value,
+            label:controls.length>1?t("automationChannelEvent",{channel:control.name,event:label}):label
+          });
+        }
+      }
+    }
+    const seen=new Set();
+    return rows.filter(row=>seen.has(row.label)?false:(seen.add(row.label),true));
+  }
+  const automationTriggerDevice=trigger=>state.devices.find(device=>device.id===trigger?.deviceId)||null;
+  const automationTriggerDeviceName=trigger=>automationTriggerDevice(trigger)?.name||t("automationMissingDevice");
+  const automationEventLabel=trigger=>{
+    const device=automationTriggerDevice(trigger);
+    const token=`${trigger?.property}=${String(trigger?.equals)}`;
+    const match=["sensor","deviceState"]
+      .flatMap(kind=>automationTriggerEvents(device,kind))
+      .find(row=>row.token===token);
+    return match?match.label:`${trigger?.property??""}`;
+  };
   const automationSentenceValues=(trigger,action,actionKey)=>({
     time:trigger.at,
     days:automationDayList(trigger.days),
     device:automationActionName(action),
     action:t(actionKey)
   });
+  const automationEventValues=(trigger,action,actionKey)=>({
+    device:automationTriggerDeviceName(trigger),
+    button:automationActionLabel(trigger.action),
+    event:automationEventLabel(trigger),
+    target:automationActionName(action),
+    action:t(actionKey)
+  });
   // Tam şablon anahtarı — cümle parça birleştirilerek kurulmuyor (TR/EN kelime sırası farklı).
-  const automationSentence=(trigger,action)=>t(
-    automationEveryDay(trigger.days)?"automationSummaryTime":"automationSummaryTimeDays",
-    automationSentenceValues(trigger,action,automationActionIsOn(action)?"automationWillTurnOn":"automationWillTurnOff")
-  );
-  const automationCardLine=(trigger,action)=>t(
-    automationEveryDay(trigger.days)?"automationCardSummary":"automationCardSummaryDays",
-    automationSentenceValues(trigger,action,automationActionIsOn(action)?"automationTurnsOn":"automationTurnsOff")
-  );
+  const automationSentence=(trigger,action)=>{
+    const actionKey=automationActionIsOn(action)?"automationWillTurnOn":"automationWillTurnOff";
+    if(trigger.type==="deviceAction")return t("automationSummaryButton",automationEventValues(trigger,action,actionKey));
+    if(trigger.type==="deviceState")return t("automationSummaryState",automationEventValues(trigger,action,actionKey));
+    return t(
+      automationEveryDay(trigger.days)?"automationSummaryTime":"automationSummaryTimeDays",
+      automationSentenceValues(trigger,action,actionKey)
+    );
+  };
+  const automationCardLine=(trigger,action)=>{
+    const actionKey=automationActionIsOn(action)?"automationTurnsOn":"automationTurnsOff";
+    if(trigger.type==="deviceAction")return t("automationCardSummaryButton",automationEventValues(trigger,action,actionKey));
+    if(trigger.type==="deviceState")return t("automationCardSummaryState",automationEventValues(trigger,action,actionKey));
+    return t(
+      automationEveryDay(trigger.days)?"automationCardSummary":"automationCardSummaryDays",
+      automationSentenceValues(trigger,action,actionKey)
+    );
+  };
   const automationRunChip=automation=>{
     if(!automation.lastRunAt)return`<span class="automation-card-chip">${t("automationNeverRan")}</span>`;
     const failed=automation.lastRunOk===false;
@@ -3466,6 +3560,13 @@
     $$("[data-remove-link]").forEach(button=>button.onclick=()=>removeSimpleLink(button.dataset.removeLink));
     $$("[data-automation-toggle]").forEach(button=>button.onclick=()=>toggleAutomationEnabled(button.dataset.automationToggle));
     $$("[data-automation-card]").forEach(card=>bindLongPress(card,()=>openAutomationActions(card.dataset.automationCard),{ignore:target=>Boolean(target.closest?.("[data-automation-toggle]"))}));
+  }
+  // Son basış ipucu yoklama turuyla tazelenir; yalnız 1. adımda ve düğme yolunda, metin alanı yok.
+  function refreshAutomationHint(){
+    const wizard=state.automationWizard;
+    if(!wizard||wizard.step!==1||wizard.triggerKind!=="button"||!wizard.triggerDeviceId)return;
+    if(!$("#automationDialog")?.open)return;
+    renderAutomationWizard();
   }
   async function loadAutomations(){
     const data=await api("/api/automations");
@@ -3511,27 +3612,43 @@
   const automationTriggerChoices=[
     {kind:"time",glyph:"🕐",label:"automationTriggerTime",ready:true},
     {kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:false},
-    {kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:false},
-    {kind:"sensor",glyph:"🚪",label:"automationTriggerSensor",ready:false},
-    {kind:"deviceState",glyph:"💡",label:"automationTriggerDeviceState",ready:false}
+    {kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:true},
+    {kind:"sensor",glyph:"🚪",label:"automationTriggerSensor",ready:true},
+    {kind:"deviceState",glyph:"💡",label:"automationTriggerDeviceState",ready:true}
   ];
+  const automationDeviceKinds=["button","sensor","deviceState"];
   const automationNewId=()=>`${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`.toLowerCase();
   const automationTimeText=wizard=>`${String(wizard.hour).padStart(2,"0")}:${String(wizard.minute).padStart(2,"0")}`;
-  const automationWizardTrigger=wizard=>({type:"time",at:automationTimeText(wizard),days:[...wizard.days].sort((left,right)=>left-right)});
-  const automationWizardName=wizard=>wizard.name.trim()
-    ||t("automationDefaultName",{device:automationActionName(wizard.action),time:automationTimeText(wizard)}).slice(0,64);
+  const automationWizardTrigger=wizard=>wizard.triggerKind==="button"
+    ?{type:"deviceAction",deviceId:wizard.triggerDeviceId,action:wizard.triggerAction}
+    :automationDeviceKinds.includes(wizard.triggerKind)
+    ?{type:"deviceState",deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty,equals:wizard.triggerEquals}
+    :{type:"time",at:automationTimeText(wizard),days:[...wizard.days].sort((left,right)=>left-right)};
+  const automationDefaultName=(trigger,action)=>(trigger.type==="time"
+    ?t("automationDefaultName",{device:automationActionName(action),time:trigger.at})
+    :t("automationDefaultNameEvent",{device:automationTriggerDeviceName(trigger),target:automationActionName(action)})).slice(0,64);
+  const automationWizardName=wizard=>wizard.name.trim()||automationDefaultName(automationWizardTrigger(wizard),wizard.action);
+  const automationTriggerKind=trigger=>!trigger?null
+    :trigger.type==="deviceAction"?"button"
+    :trigger.type==="deviceState"?(Object.prototype.hasOwnProperty.call(automationSensorEvents,trigger.property)?"sensor":"deviceState")
+    :"time";
   function openAutomationWizard(id=null){
     const existing=id?state.automations.find(item=>item.id===id):null;
     const trigger=existing?.triggers?.[0]||null;
     const action=existing?.actions?.[0]||null;
+    const timed=trigger?.type==="time";
     state.automationWizard={
       step:1,
       id:existing?.id||null,
       enabled:existing?existing.enabled!==false:true,
-      triggerKind:trigger?"time":null,
-      hour:trigger?Number(trigger.at.slice(0,2)):19,
-      minute:trigger?Number(trigger.at.slice(3,5)):0,
-      days:trigger?[...trigger.days]:[...automationWeekDays],
+      triggerKind:automationTriggerKind(trigger),
+      hour:timed?Number(trigger.at.slice(0,2)):19,
+      minute:timed?Number(trigger.at.slice(3,5)):0,
+      days:timed?[...trigger.days]:[...automationWeekDays],
+      triggerDeviceId:trigger?.deviceId||null,
+      triggerAction:trigger?.type==="deviceAction"?trigger.action:null,
+      triggerProperty:trigger?.type==="deviceState"?trigger.property:null,
+      triggerEquals:trigger?.type==="deviceState"?trigger.equals:null,
       action:action?{...action}:null,
       openDevice:action?.deviceId||null,
       room:null,
@@ -3556,13 +3673,46 @@
         return`<button class="automation-day${active?" active":""}" type="button" data-automation-day="${day}" aria-pressed="${active}">${esc(automationDayLabel(day))}</button>`;
       })
     ].join("");
+    if(automationDeviceKinds.includes(wizard.triggerKind))return`<div class="automation-triggers">${triggers}</div>${automationTriggerPickHtml(wizard)}`;
     if(wizard.triggerKind!=="time")return`<div class="automation-triggers">${triggers}</div>`;
     return`<div class="automation-triggers">${triggers}</div><div class="automation-time" role="group" aria-label="${esc(t("automationTimeLabel"))}">${unit("hour",wizard.hour,1,"automationHourUp","automationHourDown")}<span class="automation-time-colon" aria-hidden="true">:</span>${unit("minute",wizard.minute,5,"automationMinuteUp","automationMinuteDown")}</div><div class="automation-days" role="group" aria-label="${esc(t("automationDaysLabel"))}">${days}</div>`;
   }
-  function automationThenHtml(wizard){
+  // Cihaz olay akışından son basış — uydurma çağrı yok, mevcut /api/overview verisi okunuyor.
+  const automationButtonHint=device=>{
+    const event=(state.events||[]).find(item=>item.sourceName===device.sourceName&&item.property==="action");
+    return event
+      ?t("automationLastPress",{action:automationActionLabel(event.value),time:ago(event.at)})
+      :t("automationPressToLearn");
+  };
+  const automationEventPicked=(wizard,event)=>wizard.triggerKind==="button"
+    ?wizard.triggerAction===event.action
+    :wizard.triggerProperty===event.property&&wizard.triggerEquals===event.equals;
+  function automationTriggerPickHtml(wizard){
     const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
     const devices=state.devices
-      .filter(device=>isAutomationTarget(device)&&(!wizard.room||deviceInRoom(device,wizard.room)))
+      .filter(device=>automationTriggerEvents(device,wizard.triggerKind).length>0)
+      .sort(byName);
+    if(!devices.length)return`<div class="empty">${t(wizard.triggerKind==="button"?"automationNoButtons":"automationNoSensors")}</div>`;
+    const picks=devices.map(device=>{
+      const active=wizard.triggerDeviceId===device.id;
+      return`<button class="automation-pick${active?" active":""}" type="button" data-automation-trigger-device="${esc(device.id)}" aria-pressed="${active}"><strong>${esc(device.name)}</strong><small>${esc(deviceKind(device))}</small></button>`;
+    }).join("");
+    const device=devices.find(item=>item.id===wizard.triggerDeviceId)||null;
+    const events=automationTriggerEvents(device,wizard.triggerKind);
+    // Alt varlık kuralı (§5.1.1): her düğme ve her özellik ayrı bir hedeftir.
+    const list=events.map(event=>{
+      const active=automationEventPicked(wizard,event);
+      return`<button class="automation-event${active?" active":""}" type="button" data-automation-event="${esc(event.token)}" aria-pressed="${active}">${esc(event.label)}</button>`;
+    }).join("");
+    const hint=device&&wizard.triggerKind==="button"?`<p class="automation-hint">${esc(automationButtonHint(device))}</p>`:"";
+    return`<div class="automation-picks">${picks}</div>${events.length?`<div class="automation-events">${list}</div>`:""}${hint}`;
+  }
+  function automationThenHtml(wizard){
+    const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
+    // §8.2 — otomasyonu başlatan cihaz hedef olamaz; döngü daha seçim anında engellenir.
+    const starter=wizard.triggerKind==="time"?null:wizard.triggerDeviceId;
+    const devices=state.devices
+      .filter(device=>isAutomationTarget(device)&&device.id!==starter&&(!wizard.room||deviceInRoom(device,wizard.room)))
       .sort(byName);
     if(!devices.length)return`<div class="empty">${t("automationNoTargets")}</div>`;
     const rows=devices.map(device=>{
@@ -3610,6 +3760,8 @@
       stepAutomationTime(unit,Number(amount));
     });
     $$("[data-automation-day]").forEach(button=>button.onclick=()=>toggleAutomationDay(button.dataset.automationDay));
+    $$("[data-automation-trigger-device]").forEach(button=>button.onclick=()=>chooseAutomationTriggerDevice(button.dataset.automationTriggerDevice));
+    $$("[data-automation-event]").forEach(button=>button.onclick=()=>chooseAutomationEvent(button.dataset.automationEvent));
     $$("[data-automation-room]").forEach(button=>button.onclick=()=>{wizard.room=button.dataset.automationRoom||null;renderAutomationWizard()});
     $$("[data-automation-device]").forEach(button=>button.onclick=()=>toggleAutomationDevice(button.dataset.automationDevice));
     $$("[data-automation-action]").forEach(button=>button.onclick=()=>chooseAutomationAction(button.dataset.automationAction));
@@ -3634,12 +3786,51 @@
     const wizard=state.automationWizard;
     const choice=automationTriggerChoices.find(entry=>entry.kind===kind);
     if(!wizard||!choice?.ready)return;
+    if(wizard.triggerKind!==kind)automationClearTriggerDevice(wizard);
     wizard.triggerKind=kind;
     renderAutomationWizard();
     afterAutomationChoice(()=>{
-      const time=$("#automationBody .automation-time");
-      if(time)time.scrollIntoView({behavior:"smooth",block:"center"});
+      const target=$("#automationBody .automation-time")||$("#automationBody .automation-picks");
+      if(target)target.scrollIntoView({behavior:"smooth",block:"center"});
     });
+  }
+  function automationClearTriggerDevice(wizard){
+    wizard.triggerDeviceId=null;
+    wizard.triggerAction=null;
+    wizard.triggerProperty=null;
+    wizard.triggerEquals=null;
+  }
+  function automationApplyEvent(wizard,event){
+    // Kanonik kayıt: düğme için `action`, sensör için `property`+`equals`. Etiket yalnızca sunum.
+    wizard.triggerAction=wizard.triggerKind==="button"?event.action:null;
+    wizard.triggerProperty=wizard.triggerKind==="button"?null:event.property;
+    wizard.triggerEquals=wizard.triggerKind==="button"?null:event.equals;
+  }
+  function chooseAutomationTriggerDevice(deviceId){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    automationClearTriggerDevice(wizard);
+    wizard.triggerDeviceId=deviceId;
+    const device=state.devices.find(item=>item.id===deviceId)||null;
+    const events=automationTriggerEvents(device,wizard.triggerKind);
+    // Tek anlamlı seçenek varsa sessizce seçilir, kullanıcıya sorulmaz.
+    if(events.length===1)automationApplyEvent(wizard,events[0]);
+    if(wizard.action?.deviceId===deviceId)wizard.action=null;
+    renderAutomationWizard();
+    afterAutomationChoice(()=>{
+      if(automationTriggerReady(wizard)){nextAutomationStep();return}
+      const list=$("#automationBody .automation-events");
+      if(list)list.scrollIntoView({behavior:"smooth",block:"center"});
+    });
+  }
+  function chooseAutomationEvent(token){
+    const wizard=state.automationWizard;
+    const device=wizard?state.devices.find(item=>item.id===wizard.triggerDeviceId)||null:null;
+    const event=automationTriggerEvents(device,wizard?.triggerKind).find(item=>item.token===token);
+    if(!event)return;
+    automationApplyEvent(wizard,event);
+    renderAutomationWizard();
+    afterAutomationChoice(()=>{nextAutomationStep()});
   }
   function stepAutomationTime(unit,amount){
     const wizard=state.automationWizard;
@@ -3679,7 +3870,10 @@
     renderAutomationWizard();
     afterAutomationChoice(()=>{nextAutomationStep()});
   }
-  const automationStepReady=wizard=>wizard.step===1?Boolean(wizard.triggerKind):wizard.step===2?Boolean(wizard.action):true;
+  const automationTriggerReady=wizard=>wizard.triggerKind==="time"?true
+    :wizard.triggerKind==="button"?Boolean(wizard.triggerDeviceId&&wizard.triggerAction)
+    :automationDeviceKinds.includes(wizard.triggerKind)?Boolean(wizard.triggerDeviceId&&wizard.triggerProperty):false;
+  const automationStepReady=wizard=>wizard.step===1?automationTriggerReady(wizard):wizard.step===2?Boolean(wizard.action):true;
   function stepBackAutomation(){
     const wizard=state.automationWizard;
     cancelAutomationAdvance();
@@ -3695,16 +3889,22 @@
     wizard.step+=1;
     renderAutomationWizard();
   }
+  // Sunucu döngüyü reddederse ham hata metni yerine anlaşılır bir cümle gösterilir (§8.2).
+  const automationErrorText=error=>/döngü|loop/i.test(String(error?.message||""))
+    ?t("automationLoopWarning")
+    :String(error?.message||"");
   async function saveAutomationWizard(){
     const wizard=state.automationWizard;
     if(!wizard?.action)return;
+    const trigger=automationWizardTrigger(wizard);
+    if(trigger.deviceId&&trigger.deviceId===wizard.action.deviceId){showToast(t("automationLoopWarning"),true);return}
     const button=$("#automationNext");
     button.disabled=true;
     const entry={
       id:wizard.id||automationNewId(),
       name:automationWizardName(wizard),
       enabled:wizard.enabled!==false,
-      triggers:[automationWizardTrigger(wizard)],
+      triggers:[trigger],
       conditions:[],
       actions:[wizard.action],
       lastRunAt:null,
@@ -3718,7 +3918,7 @@
       else automations.push(entry);
       await persistAutomations(automations,"automationSaved");
       $("#automationDialog").close();
-    }catch(error){button.disabled=false;showToast(error.message,true)}
+    }catch(error){button.disabled=false;showToast(automationErrorText(error),true)}
   }
   async function removeSimpleLink(key){
     const link=simpleLinks().find(item=>item.key===key);

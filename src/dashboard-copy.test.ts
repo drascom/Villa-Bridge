@@ -1471,9 +1471,9 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   // Ekran 1: beş dokunma hedefi, yalnızca saat etkin, diğer dördü "Yakında" ve devre dışı.
   assert.match(dashboard, /\{kind:"time",glyph:"🕐",label:"automationTriggerTime",ready:true\}/);
   assert.match(dashboard, /\{kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:false\}/);
-  assert.match(dashboard, /\{kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:false\}/);
-  assert.match(dashboard, /\{kind:"sensor",glyph:"🚪",label:"automationTriggerSensor",ready:false\}/);
-  assert.match(dashboard, /\{kind:"deviceState",glyph:"💡",label:"automationTriggerDeviceState",ready:false\}/);
+  assert.match(dashboard, /\{kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:true\}/);
+  assert.match(dashboard, /\{kind:"sensor",glyph:"🚪",label:"automationTriggerSensor",ready:true\}/);
+  assert.match(dashboard, /\{kind:"deviceState",glyph:"💡",label:"automationTriggerDeviceState",ready:true\}/);
   assert.match(dashboard, /entry\.ready\?"":' disabled aria-disabled="true"'/);
   assert.match(dashboard, /entry\.ready\?"":`<span class="automation-soon">\$\{t\("comingSoon"\)\}<\/span>`/);
   assert.match(dashboard, /\.automation-trigger\{min-height:88px/);
@@ -1487,7 +1487,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
 
   // Gün çipleri; varsayılan "Her gün".
   assert.match(dashboard, /const automationWeekDays=\[1,2,3,4,5,6,7\]/);
-  assert.match(dashboard, /days:trigger\?\[\.\.\.trigger\.days\]:\[\.\.\.automationWeekDays\]/);
+  assert.match(dashboard, /days:timed\?\[\.\.\.trigger\.days\]:\[\.\.\.automationWeekDays\]/);
   assert.match(dashboard, /automationEveryDayChip:"Her gün"/);
   assert.match(dashboard, /automationEveryDayChip:"Every day"/);
   assert.match(dashboard, /automationDay1:"Pzt"/);
@@ -1511,7 +1511,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /const automationControl=action=>automationDevice\(action\)\?\.controls\.find\(control=>control\.property===action\?\.property\)/);
 
   // Ekran 3: özet cümlesi tam şablon anahtarıyla kuruluyor, parça birleştirme yok.
-  assert.match(dashboard, /const automationSentence=\(trigger,action\)=>t\(\s*automationEveryDay\(trigger\.days\)\?"automationSummaryTime":"automationSummaryTimeDays",/);
+  assert.match(dashboard, /automationEveryDay\(trigger\.days\)\?"automationSummaryTime":"automationSummaryTimeDays",/);
   assert.match(dashboard, /<div class="automation-sentence">\$\{esc\(sentence\)\}<\/div>/);
   assert.match(dashboard, /automationSummaryTime:"Every day at \{time\}, \{device\} will \{action\}\."/);
   assert.match(dashboard, /automationSummaryTime:"Her gün saat \{time\} olduğunda \{device\} \{action\}\."/);
@@ -1555,7 +1555,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   // "İleri" yalnızca o adımda seçim yapıldıysa aktif.
   assert.match(
     dashboard,
-    /const automationStepReady=wizard=>wizard\.step===1\?Boolean\(wizard\.triggerKind\):wizard\.step===2\?Boolean\(wizard\.action\):true/
+    /const automationStepReady=wizard=>wizard\.step===1\?automationTriggerReady\(wizard\):wizard\.step===2\?Boolean\(wizard\.action\):true/
   );
   assert.match(dashboard, /next\.disabled=!automationStepReady\(wizard\)/);
   assert.match(dashboard, /if\(!wizard\|\|!automationStepReady\(wizard\)\)return;/);
@@ -1573,15 +1573,106 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /wizard\.triggerKind=kind;\s*renderAutomationWizard\(\);\s*afterAutomationChoice\(/);
   assert.match(dashboard, /afterAutomationChoice\(\(\)=>\{nextAutomationStep\(\)\}\)/);
   // Ayar isteyen dokunuşlarda (saat, gün, oda) otomatik ilerleme yok: yalnız iki çağrı yeri var.
-  assert.equal((dashboard.match(/afterAutomationChoice\(/g) ?? []).length, 3);
+  assert.equal((dashboard.match(/afterAutomationChoice\(/g) ?? []).length, 5);
   // Geri gidildiğinde seçimler durur: sihirbaz durumu yalnızca modal kapanınca sıfırlanır.
   assert.match(dashboard, /addEventListener\("close",\(\)=>\{cancelAutomationAdvance\(\);state\.automationWizard=null\}\)/);
-  assert.match(dashboard, /triggerKind:trigger\?"time":null/);
+  assert.match(dashboard, /triggerKind:automationTriggerKind\(trigger\)/);
 
   // Faz 1 sınırı: tek tetikleyici, tek eylem, koşul yok.
-  assert.match(dashboard, /triggers:\[automationWizardTrigger\(wizard\)\],\s*conditions:\[\],\s*actions:\[wizard\.action\],/);
+  assert.match(dashboard, /triggers:\[trigger\],\s*conditions:\[\],\s*actions:\[wizard\.action\],/);
   assert.doesNotMatch(dashboard, /data-automation-condition/);
   assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:koşul|senaryo|tetikleyici|property|endpoint)/i);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Üç yeni yol açık, gün doğumu hâlâ "yakında".
+  assert.match(dashboard, /\{kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:false\}/);
+  assert.match(dashboard, /const automationDeviceKinds=\["button","sensor","deviceState"\]/);
+  assert.match(dashboard, /if\(automationDeviceKinds\.includes\(wizard\.triggerKind\)\)return`<div class="automation-triggers">\$\{triggers\}<\/div>\$\{automationTriggerPickHtml\(wizard\)\}`/);
+
+  // Cihaz seçimi kart ızgarası, açılır liste değil; dokunma hedefi 88 px.
+  assert.match(dashboard, /data-automation-trigger-device="\$\{esc\(device\.id\)\}"/);
+  assert.match(dashboard, /\.automation-pick\{min-height:88px/);
+  assert.match(dashboard, /\.automation-picks\{display:grid;grid-template-columns:repeat\(auto-fill,minmax\(150px,1fr\)\)/);
+  assert.doesNotMatch(dashboard, /<select[^>]*data-automation/);
+
+  // Kanonik kayıt: düğme için action, sensör için property + equals.
+  assert.match(dashboard, /\{type:"deviceAction",deviceId:wizard\.triggerDeviceId,action:wizard\.triggerAction\}/);
+  assert.match(dashboard, /\{type:"deviceState",deviceId:wizard\.triggerDeviceId,property:wizard\.triggerProperty,equals:wizard\.triggerEquals\}/);
+  assert.match(dashboard, /token:`action:\$\{value\}`,action:value,label:automationActionLabel\(value\)/);
+
+  // Alt varlık kuralı: her düğme ayrı hedef; liste actionTypes'tan geliyor.
+  assert.match(dashboard, /for\(const action of device\.actionTypes\|\|\[\]\)/);
+
+  // Ham `1_single` kullanıcıya basılmaz — sayı + basış eki insan diline çevriliyor.
+  assert.match(dashboard, /const numbered=\/\^\(\?:button_\)\?\(\\d\{1,2\}\)_\(\[a-z_\]\+\)\$\/\.exec\(raw\)/);
+  assert.match(dashboard, /return numbered\?t\("automationButtonPress",\{number:numbered\[1\],press:t\(press\)\}\):t\(press\)/);
+  assert.match(dashboard, /automationButtonPress:"\{number\}\. düğme · \{press\}"/);
+  assert.match(dashboard, /automationButtonPress:"Button \{number\} · \{press\}"/);
+  assert.match(dashboard, /automationPressSingle:"tek basış"/);
+  assert.match(dashboard, /automationPressDouble:"çift basış"/);
+  assert.match(dashboard, /automationPressHold:"basılı tut"/);
+  assert.match(dashboard, /automationPressSingle:"single press"/);
+  // Tanınmayan kalıpta son çare ham değer: çökme ya da boş liste yok.
+  assert.match(dashboard, /if\(!press\)return raw;/);
+  assert.doesNotMatch(dashboard, /\$\{esc\(event\.action\)\}<\/button>/);
+
+  // Kullanıcının hangi düğmeye bastığını görmesi için son basış ipucu — mevcut olay akışından.
+  assert.match(dashboard, /const event=\(state\.events\|\|\[\]\)\.find\(item=>item\.sourceName===device\.sourceName&&item\.property==="action"\)/);
+  assert.match(dashboard, /t\("automationLastPress",\{action:automationActionLabel\(event\.value\),time:ago\(event\.at\)\}\)/);
+  assert.match(dashboard, /automationPressToLearn:"Emin değilseniz düğmeye basın; son algılanan basış burada görünür\."/);
+  assert.match(dashboard, /function refreshAutomationHint\(\)\{/);
+
+  // Sensör değerleri kullanıcı dilinde; ham true\/false\/ON\/OFF gösterilmiyor.
+  assert.match(dashboard, /contact:\[\{value:false,key:"automationEventOpened"\},\{value:true,key:"automationEventClosed"\}\]/);
+  assert.match(dashboard, /occupancy:\[\{value:true,key:"automationEventMotion"\},\{value:false,key:"automationEventMotionEnds"\}\]/);
+  assert.match(dashboard, /lock_state:\[\{value:"locked",key:"automationEventLocked"\},\{value:"unlocked",key:"automationEventUnlocked"\}\]/);
+  assert.match(dashboard, /automationEventMotion:"hareket algılayınca"/);
+  assert.match(dashboard, /automationEventOpened:"kapı açılınca"/);
+  assert.match(dashboard, /automationEventSmoke:"duman algılayınca"/);
+  assert.match(dashboard, /automationEventTurnedOn:"açılınca"/);
+  assert.match(dashboard, /automationEventTurnedOn:"turns on"/);
+  assert.doesNotMatch(dashboard, /automationEvent[A-Za-z]*:"(?:true|false|ON|OFF)"/);
+
+  // Tek anlamlı seçenek sessizce seçilir.
+  assert.match(dashboard, /if\(events\.length===1\)automationApplyEvent\(wizard,events\[0\]\)/);
+
+  // Cihaz durumu yolu switch kontrollerinden türüyor; çok kanallı anahtarda kanal adı ekleniyor.
+  assert.match(dashboard, /const automationStateControls=device=>\(device\?\.controls\|\|\[\]\)\.filter\(control=>control\.kind==="switch"\)/);
+  assert.match(dashboard, /controls\.length>1\?t\("automationChannelEvent",\{channel:control\.name,event:label\}\):label/);
+
+  // §8.1 — kilit\/siren EYLEM listesinde yok ama TETİKLEYİCİ olarak seçilebilir.
+  assert.match(dashboard, /const automationControls=device=>isProtectedDevice\(device\)\?\[\]:/);
+  assert.doesNotMatch(dashboard, /function automationTriggerEvents\(device,kind\)\{[\s\S]*?isProtectedDevice[\s\S]*?\n  \}/);
+  assert.match(dashboard, /automationEventLocked:"kilitlenince"/);
+  assert.match(dashboard, /automationEventAlarm:"alarm verince"/);
+
+  // Ekran 3 ve liste ekranı: tam şablon anahtarı, parça birleştirme yok.
+  assert.match(dashboard, /if\(trigger\.type==="deviceAction"\)return t\("automationSummaryButton",automationEventValues\(trigger,action,actionKey\)\)/);
+  assert.match(dashboard, /if\(trigger\.type==="deviceState"\)return t\("automationSummaryState",automationEventValues\(trigger,action,actionKey\)\)/);
+  assert.match(dashboard, /if\(trigger\.type==="deviceAction"\)return t\("automationCardSummaryButton",automationEventValues\(trigger,action,actionKey\)\)/);
+  assert.match(dashboard, /if\(trigger\.type==="deviceState"\)return t\("automationCardSummaryState",automationEventValues\(trigger,action,actionKey\)\)/);
+  assert.match(dashboard, /automationSummaryButton:"\{device\} \{button\} olduğunda \{target\} \{action\}\."/);
+  assert.match(dashboard, /automationSummaryButton:"When \{button\} on \{device\}, \{target\} will \{action\}\."/);
+  assert.match(dashboard, /automationSummaryState:"\{device\} \{event\} \{target\} \{action\}\."/);
+  assert.match(dashboard, /automationSummaryState:"When \{device\} \{event\}, \{target\} will \{action\}\."/);
+  assert.match(dashboard, /automationCardSummaryButton:"\{device\} \{button\} → \{target\} \{action\}"/);
+  assert.match(dashboard, /automationCardSummaryState:"\{device\} \{event\} → \{target\} \{action\}"/);
+
+  // §8.2 — döngü: başlatan cihaz hedef listesinde yok, kaydetmede de durduruluyor, hata ham basılmıyor.
+  assert.match(dashboard, /const starter=wizard\.triggerKind==="time"\?null:wizard\.triggerDeviceId;/);
+  assert.match(dashboard, /isAutomationTarget\(device\)&&device\.id!==starter/);
+  assert.match(dashboard, /if\(trigger\.deviceId&&trigger\.deviceId===wizard\.action\.deviceId\)\{showToast\(t\("automationLoopWarning"\),true\);return\}/);
+  assert.match(dashboard, /showToast\(automationErrorText\(error\),true\)/);
+  assert.match(dashboard, /automationLoopWarning:"Bu cihaz otomasyonun çalıştırdığı cihazla aynı;/);
+  assert.match(dashboard, /automationLoopWarning:"This device is the one the automation runs,/);
+
+  // Arayüz dili: yeni metinlerde geliştirici sözlüğü yok.
+  assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:tetikleyici|koşul|senaryo|kural kur|cluster|endpoint|property)/i);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
