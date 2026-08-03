@@ -1474,6 +1474,10 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /\{kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:true\}/);
   assert.match(dashboard, /\{kind:"sensor",glyph:"🚪",label:"automationTriggerSensor",ready:true\}/);
   assert.match(dashboard, /\{kind:"deviceState",glyph:"💡",label:"automationTriggerDeviceState",ready:true\}/);
+  // Bu yol somut adıyla anılır: soyut "cihaz" değil, evdeki anahtar ve priz.
+  assert.match(dashboard, /automationTriggerDeviceState:"Bir anahtar veya priz açılınca \/ kapanınca"/);
+  assert.match(dashboard, /automationTriggerDeviceState:"When a switch or plug turns on or off"/);
+  assert.doesNotMatch(dashboard, /automationTriggerDeviceState:"[^"]*(?:Bir cihaz açıl|a device turns on)/);
   assert.match(dashboard, /entry\.ready\?"":' disabled aria-disabled="true"'/);
   assert.match(dashboard, /entry\.ready\?"":`<span class="automation-soon">\$\{t\("comingSoon"\)\}<\/span>`/);
   assert.match(dashboard, /\.automation-trigger\{min-height:88px/);
@@ -1849,8 +1853,8 @@ test("düğme tetikleyicisi cihazın gerçekten basış yayıp yaymadığına da
     dashboard,
     /function automationUseStateInstead\(deviceId\)\{[\s\S]*?if\(events\.length===1\)automationApplyEvent\(wizard,events\[0\]\);[\s\S]*?if\(automationTriggerReady\(wizard\)\)\{nextAutomationStep\(\);return\}/
   );
-  assert.match(dashboard, /automationButtonStateAlternative:"Bu cihaz açık mı kapalı mı olduğunu bildiriyor\./);
-  assert.match(dashboard, /automationButtonStateAlternative:"This device reports whether it is on or off\./);
+  assert.match(dashboard, /automationButtonStateAlternative:"Bu cihaz bir anahtar veya priz gibi açılıp kapanıyor\./);
+  assert.match(dashboard, /automationButtonStateAlternative:"This device turns on and off like a switch or plug\./);
   assert.match(dashboard, /automationButtonStateAlternativeAction:"Açılınca\/kapanınca ile kur"/);
   assert.match(dashboard, /automationButtonStateAlternativeAction:"Use turns on or off"/);
 
