@@ -97,6 +97,131 @@ export const createVillaBridgeDiscoveryRecord = (
   sentAt: Date.now()
 });
 
+/** Koordinatör oturumunun durumu; `state` bu değerden türetilir. */
+export type VillaBridgeCoordinatorStatus = "starting" | "ready" | "coordinator-unavailable";
+
+/**
+ * Sahiplik beyanı **rolden değil koordinatör sahipliğinden** türetilir
+ * (tablet-failover-plani.md §3.2, §4.7): koordinatör gerçekten alındıysa `owner`, aksi hâlde
+ * `standby`. Bu kural sunucu ve Android için aynıdır.
+ */
+export const ownershipStateForCoordinator = (
+  status: VillaBridgeCoordinatorStatus
+): VillaBridgeOwnershipState => (status === "ready" ? "owner" : "standby");
+
+/**
+ * Duyuru kaydının sahiplik alanlarını koordinatör sonucuna göre günceller.
+ * Sahiplik her kazanıldığında `epoch` artar (§3.1); bırakıldığında artmaz.
+ */
+export const applyCoordinatorOwnership = (
+  record: VillaBridgeDiscoveryRecord,
+  status: VillaBridgeCoordinatorStatus
+): VillaBridgeDiscoveryRecord => {
+  const next = ownershipStateForCoordinator(status);
+  if (next === record.state) return record;
+  record.state = next;
+  if (next === "owner") record.epoch += 1;
+  return record;
+};
+
+/** Ağdan okunan duyuru kaydı; eksik yeni alanlar `null` = "bilinmiyor" olur. */
+export const parseVillaBridgeDiscoveryRecord = (
+  message: Buffer | string
+): VillaBridgeDiscoveryRecord | null => {
+  try {
+    const value = JSON.parse(
+      typeof message === "string" ? message : message.toString("utf8")
+    ) as Partial<VillaBridgeDiscoveryRecord> | null;
+    const dashboardPort = Number(value?.dashboardPort);
+    if (
+      value?.protocol !== villaBridgeDiscoveryProtocol
+      || value.version !== villaBridgeDiscoveryVersion
+      || (value.role !== "server" && value.role !== "android" && value.role !== "disabled")
+      || typeof value.mode !== "string"
+      || !Number.isInteger(dashboardPort)
+      || dashboardPort < 1
+      || dashboardPort > 65535
+    ) {
+      return null;
+    }
+    const role = value.role;
+    const state = value.state;
+    return {
+      protocol: villaBridgeDiscoveryProtocol,
+      version: villaBridgeDiscoveryVersion,
+      role,
+      mode: value.mode,
+      dashboardPort,
+      nodeId: typeof value.nodeId === "string" && value.nodeId.trim() ? value.nodeId.trim() : "",
+      state: state === "owner" || state === "standby" || state === "claiming" || state === "releasing"
+        ? state
+        : "standby",
+      epoch: Number.isInteger(value.epoch) && Number(value.epoch) >= 0 ? Number(value.epoch) : 0,
+      coordinatorId: typeof value.coordinatorId === "string" && value.coordinatorId
+        ? value.coordinatorId
+        : null,
+      priority: Number.isInteger(value.priority) ? Number(value.priority) : villaBridgeNodePriority(role),
+      sentAt: Number.isInteger(value.sentAt) && Number(value.sentAt) > 0 ? Number(value.sentAt) : 0
+    };
+  } catch {
+    return null;
+  }
+};
+
+export interface LanDiscoveryQueryOptions {
+  /** Hedef adres; verilmezse yayın adresine sorulur. */
+  address?: string;
+  port?: number;
+  timeoutMs?: number;
+  /** Kendi kaydını yok saymak için. */
+  selfNodeId?: string | null;
+}
+
+export interface LanDiscoveryPeer extends VillaBridgeDiscoveryRecord {
+  address: string;
+}
+
+/** Tek turluk duyuru sorgusu: ilk geçerli yabancı kaydı döner, yoksa `null`. */
+export const queryLanDiscovery = (
+  options: LanDiscoveryQueryOptions = {}
+): Promise<LanDiscoveryPeer | null> => {
+  const target = options.address?.trim() || "255.255.255.255";
+  const port = options.port ?? villaBridgeDiscoveryPort;
+  const timeoutMs = Math.max(100, options.timeoutMs ?? 2000);
+  const selfNodeId = options.selfNodeId?.trim() || null;
+  return new Promise<LanDiscoveryPeer | null>((resolve) => {
+    const socket = createSocket({ type: "udp4" });
+    let finished = false;
+    const done = (result: LanDiscoveryPeer | null): void => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try {
+        socket.close();
+      } catch {
+        // Zaman aşımı bind tamamlanmadan gelebilir.
+      }
+      resolve(result);
+    };
+    const timer = setTimeout(() => done(null), timeoutMs);
+    timer.unref();
+    socket.on("error", () => done(null));
+    socket.on("message", (message, remote) => {
+      const record = parseVillaBridgeDiscoveryRecord(message);
+      if (!record || (selfNodeId !== null && record.nodeId === selfNodeId)) return;
+      done({ ...record, address: remote.address });
+    });
+    socket.bind(0, "0.0.0.0", () => {
+      try {
+        if (target.endsWith(".255")) socket.setBroadcast(true);
+        socket.send(Buffer.from(villaBridgeDiscoveryQuery), port, target);
+      } catch {
+        done(null);
+      }
+    });
+  });
+};
+
 export const startLanDiscoveryResponder = async (
   record: VillaBridgeDiscoveryRecord,
   port = villaBridgeDiscoveryPort

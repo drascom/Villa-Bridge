@@ -89,8 +89,9 @@ katmanıdır, temel tasarımın koşulu değildir.
 1. **Sahiplik protokolü yok.** Bugün hiçbir düğüm "koordinatör bende" diye bir şey söylemiyor.
    Duyuru kaydı (`VillaBridgeDiscoveryRecord`, `src/lan-discovery.ts:10-16`) yalnızca
    `role`/`mode`/`dashboardPort` taşıyor; sahiplik, epoch, canlılık damgası yok.
-2. **Periyodik izleme yok.** `discoverVillaBridgeServer()` yalnızca açılışta bir kez çağrılıyor
-   (`main.cjs:443-448`). Sonuç bir daha sorgulanmıyor.
+2. **Periyodik izleme yok.** *(Faz 2'de kapatıldı; §9.)* `discoverVillaBridgeServer()` yalnızca
+   açılışta bir kez çağrılıyordu (`main.cjs:443-448`) ve sonuç bir daha sorgulanmıyordu. Artık
+   `peer-watch` üç kanalı 10 saniyede bir yokluyor; **devralma hâlâ yok**.
 3. **Mod geçişi yok.** `runtime.monitor` bir kez set edilince değişmiyor; monitor ↔ standalone
    arası geçiş kodu hiç yok. Bugün geçiş = uygulamayı elle yeniden başlatmak.
 4. **Standalone tablet görünmez — ön koşul kusuru.** *(Faz 1'de kapatıldı, commit `c81a0e2`; §9.)*
@@ -108,6 +109,30 @@ katmanıdır, temel tasarımın koşulu değildir.
 7. **Durum dosyaları ayrı ve senkronsuz.** Her düğüm `dirname(VILLA_BRIDGE_CONFIG)` altına yazıyor
    (`src/index.ts:51-75`): sunucuda `/var/lib/villa-bridge/runtime/`, tablette
    `villa-data/runtime/`. Aralarında hiçbir bağ yok.
+
+### 1.6 Standalone testinin kanıtladıkları ve iki kalıcı bulgu (2026-08-03)
+
+Tablet, sunucu kapalıyken elle standalone çalıştırıldı. Sonuç: **tablet 22 cihazla evi tek başına
+sürdü** — `coordinatorStatus: "ready"`, otomasyon motoru çalıştı, panel yerel geldi. §1.2'nin
+`fan-out` ölçümüyle birlikte bu, "frame counter donanımda tutuluyor" beklentisini destekliyor:
+devralmada ağın bozulmadığı gözlendi. **Asıl risk frame counter değil, config uyuşmazlığıdır**
+(§5.1): tabletteki ağ parametreleri sunucudakiyle birebir aynı olmazsa ağ yeniden kurulur.
+
+Testten iki kalıcı bulgu çıktı:
+
+1. **`node.state` gerçeği söylemiyordu (Faz 2'de düzeltildi).** `src/index.ts` sahiplik beyanını
+   **rolden** türetiyordu (`if (nodeRole === "server") state = "owner"`). Tablet koordinatörü
+   gerçekten devraldığı hâlde kendini `standby` ilan etti. Sahiplik protokolünün tamamı bu alanı
+   okuduğu için Faz 3+ bu hatayla çalışamazdı. Yeni kural: `state`, **koordinatör sahipliğinden**
+   türetilir (`applyCoordinatorOwnership`, `src/lan-discovery.ts`) — rolden bağımsız, sunucu ve
+   Android için aynı.
+2. **Android runtime'ı `POST /api/android/runtime/shutdown` ile kapatmak yetmiyor.**
+   `NodeRuntimeService` süreci **otomatik yeniden başlatıyor** (`NodeRuntimeService.kt:178-185`,
+   `killProcess` + `START_STICKY`). Durdurmak için önce `villa-runtime-desired-state` dosyası
+   `STOPPED` yapılmalı. `ACTION_STOP` intent'i `exported="false"` olduğundan adb'den
+   tetiklenemiyor. **Bu, Faz 5 devralma/geri çekilme kodunun bilmek zorunda olduğu bir kısıttır**
+   (§4.7'nin "süreç ölümüyle değil, süreç içi durum makinesiyle" kuralının pratik karşılığı):
+   tabletin yığınını durdurmak/başlatmak isteyen her kod, önce desired-state dosyasını yazmalı.
 
 ---
 
@@ -510,14 +535,40 @@ Davranış bilerek değiştirilmedi; yalnızca zemin döşendi. Gerçekleşen ka
 
 *Kazanç: iki ön koşul kusuru kapandı, sahiplik ağda görünür oldu, hiçbir risk alınmadı.*
 
-**Faz 2 — Sürekli izleme (devralma yok).** Faz 1 sonrası zemin hazır: her düğüm (tablet dâhil)
-kendini duyuruyor, kayıt `state`/`epoch`/`priority`/`coordinatorId`/`sentAt` taşıyor, `sentAt`
-sayesinde beacon yaşı hesaplanabiliyor, sunucu koordinatörü alamadığında bile HTTP + duyuru ayakta
-kaldığı için "sunucu var ama koordinatörsüz" ile "sunucu yok" ayırt edilebiliyor
-(`coordinatorStatus`). Faz 2'de yapılacak olan, bu sinyalleri **düzenli okumak**: üç kanallı
-yoklama (beacon yaşı + `/api/discovery` + MQTT TCP), ardışık başarısızlık sayaçları ve panelde
-"sunucu görülüyor / beacon yaşı / eşiğe kalan" göstergesi. Hâlâ devralma yok.
-*Kazanç: eşikler (özellikle 90 s) gerçek ağda gözlenir.*
+**Faz 2 — Sürekli izleme (devralma yok) — ✅ TAMAMLANDI.** Davranış bilerek değiştirilmedi:
+sunucu lider, tablet monitor. Tek fark, her düğümün karşı tarafı **sürekli ölçmesi**.
+Gerçekleşen kapsam:
+
+- **`node.state` düzeltmesi (§1.6/1):** `applyCoordinatorOwnership` +
+  `ownershipStateForCoordinator` (`src/lan-discovery.ts`) sahiplik beyanını **koordinatör
+  sonucundan** türetiyor; `src/index.ts` artık rolü hiç sormuyor. Sahiplik **kazanıldığında**
+  `epoch` bir artıyor, bırakılırken artmıyor. *Sınır:* `epoch` hâlâ süreç içi — kalıcı sayaç
+  (§4.7) Faz 3'e ait.
+- **Üç kanallı izleme:** durum makinesi + zamanlayıcı iki yerde ikiz olarak duruyor —
+  `src/peer-watch.ts` (sunucu, TypeScript) ve `apps/runtime/peer-watch.cjs` (tablet/Linux host,
+  CommonJS). Kanallar §4.2'deki gibi: UDP duyuru (bayatlama toleranslı), `/api/discovery` HTTP'si,
+  karşı düğümün MQTT portuna TCP. **Üçü birden düşmeden** sayaç ilerlemiyor; tek başarı sayacı
+  sıfırlıyor. Eşikler dokümandan alındı (2 s / 15 s / 10 s / 2000 ms / 9 tur = 90 s / 3 başarı).
+  Claim jitter'ı (0-15 s) eşik tablosunda taşınıyor ama izleme jitter uygulamıyor — jitter §3.3
+  talep akışına ait, Faz 3.
+- **Eylem yok:** eşik dolunca yalnızca `readyToTakeOver` bayrağı kalkıyor ve log düşüyor. Durum
+  raporunda `action` alanı **her zaman `"none"`**; modülde devralma/talep/release ucu yok, testler
+  bunu açıkça doğruluyor.
+- **Bilinen yanlılık:** sunucudan bakıldığında tabletin gömülü broker'ı loopback'e bağlı olduğu
+  için MQTT kanalı daima düşük görünür; sayaç ancak beacon **ve** HTTP de düştüğünde ilerler.
+  Yanlılık güvenli yönde (geç fark etmek, yanlış devralmaktan iyidir).
+- **Hiç görülmemiş düğüm için sayaç ilerlemez:** yokluk, arıza kanıtı değildir (§3.1'in
+  "eksik alan = bilinmiyor" kuralının izleme karşılığı).
+- **Raporlama:** sunucuda `/api/health` ve `/api/overview` içindeki `node.peerWatch`, tablette
+  `/api/ready` içindeki `peerWatch` — karşı düğüm kimliği/adresi, son görülme anı ve yaşı, düşen
+  kanallar, ardışık sayaçlar, eşiğe kalan tur, `readyToTakeOver`. **Dashboard'a UI eklenmedi**
+  (gösterim kararı Faz 5).
+- **Zamanlayıcılar** `unref` ediliyor ve kapanışta temizleniyor (sunucu `shutdown`, runtime
+  `shutdown`); saat enjekte edilebilir, testler gerçek zaman beklemiyor.
+- **Testler:** `npm test` 167, `npm run runtime:test` 41 — tamamı geçiyor.
+
+*Kazanç: eşikler (özellikle 90 s) artık gerçek ağda gözlenebiliyor ve sahiplik beyanı doğruyu
+söylüyor — Faz 3'ün ön koşulu buydu.*
 
 **Faz 3 — Talep/release el sıkışması (koordinatöre dokunmadan).** `POST /api/failover/release`,
 `CLAIMING` penceresi ve iptal mantığı; tablet talep akışını çalıştırır ama **core başlatmaz**
@@ -529,6 +580,10 @@ seferlik doğrulama: tablet standalone açılıyor mu, evi görüyor mu. Sonra e
 
 **Faz 5 — Otomatik devralma.** `CLAIMING`/`STANDALONE`/`DEGRADED` durumları canlı; Faz 3'ün
 dry-run'ı gerçek başlatmaya çevrilir. Geri verme Faz 3'teki el sıkışmasıyla zaten hazır.
+**Kısıt (§1.6/2):** tablette yığını durdurmak/başlatmak `NodeRuntimeService`'in desired-state
+dosyasından geçer — `POST /api/android/runtime/shutdown` tek başına yetmez, servis süreci geri
+başlatır. Devralma ve geri çekilme kodu bunu hesaba katmalı. Faz 2'nin
+`peerWatch.readyToTakeOver` bayrağı bu fazın tetikleyicisidir.
 *Kazanç: döngü kapanır, sunucu düştüğünde ev otomatik ayakta kalır.*
 
 **Faz 6 — Veri senkronu.** Replika çekme, snapshot devri, `epoch` sıralaması (§6). Bundan önce,

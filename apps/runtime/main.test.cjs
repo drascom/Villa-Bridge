@@ -214,7 +214,8 @@ test("readiness endpoint distinguishes unprovisioned and fully ready states", as
     provisioning: runtime.provisioning,
     mqtt: runtime.mqtt,
     core: runtime.core,
-    matter: runtime.matter
+    matter: runtime.matter,
+    peerWatch: runtime.peerWatch
   };
   context.after(() => Object.assign(runtime, previous));
   const server = createHttpServer(config);
@@ -252,10 +253,21 @@ test("readiness endpoint distinguishes unprovisioned and fully ready states", as
   runtime.mqtt = { status: "disabled", listening: false, selfTest: false, error: null };
   runtime.core = { status: "remote", ready: true, error: null };
   runtime.matter = { status: "remote", ready: true, error: null };
+  runtime.peerWatch = {
+    watching: true,
+    peer: { nodeId: "srv-91", address: "192.0.2.61", state: "owner", mode: "direct" },
+    downChannels: ["beacon"],
+    consecutiveFailures: 0,
+    readyToTakeOver: false,
+    action: "none"
+  };
   const monitor = await getJson(address.port, "/api/ready");
   assert.equal(monitor.status, 200);
   assert.equal(monitor.body.mode, "android-monitor");
   assert.equal(monitor.body.endpoints.dashboard, "http://192.0.2.61:8091/");
+  // Phase 2 reports the peer watch state; it never changes readiness or triggers a take-over.
+  assert.deepEqual(monitor.body.peerWatch, runtime.peerWatch);
+  assert.equal(monitor.body.peerWatch.action, "none");
 });
 
 test("runtime shutdown requires the local bearer token and runs only once", async (context) => {

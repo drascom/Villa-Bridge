@@ -10,6 +10,7 @@ const path = require("node:path");
 const Aedes = require("aedes");
 const mqtt = require("mqtt");
 const { discoverVillaBridgeServer, resolveVillaBridgeNodeId } = require("./lan-discovery.cjs");
+const { createPeerProbe, startPeerWatcher } = require("./peer-watch.cjs");
 const {
   loadProvisioning,
   matterbridgeReady,
@@ -24,6 +25,8 @@ const runtime = {
   core: { status: "unprovisioned", ready: false, error: null },
   matter: { status: "unprovisioned", ready: false, error: null },
   multicast: { available: false, error: null },
+  // Three-channel peer watching (phase 2): observation only, never a take-over.
+  peerWatch: null,
   lastProbe: null,
   provisioning: { provisioned: false, reason: "Not checked." }
 };
@@ -128,6 +131,7 @@ function diagnostics(config) {
     core: runtime.core,
     matter: runtime.matter,
     multicast: runtime.multicast,
+    peerWatch: runtime.peerWatch,
     lastProbe: runtime.lastProbe,
     endpoints: {
       dashboard,
@@ -440,6 +444,7 @@ async function start() {
   let coreService = null;
   let matterService = null;
   let matterMonitor = null;
+  let peerWatcher = null;
   const peer = config.platform === "android"
     ? await discoverVillaBridgeServer({ selfNodeId: resolveVillaBridgeNodeId("android") }).catch((error) => {
       console.warn(`Villa Bridge LAN discovery failed: ${error.message}`);
@@ -478,6 +483,20 @@ async function start() {
     console.log(
       `Villa Bridge server found at ${peer.dashboardUrl}; Android is running in monitor-only mode.`
     );
+    // Phase 2: keep watching the server on three channels. No take-over is ever attempted here.
+    peerWatcher = startPeerWatcher({
+      probe: createPeerProbe({
+        address: peer.address,
+        dashboardPort: peer.dashboardPort,
+        mqttPort: config.mqttPort,
+        nodeId: peer.nodeId ?? null,
+        mode: peer.mode ?? null,
+        state: peer.state ?? null
+      }),
+      onStatus: (status) => {
+        runtime.peerWatch = status;
+      }
+    });
   } else {
     mqttServer = startMqttBroker({
       ...config,
@@ -558,6 +577,7 @@ async function start() {
     if (shutdownPromise) return shutdownPromise;
     shutdownPromise = (async () => {
       if (matterMonitor) clearInterval(matterMonitor);
+      peerWatcher?.stop?.();
       await Promise.resolve(matterService?.stop?.())
         .catch((error) => console.error("Matter shutdown failed:", error));
       await Promise.resolve(coreService?.stop?.())

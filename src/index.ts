@@ -22,13 +22,16 @@ import {
 import { HomeGroupsStore, homeGroupDeviceControlId, validateHomeGroups } from "./home-groups.js";
 import { InstallationStateStore } from "./installation-state.js";
 import {
+  applyCoordinatorOwnership,
   createVillaBridgeDiscoveryRecord,
   resolveVillaBridgeNodeId,
   resolveVillaBridgeNodeRole,
   startLanDiscoveryResponder,
   villaBridgeCoordinatorId,
-  villaBridgeDiscoveryPort
+  villaBridgeDiscoveryPort,
+  type VillaBridgeCoordinatorStatus
 } from "./lan-discovery.js";
+import { createPeerProbe, createPeerWatcher, type PeerWatcher } from "./peer-watch.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
 import { getNetworkInfo } from "./network-info.js";
@@ -101,8 +104,14 @@ const discoveryRecord = createVillaBridgeDiscoveryRecord(
   }
 );
 /** Koordinatör oturumunun durumu; `source.start()` sonucuna göre güncellenir. */
-let coordinatorStatus: "starting" | "ready" | "coordinator-unavailable" = "starting";
+let coordinatorStatus: VillaBridgeCoordinatorStatus = "starting";
 let coordinatorError: string | null = null;
+let peerWatcher: PeerWatcher | null = null;
+/** `state` rolden değil koordinatör sahipliğinden türetilir (tablet-failover-plani.md §3.2). */
+const applyCoordinatorStatus = (status: VillaBridgeCoordinatorStatus): void => {
+  coordinatorStatus = status;
+  applyCoordinatorOwnership(discoveryRecord, status);
+};
 const nodeStatus = (): JsonObject => ({
   nodeId,
   role: nodeRole,
@@ -110,7 +119,8 @@ const nodeStatus = (): JsonObject => ({
   epoch: discoveryRecord.epoch,
   priority: discoveryRecord.priority,
   coordinatorStatus,
-  coordinatorError
+  coordinatorError,
+  peerWatch: (peerWatcher?.status() ?? null) as JsonObject | null
 });
 store.setMode(config.mode);
 let source: ZigbeeSource;
@@ -944,6 +954,7 @@ const shutdown = async (): Promise<void> => {
   clearInterval(imageWarmTimer);
   clearTimeout(imageWarmStartTimer);
   automationEngine.stop();
+  peerWatcher?.stop();
   await discoveryResponder?.close();
   await source.stop();
   await app.close();
@@ -968,17 +979,32 @@ try {
   console.warn(`Villa Bridge LAN keşfi başlatılamadı: ${String(error)}`);
 }
 
+// Üç kanallı karşı düğüm izlemesi (§4.2): yalnızca gözlem, hiçbir devralma yok.
+if (nodeRole !== "disabled") {
+  const mqttPort = (() => {
+    try {
+      const port = Number(new URL(config.mqtt.url).port);
+      return Number.isInteger(port) && port > 0 ? port : 1883;
+    } catch {
+      return 1883;
+    }
+  })();
+  peerWatcher = createPeerWatcher({
+    probe: createPeerProbe({ selfNodeId: nodeId, mqttPort }),
+    logger: (message) => console.log(message)
+  });
+  peerWatcher.start();
+}
+
 try {
   await source.start();
-  coordinatorStatus = "ready";
+  applyCoordinatorStatus("ready");
   coordinatorError = null;
-  if (nodeRole === "server") discoveryRecord.state = "owner";
   automationEngine.start();
 } catch (error) {
   // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
-  coordinatorStatus = "coordinator-unavailable";
+  applyCoordinatorStatus("coordinator-unavailable");
   coordinatorError = error instanceof Error ? error.message : String(error);
-  discoveryRecord.state = "standby";
   recentErrors.record({
     operation: "source.start",
     statusCode: 503,

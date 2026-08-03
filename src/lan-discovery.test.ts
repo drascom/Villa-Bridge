@@ -3,7 +3,11 @@ import { createSocket } from "node:dgram";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  applyCoordinatorOwnership,
   createVillaBridgeDiscoveryRecord,
+  ownershipStateForCoordinator,
+  parseVillaBridgeDiscoveryRecord,
+  queryLanDiscovery,
   resolveVillaBridgeNodeId,
   resolveVillaBridgeNodeRole,
   startLanDiscoveryResponder,
@@ -117,7 +121,67 @@ test("the node announces itself before it claims the coordinator", async () => {
   assert.match(server.slice(Math.max(0, startAt - 120), startAt), /try \{\s*$/);
   const guarded = server.slice(startAt, startAt + 900);
   assert.match(guarded, /catch \(error\)/, "source.start() bir try/catch içinde olmalı.");
-  assert.match(guarded, /coordinatorStatus = "coordinator-unavailable"/);
+  assert.match(guarded, /applyCoordinatorStatus\("coordinator-unavailable"\)/);
   assert.doesNotMatch(guarded, /process\.exit/);
   assert.match(server, /await discoveryResponder\?\.close\(\)/);
+});
+
+test("ownership follows the coordinator, not the node role", () => {
+  for (const role of ["server", "android"] as const) {
+    const record = createVillaBridgeDiscoveryRecord(role, "direct", 8091, { nodeId: `${role}-node` });
+    assert.equal(record.state, "standby");
+    assert.equal(record.epoch, 0);
+
+    // Koordinatör gerçekten alındıysa düğüm `owner`; rolü ne olursa olsun.
+    applyCoordinatorOwnership(record, "ready");
+    assert.equal(record.state, "owner");
+    assert.equal(record.epoch, 1, "Sahiplik kazanıldığında epoch artar.");
+    applyCoordinatorOwnership(record, "ready");
+    assert.equal(record.epoch, 1, "Aynı sahiplik epoch'u tekrar artırmaz.");
+
+    // Koordinatör alınamadıysa düğüm `standby`; epoch bırakırken artmaz.
+    applyCoordinatorOwnership(record, "coordinator-unavailable");
+    assert.equal(record.state, "standby");
+    assert.equal(record.epoch, 1);
+    applyCoordinatorOwnership(record, "starting");
+    assert.equal(record.state, "standby");
+
+    applyCoordinatorOwnership(record, "ready");
+    assert.equal(record.epoch, 2);
+  }
+  assert.equal(ownershipStateForCoordinator("ready"), "owner");
+  assert.equal(ownershipStateForCoordinator("starting"), "standby");
+  assert.equal(ownershipStateForCoordinator("coordinator-unavailable"), "standby");
+});
+
+test("discovery records are parsed defensively and can be queried over UDP", async (context) => {
+  assert.equal(parseVillaBridgeDiscoveryRecord("{"), null);
+  assert.equal(parseVillaBridgeDiscoveryRecord(JSON.stringify({ protocol: "other" })), null);
+
+  const record = createVillaBridgeDiscoveryRecord("server", "direct", 8091, {
+    nodeId: "srv-query",
+    state: "owner",
+    epoch: 3
+  });
+  const responder = await startLanDiscoveryResponder(record, 0);
+  assert.ok(responder);
+  context.after(() => responder.close());
+
+  const peer = await queryLanDiscovery({ address: "127.0.0.1", port: responder.port, timeoutMs: 1000 });
+  assert.ok(peer);
+  assert.equal(peer.nodeId, "srv-query");
+  assert.equal(peer.state, "owner");
+  assert.equal(peer.epoch, 3);
+  assert.equal(peer.address, "127.0.0.1");
+
+  // Kendi kaydını yok sayar; kimse cevap vermezse `null` döner.
+  assert.equal(
+    await queryLanDiscovery({
+      address: "127.0.0.1",
+      port: responder.port,
+      timeoutMs: 400,
+      selfNodeId: "srv-query"
+    }),
+    null
+  );
 });
