@@ -7,6 +7,7 @@ import {
   DirectZigbeeSource,
   directBridgeInfo,
   endpointNamesForDevice,
+  isRawGenOnOffFrame,
   isUnresolvedActionMessage,
   parsePermitJoinSeconds,
   shouldPublishDeviceState,
@@ -26,6 +27,12 @@ test("çözümlenmeyen genOnOff komutları tuş olayı teşhisine alınır", () 
     cluster: "genPowerCfg",
     type: "attributeReport"
   } as never, 0, 0), false);
+});
+
+test("çözümlenemeyen ham genOnOff çerçeveleri Tuya tuş yoluna alınır", () => {
+  assert.equal(isRawGenOnOffFrame({ cluster: "genOnOff", type: "raw" } as never), true);
+  assert.equal(isRawGenOnOffFrame({ cluster: "genOnOff", type: "commandToggle" } as never), false);
+  assert.equal(isRawGenOnOffFrame({ cluster: "genPowerCfg", type: "raw" } as never), false);
 });
 
 test("Matterbridge permit-join boolean requests map to a bounded Zigbee duration", () => {

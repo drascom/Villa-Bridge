@@ -11,10 +11,11 @@ import {
 } from "zigbee-herdsman-converters";
 import type { DirectZigbeeConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
-import { DeviceStore } from "./device-store.js";
+import { DeviceStore, featureValues } from "./device-store.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
 import type { OtaCheckResult, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
+import { decodeTuyaButtonFrame } from "./tuya-button-frames.js";
 import type { BridgeDevice, BridgeGroup, JsonObject } from "./types.js";
 
 function messageText(value: string | (() => string)): string {
@@ -63,6 +64,17 @@ export function isUnresolvedActionMessage(
     && typeof message.type === "string"
     && message.type.startsWith("command")
     && (matchingConverterCount === 0 || convertedPropertyCount === 0);
+}
+
+/**
+ * `zigbee-herdsman` çözemediği ZCL çerçevelerini `type: "raw"` olarak yollar. Tuya sahne
+ * anahtarlarının buton olayları tam olarak bu yoldan gelir, bu yüzden ham `genOnOff`
+ * çerçeveleri ayrıca ele alınır.
+ */
+export function isRawGenOnOffFrame(
+  message: Pick<Events.MessagePayload, "cluster" | "type">
+): boolean {
+  return message.cluster === "genOnOff" && message.type === "raw";
 }
 
 export function shouldPublishDeviceState(
@@ -133,6 +145,8 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private readonly deviceAvailability = new Map<string, "online" | "offline">();
   private readonly lastDevicePublications = new Map<string, DeviceStatePublication>();
   private readonly otaUpdates = new Set<string>();
+  /** Tuya tuş çerçevelerinin son ZCL sıra numarası; cihazın tekrarlarını eler. */
+  private readonly lastButtonSequences = new Map<string, number>();
 
   constructor(
     private readonly config: DirectZigbeeConfig,
@@ -766,6 +780,13 @@ export class DirectZigbeeSource implements ZigbeeSource {
         console.warn(`Zigbee mesajı dönüştürülemedi (${friendlyName}): ${String(error)}`);
       }
     }
+    if (Object.keys(result).length === 0 && isRawGenOnOffFrame(message)) {
+      const decoded = this.decodeButtonFrame(message, definition, friendlyName, options);
+      if (decoded) {
+        publish(decoded);
+        return;
+      }
+    }
     if (isUnresolvedActionMessage(message, matching.length, Object.keys(result).length)) {
       const endpoint = "ID" in message.endpoint ? message.endpoint.ID : "unknown";
       console.warn(
@@ -783,6 +804,44 @@ export class DirectZigbeeSource implements ZigbeeSource {
       postProcessConvertedFromZigbeeMessage(definition, result, options, message.device);
       publish(result);
     }
+  }
+
+  /**
+   * Tuya TS004x sahne anahtarlarının çözümlenemeyen `genOnOff` çerçevesini `action`
+   * değerine çevirir. Üretilen değer cihaz tanımının `action` sözlüğüyle doğrulanır;
+   * uymazsa yayımlanmaz ama Türkçe uyarı bırakılır.
+   */
+  private decodeButtonFrame(
+    message: Events.MessagePayload,
+    definition: Definition,
+    friendlyName: string,
+    options: JsonObject
+  ): JsonObject | undefined {
+    const endpointId = "ID" in message.endpoint ? message.endpoint.ID : Number.NaN;
+    const decoded = decodeTuyaButtonFrame({
+      data: message.data as ArrayLike<number>,
+      endpointId,
+      endpointCount: message.device.endpoints.length,
+      modelId: message.device.modelID ?? undefined
+    });
+    if (!decoded.ok) {
+      console.warn(`Zigbee tuş çerçevesi çözümlenemedi (${friendlyName}): ${decoded.reason}`);
+      return undefined;
+    }
+    const exposes = typeof definition.exposes === "function"
+      ? definition.exposes(message.device, options)
+      : definition.exposes;
+    const supported = featureValues(exposes, "action");
+    if (supported.length > 0 && !supported.includes(decoded.action)) {
+      console.warn(
+        `Tuya tuş olayı cihaz sözlüğünde yok (${friendlyName}): ${decoded.action}`
+      );
+      return undefined;
+    }
+    // Cihaz aynı çerçeveyi tekrarlayabilir; Zigbee2MQTT gibi ZCL sıra numarasına bakıyoruz.
+    if (this.lastButtonSequences.get(message.device.ieeeAddr) === decoded.sequence) return undefined;
+    this.lastButtonSequences.set(message.device.ieeeAddr, decoded.sequence);
+    return { action: decoded.action };
   }
 
   private publishOtaState(id: string, update: JsonObject): void {

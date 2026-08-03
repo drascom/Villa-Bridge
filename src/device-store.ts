@@ -53,7 +53,7 @@ function featureNames(exposes: unknown): string[] {
   return [...names].sort();
 }
 
-function featureValues(exposes: unknown, property: string): string[] {
+export function featureValues(exposes: unknown, property: string): string[] {
   const values = new Set<string>();
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) {
