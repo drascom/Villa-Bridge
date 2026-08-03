@@ -191,7 +191,7 @@
     .automation-triggers{display:grid;gap:11px;margin-top:16px}.automation-trigger{min-height:88px;display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-trigger:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-trigger[disabled]{opacity:.62}.automation-trigger.active{border-color:var(--forest);background:var(--forest-soft)}.automation-trigger-glyph{display:grid;place-items:center;font-size:23px}.automation-trigger strong{display:block;font-size:15px;font-weight:800}
     .automation-time{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}.automation-time-unit{display:grid;gap:9px;justify-items:center}.automation-time-value{min-width:88px;font:800 42px/1 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}.automation-time-step{width:88px;min-height:60px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);font-size:27px;font-weight:800;touch-action:manipulation}.automation-time-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-time-colon{font:800 34px/1 system-ui,sans-serif}
     .automation-days{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.automation-day{min-height:44px;padding:9px 15px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;touch-action:manipulation}.automation-day:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-day.active{border-color:var(--forest);background:var(--forest-soft)}
-    .automation-targets{display:grid;gap:10px;margin-top:16px}.automation-target{border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);overflow:hidden}.automation-target.selected{border-color:var(--forest)}.automation-target-head{width:100%;min-height:64px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px;border:0;color:var(--ink);background:transparent;text-align:left;touch-action:manipulation}.automation-target-head strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-target-head small{color:var(--muted);font-size:12px}.automation-control-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:0 14px 14px}.automation-control-row span{font-size:13px;font-weight:750;overflow-wrap:anywhere}.automation-control-choice{min-height:48px;padding:10px 18px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:14px;font-weight:800;touch-action:manipulation}.automation-control-choice.active{border-color:var(--forest);background:var(--forest-soft)}
+    .automation-targets{display:grid;gap:10px;margin-top:16px}.automation-target{border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);overflow:hidden}.automation-target.selected{border-color:var(--forest)}.automation-target-head{width:100%;min-height:64px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px;border:0;color:var(--ink);background:transparent;text-align:left;touch-action:manipulation}.automation-target-head strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-target-head small{color:var(--muted);font-size:12px}.automation-control-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:0 14px 14px}.automation-control-row span{font-size:13px;font-weight:750;overflow-wrap:anywhere}.automation-control-choices{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}.automation-control-choice{min-height:48px;padding:10px 18px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:14px;font-weight:800;touch-action:manipulation}.automation-control-choice.active{border-color:var(--forest);background:var(--forest-soft)}
     .automation-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}.automation-pick{min-height:88px;display:grid;align-content:center;gap:4px;padding:13px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-pick:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-pick.active{border-color:var(--forest);background:var(--forest-soft)}.automation-pick strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.automation-pick small{color:var(--muted);font-size:12px}
     .automation-events{display:grid;gap:9px;margin-top:14px}.automation-event{display:block;min-height:60px;padding:17px 15px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:15px;font-weight:750;text-align:left;touch-action:manipulation}.automation-event::first-letter{text-transform:uppercase}.automation-event:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-event.active{border-color:var(--forest);background:var(--forest-soft)}
     .automation-hint{margin:14px 0 0;padding:11px 13px;border-radius:13px;color:var(--muted);background:var(--surface-soft);font-size:13px;line-height:1.4}
@@ -3417,12 +3417,17 @@
   const automationControls=device=>isProtectedDevice(device)?[]:(device?.controls||[]).filter(isAutomationControl);
   const isAutomationTarget=device=>automationControls(device).length>0;
   const automationControlValue=(control,on)=>on?(control.valueOn??"ON"):(control.valueOff??"OFF");
+  // Tek basışta hem açan hem kapatan seçenek yalnızca cihaz bunu bildiriyorsa sunulur.
+  const automationCanToggle=control=>control?.valueToggle!==undefined&&control?.valueToggle!==null;
   const automationDevice=action=>state.devices.find(device=>device.id===action?.deviceId)||null;
   // Kanonik hedef property; controlId ve ad yalnızca sunum verisi (§5.1.1).
   const automationControl=action=>automationDevice(action)?.controls.find(control=>control.property===action?.property)||null;
-  const automationActionIsOn=action=>{
+  const automationActionMode=action=>{
     const control=automationControl(action);
-    return control?action?.value===automationControlValue(control,true):action?.value===true||String(action?.value).toUpperCase()==="ON";
+    if(control&&automationCanToggle(control)&&action?.value===control.valueToggle)return"toggle";
+    if(control)return action?.value===automationControlValue(control,true)?"on":"off";
+    if(String(action?.value).toUpperCase()==="TOGGLE")return"toggle";
+    return action?.value===true||String(action?.value).toUpperCase()==="ON"?"on":"off";
   };
   const automationActionName=action=>{
     const device=automationDevice(action);
@@ -3516,9 +3521,12 @@
     target:automationActionName(action),
     action:t(actionKey)
   });
+  // Her eylem biçimi için ayrı tam anahtar; TR/EN cümleleri parçadan kurulmuyor.
+  const automationSentenceKeys={on:"automationWillTurnOn",off:"automationWillTurnOff",toggle:"automationWillToggle"};
+  const automationCardKeys={on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles"};
   // Tam şablon anahtarı — cümle parça birleştirilerek kurulmuyor (TR/EN kelime sırası farklı).
   const automationSentence=(trigger,action)=>{
-    const actionKey=automationActionIsOn(action)?"automationWillTurnOn":"automationWillTurnOff";
+    const actionKey=automationSentenceKeys[automationActionMode(action)];
     if(trigger.type==="deviceAction")return t("automationSummaryButton",automationEventValues(trigger,action,actionKey));
     if(trigger.type==="deviceState")return t("automationSummaryState",automationEventValues(trigger,action,actionKey));
     return t(
@@ -3527,7 +3535,7 @@
     );
   };
   const automationCardLine=(trigger,action)=>{
-    const actionKey=automationActionIsOn(action)?"automationTurnsOn":"automationTurnsOff";
+    const actionKey=automationCardKeys[automationActionMode(action)];
     if(trigger.type==="deviceAction")return t("automationCardSummaryButton",automationEventValues(trigger,action,actionKey));
     if(trigger.type==="deviceState")return t("automationCardSummaryState",automationEventValues(trigger,action,actionKey));
     return t(
@@ -3722,9 +3730,12 @@
       // Tek uygun kontrol sessizce seçilir; kullanıcıya "hangisi?" diye sorulmaz.
       const single=controls.length===1;
       const choices=open?controls.map(control=>{
-        const on=wizard.action?.property===control.property&&wizard.action?.value===automationControlValue(control,true);
-        const off=wizard.action?.property===control.property&&wizard.action?.value===automationControlValue(control,false);
-        return`<div class="automation-control-row"><span>${single?"":esc(control.name)}</span><button class="automation-control-choice${on?" active":""}" type="button" data-automation-action="${esc(device.id)}|${esc(control.id)}|on" aria-pressed="${on}">${t("automationTurnOn")}</button><button class="automation-control-choice${off?" active":""}" type="button" data-automation-action="${esc(device.id)}|${esc(control.id)}|off" aria-pressed="${off}">${t("automationTurnOff")}</button></div>`;
+        const picked=wizard.action?.deviceId===device.id&&wizard.action?.property===control.property;
+        const mode=picked?automationActionMode(wizard.action):null;
+        const choice=(key,label,active)=>`<button class="automation-control-choice${active?" active":""}" type="button" data-automation-action="${esc(device.id)}|${esc(control.id)}|${key}" aria-pressed="${active}">${t(label)}</button>`;
+        // "Değiştir" yalnızca cihaz tek basışta iki yönü de destekliyorsa görünür.
+        const toggle=automationCanToggle(control)?choice("toggle","automationTurnToggle",mode==="toggle"):"";
+        return`<div class="automation-control-row"><span>${single?"":esc(control.name)}</span><div class="automation-control-choices">${choice("on","automationTurnOn",mode==="on")}${choice("off","automationTurnOff",mode==="off")}${toggle}</div></div>`;
       }).join(""):"";
       return`<article class="automation-target${selected?" selected":""}"><button class="automation-target-head" type="button" data-automation-device="${esc(device.id)}" aria-expanded="${open}"><span><strong>${esc(device.name)}</strong><small>${esc(deviceKind(device))}</small></span><span aria-hidden="true">${open?"⌄":"›"}</span></button>${choices}</article>`;
     }).join("");
@@ -3866,7 +3877,9 @@
     const device=state.devices.find(item=>item.id===deviceId);
     const control=device?automationControls(device).find(item=>item.id===controlId):null;
     if(!control)return;
-    wizard.action={type:"device",deviceId,property:control.property,controlId:control.id,value:automationControlValue(control,mode==="on")};
+    if(mode==="toggle"&&!automationCanToggle(control))return;
+    const value=mode==="toggle"?control.valueToggle:automationControlValue(control,mode==="on");
+    wizard.action={type:"device",deviceId,property:control.property,controlId:control.id,value};
     renderAutomationWizard();
     afterAutomationChoice(()=>{nextAutomationStep()});
   }

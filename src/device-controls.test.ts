@@ -49,6 +49,31 @@ test("yazılabilir ışık özellikleri güncel durum gelmeden de kumanda oluşt
       { property: "color_temp", kind: "temperature", value: null }
     ]
   );
+
+  // ON/OFF kullanan yazılabilir durum tek komutla iki yönü de yapabilir.
+  assert.equal(controls[0]?.valueToggle, "TOGGLE");
+
+  // Cihazın kendi bildirdiği değer korunur.
+  const declared = deviceControls(
+    "0x457",
+    "Hall Switch",
+    [{ property: "state", name: "state", type: "binary", valueOn: "ON", valueOff: "OFF", valueToggle: "FLIP" }],
+    {},
+    new Map()
+  );
+  assert.equal(declared[0]?.valueToggle, "FLIP");
+
+  // ON/OFF dışı değer kümesinde ve salt okunur durumda uydurma komut üretilmez.
+  const boolean = deviceControls(
+    "0x458",
+    "Bool Switch",
+    [{ property: "state", name: "state", type: "binary", valueOn: true, valueOff: false }],
+    {},
+    new Map()
+  );
+  assert.equal(boolean[0]?.valueToggle, undefined);
+  const readOnly = deviceControls("0x459", "Plug", [], { state: "ON" }, new Map());
+  assert.equal(readOnly[0]?.valueToggle, undefined);
 });
 
 test("RGB ışık rengi UID tabanlı denetim olarak sunulur", () => {

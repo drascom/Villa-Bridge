@@ -1506,7 +1506,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   // §5.1.1 alt varlık: kaydedilen eylem kanonik property taşır, controlId yalnızca sunum.
   assert.match(
     dashboard,
-    /wizard\.action=\{type:"device",deviceId,property:control\.property,controlId:control\.id,value:automationControlValue\(control,mode==="on"\)\}/
+    /wizard\.action=\{type:"device",deviceId,property:control\.property,controlId:control\.id,value\}/
   );
   assert.match(dashboard, /const automationControl=action=>automationDevice\(action\)\?\.controls\.find\(control=>control\.property===action\?\.property\)/);
 
@@ -1662,6 +1662,25 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   assert.match(dashboard, /automationSummaryState:"When \{device\} \{event\}, \{target\} will \{action\}\."/);
   assert.match(dashboard, /automationCardSummaryButton:"\{device\} \{button\} → \{target\} \{action\}"/);
   assert.match(dashboard, /automationCardSummaryState:"\{device\} \{event\} → \{target\} \{action\}"/);
+
+  // Tek basış hem açıp hem kapatabilsin: seçenek yalnız cihaz destekliyorsa listelenir.
+  assert.match(dashboard, /const automationCanToggle=control=>control\?\.valueToggle!==undefined&&control\?\.valueToggle!==null/);
+  assert.match(dashboard, /const toggle=automationCanToggle\(control\)\?choice\("toggle","automationTurnToggle",mode==="toggle"\):"";/);
+  assert.match(dashboard, /\$\{choice\("on","automationTurnOn",mode==="on"\)\}\$\{choice\("off","automationTurnOff",mode==="off"\)\}\$\{toggle\}/);
+  // Kaydedilen değer cihazın kendi bildirdiği değer; arayüzde uydurulmuyor.
+  assert.match(dashboard, /if\(mode==="toggle"&&!automationCanToggle\(control\)\)return;/);
+  assert.match(dashboard, /const value=mode==="toggle"\?control\.valueToggle:automationControlValue\(control,mode==="on"\);/);
+  // Özet yine tam şablon anahtarıyla kuruluyor; üçüncü biçim için ayrı anahtar var.
+  assert.match(dashboard, /const automationSentenceKeys=\{on:"automationWillTurnOn",off:"automationWillTurnOff",toggle:"automationWillToggle"\}/);
+  assert.match(dashboard, /const automationCardKeys=\{on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles"\}/);
+  assert.match(dashboard, /const actionKey=automationSentenceKeys\[automationActionMode\(action\)\];/);
+  assert.match(dashboard, /const actionKey=automationCardKeys\[automationActionMode\(action\)\];/);
+  assert.match(dashboard, /automationTurnToggle:"Değiştir"/);
+  assert.match(dashboard, /automationTurnToggle:"Turn on or off"/);
+  assert.match(dashboard, /automationWillToggle:"açıksa kapanacak, kapalıysa açılacak"/);
+  assert.match(dashboard, /automationWillToggle:"switch on or off"/);
+  assert.match(dashboard, /automationToggles:"açık\/kapalı değişir"/);
+  assert.match(dashboard, /automationToggles:"switches on or off"/);
 
   // §8.2 — döngü: başlatan cihaz hedef listesinde yok, kaydetmede de durduruluyor, hata ham basılmıyor.
   assert.match(dashboard, /const starter=wizard\.triggerKind==="time"\?null:wizard\.triggerDeviceId;/);

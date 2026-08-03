@@ -150,15 +150,19 @@ export function deviceControls(
     const value = onOff(state[property]);
     if (value === null && !writable.has(property)) continue;
     const channel = suffixOf(property, "state");
+    const valueOn = descriptor?.valueOn ?? "ON";
+    const valueOff = descriptor?.valueOff ?? "OFF";
+    // Zigbee2MQTT sözleşmesi: ON/OFF kullanan yazılabilir bir durum TOGGLE komutunu da kabul eder.
+    const canToggle = writable.has(property) && valueOn === "ON" && valueOff === "OFF";
     add({
       id: channel,
       property,
       name: aliases.get(`${id}:${channel}`) ?? defaultChannelName(deviceName, channel),
       kind: "switch",
       value,
-      valueOn: descriptor?.valueOn ?? "ON",
-      valueOff: descriptor?.valueOff ?? "OFF",
-      valueToggle: descriptor?.valueToggle,
+      valueOn,
+      valueOff,
+      valueToggle: descriptor?.valueToggle ?? (canToggle ? "TOGGLE" : undefined),
       adminOnly: descriptor?.category === "config"
     });
   }
