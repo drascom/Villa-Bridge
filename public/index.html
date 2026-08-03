@@ -196,6 +196,7 @@
     .automation-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}.automation-pick{min-height:88px;display:grid;align-content:center;gap:4px;padding:13px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-pick:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-pick.active{border-color:var(--forest);background:var(--forest-soft)}.automation-pick strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.automation-pick small{color:var(--muted);font-size:12px}
     .automation-events{display:grid;gap:9px;margin-top:14px}.automation-event{display:block;min-height:60px;padding:17px 15px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:15px;font-weight:750;text-align:left;touch-action:manipulation}.automation-event::first-letter{text-transform:uppercase}.automation-event:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-event.active{border-color:var(--forest);background:var(--forest-soft)}
     .automation-hint{margin:14px 0 0;padding:11px 13px;border-radius:13px;color:var(--muted);background:var(--surface-soft);font-size:13px;line-height:1.4}
+    .automation-pick-head{margin:16px 0 0;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}.automation-pick.unproven{border-style:dashed}.automation-pick.unproven small{color:var(--sun);font-weight:750}.automation-warning{margin:14px 0 0;padding:12px 14px;border:1px solid var(--sun);border-radius:13px;color:var(--ink);background:var(--surface-soft);font-size:13px;line-height:1.45;font-weight:700}.automation-alt{display:grid;gap:10px;justify-items:start;margin-top:12px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.automation-alt p{margin:0;font-size:13px;line-height:1.45}
     .automation-sentence{margin-top:18px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);font:750 18px/1.45 system-ui,sans-serif}.automation-name-field{display:grid;gap:8px;margin-top:16px}.automation-name-field label{font-size:13px;font-weight:750;color:var(--muted)}
     .automation-card-chip{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:11px;font-weight:800}.automation-card-chip.warn{color:var(--danger)}.automation-card.off{opacity:.62}.automation-card-actions{display:flex;align-items:center;gap:12px}.automation-card-menu{width:48px;height:48px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:15px;background:var(--surface-soft);color:var(--muted);font-size:23px;font-weight:800;line-height:1;cursor:pointer}.automation-card-menu:hover{border-color:var(--forest);color:var(--forest)}
     @media(max-width:560px){.simple-link-choices{grid-template-columns:1fr}.automation-card{grid-template-columns:46px minmax(0,1fr);row-gap:12px}.automation-card .danger-button{grid-column:1/-1}.automation-card-actions{grid-column:1/-1;justify-content:flex-end}.automation-control-row{grid-template-columns:minmax(0,1fr)}}
@@ -906,6 +907,11 @@
     if(!last||last.buttonId!==button.id)return false;
     return Date.now()-new Date(last.at).getTime()<deviceButtonPressWindowMs;
   };
+  // Cihaz tanımında `action` görünmesi düğme sinyali gönderdiğini KANITLAMAZ: duvar dimmer'ları da
+  // bildirir ama hiç yaymaz. Tek kanıt cihazın kendi yaydığı basış — sunucudaki `lastAction` ve olay akışı.
+  // Türetici (src/device-buttons.ts) değişmez; eleme yalnız burada, sunum katmanındadır.
+  const deviceSeenPress=device=>Boolean(device?.lastAction)
+    ||(state.events||[]).some(item=>item.sourceName===device?.sourceName&&item.property==="action");
   const deviceButtonLastLine=device=>{
     const last=device.lastAction;
     const button=last?(device.buttons||[]).find(item=>item.id===last.buttonId):null;
@@ -916,6 +922,10 @@
   const deviceButtonsHtml=device=>{
     const buttons=device.buttons||[];
     if(!buttons.length)return"";
+    // Prizden beslenen cihaz (kumanda değil, duvar anahtarı/dimmer) hiç basış yaymadıysa bölüm çıkmaz:
+    // orada bastıracak düğme yok, adlandırma kutusu yanıltıyor. Pilli kumandada bölüm kalır —
+    // yeni eşleştirilmiş kumanda henüz basılmamış olabilir, ipucu satırı ona yol gösterir.
+    if(device.type==="Router"&&!deviceSeenPress(device))return"";
     const rows=buttons.map(button=>`<div class="device-button-row${deviceButtonPressed(device,button)?" pressed":""}" data-device-button="${esc(button.id)}"><div class="device-button-name">${esc(deviceButtonName(button))}${deviceButtonRenameButton(device,button)}</div><div class="device-button-presses">${esc(deviceButtonPressList(button))}</div></div>`).join("");
     return`<div class="device-buttons"><div class="device-buttons-head">${t("deviceButtons")}</div>${deviceButtonLastLine(device)}${rows}</div>`;
   };
@@ -3900,6 +3910,12 @@
   const automationEventPicked=(wizard,event)=>wizard.triggerKind==="button"
     ?wizard.triggerAction===event.action
     :wizard.triggerProperty===event.property&&wizard.triggerEquals===event.equals;
+  // Kanıtsız cihaz gizlenmez — yeni eşleştirilmiş, henüz basılmamış gerçek bir kumanda kaybolmasın.
+  // Bunun yerine ikinci sıraya iner ve "henüz sinyal göndermedi" notuyla işaretlenir.
+  const automationButtonUnproven=(wizard,device)=>Boolean(device)&&wizard?.triggerKind==="button"&&!deviceSeenPress(device);
+  const automationPickGroups=(devices,kind)=>kind!=="button"
+    ?[{devices,proven:true}]
+    :[{devices:devices.filter(deviceSeenPress),proven:true},{devices:devices.filter(device=>!deviceSeenPress(device)),proven:false}];
   function automationTriggerPickHtml(wizard){
     const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
     // Kayıtlı kural düzenlenirken seçili basış elenmiş olsa bile listede kalır (`wizard.triggerAction`).
@@ -3907,9 +3923,17 @@
       .filter(device=>automationTriggerEvents(device,wizard.triggerKind,wizard.triggerAction).length>0)
       .sort(byName);
     if(!devices.length)return`<div class="empty">${t(wizard.triggerKind==="button"?"automationNoButtons":"automationNoSensors")}</div>`;
-    const picks=devices.map(device=>{
-      const active=wizard.triggerDeviceId===device.id;
-      return`<button class="automation-pick${active?" active":""}" type="button" data-automation-trigger-device="${esc(device.id)}" aria-pressed="${active}"><strong>${esc(device.name)}</strong><small>${esc(deviceKind(device))}</small></button>`;
+    const groups=automationPickGroups(devices,wizard.triggerKind).filter(group=>group.devices.length>0);
+    // Başlık yalnızca iki küme de doluyken: tek kümede gereksiz gürültü olmasın.
+    const labelled=groups.length>1;
+    const picks=groups.map(group=>{
+      const head=labelled?`<p class="automation-pick-head">${esc(t(group.proven?"automationButtonProvenGroup":"automationButtonUnprovenGroup"))}</p>`:"";
+      const cards=group.devices.map(device=>{
+        const active=wizard.triggerDeviceId===device.id;
+        const note=group.proven?deviceKind(device):t("automationButtonUnproven");
+        return`<button class="automation-pick${active?" active":""}${group.proven?"":" unproven"}" type="button" data-automation-trigger-device="${esc(device.id)}" aria-pressed="${active}"><strong>${esc(device.name)}</strong><small>${esc(note)}</small></button>`;
+      }).join("");
+      return`${head}<div class="automation-picks">${cards}</div>`;
     }).join("");
     const device=devices.find(item=>item.id===wizard.triggerDeviceId)||null;
     const events=automationTriggerEvents(device,wizard.triggerKind,wizard.triggerAction);
@@ -3918,8 +3942,15 @@
       const active=automationEventPicked(wizard,event);
       return`<button class="automation-event${active?" active":""}" type="button" data-automation-event="${esc(event.token)}" aria-pressed="${active}">${esc(event.label)}</button>`;
     }).join("");
+    const unproven=automationButtonUnproven(wizard,device);
+    // Seçim engellenmez, ama kural neden hiç çalışmayabilir açıkça yazar.
+    const warning=unproven?`<p class="automation-warning">${esc(t("automationButtonUnprovenWarning"))}</p>`:"";
+    // Asıl değerli kısım: durum bildiren cihazda doğru yol "açılınca/kapanınca" — tek dokunuşla geçilir.
+    const alternative=unproven&&automationTriggerEvents(device,"deviceState").length>0
+      ?`<div class="automation-alt"><p>${esc(t("automationButtonStateAlternative"))}</p><button class="secondary" type="button" data-automation-state-instead="${esc(device.id)}">${esc(t("automationButtonStateAlternativeAction"))}</button></div>`
+      :"";
     const hint=device&&wizard.triggerKind==="button"?`<p class="automation-hint">${esc(automationButtonHint(device))}</p>`:"";
-    return`<div class="automation-picks">${picks}</div>${events.length?`<div class="automation-events">${list}</div>`:""}${hint}`;
+    return`${picks}${warning}${alternative}${events.length?`<div class="automation-events">${list}</div>`:""}${hint}`;
   }
   function automationThenHtml(wizard){
     const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
@@ -3979,6 +4010,7 @@
     $$("[data-automation-day]").forEach(button=>button.onclick=()=>toggleAutomationDay(button.dataset.automationDay));
     $$("[data-automation-trigger-device]").forEach(button=>button.onclick=()=>chooseAutomationTriggerDevice(button.dataset.automationTriggerDevice));
     $$("[data-automation-event]").forEach(button=>button.onclick=()=>chooseAutomationEvent(button.dataset.automationEvent));
+    $$("[data-automation-state-instead]").forEach(button=>button.onclick=()=>automationUseStateInstead(button.dataset.automationStateInstead));
     $$("[data-automation-room]").forEach(button=>button.onclick=()=>{wizard.room=button.dataset.automationRoom||null;renderAutomationWizard()});
     $$("[data-automation-device]").forEach(button=>button.onclick=()=>toggleAutomationDevice(button.dataset.automationDevice));
     $$("[data-automation-action]").forEach(button=>button.onclick=()=>chooseAutomationAction(button.dataset.automationAction));
@@ -4034,7 +4066,27 @@
     wizard.triggerDeviceId=deviceId;
     const device=state.devices.find(item=>item.id===deviceId)||null;
     const events=automationTriggerEvents(device,wizard.triggerKind);
+    const unproven=automationButtonUnproven(wizard,device);
     // Tek anlamlı seçenek varsa sessizce seçilir, kullanıcıya sorulmaz.
+    // Kanıtsız cihazda bu atlama kapalı: uyarı ve alternatif okunmadan adım geçilmesin.
+    if(events.length===1&&!unproven)automationApplyEvent(wizard,events[0]);
+    if(wizard.action?.deviceId===deviceId)wizard.action=null;
+    renderAutomationWizard();
+    afterAutomationChoice(()=>{
+      if(!unproven&&automationTriggerReady(wizard)){nextAutomationStep();return}
+      const list=$("#automationBody .automation-warning")||$("#automationBody .automation-events");
+      if(list)list.scrollIntoView({behavior:"smooth",block:"center"});
+    });
+  }
+  // Durum bildiren cihazda düğme yolundan "açılınca/kapanınca" yoluna geçiş: cihaz seçimi korunur.
+  function automationUseStateInstead(deviceId){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    automationClearTriggerDevice(wizard);
+    wizard.triggerKind="deviceState";
+    wizard.triggerDeviceId=deviceId;
+    const device=state.devices.find(item=>item.id===deviceId)||null;
+    const events=automationTriggerEvents(device,"deviceState");
     if(events.length===1)automationApplyEvent(wizard,events[0]);
     if(wizard.action?.deviceId===deviceId)wizard.action=null;
     renderAutomationWizard();
@@ -4049,6 +4101,8 @@
     const device=wizard?state.devices.find(item=>item.id===wizard.triggerDeviceId)||null:null;
     const event=automationTriggerEvents(device,wizard?.triggerKind,wizard?.triggerAction).find(item=>item.token===token);
     if(!event)return;
+    // Seçim engellenmez ama uyarı bir kez daha yüzeye çıkar: kullanıcı sonucu bilerek ilerlesin.
+    if(automationButtonUnproven(wizard,device))showToast(t("automationButtonUnprovenWarning"),true);
     automationApplyEvent(wizard,event);
     renderAutomationWizard();
     afterAutomationChoice(()=>{nextAutomationStep()});
