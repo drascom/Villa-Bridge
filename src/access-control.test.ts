@@ -40,6 +40,9 @@ const setupApp = async (context: { after: (callback: () => Promise<void>) => voi
   app.get("/api/zigbee/backup", async () => ({ ok: true }));
   app.post("/api/zigbee/restore", async () => ({ ok: true }));
   app.put("/api/favorites", async () => ({ ok: true }));
+  app.get("/api/backup", async () => ({ ok: true }));
+  app.post("/api/backup/preview", async () => ({ ok: true }));
+  app.post("/api/backup/restore", async () => ({ ok: true }));
   return { app };
 };
 
@@ -135,6 +138,9 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
     ["PUT", "/api/devices/test/ota-schedule"],
     ["GET", "/api/zigbee/backup"],
     ["POST", "/api/zigbee/restore"],
+    ["GET", "/api/backup"],
+    ["POST", "/api/backup/preview"],
+    ["POST", "/api/backup/restore"],
     ["PUT", "/api/auth/admin-password"]
   ] as const) {
     const response = await app.inject({

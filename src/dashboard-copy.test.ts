@@ -1922,3 +1922,63 @@ test("Matter modalı eşleştirmenin bittiğini kendisi fark eder", async () => 
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
+
+test("Ayarlar'da yedek al ve geri yükle kartı onay adımı atlanmadan çalışır", async () => {
+  const dashboard = await readDashboardBundle();
+  const settingsStart = dashboard.indexOf('<section id="settings"');
+  const settings = dashboard.slice(
+    settingsStart,
+    dashboard.indexOf("</section>\n  </main>", settingsStart) + 10
+  );
+
+  // Kart yalnız yöneticiye görünür ve ev diliyle yazılır.
+  assert.match(settings, /<article id="homeBackupCard" class="setting-card backup-card home-backup-card" data-admin-only>/);
+  assert.match(settings, /<h2 data-i18n="homeBackupTitle">/);
+  assert.match(settings, /id="downloadHomeBackup"[\s\S]*data-i18n="homeBackupExport"/);
+  assert.match(settings, /id="chooseHomeRestore"[\s\S]*data-i18n="homeBackupImport"/);
+  assert.match(settings, /<input id="homeRestoreFile" type="file" accept="application\/json,\.json" hidden>/);
+  assert.match(dashboard, /homeBackupTitle:"Home backup"/);
+  assert.match(dashboard, /homeBackupTitle:"Yedekleme"/);
+  assert.match(dashboard, /homeBackupExport:"Save a backup"/);
+  assert.match(dashboard, /homeBackupExport:"Yedek al"/);
+  assert.match(dashboard, /homeBackupImport:"Restore a backup"/);
+  assert.match(dashboard, /homeBackupImport:"Yedeği geri yükle"/);
+
+  // Dışa aktarım tarih damgalı dosya adıyla iner, yeni bağımlılık yok.
+  assert.match(dashboard, /const data=await api\("\/api\/backup"\)/);
+  assert.match(dashboard, /link\.download=`villa-yedek-\$\{stamp\}\.json`/);
+  assert.match(dashboard, /new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
+
+  // Dosya seçilir seçilmez önizleme çağrılır; hiçbir şey uygulanmaz.
+  assert.match(dashboard, /api\("\/api\/backup\/preview",\{method:"POST",body:JSON\.stringify\(\{backup:pendingHomeBackup,mode:selectedHomeBackupMode\(\)\}\)\}/);
+  assert.match(dashboard, /\$\("#homeBackupDialog"\)\.showModal\(\);\s*await previewHomeBackup\(\)/);
+
+  // Onay adımı atlanamaz: geri yükle düğmesi özet gelene kadar kapalı kalır.
+  assert.match(dashboard, /<button id="confirmHomeRestore" class="primary" type="button" data-i18n="homeRestoreApply" disabled>/);
+  assert.match(dashboard, /button\.disabled=true;\s*\$\("#homeBackupSummary"\)\.textContent=t\("homeBackupChecking"\)/);
+  assert.match(dashboard, /renderHomeBackupSummary\(data\.summary\);\s*button\.disabled=false/);
+  assert.match(dashboard, /catch\(error\)\{\$\("#homeBackupSummary"\)\.textContent=error\.message\}/);
+  assert.match(dashboard, /\$\("#confirmHomeRestore"\)\.onclick=applyHomeRestore/);
+  assert.match(dashboard, /async function applyHomeRestore\(\)\{\s*if\(!pendingHomeBackup\)return/);
+
+  // Üzerine yaz / yanına ekle seçimi ve yumuşak vurgu.
+  assert.match(dashboard, /<input type="radio" name="homeBackupMode" value="merge" checked>/);
+  assert.match(dashboard, /class="home-backup-mode replace-mode"><input type="radio" name="homeBackupMode" value="replace">/);
+  assert.match(dashboard, /\.home-backup-mode\.replace-mode\{border-color:#d9a441;background:rgba\(217,164,65,\.11\)\}/);
+  assert.doesNotMatch(dashboard, /home-backup-mode replace-mode danger/);
+  assert.match(dashboard, /\$\$\("input\[name=homeBackupMode\]"\)\.forEach\(radio=>\{radio\.onchange=previewHomeBackup\}\)/);
+  assert.match(dashboard, /homeRestoreMergeTitle:"Add alongside"/);
+  assert.match(dashboard, /homeRestoreMergeTitle:"Yanına ekle"/);
+  assert.match(dashboard, /homeRestoreReplaceTitle:"Replace everything"/);
+  assert.match(dashboard, /homeRestoreReplaceTitle:"Üzerine yaz"/);
+
+  // Artık var olmayan cihazlar özet içinde kullanıcıya söylenir.
+  assert.match(dashboard, /homeBackupSkipped:"\{count\} entries belong to devices that are no longer here/);
+  assert.match(dashboard, /homeBackupSkipped:"\{count\} kayıt artık evde olmayan cihazlara ait/);
+
+  // Başarıdan sonra ekran tazelenir.
+  assert.match(dashboard, /api\("\/api\/backup\/restore",\{method:"POST",body:JSON\.stringify\(\{backup:pendingHomeBackup,mode:selectedHomeBackupMode\(\)\}\)\}/);
+  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadAutomations\(\)\]\);\s*render\(\)/);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});

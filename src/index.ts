@@ -20,6 +20,7 @@ import {
   validateHomeFavorites
 } from "./home-favorites.js";
 import { HomeGroupsStore, homeGroupDeviceControlId, validateHomeGroups } from "./home-groups.js";
+import { HomeBackupService, type HomeBackupMode } from "./home-backup.js";
 import { InstallationStateStore } from "./installation-state.js";
 import {
   applyCoordinatorOwnership,
@@ -89,6 +90,21 @@ const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
 );
 const authStore = new AuthStore(resolve(dirname(configPath), "auth.json"));
+// Yedek yalnızca ev yapılandırmasını kapsar: parola özetleri, ağ anahtarı ve kuruluma
+// özel durum dosyaları bilerek dışarıda bırakılmıştır.
+const homeBackupService = new HomeBackupService({
+  paths: {
+    automations: resolve(dirname(configPath), "automations.json"),
+    aliases: config.aliasesFile,
+    homeGroups: resolve(dirname(configPath), "home-groups.json"),
+    favorites: resolve(dirname(configPath), "home-favorites.json"),
+    deviceNotes: resolve(dirname(configPath), "device-notes.json"),
+    deviceImages: resolve(dirname(configPath), "device-images.json")
+  },
+  aliases,
+  knownDeviceIds: () => store.getDevices().map((device) => device.id),
+  automationLookup: (deviceId) => store.getDevice(deviceId)
+});
 const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
   config.zigbee.configurationFile,
@@ -656,6 +672,53 @@ app.post<{ Params: { id: string } }>("/api/automations/:id/run", async (request,
   }
   return { ok: true };
 });
+
+app.get("/api/backup", async (_request, reply) => {
+  try {
+    return { ok: true, backup: await homeBackupService.create() };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post<{ Body?: { backup?: unknown; mode?: unknown } }>(
+  "/api/backup/preview",
+  async (request, reply) => {
+    const mode = request.body?.mode === "merge" ? "merge" : "replace";
+    try {
+      return { ok: true, summary: await homeBackupService.preview(request.body?.backup, mode) };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
+
+app.post<{ Body?: { backup?: unknown; mode?: unknown } }>(
+  "/api/backup/restore",
+  async (request, reply) => {
+    if (request.body?.mode !== "merge" && request.body?.mode !== "replace") {
+      return reply.code(400).send({ ok: false, error: "Geri yükleme biçimi geçersiz." });
+    }
+    const mode: HomeBackupMode = request.body.mode;
+    try {
+      const summary = await homeBackupService.restore(request.body?.backup, mode);
+      imagePreferences = await imagesStore.get();
+      store.setImagePreferences(imagePreferences);
+      return { ok: true, summary };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
 
 app.put<{
   Params: { id: string };
