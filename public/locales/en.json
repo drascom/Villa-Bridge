@@ -644,6 +644,7 @@
     "automationRunNow": "Run now",
     "automationEdit": "Edit",
     "automationDelete": "Delete",
+    "automationCardMenu": "Automation options",
     "automationDeleteConfirm": "Delete “{name}”?",
     "automationDeleted": "The automation was deleted.",
     "automationSaved": "The automation is ready.",

@@ -1557,7 +1557,8 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
     dashboard,
     /const automationStepReady=wizard=>wizard\.step===1\?automationTriggerReady\(wizard\):wizard\.step===2\?Boolean\(wizard\.action\):true/
   );
-  assert.match(dashboard, /next\.disabled=!automationStepReady\(wizard\)/);
+  assert.match(dashboard, /const ready=automationStepReady\(wizard\);/);
+  assert.match(dashboard, /next\.disabled=!ready;/);
   assert.match(dashboard, /if\(!wizard\|\|!automationStepReady\(wizard\)\)return;/);
   assert.match(dashboard, /\.automation-actions button\[disabled\]\{opacity:\.45\}/);
 
@@ -1603,12 +1604,12 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   // Kanonik kayıt: düğme için action, sensör için property + equals.
   assert.match(dashboard, /\{type:"deviceAction",deviceId:wizard\.triggerDeviceId,action:wizard\.triggerAction\}/);
   assert.match(dashboard, /\{type:"deviceState",deviceId:wizard\.triggerDeviceId,property:wizard\.triggerProperty,equals:wizard\.triggerEquals\}/);
-  assert.match(dashboard, /token:`action:\$\{value\}`,action:value,label:automationActionLabel\(value\)/);
+  assert.match(dashboard, /token:`action:\$\{entry\.action\}`,action:entry\.action,label:automationActionLabel\(entry\.action\)/);
 
   // Alt varlık kuralı: her düğme ayrı hedef; liste sunucunun `buttons` yapısından geliyor.
-  assert.match(dashboard, /for\(const button of device\.buttons\|\|\[\]\)\{\s*for\(const entry of button\.actions\)\{/);
+  assert.match(dashboard, /for\(const button of device\.buttons\|\|\[\]\)\{\s*for\(const entry of visiblePresses\(button\.actions,keep\)\)\{/);
   // Sunucu düğme türetmediyse ham actionTypes yedeği devrede kalır.
-  assert.match(dashboard, /if\(!\(device\.buttons\|\|\[\]\)\.length\)for\(const action of device\.actionTypes\|\|\[\]\)/);
+  assert.match(dashboard, /if\(!\(device\.buttons\|\|\[\]\)\.length\)\{\s*const raw=\(device\.actionTypes\|\|\[\]\)/);
 
   // Ham `1_single` kullanıcıya basılmaz — sayı + basış eki insan diline çevriliyor.
   assert.match(dashboard, /const numbered=\/\^\(\?:button_\)\?\(\\d\{1,2\}\)_\(\[a-z_\]\+\)\$\/\.exec\(raw\)/);
@@ -1649,7 +1650,7 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
 
   // §8.1 — kilit\/siren EYLEM listesinde yok ama TETİKLEYİCİ olarak seçilebilir.
   assert.match(dashboard, /const automationControls=device=>isProtectedDevice\(device\)\?\[\]:/);
-  assert.doesNotMatch(dashboard, /function automationTriggerEvents\(device,kind\)\{[\s\S]*?isProtectedDevice[\s\S]*?\n  \}/);
+  assert.doesNotMatch(dashboard, /function automationTriggerEvents\(device,kind,keep\)\{[\s\S]*?isProtectedDevice[\s\S]*?\n  \}/);
   assert.match(dashboard, /automationEventLocked:"kilitlenince"/);
   assert.match(dashboard, /automationEventAlarm:"alarm verince"/);
 
@@ -1710,7 +1711,7 @@ test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla göste
   assert.match(dashboard, /<div class="device-button-row\$\{deviceButtonPressed\(device,button\)\?" pressed":""\}" data-device-button="\$\{esc\(button\.id\)\}">/);
   assert.match(dashboard, /<div class="device-button-name">\$\{esc\(deviceButtonName\(button\)\)\}\$\{deviceButtonRenameButton\(device,button\)\}<\/div>/);
   assert.match(dashboard, /<div class="device-button-presses">\$\{esc\(deviceButtonPressList\(button\)\)\}<\/div>/);
-  assert.match(dashboard, /const deviceButtonPressList=button=>\(button\?\.actions\|\|\[\]\)\.map\(entry=>deviceButtonPressLabel\(entry\.press\)\)\.join\(" · "\)/);
+  assert.match(dashboard, /const deviceButtonPressList=button=>visiblePresses\(button\?\.actions\)\.map\(entry=>deviceButtonPressLabel\(entry\.press\)\)\.join\(" · "\)/);
 
   // Yeniden adlandırma mevcut kanal desenini kullanır; yeni diyalog icat edilmedi.
   assert.match(dashboard, /const deviceButtonRenameButton=\(device,button\)=>`<button class="control-rename" type="button" data-admin-only data-rename-channel="\$\{esc\(device\.id\)\}" data-channel="\$\{esc\(button\.id\)\}"/);
@@ -1756,6 +1757,125 @@ test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla göste
   assert.match(dashboard, /const automationButtonLabel=\(device,action\)=>\{[\s\S]*?if\(!found\)return automationActionLabel\(action\);/);
   // Düğmelerde eleme kanonik `action` üzerinden; aynı ada sahip iki düğme birbirini yutmaz.
   assert.match(dashboard, /const key=kind==="button"\?row\.token:row\.label;/);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+interface PressEntry {
+  action: string;
+  press: string;
+}
+
+/** Basış eleme yardımcısını sayfadan çıkarıp gerçekten çalıştırır — davranış metinle değil koşarak kanıtlanır. */
+function pressFilter(dashboard: string): (entries: PressEntry[], keep?: string | null) => PressEntry[] {
+  const source = /const hiddenPressKinds=new Set\(\[[\s\S]*?const visiblePresses=\(entries,keep\)=>\{[\s\S]*?\n {2}\};/
+    .exec(dashboardScripts(dashboard));
+  assert.ok(source, "basış eleme kaynağı bulunamadı");
+  return new Function(`${source[0]}\nreturn visiblePresses;`)() as (entries: PressEntry[], keep?: string | null) => PressEntry[];
+}
+
+test("kurulum sırasında yalnız kısa basış ve basılı tutma sunulur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Eleme yalnız sunum katmanında: tek bir yardımcı hem cihaz detayını hem sihirbazı besliyor.
+  assert.match(dashboard, /const hiddenPressKinds=new Set\(\["double","triple","quadruple","quintuple","many"\]\)/);
+  assert.match(dashboard, /const kept=list\.filter\(entry=>!hiddenPressKinds\.has\(entry\.press\)\|\|\(keep!=null&&keep===entry\.action\)\);/);
+  // Boş liste yasak: elemeden sonra hiçbir şey kalmazsa cihazın bildirdiği ne varsa gösterilir.
+  assert.match(dashboard, /return kept\.length\?kept:list;/);
+
+  // Cihaz detayındaki düğme listesi ve sihirbaz aynı elemeyi kullanır.
+  assert.match(dashboard, /const deviceButtonPressList=button=>visiblePresses\(button\?\.actions\)/);
+  assert.match(dashboard, /for\(const entry of visiblePresses\(button\.actions,keep\)\)\{/);
+  // Sunucu düğme türetmediğinde çalışan yedek yol da eleniyor.
+  assert.match(dashboard, /\.filter\(Boolean\)\.map\(action=>\(\{action,press:rawActionPress\(action\)\}\)\);/);
+  assert.match(dashboard, /for\(const entry of visiblePresses\(raw,keep\)\)\{/);
+
+  // Kayıtlı kural düzenlenirken seçili basış listede kalır.
+  assert.match(dashboard, /automationTriggerEvents\(device,wizard\.triggerKind,wizard\.triggerAction\)\.length>0/);
+  assert.match(dashboard, /const events=automationTriggerEvents\(device,wizard\.triggerKind,wizard\.triggerAction\);/);
+  assert.match(dashboard, /automationTriggerEvents\(device,wizard\?\.triggerKind,wizard\?\.triggerAction\)\.find\(item=>item\.token===token\)/);
+  // Yeni cihaz seçiminde `keep` yok: sıfırdan kurulan kural art arda basış önermez.
+  assert.match(dashboard, /const events=automationTriggerEvents\(device,wizard\.triggerKind\);\s*\/\/ Tek anlamlı seçenek/);
+
+  // Kayıtlı kuralın özeti elenmemiş ham listeden okunur; `1_double` kuralı doğru cümleyi verir.
+  assert.match(dashboard, /const entry=button\.actions\.find\(item=>item\.action===action\);/);
+
+  const visiblePresses = pressFilter(dashboard);
+  const remote: PressEntry[] = [
+    { action: "1_single", press: "single" },
+    { action: "1_double", press: "double" },
+    { action: "1_hold", press: "hold" }
+  ];
+  assert.deepEqual(visiblePresses(remote).map((entry) => entry.press), ["single", "hold"]);
+  // Kayıtlı seçim korunur.
+  assert.deepEqual(visiblePresses(remote, "1_double").map((entry) => entry.action), ["1_single", "1_double", "1_hold"]);
+  // Cihaz yalnız art arda basış bildiriyorsa liste boş kalmaz.
+  const onlyDouble: PressEntry[] = [{ action: "2_double", press: "double" }];
+  assert.deepEqual(visiblePresses(onlyDouble).map((entry) => entry.action), ["2_double"]);
+  // `press`/`release` gibi kalıplar dokunulmadan geçer.
+  const releaseOnly: PressEntry[] = [
+    { action: "press", press: "press" },
+    { action: "release", press: "release" },
+    { action: "double", press: "double" }
+  ];
+  assert.deepEqual(visiblePresses(releaseOnly).map((entry) => entry.press), ["press", "release"]);
+  assert.deepEqual(visiblePresses(undefined as unknown as PressEntry[]), []);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+test("otomasyon kartı tek dokunuşla düzenlemeyi açar, çalıştır ve sil görünür düğmede durur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Kart gövdesine tek dokunuş doğrudan düzenlemeyi açar — birincil yol artık uzun basma değil.
+  assert.match(dashboard, /card\.onclick=event=>\{\s*if\(event\.target\.closest\?\.\("\[data-automation-toggle\],\[data-automation-menu\]"\)\)return;\s*openAutomationWizard\(card\.dataset\.automationCard\);\s*\};/);
+  // Uzun basma kaldırılmadı: aynı seçenek diyaloğunu açmayı sürdürüyor.
+  assert.match(dashboard, /bindLongPress\(card,\(\)=>openAutomationActions\(card\.dataset\.automationCard\),\{ignore:target=>Boolean\(target\.closest\?\.\("\[data-automation-toggle\],\[data-automation-menu\]"\)\)\}\)/);
+
+  // Anahtar ve menü dokunuşu karta sızmaz: yanlışlıkla düzenleme açılmaz.
+  assert.match(dashboard, /\$\$\("\[data-automation-toggle\]"\)\.forEach\(button=>button\.onclick=event=>\{event\.stopPropagation\(\);toggleAutomationEnabled\(button\.dataset\.automationToggle\)\}\)/);
+  assert.match(dashboard, /\$\$\("\[data-automation-menu\]"\)\.forEach\(button=>button\.onclick=event=>\{event\.stopPropagation\(\);openAutomationActions\(button\.dataset\.automationMenu\)\}\)/);
+
+  // Görünür menü düğmesi kartın sağında; anahtarla aynı şeritte ama ayrı dokunma alanında.
+  assert.match(dashboard, /<div class="automation-card-actions"><button class="automation-card-menu" type="button" data-automation-menu="\$\{esc\(automation\.id\)\}"/);
+  assert.match(dashboard, /aria-label="\$\{esc\(t\("automationCardMenu"\)\)\}" title="\$\{esc\(t\("automationCardMenu"\)\)\}"><span aria-hidden="true">⋯<\/span><\/button>/);
+  assert.match(dashboard, /\.automation-card-actions\{display:flex;align-items:center;gap:12px\}/);
+  assert.match(dashboard, /\.automation-card-menu\{width:48px;height:48px/);
+
+  // Diyalog yeni değil: mevcut cihaz eylem deseni kullanılıyor.
+  assert.match(dashboard, /<dialog id="automationActionDialog"><div class="modal device-action-modal">/);
+  assert.match(dashboard, /id="runAutomationNow"[\s\S]*?id="editAutomation"[\s\S]*?id="deleteAutomation"/);
+
+  assert.match(dashboard, /automationCardMenu:"Otomasyon seçenekleri"/);
+  assert.match(dashboard, /automationCardMenu:"Automation options"/);
+  // Arayüz dili: teknik kelime yok.
+  assert.doesNotMatch(dashboard, /automationCardMenu:"[^"]*(?:menü|menu|aksiyon|action)/i);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+test("sihirbazda kaydet düğmesi hem üstte hem altta erişilebilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Üstte ikinci bir İleri/Kaydet düğmesi; başlık şeridi yapışkan, uzun ekranda kaybolmuyor.
+  assert.match(dashboard, /<button id="automationTopNext" class="primary automation-top-next" type="button" data-i18n="next">Next<\/button>/);
+  assert.match(dashboard, /\.automation-progress\{position:sticky;top:-24px;z-index:2/);
+  assert.match(dashboard, /\.automation-top-next\{min-width:120px;min-height:48px/);
+  // Alt eylem şeridi de yapışkan kalmaya devam ediyor.
+  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px/);
+
+  // Tek davranış, iki düğme: metin, kilit ve tıklama aynı.
+  assert.match(dashboard, /const automationNextButtons=\(\)=>\[\$\("#automationTopNext"\),\$\("#automationNext"\)\]\.filter\(Boolean\)/);
+  assert.match(dashboard, /const label=t\(wizard\.step===3\?"save":"next"\);/);
+  assert.match(dashboard, /for\(const next of automationNextButtons\(\)\)\{\s*next\.textContent=label;\s*next\.disabled=!ready;\s*\}/);
+  assert.match(dashboard, /\$\("#automationNext"\)\.onclick=nextAutomationStep;\s*\$\("#automationTopNext"\)\.onclick=nextAutomationStep;/);
+  // Kayıt sırasında ikisi de kilitlenir, hata olursa ikisi de açılır.
+  assert.match(dashboard, /const buttons=automationNextButtons\(\);\s*buttons\.forEach\(button=>\{button\.disabled=true\}\);/);
+  assert.match(dashboard, /buttons\.forEach\(button=>\{button\.disabled=false\}\);showToast\(automationErrorText\(error\),true\)/);
+
+  // Faz 1'in Geri/İleri deseni bozulmadı: Geri düğmesi yerinde.
+  assert.match(dashboard, /<button id="automationBack" class="secondary" type="button" data-i18n="back">Back<\/button>/);
+  assert.match(dashboard, /\$\("#automationBack"\)\.onclick=stepBackAutomation;/);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });

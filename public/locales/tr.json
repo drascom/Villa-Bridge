@@ -644,6 +644,7 @@
     "automationRunNow": "Şimdi çalıştır",
     "automationEdit": "Düzenle",
     "automationDelete": "Sil",
+    "automationCardMenu": "Otomasyon seçenekleri",
     "automationDeleteConfirm": "“{name}” silinsin mi?",
     "automationDeleted": "Otomasyon silindi.",
     "automationSaved": "Otomasyon hazır.",
