@@ -13,6 +13,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { create as createTar } from "tar";
+import { assertRuntimeFileList, assertRuntimeModuleGraph } from "./runtime-module-graph.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeSource = path.join(projectRoot, "apps", "runtime");
@@ -35,6 +36,7 @@ const requiredFiles = [
   "main.cjs",
   "matter-bigint-guard.cjs",
   "orchestration.cjs",
+  "peer-watch.cjs",
   "package-lock.json",
   "package.json"
 ];
@@ -109,6 +111,13 @@ async function prepare() {
   }
   await access(path.join(projectRoot, "public", "index.html"));
   await access(lazySerialPortPatch);
+  // Yeni bir runtime modulu eklenip listeye yazilmadiysa paketleme burada durur.
+  const sourceGraph = await assertRuntimeFileList(runtimeSource, requiredFiles);
+  if (sourceGraph.dynamic.length > 0) {
+    console.warn(
+      `Uyari: dinamik require iceren runtime modulleri statik olarak dogrulanamadi: ${sourceGraph.dynamic.join(", ")}`
+    );
+  }
 
   await rm(stagingRoot, { recursive: true, force: true });
   await mkdir(stagedProject, { recursive: true });
@@ -225,6 +234,8 @@ async function prepare() {
       { cwd: stagedProject }
     );
     await run(process.execPath, ["--check", path.join(stagedProject, "main.cjs")]);
+    // `--check` yalnizca sozdizimi bakar; paketin modul grafigi de cozulebilmeli.
+    await assertRuntimeModuleGraph(stagedProject);
 
     const packageJson = JSON.parse(await readFile(path.join(stagedProject, "package.json"), "utf8"));
     const manifest = {
