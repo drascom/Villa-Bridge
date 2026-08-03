@@ -66,6 +66,8 @@ export interface DeviceView {
   endpoints?: DeviceEndpointView[];
   features: string[];
   actionTypes?: string[];
+  buttons?: DeviceButtonView[];
+  lastAction?: DeviceLastActionView | null;
   alerts: DeviceAlertView[];
   controls: DeviceControlView[];
   state: JsonObject;
@@ -104,6 +106,28 @@ export interface DeviceImageView {
   selectionRequired: boolean;
   userSelected: boolean;
   preferenceKey: string;
+}
+
+export interface DeviceButtonActionView {
+  /** Ham Zigbee `action` değeri — kanonik kimlik budur, otomasyonlar buna bağlanır. */
+  action: string;
+  /** İnsan diline çevrilebilir basış kimliği (`single`, `double`, `hold`, `release`, …). */
+  press: string;
+}
+
+export interface DeviceButtonView {
+  id: string;
+  name: string;
+  kind: "numbered" | "named" | "single" | "ungrouped";
+  number: number | null;
+  key: string | null;
+  actions: DeviceButtonActionView[];
+}
+
+export interface DeviceLastActionView {
+  action: string;
+  buttonId: string | null;
+  at: string;
 }
 
 export interface DeviceControlView {

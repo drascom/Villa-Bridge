@@ -82,6 +82,56 @@ test("buton action türleri expose bilgisinden çıkarılır", () => {
   assert.deepEqual(store.getDevices()[0].actionTypes, ["double", "hold", "single"]);
 });
 
+test("sahne kumandasının düğmeleri ve son basılan düğme cihaz modeline eklenir", () => {
+  const store = new DeviceStore(new Map([["0x20a716fffe6835f1:button:2", "Perde"]]));
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0x20a716fffe6835f1",
+    friendly_name: "Sahne Anahtari",
+    type: "EndDevice",
+    definition: {
+      model: "TS0043",
+      exposes: [{
+        type: "enum",
+        property: "action",
+        access: 1,
+        values: [
+          "1_single", "1_double", "1_hold",
+          "2_single", "2_double", "2_hold",
+          "3_single", "3_double", "3_hold"
+        ]
+      }]
+    }
+  }])));
+  store.ingest("Sahne Anahtari", Buffer.from('{"action":"2_double","battery":100}'));
+
+  const [device] = store.getDevices();
+  assert.deepEqual(
+    device.buttons?.map((button) => ({ id: button.id, name: button.name, count: button.actions.length })),
+    [
+      { id: "button:1", name: "1. düğme", count: 3 },
+      { id: "button:2", name: "Perde", count: 3 },
+      { id: "button:3", name: "3. düğme", count: 3 }
+    ]
+  );
+  assert.equal(device.lastAction?.action, "2_double");
+  assert.equal(device.lastAction?.buttonId, "button:2");
+  assert.ok(device.lastAction?.at);
+});
+
+test("eylem üretmeyen cihazda düğme listesi boş kalır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xlight",
+    friendly_name: "Kitchen LED",
+    type: "Router",
+    definition: { exposes: [{ name: "light", features: [{ property: "state", access: 7 }] }] }
+  }])));
+
+  const [device] = store.getDevices();
+  assert.deepEqual(device.buttons, []);
+  assert.equal(device.lastAction, null);
+});
+
 test("düşük pil eşiği backend uyarısı ve kalıcı geçiş olayı üretir", () => {
   const store = new DeviceStore(new Map());
   store.setLowBatteryThreshold(20);

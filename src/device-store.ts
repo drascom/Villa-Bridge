@@ -7,6 +7,7 @@ import type {
   JsonObject,
   JsonScalar
 } from "./types.js";
+import { deviceButtons } from "./device-buttons.js";
 import { deviceControls, type WritableFeature } from "./device-controls.js";
 import { canonicalDeviceModel, deviceIdentity } from "./device-identity.js";
 import type { DeviceImagePreferences } from "./device-images.js";
@@ -354,6 +355,12 @@ export class DeviceStore {
   getDevices(): DeviceView[] {
     this.expirePairingIfNeeded();
     const pairingActive = this.pairingStatus === "open" || this.pairingStatus === "pending";
+    // Olaylar en yeniden eskiye sıralı: her cihaz için ilk `action` kaydı son basılan düğmedir.
+    const lastActions = new Map<string, DeviceEventView>();
+    for (const event of this.events) {
+      if (event.property !== "action" || typeof event.value !== "string") continue;
+      if (!lastActions.has(event.sourceName)) lastActions.set(event.sourceName, event);
+    }
     return this.devices
       .filter((device) => device.type !== "Coordinator")
       .map((device) => {
@@ -389,6 +396,17 @@ export class DeviceStore {
             threshold: this.lowBatteryThreshold
           });
         }
+        const buttons = deviceButtons(id, actionTypes, this.aliases);
+        const lastActionEvent = lastActions.get(sourceName);
+        const lastAction = lastActionEvent
+          ? {
+            action: String(lastActionEvent.value),
+            buttonId: buttons.find((button) =>
+              button.actions.some((action) => action.action === lastActionEvent.value)
+            )?.id ?? null,
+            at: lastActionEvent.at
+          }
+          : null;
         if (stateValue.smoke === true) alerts.push({ code: "smoke", severity: "critical" });
         if (stateValue.carbon_monoxide === true) {
           alerts.push({ code: "carbon_monoxide", severity: "critical" });
@@ -419,6 +437,8 @@ export class DeviceStore {
           endpoints: deviceEndpoints(device),
           features,
           actionTypes,
+          buttons,
+          lastAction,
           alerts,
           controls: deviceControls(id, name, writable, stateValue, this.aliases),
           state: stateValue

@@ -757,7 +757,12 @@ app.put<{
     return reply.code(400).send({ ok: false, error: "İsim 2–32 bayt arasında olmalı." });
   }
   const channel = request.body?.channel?.trim().toLowerCase();
-  if (channel && !device.controls.some((control) => control.id === channel || control.id.startsWith(`${channel}:`))) {
+  // Kanal anahtarı hem kumanda kanallarını hem türetilmiş düğme alt varlıklarını (`button:1`) kapsar.
+  const knownChannel = channel !== undefined && (
+    device.controls.some((control) => control.id === channel || control.id.startsWith(`${channel}:`))
+    || (device.buttons ?? []).some((button) => button.id === channel)
+  );
+  if (channel && !knownChannel) {
     return reply.code(400).send({ ok: false, error: "Kanal bulunamadı." });
   }
   const aliasKey = channel ? `${id}:${channel}` : id;
