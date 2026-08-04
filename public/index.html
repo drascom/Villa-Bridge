@@ -186,16 +186,19 @@
     .automation-paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:14px;margin:0 0 20px}.automation-paths[hidden]{display:none}.automation-path{min-height:88px;display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:15px;padding:18px;border:1px solid var(--line);border-radius:18px;color:var(--ink);background:var(--surface);box-shadow:var(--card-shadow);text-align:left;touch-action:manipulation}.automation-path:hover,.automation-path:focus-visible{border-color:var(--forest)}.automation-path:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-path[disabled]{opacity:.62}.automation-path-glyph{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;background:var(--forest-soft);font-size:22px}.automation-path-copy{min-width:0}.automation-path strong{display:block;font-size:16px;font-weight:800}.automation-path-lead{display:block;margin-top:5px;color:var(--muted);font-size:13px;line-height:1.35}.automation-soon{display:inline-block;margin-top:9px;padding:3px 9px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:11px;font-weight:850}
     .automation-list{display:grid;gap:12px}.automation-card{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:15px;padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--card-shadow)}.automation-card-glyph{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;color:var(--forest);background:var(--forest-soft);font-size:21px}.automation-card-copy{min-width:0}.automation-card strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-card-note{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.35}.automation-empty{display:grid;justify-items:center;gap:10px;padding:44px 20px}.automation-empty-icon{width:62px;height:62px;display:grid;place-items:center;border-radius:20px;color:var(--forest);background:var(--forest-soft);font-size:30px}.automation-empty h2{margin:4px 0 0;color:var(--ink);font:750 23px/1.1 system-ui,sans-serif}.automation-empty p{max-width:480px;margin:0}
     dialog.simple-link-dialog{width:min(94vw,660px)}.simple-link-modal{max-height:min(92vh,860px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.simple-link-modal .room-filter{margin:16px 0 0}.simple-link-choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:11px;margin-top:16px}.simple-link-choice{min-height:88px;display:grid;align-content:center;gap:6px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.simple-link-choice:hover,.simple-link-choice:focus-visible{border-color:var(--forest)}.simple-link-choice:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.simple-link-choice.active{border-color:var(--forest);background:var(--forest-soft)}.simple-link-choice strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.simple-link-choice small{color:var(--muted);font-size:12px}.simple-link-summary{margin-top:18px;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.simple-link-summary[hidden]{display:none}.simple-link-summary strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.simple-link-summary p{margin:8px 0 0;font-size:13px;line-height:1.4}.simple-link-modal .modal-actions button[hidden]{display:none}
-    dialog.automation-dialog{width:min(94vw,680px)}.automation-modal{max-height:min(92vh,880px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.automation-modal .room-filter{margin:16px 0 0}.automation-modal .modal-actions button[hidden]{display:none}.automation-progress button[hidden]{display:none}.automation-modal .automation-paths{margin:18px 0 0}
+    dialog.automation-dialog{width:min(94vw,680px)}.automation-modal{max-height:min(92vh,880px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.automation-modal .modal-actions button[hidden]{display:none}.automation-progress button[hidden]{display:none}.automation-modal .automation-paths{margin:18px 0 0}
     dialog.automation-dialog::backdrop{background:rgba(12,26,20,.94);backdrop-filter:blur(10px)}
-    .automation-show-all{width:100%;min-height:56px;margin-top:14px;padding:14px;border:1px dashed var(--line);border-radius:16px;color:var(--muted);background:transparent;font-size:14px;font-weight:800;touch-action:manipulation}.automation-show-all:hover,.automation-show-all:focus-visible{border-color:var(--forest);color:var(--forest)}
+    .automation-tabs{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:16px;padding-bottom:2px;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none}.automation-tabs::-webkit-scrollbar{display:none}.automation-tab{min-height:44px;flex:0 0 auto;padding:10px 16px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;white-space:nowrap;touch-action:manipulation}.automation-tab:hover,.automation-tab:focus-visible{border-color:var(--forest)}.automation-tab.active{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}.automation-tab:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
+    .automation-search{position:relative;display:flex;margin-top:12px}.automation-search .search{width:100%;min-height:52px;font-size:16px}.automation-pick-list{display:block}
+    .automation-subhead{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft)}.automation-subback{width:48px;height:48px;flex:none;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font:850 22px/1 system-ui,sans-serif;touch-action:manipulation}.automation-subback:hover,.automation-subback:focus-visible{border-color:var(--forest);color:var(--forest)}.automation-subback:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-subhead-copy{min-width:0;display:grid;gap:3px}.automation-subhead-copy strong{font-size:16px;font-weight:850;overflow-wrap:anywhere}.automation-subhead-copy small{color:var(--muted);font-size:12px}
+    .automation-subitems{margin-top:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);overflow:hidden}.automation-subitems .automation-control-row{padding:14px}.automation-subitems .automation-control-row+.automation-control-row{border-top:1px solid var(--line)}
     .automation-map{display:grid;gap:12px;margin-top:4px}.automation-map-row{display:grid;gap:10px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft)}.automation-map-label{font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-map-row .automation-control-choices{justify-content:flex-start}.automation-map-row .automation-control-choice{min-height:52px;flex:1 1 132px}
     .automation-progress{position:sticky;top:-24px;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:24px 0 12px;margin-top:-24px;background:var(--surface)}.automation-top-next{min-width:120px;min-height:48px;font-size:15px}.automation-top-next[disabled]{opacity:.45}.automation-dots{display:flex;align-items:center;gap:7px}.automation-dots[hidden]{display:none}.automation-dots span{width:9px;height:9px;border-radius:50%;background:var(--line)}.automation-dots span.done{background:var(--forest-soft)}.automation-dots span.active{width:24px;border-radius:999px;background:var(--forest)}
     .automation-actions{position:sticky;bottom:-24px;z-index:2;justify-content:space-between;gap:12px;margin-top:24px;padding:16px 0 24px;background:var(--surface)}.automation-actions button{min-width:132px;min-height:52px;font-size:15px}.automation-actions button[disabled]{opacity:.45}
     .automation-triggers{display:grid;gap:11px;margin-top:16px}.automation-trigger{min-height:88px;display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-trigger:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-trigger[disabled]{opacity:.62}.automation-trigger.active{border-color:var(--forest);background:var(--forest-soft)}.automation-trigger-glyph{display:grid;place-items:center;font-size:23px}.automation-trigger strong{display:block;font-size:15px;font-weight:800}
     .automation-time{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}.automation-time-unit{display:grid;gap:9px;justify-items:center}.automation-time-value{min-width:88px;font:800 42px/1 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}.automation-time-step{width:88px;min-height:60px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);font-size:27px;font-weight:800;touch-action:manipulation}.automation-time-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-time-colon{font:800 34px/1 system-ui,sans-serif}
     .automation-days{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.automation-day{min-height:44px;padding:9px 15px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;touch-action:manipulation}.automation-day:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-day.active{border-color:var(--forest);background:var(--forest-soft)}
-    .automation-targets{display:grid;gap:10px;margin-top:16px}.automation-target{border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);overflow:hidden}.automation-target.selected{border-color:var(--forest)}.automation-target-head{width:100%;min-height:64px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px;border:0;color:var(--ink);background:transparent;text-align:left;touch-action:manipulation}.automation-target-head strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-target-head small{color:var(--muted);font-size:12px}.automation-control-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:0 14px 14px}.automation-control-row span{font-size:13px;font-weight:750;overflow-wrap:anywhere}.automation-control-choices{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}.automation-control-choice{min-height:48px;padding:10px 18px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:14px;font-weight:800;touch-action:manipulation}.automation-control-choice.active{border-color:var(--forest);background:var(--forest-soft)}
+    .automation-control-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:0 14px 14px}.automation-control-row span{font-size:13px;font-weight:750;overflow-wrap:anywhere}.automation-control-choices{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}.automation-control-choice{min-height:48px;padding:10px 18px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:14px;font-weight:800;touch-action:manipulation}.automation-control-choice.active{border-color:var(--forest);background:var(--forest-soft)}
     .automation-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}.automation-pick{min-height:88px;display:grid;align-content:center;gap:4px;padding:13px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-pick:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-pick.active{border-color:var(--forest);background:var(--forest-soft)}.automation-pick strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.automation-pick small{color:var(--muted);font-size:12px}
     .automation-events{display:grid;gap:9px;margin-top:14px}.automation-event{display:block;min-height:60px;padding:17px 15px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:15px;font-weight:750;text-align:left;touch-action:manipulation}.automation-event::first-letter{text-transform:uppercase}.automation-event:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-event.active{border-color:var(--forest);background:var(--forest-soft)}
     .automation-hint{margin:14px 0 0;padding:11px 13px;border-radius:13px;color:var(--muted);background:var(--surface-soft);font-size:13px;line-height:1.4}
@@ -374,7 +377,7 @@
 <dialog id="weatherLocationDialog"><div class="modal location-modal"><h2 data-i18n="chooseWeatherLocation">Choose weather location</h2><p data-i18n="chooseWeatherLocationLead">Search for a city or use this tablet’s current location.</p><button id="useCurrentWeatherLocation" class="secondary location-current" type="button" data-i18n="weatherUseLocation">Use current location</button><div class="location-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="weatherLocationSearch" type="search" autocomplete="off" data-i18n-placeholder="searchCity" placeholder="Search city…"></div><div id="weatherSearchStatus" class="location-search-status"></div><div id="weatherSearchResults" class="location-results"></div><div class="modal-actions"><button id="closeWeatherLocationDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
 <dialog id="widgetDialog"><div class="modal add-modal"><h2 data-i18n="addToDashboard">Add to dashboard</h2><div class="modal-tabs" role="tablist" data-i18n-aria="addToDashboard" aria-label="Add to dashboard"><button id="addTabWidgets" class="modal-tab" type="button" role="tab" aria-selected="true" aria-controls="addPanelWidgets" data-add-tab="widgets" data-i18n="addWidgetsTab">Widgets</button><button id="addTabGroups" class="modal-tab" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="groupForm" data-add-tab="groups" data-i18n="addGroupsTab">Device groups</button></div><section id="addPanelWidgets" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabWidgets" tabindex="0"><p data-i18n="addWidgetLead">Choose compact widgets for the information you want to see at a glance.</p><div id="widgetCatalog" class="widget-catalog"></div><div class="modal-actions"><button id="closeWidgetDialog" class="quiet" type="button" data-i18n="close">Close</button></div></section><form id="groupForm" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabGroups" tabindex="0" hidden><h2 id="groupDialogTitle" data-i18n="createDeviceGroup">Create device group</h2><p data-i18n="groupDialogLead">Give the widget a simple name, then choose its controls.</p><div class="field"><label for="groupName" data-i18n="groupName">Group name</label><input id="groupName" minlength="2" maxlength="32" autocomplete="off" required data-i18n-placeholder="groupNamePlaceholder" placeholder="Living room"><span class="room-suggest-hint" data-i18n="roomSuggestHint">Pick a suggestion or type your own name.</span><div id="roomSuggestions" class="room-suggestions"></div></div><div id="groupOrderRow" class="group-order-row" hidden><span data-i18n="groupOrder">Order</span><div class="group-order-actions"><button id="groupMoveLeft" class="secondary" type="button" data-i18n-aria="moveGroupEarlier" aria-label="Move earlier">←</button><span id="groupOrderPosition" class="group-order-position"></span><button id="groupMoveRight" class="secondary" type="button" data-i18n-aria="moveGroupLater" aria-label="Move later">→</button></div></div><div class="group-picker-head"><strong data-i18n="groupDevices">Devices and controls</strong><span id="groupSelectionCount"></span></div><div id="groupDeviceChoices" class="group-device-choices"></div><div class="modal-actions group-modal-actions"><button id="deleteGroup" class="danger-button" type="button" data-i18n="deleteGroup" hidden>Delete group</button><div><button id="cancelGroup" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveGroup" class="primary" type="submit" data-i18n="saveGroup">Save group</button></div></div></form></div></dialog>
 <dialog id="groupDeleteDialog"><div class="modal"><h2 data-i18n="deleteGroupTitle">Delete this room?</h2><p id="groupDeleteLead" class="danger-copy"></p><p class="group-delete-note" data-i18n="deleteGroupNote">The devices themselves stay untouched — only the room disappears.</p><div class="modal-actions"><button id="cancelGroupDelete" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmGroupDelete" class="danger-button" type="button" data-i18n="deleteGroup">Delete group</button></div></div></dialog>
-<dialog id="automationDialog" class="automation-dialog"><div class="modal automation-modal"><div class="automation-progress"><div id="automationStep" class="eyebrow"></div><div id="automationDots" class="automation-dots" aria-hidden="true"><span></span><span></span><span></span></div><button id="automationTopNext" class="primary automation-top-next" type="button" data-i18n="next">Next</button></div><h2 id="automationTitle" data-i18n="automationWhenTitle">When should it run?</h2><p id="automationLead" data-i18n="automationWhenLead">Pick the moment that starts it.</p><div id="automationRooms" class="room-filter" data-i18n-aria="roomFilterLabel" role="group" aria-label="Filter by room" hidden></div><div id="automationBody"></div><div class="modal-actions automation-actions"><button id="automationBack" class="secondary" type="button" data-i18n="back">Back</button><button id="automationNext" class="primary" type="button" data-i18n="next">Next</button></div></div></dialog>
+<dialog id="automationDialog" class="automation-dialog"><div class="modal automation-modal"><div class="automation-progress"><div id="automationStep" class="eyebrow"></div><div id="automationDots" class="automation-dots" aria-hidden="true"><span></span><span></span><span></span></div><button id="automationTopNext" class="primary automation-top-next" type="button" data-i18n="next">Next</button></div><h2 id="automationTitle" data-i18n="automationWhenTitle">When should it run?</h2><p id="automationLead" data-i18n="automationWhenLead">Pick the moment that starts it.</p><div id="automationBody"></div><div class="modal-actions automation-actions"><button id="automationBack" class="secondary" type="button" data-i18n="back">Back</button><button id="automationNext" class="primary" type="button" data-i18n="next">Next</button></div></div></dialog>
 <dialog id="automationActionDialog"><div class="modal device-action-modal"><div class="device-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg></div><h2 id="automationActionName">Automation</h2><p data-i18n="automationActionLead">Choose what you want to do with this automation.</p><div class="modal-actions"><button id="closeAutomationActions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="runAutomationNow" class="secondary" type="button" data-i18n="automationRunNow">Run now</button><button id="editAutomation" class="primary" type="button" data-i18n="automationEdit">Edit</button><button id="deleteAutomation" class="danger-button" type="button" data-i18n="automationDelete">Delete</button></div></div></dialog>
 <dialog id="simpleLinkDialog" class="simple-link-dialog"><div class="modal simple-link-modal"><div id="simpleLinkStep" class="eyebrow"></div><h2 id="simpleLinkTitle" data-i18n="simpleLinkStepOneTitle">Which button?</h2><p id="simpleLinkLead" data-i18n="simpleLinkStepOneLead">Choose the button or remote that should start it.</p><div id="simpleLinkRooms" class="room-filter" data-i18n-aria="roomFilterLabel" role="group" aria-label="Filter by room" hidden></div><div id="simpleLinkChoices" class="simple-link-choices"></div><div id="simpleLinkSummary" class="simple-link-summary" hidden></div><div class="modal-actions"><button id="simpleLinkBack" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="simpleLinkSave" class="primary" type="button" data-i18n="save" disabled hidden>Save</button></div></div></dialog>
 <dialog id="matterDialog"><div class="modal"><h2 data-i18n="connectPlatform">Connect Matter system</h2><p data-i18n="matterLead">Choose “Add Matter device” in Alexa, Apple Home or a compatible Matter controller and scan this code.</p><div id="qr" class="qr"></div><div id="manualCode" class="code"></div><div id="matterWaiting" class="matter-waiting"><span class="matter-waiting-dot" aria-hidden="true"></span><span data-i18n="matterPairingWaiting">Waiting for pairing…</span></div><p class="matter-hint" data-i18n="matterEcosystemHint">Each ecosystem needs its own code: close this window and press the button again to add another controller such as Alexa.</p><div class="modal-actions"><button id="closeMatter" class="quiet" data-i18n="close">Close</button></div></div></dialog>
@@ -3735,9 +3738,47 @@
   // Sınıflandırma sunucudan gelir: `category` standart `definition.exposes[].type` tahminidir,
   // kullanıcı rol seçtiyse onunla ezilmiştir. İstemcide model listesi ya da satıcıya özgü
   // özellik adına bakan hiçbir kural yok — öyle bir kural yalnız tek bir evde çalışır.
-  // Kanal seviyesi rol kümelemeyi de sürer: bir kanalı lamba olan çok kanallı anahtar lamba tarafına düşer.
-  const automationLightLike=device=>device?.category==="light"
-    ||(device?.controls||[]).some(control=>control.kind==="switch"&&control.category==="light");
+  // Sekmeler cihaz sınıfından türer, eleme yapmaz. Bir cihaz birden çok sekmede görünebilir:
+  // kanal seviyesi rol de sayılır, yani bir kanalı lamba olan çok kanallı anahtar hem "Lambalar"
+  // hem "Anahtarlar" sekmesinde durur. Basış yayan cihaz "Kumandalar"a, sınıfı ve basışı olmayıp
+  // yalnız sensör özelliği bildiren cihaz "Sensörler"e düşer; hiçbiri yoksa "Diğer".
+  const automationTabOrder=["light","switch","cover","climate","lock","fan","button","sensor","other"];
+  const automationTabLabels={
+    light:"automationTabLight",switch:"automationTabSwitch",cover:"automationTabCover",
+    climate:"automationTabClimate",lock:"automationTabLock",fan:"automationTabFan",
+    button:"automationTabButton",sensor:"automationTabSensor",other:"automationTabOther"
+  };
+  const automationDeviceTabs=device=>{
+    const tabs=new Set();
+    const add=value=>{if(automationTabOrder.includes(value))tabs.add(value)};
+    add(device?.category);
+    for(const control of device?.controls||[])if(control.kind==="switch")add(control.category);
+    const classified=tabs.size>0;
+    if((device?.buttons||[]).length||(device?.actionTypes||[]).length)tabs.add("button");
+    if(!classified&&!tabs.size){
+      const keys=new Set([...(device?.features||[]),...Object.keys(device?.state||{})]);
+      if(Object.keys(automationSensorEvents).some(property=>keys.has(property)))tabs.add("sensor");
+    }
+    if(!tabs.size)tabs.add("other");
+    return[...tabs];
+  };
+  const automationTabMatches=(device,tab)=>!tab||tab==="all"||automationDeviceTabs(device).includes(tab);
+  // Oda süzgeci kalktı; odaya erişim aramadan geliyor. Kanal ve düğme adları da aranabilir.
+  const automationDeviceRooms=device=>(state.groups||[])
+    .filter(group=>(group.items||[]).some(item=>item.deviceId===device?.id))
+    .map(group=>group.name);
+  const automationSearchMatches=(device,query)=>{
+    const needle=String(query||"").trim().toLocaleLowerCase(state.language);
+    if(!needle)return true;
+    const parts=[
+      device?.name,
+      deviceKind(device),
+      ...(device?.controls||[]).filter(control=>control.kind==="switch").map(control=>control.name),
+      ...(device?.buttons||[]).map(button=>deviceButtonName(button)),
+      ...automationDeviceRooms(device)
+    ];
+    return parts.some(part=>String(part||"").toLocaleLowerCase(state.language).includes(needle));
+  };
   const automationDevice=action=>state.devices.find(device=>device.id===action?.deviceId)||null;
   // Kanonik hedef property; controlId ve ad yalnızca sunum verisi (§5.1.1).
   const automationControl=action=>automationDevice(action)?.controls.find(control=>control.property===action?.property)||null;
@@ -4137,9 +4178,12 @@
       // Varsayılan takip: açıldığında Aç, kapandığında Kapat.
       mapOn:seed?seed.onMode:"on",
       mapOff:seed?seed.offMode:"off",
-      showAllTriggerDevices:false,
-      openDevice:seed?.target?.deviceId||action?.deviceId||null,
-      room:null,
+      // Seçici durumu adım başına ayrı: sekme + arama. Düzenlemede hedef cihazın alt öğe ekranı açılır.
+      triggerTab:"all",
+      targetTab:"all",
+      triggerQuery:"",
+      targetQuery:"",
+      targetDeviceId:seed?.target?.deviceId||action?.deviceId||null,
       name:existing?.name||""
     };
     const dialog=$("#automationDialog");
@@ -4177,50 +4221,109 @@
   // Kanıtsız cihaz gizlenmez — yeni eşleştirilmiş, henüz basılmamış gerçek bir kumanda kaybolmasın.
   // Bunun yerine ikinci sıraya iner ve "henüz sinyal göndermedi" notuyla işaretlenir.
   const automationButtonUnproven=(wizard,device)=>Boolean(device)&&wizard?.triggerKind==="button"&&!deviceSeenPress(device);
-  // Tetikleyici türüne göre kümeleme: agresif eleme yok. Düğme yolunda kanıt, anahtar yolunda
-  // "lamba gibi görünenler" ikinci kümeye iner ve "Tüm cihazları göster" ile açılır.
+  // Tetikleyici türüne göre kümeleme: eleme yok. Düğme yolunda kanıtsız cihaz gizlenmez, yalnız
+  // ikinci kümeye iner ve "henüz sinyal göndermedi" notuyla işaretlenir.
   const automationPickGroups=(devices,kind)=>kind==="button"
     ?[{devices:devices.filter(deviceSeenPress),proven:true,head:"automationButtonProvenGroup"},
       {devices:devices.filter(device=>!deviceSeenPress(device)),proven:false,head:"automationButtonUnprovenGroup"}]
-    :kind==="deviceState"
-    ?[{devices:devices.filter(device=>!automationLightLike(device)),proven:true,head:"automationSwitchGroup"},
-      {devices:devices.filter(automationLightLike),proven:true,extra:true,head:"automationOtherDevicesGroup"}]
     :[{devices,proven:true}];
-  function automationTriggerPickHtml(wizard){
-    const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
-    // Kayıtlı kural düzenlenirken seçili basış elenmiş olsa bile listede kalır (`wizard.triggerAction`).
+  const automationByName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
+  // Adım 1'de her cihaz tetikleyici olabilir; yalnız o yolda hiç olayı olmayan cihaz listeye girmez.
+  // Kayıtlı kural düzenlenirken seçili basış elenmiş olsa bile listede kalır (`wizard.triggerAction`).
+  const automationTriggerDevices=wizard=>state.devices
+    .filter(device=>automationTriggerEvents(device,wizard.triggerKind,wizard.triggerAction).length>0)
+    .sort(automationByName);
+  // §8.2 — otomasyonu başlatan kanal hedef olamaz; döngü daha seçim anında engellenir.
+  // Çok kanallı anahtarda cihazın komşu kanalları listede kalır: bir kanal tetikler, öbürü yanar.
+  // Buton yolunda kanal (property) yoktur; orada cihazın tamamı elenir.
+  // Hedef adımının tek elemesi cihazın gerçek yeteneğidir: açılıp kapatılabilir kontrolü olmayan
+  // cihaz (ve §8.1 gereği kilit/siren) hiç listelenmez — ad ya da model tahmini yok.
+  function automationTargetScope(wizard){
+    const channelStarter=wizard.triggerKind!=="time"&&wizard.triggerKind!=="button"&&Boolean(wizard.triggerProperty);
+    const starter=wizard.triggerKind==="time"||channelStarter?null:wizard.triggerDeviceId;
+    const starterChannel=channelStarter?automationChannelKey(wizard.triggerDeviceId,wizard.triggerProperty):null;
+    const targetControls=device=>automationControls(device).filter(control=>automationChannelKey(device.id,control.property)!==starterChannel);
     const devices=state.devices
-      .filter(device=>automationTriggerEvents(device,wizard.triggerKind,wizard.triggerAction).length>0)
-      .sort(byName);
-    if(!devices.length)return`<div class="empty">${t(wizard.triggerKind==="button"?"automationNoButtons":"automationNoSensors")}</div>`;
-    const groups=automationPickGroups(devices,wizard.triggerKind).filter(group=>group.devices.length>0);
+      .filter(device=>targetControls(device).length>0&&device.id!==starter)
+      .sort(automationByName);
+    return{targetControls,devices};
+  }
+  const automationPickScopeDevices=(wizard,scope)=>scope==="trigger"
+    ?automationTriggerDevices(wizard)
+    :automationTargetScope(wizard).devices;
+  const automationPickQuery=(wizard,scope)=>scope==="trigger"?wizard.triggerQuery:wizard.targetQuery;
+  const automationPickTab=(wizard,scope)=>scope==="trigger"?wizard.triggerTab:wizard.targetTab;
+  // Listede işaretli kalan cihaz: hedefte alt öğe ekranından çıkılsa da seçim görünür kalır.
+  const automationPickSelectedId=(wizard,scope)=>scope==="trigger"
+    ?wizard.triggerDeviceId
+    :wizard.targetDeviceId||wizard.target?.deviceId||wizard.action?.deviceId||null;
+  // Sekmeler evdeki cihazlardan türer: boş sekme çıkmaz, tek sekme kalırsa şerit hiç gösterilmez.
+  function automationTabsHtml(wizard,scope,devices){
+    const active=automationPickTab(wizard,scope)||"all";
+    const found=new Set();
+    for(const device of devices)for(const tab of automationDeviceTabs(device))found.add(tab);
+    const tabs=automationTabOrder.filter(tab=>found.has(tab));
+    if(tabs.length<2)return"";
+    const chip=(tab,label)=>{
+      const on=active===tab;
+      return`<button class="automation-tab${on?" active":""}" type="button" data-automation-tab="${scope}|${tab}" aria-pressed="${on}">${esc(label)}</button>`;
+    };
+    return`<div class="automation-tabs" role="group" aria-label="${esc(t("automationTabsLabel"))}">${chip("all",t("automationTabAll"))}${tabs.map(tab=>chip(tab,t(automationTabLabels[tab]))).join("")}</div>`;
+  }
+  function automationPickListHtml(wizard,scope){
+    const devices=automationPickScopeDevices(wizard,scope).filter(device=>
+      automationTabMatches(device,automationPickTab(wizard,scope))&&automationSearchMatches(device,automationPickQuery(wizard,scope)));
+    if(!devices.length)return`<div class="empty">${esc(t("automationPickNoMatch"))}</div>`;
+    const selected=automationPickSelectedId(wizard,scope);
+    const groups=(scope==="trigger"?automationPickGroups(devices,wizard.triggerKind):[{devices,proven:true}])
+      .filter(group=>group.devices.length>0);
     // Başlık yalnızca iki küme de doluyken: tek kümede gereksiz gürültü olmasın.
     const labelled=groups.length>1;
-    // Katlanmış küme seçili cihazı taşıyorsa açık gelir: düzenlemede seçim kaybolmasın.
-    const folded=groups.find(group=>group.extra)||null;
-    // Katlanacak başka küme yoksa liste boş görünmesin; katlama yalnız önde bir şey varken anlamlı.
-    const showFolded=Boolean(folded)&&(wizard.showAllTriggerDevices||groups.length===1||folded.devices.some(item=>item.id===wizard.triggerDeviceId));
-    const picks=groups.map(group=>{
-      if(group.extra&&!showFolded){
-        return`<button class="automation-show-all" type="button" data-automation-show-all="1">${esc(t("automationShowAllDevices",{count:group.devices.length}))}</button>`;
-      }
+    return groups.map(group=>{
       const head=labelled?`<p class="automation-pick-head">${esc(t(group.head))}</p>`:"";
       const cards=group.devices.map(device=>{
-        const active=wizard.triggerDeviceId===device.id;
+        const active=selected===device.id;
         const note=group.proven?deviceKind(device):t("automationButtonUnproven");
-        return`<button class="automation-pick${active?" active":""}${group.proven?"":" unproven"}" type="button" data-automation-trigger-device="${esc(device.id)}" aria-pressed="${active}"><strong>${esc(device.name)}</strong><small>${esc(note)}</small></button>`;
+        const hook=scope==="trigger"
+          ?`data-automation-trigger-device="${esc(device.id)}"`
+          :`data-automation-target-device="${esc(device.id)}"`;
+        return`<button class="automation-pick${active?" active":""}${group.proven?"":" unproven"}" type="button" ${hook} aria-pressed="${active}"><strong>${esc(device.name)}</strong><small>${esc(note)}</small></button>`;
       }).join("");
       return`${head}<div class="automation-picks">${cards}</div>`;
     }).join("");
-    const device=devices.find(item=>item.id===wizard.triggerDeviceId)||null;
+  }
+  // Ortak cihaz seçici: sekmeler + arama + kart ızgarası. Süzgeç değil düzenleme — cihaz elenmez.
+  function automationPickerHtml(wizard,scope){
+    const devices=automationPickScopeDevices(wizard,scope);
+    const emptyKey=scope==="target"?"automationNoTargets":wizard.triggerKind==="button"?"automationNoButtons":"automationNoSensors";
+    if(!devices.length)return`<div class="empty">${t(emptyKey)}</div>`;
+    const query=automationPickQuery(wizard,scope)||"";
+    const search=`<div class="automation-search"><input class="search" type="search" data-automation-search="${scope}" value="${esc(query)}" placeholder="${esc(t("automationSearchPlaceholder"))}" aria-label="${esc(t("automationSearchPlaceholder"))}" autocomplete="off" autocapitalize="none"></div>`;
+    return`<div class="automation-picker">${automationTabsHtml(wizard,scope,devices)}${search}<div class="automation-pick-list" data-automation-pick-list="${scope}">${automationPickListHtml(wizard,scope)}</div></div>`;
+  }
+  // Alt öğe ekranının başlığı: kanalların hangi cihaza ait olduğu renkle değil, adıyla yazar.
+  const automationPickHeadHtml=(device,scope)=>`<div class="automation-subhead"><button class="automation-subback" type="button" data-automation-pick-back="${scope}" aria-label="${esc(t("automationPickBack"))}" title="${esc(t("automationPickBack"))}"><span aria-hidden="true">‹</span></button><span class="automation-subhead-copy"><strong>${esc(device.name)}</strong><small>${esc(deviceKind(device))}</small></span></div><p class="automation-pick-head">${esc(t("automationPickParts",{device:device.name}))}</p>`;
+  // Alt öğe ekranı yalnız gerçek bir seçim varsa açılır: tek alt öğeli cihazda bu adım atlanır.
+  // Kanıtsız düğmede uyarı ve durum alternatifi okunmadan geçilmesin diye ekran yine açılır.
+  const automationTriggerChoiceCount=(wizard,device)=>automationMappingMode(wizard)
+    ?automationStateControls(device).length
+    :automationTriggerEvents(device,wizard.triggerKind,wizard.triggerAction).length;
+  const automationTriggerDetailDevice=wizard=>{
+    const device=state.devices.find(item=>item.id===wizard.triggerDeviceId)||null;
+    if(!device)return null;
+    return automationTriggerChoiceCount(wizard,device)>1||automationButtonUnproven(wizard,device)?device:null;
+  };
+  function automationTriggerPickHtml(wizard){
+    const device=automationTriggerDetailDevice(wizard);
+    if(!device)return automationPickerHtml(wizard,"trigger");
+    const head=automationPickHeadHtml(device,"trigger");
     if(automationMappingMode(wizard)){
       // Durum sorulmaz; yalnız çok kanallı anahtarda hangi kanal olduğu sorulur.
-      const controls=automationStateControls(device);
-      const channels=controls.length>1?controls.map(control=>{
+      const channels=automationStateControls(device).map(control=>{
         const active=wizard.triggerProperty===control.property;
         return`<button class="automation-event${active?" active":""}" type="button" data-automation-channel="${esc(control.property)}" aria-pressed="${active}">${esc(control.name)}</button>`;
-      }).join(""):"";
-      return`${picks}${channels?`<div class="automation-events">${channels}</div>`:""}`;
+      }).join("");
+      return`${head}<div class="automation-events">${channels}</div>`;
     }
     const events=automationTriggerEvents(device,wizard.triggerKind,wizard.triggerAction);
     // Alt varlık kuralı (§5.1.1): her düğme ve her özellik ayrı bir hedeftir.
@@ -4236,44 +4339,36 @@
       ?`<div class="automation-alt"><p>${esc(t("automationButtonStateAlternative"))}</p><button class="secondary" type="button" data-automation-state-instead="${esc(device.id)}">${esc(t("automationButtonStateAlternativeAction"))}</button></div>`
       :"";
     const hint=device&&wizard.triggerKind==="button"?`<p class="automation-hint">${esc(automationButtonHint(device))}</p>`:"";
-    return`${picks}${warning}${alternative}${events.length?`<div class="automation-events">${list}</div>`:""}${hint}`;
+    return`${head}${warning}${alternative}${events.length?`<div class="automation-events">${list}</div>`:""}${hint}`;
   }
+  // Seçili hedef cihaz artık listede değilse (tetikleyici değişmiş olabilir) alt öğe ekranı açılmaz.
+  const automationTargetDetailDevice=wizard=>{
+    if(!wizard.targetDeviceId)return null;
+    return automationTargetScope(wizard).devices.find(item=>item.id===wizard.targetDeviceId)||null;
+  };
+  // Adım 2 de iki ekrandır: önce cihaz, sonra o cihazın kanalları. Başlık hangi cihaz olduğunu yazar.
   function automationThenHtml(wizard){
-    const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
-    // §8.2 — otomasyonu başlatan kanal hedef olamaz; döngü daha seçim anında engellenir.
-    // Çok kanallı anahtarda cihazın komşu kanalları listede kalır: bir kanal tetikler, öbürü yanar.
-    // Buton yolunda kanal (property) yoktur; orada cihazın tamamı elenir.
-    const channelStarter=wizard.triggerKind!=="time"&&wizard.triggerKind!=="button"&&Boolean(wizard.triggerProperty);
-    const starter=wizard.triggerKind==="time"||channelStarter?null:wizard.triggerDeviceId;
-    const starterChannel=channelStarter?automationChannelKey(wizard.triggerDeviceId,wizard.triggerProperty):null;
-    const targetControls=device=>automationControls(device).filter(control=>automationChannelKey(device.id,control.property)!==starterChannel);
-    const devices=state.devices
-      .filter(device=>targetControls(device).length>0&&device.id!==starter&&(!wizard.room||deviceInRoom(device,wizard.room)))
-      .sort(byName);
-    if(!devices.length)return`<div class="empty">${t("automationNoTargets")}</div>`;
+    const scope=automationTargetScope(wizard);
+    const device=scope.devices.find(item=>item.id===wizard.targetDeviceId)||null;
+    if(!device)return automationPickerHtml(wizard,"target");
+    const controls=scope.targetControls(device);
     // Anahtar yolunda burada yalnız hedef seçilir; ne yapılacağı eşleme formunda sorulur.
     const mapping=automationMappingMode(wizard);
-    const rows=devices.map(device=>{
-      const controls=targetControls(device);
-      const selected=mapping?wizard.target?.deviceId===device.id:wizard.action?.deviceId===device.id;
-      const open=wizard.openDevice===device.id;
-      // Tek uygun kontrol sessizce seçilir; kullanıcıya "hangisi?" diye sorulmaz.
-      const single=controls.length===1;
-      const choices=open?controls.map(control=>{
-        if(mapping){
-          const chosen=wizard.target?.deviceId===device.id&&wizard.target?.property===control.property;
-          return`<div class="automation-control-row"><span>${single?"":esc(control.name)}</span><div class="automation-control-choices"><button class="automation-control-choice${chosen?" active":""}" type="button" data-automation-target="${esc(device.id)}|${esc(control.id)}" aria-pressed="${chosen}">${t(chosen?"automationTargetPicked":"automationTargetPick")}</button></div></div>`;
-        }
-        const picked=wizard.action?.deviceId===device.id&&wizard.action?.property===control.property;
-        const mode=picked?automationActionMode(wizard.action):null;
-        const choice=(key,label,active)=>`<button class="automation-control-choice${active?" active":""}" type="button" data-automation-action="${esc(device.id)}|${esc(control.id)}|${key}" aria-pressed="${active}">${t(label)}</button>`;
-        // "Değiştir" yalnızca cihaz tek basışta iki yönü de destekliyorsa görünür.
-        const toggle=automationCanToggle(control)?choice("toggle","automationTurnToggle",mode==="toggle"):"";
-        return`<div class="automation-control-row"><span>${single?"":esc(control.name)}</span><div class="automation-control-choices">${choice("on","automationTurnOn",mode==="on")}${choice("off","automationTurnOff",mode==="off")}${toggle}</div></div>`;
-      }).join(""):"";
-      return`<article class="automation-target${selected?" selected":""}"><button class="automation-target-head" type="button" data-automation-device="${esc(device.id)}" aria-expanded="${open}"><span><strong>${esc(device.name)}</strong><small>${esc(deviceKind(device))}</small></span><span aria-hidden="true">${open?"⌄":"›"}</span></button>${choices}</article>`;
+    // Tek kanallı cihazda "hangisi?" diye sorulmaz; satır adsız gelir.
+    const single=controls.length===1;
+    const rows=controls.map(control=>{
+      if(mapping){
+        const chosen=wizard.target?.deviceId===device.id&&wizard.target?.property===control.property;
+        return`<div class="automation-control-row"><span>${single?"":esc(control.name)}</span><div class="automation-control-choices"><button class="automation-control-choice${chosen?" active":""}" type="button" data-automation-target="${esc(device.id)}|${esc(control.id)}" aria-pressed="${chosen}">${t(chosen?"automationTargetPicked":"automationTargetPick")}</button></div></div>`;
+      }
+      const picked=wizard.action?.deviceId===device.id&&wizard.action?.property===control.property;
+      const mode=picked?automationActionMode(wizard.action):null;
+      const choice=(key,label,active)=>`<button class="automation-control-choice${active?" active":""}" type="button" data-automation-action="${esc(device.id)}|${esc(control.id)}|${key}" aria-pressed="${active}">${t(label)}</button>`;
+      // "Değiştir" yalnızca cihaz tek basışta iki yönü de destekliyorsa görünür.
+      const toggle=automationCanToggle(control)?choice("toggle","automationTurnToggle",mode==="toggle"):"";
+      return`<div class="automation-control-row"><span>${single?"":esc(control.name)}</span><div class="automation-control-choices">${choice("on","automationTurnOn",mode==="on")}${choice("off","automationTurnOff",mode==="off")}${toggle}</div></div>`;
     }).join("");
-    return`<div class="automation-targets">${rows}</div>`;
+    return`${automationPickHeadHtml(device,"target")}<div class="automation-subitems">${rows}</div>`;
   }
   // Eşleme formu: her yön için ne yapılacağını kullanıcı seçer. Tablette geniş satır, geniş düğme.
   function automationMapHtml(wizard){
@@ -4300,6 +4395,62 @@
     const entry=(path,glyph,titleKey,leadKey)=>`<button class="automation-path" type="button" data-automation-path="${path}"><span class="automation-path-glyph" aria-hidden="true">${glyph}</span><span class="automation-path-copy"><strong>${t(titleKey)}</strong><span class="automation-path-lead">${t(leadKey)}</span></span></button>`;
     return`<div class="automation-paths">${entry("link","⚡","simpleLinkPath","simpleLinkPathLead")}${entry("rule","🧩","rulePath","rulePathLead")}</div>`;
   }
+  // Gövde her yeniden çizimde ve arama tazelemesinde aynı yerden bağlanır.
+  function automationBindBody(){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    $$("[data-automation-path]").forEach(button=>button.onclick=()=>chooseAutomationPath(button.dataset.automationPath));
+    $$("[data-automation-channel]").forEach(button=>button.onclick=()=>chooseAutomationChannel(button.dataset.automationChannel));
+    $$("[data-automation-target]").forEach(button=>button.onclick=()=>chooseAutomationTarget(button.dataset.automationTarget));
+    $$("[data-automation-map]").forEach(button=>button.onclick=()=>chooseAutomationMap(button.dataset.automationMap));
+    $$("[data-automation-trigger]").forEach(button=>button.onclick=()=>chooseAutomationTrigger(button.dataset.automationTrigger));
+    $$("[data-automation-time]").forEach(button=>button.onclick=()=>{
+      const [unit,amount]=button.dataset.automationTime.split(":");
+      stepAutomationTime(unit,Number(amount));
+    });
+    $$("[data-automation-day]").forEach(button=>button.onclick=()=>toggleAutomationDay(button.dataset.automationDay));
+    $$("[data-automation-tab]").forEach(button=>button.onclick=()=>chooseAutomationTab(button.dataset.automationTab));
+    $$("[data-automation-search]").forEach(input=>{input.oninput=()=>automationSearchInput(input.dataset.automationSearch,input.value)});
+    $$("[data-automation-pick-back]").forEach(button=>button.onclick=()=>automationPickBack(button.dataset.automationPickBack));
+    $$("[data-automation-trigger-device]").forEach(button=>button.onclick=()=>chooseAutomationTriggerDevice(button.dataset.automationTriggerDevice));
+    $$("[data-automation-target-device]").forEach(button=>button.onclick=()=>chooseAutomationTargetDevice(button.dataset.automationTargetDevice));
+    $$("[data-automation-event]").forEach(button=>button.onclick=()=>chooseAutomationEvent(button.dataset.automationEvent));
+    $$("[data-automation-state-instead]").forEach(button=>button.onclick=()=>automationUseStateInstead(button.dataset.automationStateInstead));
+    $$("[data-automation-action]").forEach(button=>button.onclick=()=>chooseAutomationAction(button.dataset.automationAction));
+    const nameInput=$("#automationName");
+    if(nameInput)nameInput.oninput=()=>{wizard.name=nameInput.value.slice(0,64)};
+  }
+  // Arama her tuşta yalnız listeyi tazeler: odak ve imleç arama kutusunda kalır.
+  function automationSearchInput(scope,value){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    if(scope==="trigger")wizard.triggerQuery=value;
+    else wizard.targetQuery=value;
+    const list=$(`[data-automation-pick-list="${scope}"]`);
+    if(!list)return;
+    list.innerHTML=automationPickListHtml(wizard,scope);
+    automationBindBody();
+  }
+  function chooseAutomationTab(token){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    const [scope,tab]=String(token).split("|");
+    if(scope==="trigger")wizard.triggerTab=tab;
+    else wizard.targetTab=tab;
+    renderAutomationWizard();
+  }
+  // Alt öğe ekranı açıksa geri düğmesi adımı değiştirmez, cihaz listesine döner.
+  const automationDetailOpen=wizard=>wizard.step===1
+    ?Boolean(automationTriggerDetailDevice(wizard))
+    :wizard.step===2?Boolean(automationTargetDetailDevice(wizard)):false;
+  function automationPickBack(scope){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    cancelAutomationAdvance();
+    if(scope==="trigger")automationClearTriggerDevice(wizard);
+    else wizard.targetDeviceId=null;
+    renderAutomationWizard();
+  }
   function renderAutomationWizard(){
     const wizard=state.automationWizard;
     if(!wizard)return;
@@ -4314,37 +4465,14 @@
     });
     $("#automationTitle").textContent=t(paths?"automationPathTitle":titles[wizard.step-1]);
     $("#automationLead").textContent=t(paths?"automationPathLead":leads[wizard.step-1]);
-    const rooms=$("#automationRooms");
-    rooms.hidden=wizard.step!==2||state.groups.length===0;
-    rooms.innerHTML=rooms.hidden?"":[{id:"",name:t("roomFilterAll")},...state.groups].map(group=>{
-      const active=(group.id||null)===wizard.room;
-      return`<button class="room-chip${active?" active":""}" type="button" data-automation-room="${esc(group.id)}" aria-pressed="${active}">${esc(group.name)}</button>`;
-    }).join("");
     $("#automationBody").innerHTML=paths
       ?automationPathHtml()
       :wizard.step===1?automationWhenHtml(wizard)
       :wizard.step===2?automationThenHtml(wizard):automationReviewHtml(wizard);
-    $$("[data-automation-path]").forEach(button=>button.onclick=()=>chooseAutomationPath(button.dataset.automationPath));
-    $$("[data-automation-show-all]").forEach(button=>button.onclick=()=>{wizard.showAllTriggerDevices=true;renderAutomationWizard()});
-    $$("[data-automation-channel]").forEach(button=>button.onclick=()=>chooseAutomationChannel(button.dataset.automationChannel));
-    $$("[data-automation-target]").forEach(button=>button.onclick=()=>chooseAutomationTarget(button.dataset.automationTarget));
-    $$("[data-automation-map]").forEach(button=>button.onclick=()=>chooseAutomationMap(button.dataset.automationMap));
-    $$("[data-automation-trigger]").forEach(button=>button.onclick=()=>chooseAutomationTrigger(button.dataset.automationTrigger));
-    $$("[data-automation-time]").forEach(button=>button.onclick=()=>{
-      const [unit,amount]=button.dataset.automationTime.split(":");
-      stepAutomationTime(unit,Number(amount));
-    });
-    $$("[data-automation-day]").forEach(button=>button.onclick=()=>toggleAutomationDay(button.dataset.automationDay));
-    $$("[data-automation-trigger-device]").forEach(button=>button.onclick=()=>chooseAutomationTriggerDevice(button.dataset.automationTriggerDevice));
-    $$("[data-automation-event]").forEach(button=>button.onclick=()=>chooseAutomationEvent(button.dataset.automationEvent));
-    $$("[data-automation-state-instead]").forEach(button=>button.onclick=()=>automationUseStateInstead(button.dataset.automationStateInstead));
-    $$("[data-automation-room]").forEach(button=>button.onclick=()=>{wizard.room=button.dataset.automationRoom||null;renderAutomationWizard()});
-    $$("[data-automation-device]").forEach(button=>button.onclick=()=>toggleAutomationDevice(button.dataset.automationDevice));
-    $$("[data-automation-action]").forEach(button=>button.onclick=()=>chooseAutomationAction(button.dataset.automationAction));
-    const nameInput=$("#automationName");
-    if(nameInput)nameInput.oninput=()=>{wizard.name=nameInput.value.slice(0,64)};
+    automationBindBody();
     // İlk adımda dönülecek yer yok: düğme diyaloğu kapatır, o yüzden etiketi de "Vazgeç".
-    $("#automationBack").textContent=t(wizard.step<=1?"cancel":"back");
+    // Alt öğe ekranındayken geri cihaz listesine döner, o yüzden orada etiket "Geri".
+    $("#automationBack").textContent=t(wizard.step<=1&&!automationDetailOpen(wizard)?"cancel":"back");
     // Aynı düğme hem üstte hem altta: uzun ekranda kaydetmek için kaydırmak gerekmiyor.
     const label=t(wizard.step===3?"save":"next");
     const ready=automationStepReady(wizard);
@@ -4489,11 +4617,22 @@
     }
     renderAutomationWizard();
   }
-  function toggleAutomationDevice(deviceId){
+  // Hedefte de önce cihaz seçilir, sonra alt öğesi. Eşleme yolunda tek kanallı cihazda alt öğe
+  // ekranı hiç açılmaz: kanal sessizce seçilip bir sonraki adıma geçilir.
+  function chooseAutomationTargetDevice(deviceId){
     const wizard=state.automationWizard;
     if(!wizard)return;
-    wizard.openDevice=wizard.openDevice===deviceId?null:deviceId;
+    const scope=automationTargetScope(wizard);
+    const device=scope.devices.find(item=>item.id===deviceId)||null;
+    if(!device)return;
+    const controls=scope.targetControls(device);
+    wizard.targetDeviceId=deviceId;
+    if(automationMappingMode(wizard)&&controls.length===1){chooseAutomationTarget(`${deviceId}|${controls[0].id}`);return}
     renderAutomationWizard();
+    afterAutomationChoice(()=>{
+      const list=$("#automationBody .automation-subitems");
+      if(list)list.scrollIntoView({behavior:"smooth",block:"center"});
+    });
   }
   function chooseAutomationAction(token){
     const wizard=state.automationWizard;
@@ -4547,6 +4686,8 @@
   function stepBackAutomation(){
     const wizard=state.automationWizard;
     cancelAutomationAdvance();
+    // Alt öğe ekranından geri: adım değişmez, cihaz listesine dönülür.
+    if(wizard&&automationDetailOpen(wizard)){automationPickBack(wizard.step===1?"trigger":"target");return}
     if(!wizard||wizard.step<=1){$("#automationDialog").close();return}
     wizard.step-=1;
     renderAutomationWizard();

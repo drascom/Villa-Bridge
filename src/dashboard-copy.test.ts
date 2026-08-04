@@ -1507,8 +1507,10 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /\.automation-dots\[hidden\]\{display:none\}/);
   assert.match(dashboard, /automationPathTitle:"Bunu nasıl kurmak istersiniz\?"/);
   assert.match(dashboard, /automationPathTitle:"How do you want to set this up\?"/);
-  // Adım 1'de dönülecek yer yok: düğme kapatıyor, etiketi de "Vazgeç".
-  assert.match(dashboard, /\$\("#automationBack"\)\.textContent=t\(wizard\.step<=1\?"cancel":"back"\)/);
+  // Adım 1'de dönülecek yer yok: düğme kapatıyor, etiketi de "Vazgeç". Alt öğe ekranındaysa
+  // dönülecek yer var (cihaz listesi), orada etiket "Geri" olur.
+  assert.match(dashboard, /\$\("#automationBack"\)\.textContent=t\(wizard\.step<=1&&!automationDetailOpen\(wizard\)\?"cancel":"back"\)/);
+  assert.match(dashboard, /if\(wizard&&automationDetailOpen\(wizard\)\)\{automationPickBack\(wizard\.step===1\?"trigger":"target"\);return\}/);
   assert.match(dashboard, /if\(!wizard\|\|wizard\.step<=1\)\{\$\("#automationDialog"\)\.close\(\);return\}/);
 
   // Üç adımlı sihirbaz kabuğu.
@@ -1554,11 +1556,13 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /automationDay1:"Pzt"/);
   assert.match(dashboard, /automationDay7:"Sun"/);
 
-  // Ekran 2: oda çipleri + cihaz kartı; alt varlıklar satır içinde açılır.
-  assert.match(dashboard, /data-automation-room="\$\{esc\(group\.id\)\}"/);
-  assert.match(dashboard, /function toggleAutomationDevice\(deviceId\)\{/);
+  // Ekran 2 iki aşamalı: önce cihaz kartı, sonra o cihazın alt öğeleri. Oda süzgeci kalktı,
+  // odaya erişim aramadan geliyor.
+  assert.doesNotMatch(dashboard, /data-automation-room/);
+  assert.doesNotMatch(dashboard, /id="automationRooms"/);
+  assert.match(dashboard, /function chooseAutomationTargetDevice\(deviceId\)\{/);
   assert.match(dashboard, /const single=controls\.length===1;/);
-  assert.match(dashboard, /\.automation-target\.selected\{border-color:var\(--forest\)\}/);
+  assert.match(dashboard, /\.automation-pick\.active\{border-color:var\(--forest\);background:var\(--forest-soft\)\}/);
 
   // §8.1 güvenlik: kilit ve siren hiç listelenmez, yalnızca switch kontrolleri hedef.
   assert.match(dashboard, /const isAutomationControl=control=>control\.kind==="switch"&&control\.adminOnly!==true/);
@@ -1635,9 +1639,10 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /data-automation-trigger\]"\)\.forEach\(button=>button\.onclick=\(\)=>chooseAutomationTrigger\(button\.dataset\.automationTrigger\)\)/);
   assert.match(dashboard, /wizard\.triggerKind=kind;\s*renderAutomationWizard\(\);\s*afterAutomationChoice\(/);
   assert.match(dashboard, /afterAutomationChoice\(\(\)=>\{nextAutomationStep\(\)\}\)/);
-  // Ayar isteyen dokunuşlarda (saat, gün, oda, eşleme formu) otomatik ilerleme yok: sayılı çağrı yeri
-  // var (tanım + tetikleyici türü + cihaz seçimi ×2 + kanal + olay + hedef + eylem + alternatif).
-  assert.equal((dashboard.match(/afterAutomationChoice\(/g) ?? []).length, 9);
+  // Ayar isteyen dokunuşlarda (saat, gün, sekme, arama, eşleme formu) otomatik ilerleme yok: sayılı
+  // çağrı yeri var (tanım + tetikleyici türü + cihaz seçimi ×3 + kanal + olay + hedef + eylem +
+  // alternatif).
+  assert.equal((dashboard.match(/afterAutomationChoice\(/g) ?? []).length, 10);
   // Geri gidildiğinde seçimler durur: sihirbaz durumu yalnızca modal kapanınca sıfırlanır.
   assert.match(dashboard, /addEventListener\("close",\(\)=>\{cancelAutomationAdvance\(\);state\.automationWizard=null\}\)/);
   assert.match(dashboard, /triggerKind:automationTriggerKind\(trigger\)/);
@@ -1853,9 +1858,13 @@ interface PickDevice {
   name: string;
   sourceName: string;
   lastAction?: { action: string } | null;
-  controls?: Array<{ id: string; kind: string }>;
+  controls?: Array<{ id: string; kind: string; name?: string; category?: string }>;
+  buttons?: Array<{ name?: string; actions?: unknown[] }>;
+  actionTypes?: string[];
   features?: string[];
+  state?: Record<string, unknown>;
   category?: string;
+  kind?: string;
 }
 
 interface PickGroup {
@@ -1867,23 +1876,54 @@ interface PickGroup {
 interface PickApi {
   deviceSeenPress: (device: PickDevice) => boolean;
   automationPickGroups: (devices: PickDevice[], kind: string) => PickGroup[];
-  automationLightLike: (device: PickDevice) => boolean;
 }
 
 /** Kanıt ölçütünü ve kümelemeyi sayfadan çıkarıp çalıştırır — sıralama metinle değil koşarak kanıtlanır. */
 function pickGrouping(dashboard: string): (events: Array<{ sourceName: string; property: string }>) => PickApi {
   const scripts = dashboardScripts(dashboard);
   const seen = /const deviceSeenPress=device=>[\s\S]*?item\.property==="action"\);/.exec(scripts);
-  const light = /const automationLightLike=device=>device\?\.category==="light"[\s\S]*?control\.category==="light"\);/.exec(scripts);
   const groups = /const automationPickGroups=\(devices,kind\)=>[\s\S]*?:\[\{devices,proven:true\}\];/.exec(scripts);
   assert.ok(seen, "kanıt ölçütü bulunamadı");
-  assert.ok(light, "anahtar/lamba ölçütü bulunamadı");
   assert.ok(groups, "kümeleme kaynağı bulunamadı");
   const build = new Function(
     "state",
-    `${seen[0]}\n${light[0]}\n${groups[0]}\nreturn {deviceSeenPress,automationPickGroups,automationLightLike};`
+    `${seen[0]}\n${groups[0]}\nreturn {deviceSeenPress,automationPickGroups};`
   );
   return (events) => build({ events }) as PickApi;
+}
+
+interface PickerApi {
+  automationDeviceTabs: (device: PickDevice) => string[];
+  automationTabMatches: (device: PickDevice, tab: string) => boolean;
+  automationSearchMatches: (device: PickDevice, query: string) => boolean;
+}
+
+/** Sekme türetmeyi ve aramayı sayfadan çıkarıp çalıştırır — davranış metinle değil koşarak kanıtlanır. */
+function pickerApi(
+  dashboard: string,
+  groups: Array<{ id: string; name: string; items: Array<{ deviceId: string }> }> = []
+): PickerApi {
+  const scripts = dashboardScripts(dashboard);
+  const sensors = /const automationSensorEvents=\{[\s\S]*?\n {2}\};/.exec(scripts);
+  const order = /const automationTabOrder=\[[^\n]*\];/.exec(scripts);
+  const tabs = /const automationDeviceTabs=device=>\{[\s\S]*?\n {2}\};/.exec(scripts);
+  const matches = /const automationTabMatches=[^\n]*;/.exec(scripts);
+  const rooms = /const automationDeviceRooms=device=>[\s\S]*?\.map\(group=>group\.name\);/.exec(scripts);
+  const search = /const automationSearchMatches=\(device,query\)=>\{[\s\S]*?\n {2}\};/.exec(scripts);
+  assert.ok(sensors, "sensör olay tablosu bulunamadı");
+  assert.ok(order && tabs && matches, "sekme türetme kaynağı bulunamadı");
+  assert.ok(rooms && search, "arama kaynağı bulunamadı");
+  const build = new Function(
+    "state",
+    "deviceKind",
+    "deviceButtonName",
+    `${sensors[0]}\n${order[0]}\n${tabs[0]}\n${matches[0]}\n${rooms[0]}\n${search[0]}\nreturn {automationDeviceTabs,automationTabMatches,automationSearchMatches};`
+  );
+  return build(
+    { language: "tr", groups },
+    (device: PickDevice) => device.kind ?? "",
+    (button: { name?: string }) => button.name ?? ""
+  ) as PickerApi;
 }
 
 test("düğme tetikleyicisi cihazın gerçekten basış yayıp yaymadığına dayanır", async () => {
@@ -2014,24 +2054,46 @@ test("anahtar yolunda sınıflandırma sunucudan gelir, eve özel kural kalmaz",
   // Tanımı bilinmeyen cihaz belirsiz kalır: elenmez, üst kümede seçilebilir durur.
   const unknown = shape("0xa4c1380000000001", "Unknown module", "unknown");
 
-  const grouping = pickGrouping(dashboard)([]);
-  assert.equal(grouping.automationLightLike(balcony), true);
-  assert.equal(grouping.automationLightLike(ikeaBulb), true);
-  assert.equal(grouping.automationLightLike(garden), false);
-  assert.equal(grouping.automationLightLike(relay), false);
-  assert.equal(grouping.automationLightLike(unknown), false);
+  const picker = pickerApi(dashboard);
+  assert.deepEqual(picker.automationDeviceTabs(balcony), ["light"]);
+  assert.deepEqual(picker.automationDeviceTabs(ikeaBulb), ["light"]);
+  assert.deepEqual(picker.automationDeviceTabs(garden), ["switch"]);
+  assert.deepEqual(picker.automationDeviceTabs(relay), ["switch"]);
+  // Tanımı bilinmeyen cihaz elenmez; sınıfsız kaldığı için "Diğer" sekmesinde durur.
+  assert.deepEqual(picker.automationDeviceTabs(unknown), ["other"]);
   // Kullanıcının rolü tahmini ezdiğinde sunucu `category`yi çevirir; sihirbaz o an lamba der.
-  assert.equal(grouping.automationLightLike({ ...garden, category: "light" }), true);
-  assert.equal(grouping.automationLightLike({ ...balcony, category: "switch" }), false);
-  assert.equal(grouping.automationLightLike({ id: "0x0", name: "?", sourceName: "?" }), false);
+  assert.deepEqual(picker.automationDeviceTabs({ ...garden, category: "light" }), ["light"]);
+  // Kanal seviyesi rol de sayılır: bir kanalı lamba olan çok kanallı anahtar iki sekmede birden çıkar.
+  assert.deepEqual(
+    picker.automationDeviceTabs({
+      ...garden,
+      controls: [
+        { id: "l1", kind: "switch", category: "light" },
+        { id: "l2", kind: "switch", category: "switch" }
+      ]
+    }),
+    ["switch", "light"]
+  );
+  // Basış yayan cihaz kumandalara, yalnız sensör özelliği bildiren cihaz sensörlere düşer.
+  assert.deepEqual(
+    picker.automationDeviceTabs({ id: "0xr", name: "Remote", sourceName: "r", buttons: [{ actions: [] }] }),
+    ["button"]
+  );
+  assert.deepEqual(
+    picker.automationDeviceTabs({ id: "0xd", name: "Door", sourceName: "d", features: ["contact", "battery"] }),
+    ["sensor"]
+  );
+  // Sekme bir süzgeç değil: "Tümü" hiçbir cihazı elemez.
+  for (const device of [balcony, garden, unknown]) {
+    assert.equal(picker.automationTabMatches(device, "all"), true);
+  }
+  assert.equal(picker.automationTabMatches(balcony, "switch"), false);
 
-  const groups = grouping.automationPickGroups([garden, relay, unknown, balcony, ikeaBulb], "deviceState");
+  const groups = pickGrouping(dashboard)([]).automationPickGroups([garden, relay, unknown, balcony, ikeaBulb], "deviceState");
+  // Anahtar yolunda artık ikinci küme yok: hiçbir cihaz katlanmıyor, hepsi tek listede.
   assert.deepEqual(
     groups.map((group) => [Boolean(group.extra), group.devices.map((device) => device.name)]),
-    [
-      [false, ["Garden 3 Way Switch", "Corridor relay", "Unknown module"]],
-      [true, ["Balkon lambası", "Bedroom bulb"]]
-    ]
+    [[false, ["Garden 3 Way Switch", "Corridor relay", "Unknown module", "Balkon lambası", "Bedroom bulb"]]]
   );
 
   // Eve özel mantık geri sızmasın: model listesi ve satıcıya özgü özellik adları ölçüt olamaz.
@@ -2040,15 +2102,84 @@ test("anahtar yolunda sınıflandırma sunucudan gelir, eve özel kural kalmaz",
   assert.doesNotMatch(dashboard, /automationChannelSwitches/);
   assert.doesNotMatch(dashboard, /switch_mode_l1|adjustment_mode|indicator_mode/);
 
-  // Eleme değil katlama: geride kalanlar "Tüm cihazları göster" ile açılır.
-  assert.match(dashboard, /data-automation-show-all="1"/);
-  assert.match(dashboard, /wizard\.showAllTriggerDevices=true;renderAutomationWizard\(\)/);
-  assert.match(dashboard, /automationShowAllDevices:"Tüm cihazları göster \(\{count\}\)"/);
-  assert.match(dashboard, /automationShowAllDevices:"Show all devices \(\{count\}\)"/);
-  assert.match(dashboard, /automationSwitchGroup:"Anahtarlar ve prizler"/);
-  assert.match(dashboard, /automationOtherDevicesGroup:"Diğer cihazlar"/);
-  // Düzenlemede katlanmış kümedeki seçim kaybolmaz.
-  assert.match(dashboard, /folded\.devices\.some\(item=>item\.id===wizard\.triggerDeviceId\)/);
+  // Katlama ve "Tüm cihazları göster" kalktı: eleme yerine sekme + arama var.
+  assert.doesNotMatch(dashboard, /data-automation-show-all/);
+  assert.doesNotMatch(dashboard, /showAllTriggerDevices/);
+  assert.doesNotMatch(dashboard, /automationShowAllDevices/);
+  assert.doesNotMatch(dashboard, /automationSwitchGroup/);
+  assert.doesNotMatch(dashboard, /automationOtherDevicesGroup/);
+  assert.doesNotMatch(dashboard, /automationLightLike/);
+});
+
+test("sihirbaz cihazı elemek yerine sekme ve aramayla buldurur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Sekmeler evdeki cihazlardan türer, boş sekme çıkmaz, tek sekme kalırsa şerit hiç gösterilmez.
+  assert.match(dashboard, /const tabs=automationTabOrder\.filter\(tab=>found\.has\(tab\)\);\s*if\(tabs\.length<2\)return"";/);
+  assert.match(dashboard, /data-automation-tab="\$\{scope\}\|\$\{tab\}"/);
+  assert.match(dashboard, /automationTabAll:"Tümü"/);
+  assert.match(dashboard, /automationTabAll:"All"/);
+  assert.match(dashboard, /automationTabLight:"Lambalar"/);
+  assert.match(dashboard, /automationTabSwitch:"Anahtarlar ve prizler"/);
+  assert.match(dashboard, /automationTabSensor:"Sensörler"/);
+  assert.match(dashboard, /automationTabButton:"Kumandalar"/);
+  // Dokunmatik hedefler: sekme 44 px, arama kutusu 52 px.
+  assert.match(dashboard, /\.automation-tab\{min-height:44px/);
+  assert.match(dashboard, /\.automation-search \.search\{width:100%;min-height:52px;font-size:16px\}/);
+  assert.match(dashboard, /\.automation-tabs\{[^}]*overflow-x:auto/);
+
+  // Arama hem tetikleyici hem hedef adımında aynı kutudan gelir ve yalnız listeyi tazeler.
+  assert.match(dashboard, /data-automation-search="\$\{scope\}"/);
+  assert.match(dashboard, /list\.innerHTML=automationPickListHtml\(wizard,scope\);\s*automationBindBody\(\);/);
+  assert.match(dashboard, /automationSearchPlaceholder:"Cihaz veya oda arayın"/);
+  assert.match(dashboard, /automationSearchPlaceholder:"Search by device or room"/);
+  assert.match(dashboard, /automationPickNoMatch:"Bu aramayla eşleşen cihaz yok\."/);
+
+  // Arama ad, oda ve kullanıcının verdiği kanal/düğme adlarında birlikte çalışır.
+  const rooms = [{ id: "salon", name: "Oturma Odası", items: [{ deviceId: "0xlight" }] }];
+  const picker = pickerApi(dashboard, rooms);
+  const light: PickDevice = {
+    id: "0xlight",
+    name: "Balkon lambası",
+    sourceName: "balkon",
+    kind: "Lamba",
+    controls: [{ id: "l1", kind: "switch", name: "Kanal 1" }],
+    buttons: [{ name: "Sol düğme" }]
+  };
+  const other: PickDevice = { id: "0xother", name: "Koridor rölesi", sourceName: "koridor", kind: "Anahtar" };
+  assert.equal(picker.automationSearchMatches(light, ""), true);
+  assert.equal(picker.automationSearchMatches(light, "balkon"), true);
+  assert.equal(picker.automationSearchMatches(light, "oturma"), true);
+  assert.equal(picker.automationSearchMatches(light, "kanal 1"), true);
+  assert.equal(picker.automationSearchMatches(light, "sol düğme"), true);
+  assert.equal(picker.automationSearchMatches(light, "koridor"), false);
+  assert.equal(picker.automationSearchMatches(other, "oturma"), false);
+
+  // İki adımlı seçim: cihaz seçilince ekran alt öğelere geçer, başlıkta cihazın adı ve geri düğmesi olur.
+  assert.match(dashboard, /const automationPickHeadHtml=\(device,scope\)=>`<div class="automation-subhead">/);
+  assert.match(dashboard, /data-automation-pick-back="\$\{scope\}"/);
+  assert.match(dashboard, /<span class="automation-subhead-copy"><strong>\$\{esc\(device\.name\)\}<\/strong><small>\$\{esc\(deviceKind\(device\)\)\}<\/small><\/span>/);
+  assert.match(dashboard, /automationPickParts:"\{device\} düğmeleri ve kanalları"/);
+  assert.match(dashboard, /automationPickParts:"Buttons and channels of \{device\}"/);
+  assert.match(dashboard, /automationPickBack:"Cihaz listesine dön"/);
+  assert.match(dashboard, /\.automation-subback\{width:48px;height:48px/);
+
+  // Tek alt öğeli cihazda bu adım atlanır: tetikleyicide olay tek ise ekran hiç açılmaz,
+  // eşleme yolunda tek kanallı hedef doğrudan seçilip ilerlenir.
+  assert.match(
+    dashboard,
+    /return automationTriggerChoiceCount\(wizard,device\)>1\|\|automationButtonUnproven\(wizard,device\)\?device:null;/
+  );
+  assert.match(
+    dashboard,
+    /if\(automationMappingMode\(wizard\)&&controls\.length===1\)\{chooseAutomationTarget\(`\$\{deviceId\}\|\$\{controls\[0\]\.id\}`\);return\}/
+  );
+
+  // Hedef adımının tek elemesi cihazın gerçek yeteneği; oda ya da ad tahmini yok.
+  assert.match(dashboard, /targetControls\(device\)\.length>0&&device\.id!==starter/);
+  assert.doesNotMatch(dashboard, /deviceInRoom\(device,wizard\.room\)/);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
 
 test("cihaz rolü eşleştirmede sorulur ve cihaz kartındaki özellik listesinden değiştirilir", async () => {
@@ -2099,8 +2230,8 @@ test("cihaz rolü eşleştirmede sorulur ve cihaz kartındaki özellik listesind
   assert.match(dashboard, /channels\.length>1\?t\("deviceRoleChannelLabel",\{channel:channelDisplayName\(device,control\)\}\):t\("deviceRoleLabel"\)/);
   assert.match(dashboard, /deviceRoleChannelLabel:"Show \{channel\} as"/);
   assert.match(dashboard, /deviceRoleChannelLabel:"\{channel\} şöyle görünsün"/);
-  // Kümeleme ve simge kanal seviyesindeki rolü kullanır.
-  assert.match(dashboard, /control\.kind==="switch"&&control\.category==="light"/);
+  // Sekme kümelemesi ve simge kanal seviyesindeki rolü kullanır.
+  assert.match(dashboard, /for\(const control of device\?\.controls\|\|\[\]\)if\(control\.kind==="switch"\)add\(control\.category\);/);
   assert.match(dashboard, /const category=\(control\?\.kind==="switch"&&control\.category\)\|\|device\.category;/);
 
   // Kart alt yazısı artık her cihazda "Kumanda" demiyor; sınıfı yansıtıyor.
