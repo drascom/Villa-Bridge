@@ -123,8 +123,9 @@ export interface AppConfig {
     lowBatteryThreshold: number;
   };
   /**
-   * Faz 1 otomatik onarım: cihaz kendini ilan edince raporlama ayarları yeniden yazılır.
-   * `probeOffline` Faz 2'nin yeri — bu sürümde yalnız saklanır, hiçbir davranışı yoktur.
+   * Otomatik onarım. Faz 1: cihaz kendini ilan edince raporlama ayarları yeniden yazılır.
+   * Faz 2 (`probeOffline`): çevrimdışı görünen şebeke beslemeli yönlendiriciler tek ucuz
+   * okumayla yoklanır; yanıt verirse erişilebilirlik geri alınır.
    */
   selfHealing: {
     enabled: boolean;
@@ -200,7 +201,7 @@ export async function loadConfig(): Promise<AppConfig> {
         : file.selfHealing?.enabled !== false,
       probeOffline: process.env.VILLA_BRIDGE_SELF_HEALING_PROBE_OFFLINE
         ? process.env.VILLA_BRIDGE_SELF_HEALING_PROBE_OFFLINE === "true"
-        : file.selfHealing?.probeOffline === true
+        : file.selfHealing?.probeOffline !== false
     },
     debug: {
       enabled: process.env.VILLA_BRIDGE_DEBUG

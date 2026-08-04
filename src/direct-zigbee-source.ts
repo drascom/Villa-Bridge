@@ -16,8 +16,10 @@ import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
 import {
   SelfHealScheduler,
+  selfHealProbeTimeoutMs,
   type SelfHealDeviceState,
-  type SelfHealOutcome
+  type SelfHealOutcome,
+  type SelfHealProbeResult
 } from "./self-heal.js";
 import type { OtaCheckResult, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
 import { decodeTuyaButtonFrame } from "./tuya-button-frames.js";
@@ -54,6 +56,16 @@ export function zigbeeAvailabilityState(
       ? 36 * 60 * 60 * 1_000
       : 15 * 60 * 1_000;
   return typeof lastSeen === "number" && now - lastSeen <= timeout ? "online" : "offline";
+}
+
+/**
+ * Çevrimdışı yoklama yalnız şebeke beslemeli yönlendiricilere yapılır. Ayrım herdsman'in
+ * kendi `type`/`powerSource` alanlarından gelir; model ya da satıcı listesi yoktur.
+ * Pilli cihaz uyur — uzun sessizlik onda normaldir, yoklamak pil harcamaktan başka işe yaramaz.
+ */
+export function isSelfHealProbeTarget(device: { type: string; powerSource?: string }): boolean {
+  if (device.type !== "Router") return false;
+  return !(device.powerSource?.toLowerCase() ?? "").includes("battery");
 }
 
 export interface DeviceStatePublication {
@@ -169,6 +181,8 @@ export function endpointNamesForDevice(
  */
 export interface DirectSelfHealingSetup {
   enabled: boolean;
+  /** Faz 2: çevrimdışı yönlendiricileri ucuz okumayla yoklama. */
+  probeOffline?: boolean;
   state?: Map<string, SelfHealDeviceState>;
   persist?: (state: Map<string, SelfHealDeviceState>) => void;
   recordFailure?: (deviceId: string, message: string) => void;
@@ -208,10 +222,12 @@ export class DirectZigbeeSource implements ZigbeeSource {
   ) {
     this.selfHeal = new SelfHealScheduler({
       enabled: selfHealing.enabled,
+      probeEnabled: selfHealing.probeOffline === true,
       initialState: selfHealing.state,
       persist: selfHealing.persist,
       blockedReason: (deviceId) => this.selfHealBlockedReason(deviceId),
       prepare: (deviceId) => this.selfHealPrepare(deviceId),
+      probe: (deviceId) => this.selfHealProbe(deviceId),
       onOutcome: (deviceId, outcome) => this.recordSelfHealEvent(deviceId, outcome),
       onFailure: selfHealing.recordFailure,
       ...(selfHealing.spacingMs === undefined ? {} : { spacingMs: selfHealing.spacingMs }),
@@ -222,6 +238,10 @@ export class DirectZigbeeSource implements ZigbeeSource {
 
   setSelfHealingEnabled(enabled: boolean): void {
     this.selfHeal.setEnabled(enabled);
+  }
+
+  setSelfHealProbeEnabled(enabled: boolean): void {
+    this.selfHeal.setProbeEnabled(enabled);
   }
 
   /**
@@ -262,6 +282,55 @@ export class DirectZigbeeSource implements ZigbeeSource {
       await definition.configure?.(device, coordinator, definition);
       await this.refreshDevices();
     };
+  }
+
+  /**
+   * Çevrimdışı yönlendiriciyi tek hafif okumayla yoklar (`genBasic/zclVersion`, 5 sn,
+   * `disableRecovery`). Amaç en ucuz yol: yanıt gelirse cihaz zaten erişilebilirdir,
+   * "erişilemez" işareti düşürülür. `interview(true)` bu yolda **asla** çağrılmaz.
+   */
+  private async selfHealProbe(deviceId: string): Promise<(() => Promise<SelfHealProbeResult>) | null> {
+    const device = this.controller?.getDeviceByIeeeAddr(deviceId);
+    if (!device || !isSelfHealProbeTarget(device)) return null;
+    if (this.config.devices[deviceId]?.disabled === true) return null;
+    const endpoint = device.getEndpoint(1) ?? device.endpoints[0];
+    if (!endpoint) return null;
+    return async () => {
+      try {
+        await endpoint.read("genBasic", ["zclVersion"], {
+          timeout: selfHealProbeTimeoutMs,
+          disableRecovery: true
+        });
+      } catch (error) {
+        // Tek deneme; ikinci okuma yok. Karar geri çekilmeye bırakılır.
+        return { reachable: false, message: error instanceof Error ? error.message : String(error) };
+      }
+      const recovered = this.deviceAvailability.get(deviceId) !== "online";
+      this.setAvailability(deviceId, "online");
+      try {
+        return { reachable: true, recovered, configured: await this.selfHealConfigureIfPending(device) };
+      } catch (error) {
+        // Cihaz erişilebilir; yalnız yapılandırma yazılamadı. Yoklama başarısız sayılmaz.
+        return {
+          reachable: true,
+          recovered,
+          configured: false,
+          message: error instanceof Error ? error.message : String(error)
+        };
+      }
+    };
+  }
+
+  /**
+   * Yapılandırma gerçekten gerekiyor mu? Herdsman veritabanında `meta.configured` yazılıysa
+   * cihaz zaten yapılandırılmıştır; yoklamanın ardından koordinatörü boşuna meşgul etmeyiz.
+   */
+  private async selfHealConfigureIfPending(device: { ieeeAddr: string; meta?: JsonObject }): Promise<boolean> {
+    if (device.meta?.configured !== undefined) return false;
+    const run = await this.selfHealPrepare(device.ieeeAddr);
+    if (!run) return false;
+    await run();
+    return true;
   }
 
   private recordSelfHealEvent(deviceId: string, outcome: SelfHealOutcome): void {
@@ -1093,7 +1162,12 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const now = Date.now();
     for (const device of controller.getDevicesIterator()) {
       if (device.type === "Coordinator") continue;
-      this.setAvailability(device.ieeeAddr, zigbeeAvailabilityState(device.lastSeen, device, now));
+      const availability = zigbeeAvailabilityState(device.lastSeen, device, now);
+      this.setAvailability(device.ieeeAddr, availability);
+      // Çevrimdışı görünen şebeke beslemeli yönlendirici yoklanır; sıklığı zamanlayıcı belirler.
+      if (availability === "offline" && isSelfHealProbeTarget(device)) {
+        this.selfHeal.scheduleProbe(device.ieeeAddr);
+      }
     }
   }
 

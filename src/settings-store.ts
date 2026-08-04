@@ -21,7 +21,7 @@ export interface ConnectionSettings {
   alerts: {
     lowBatteryThreshold: number;
   };
-  /** `probeOffline` Faz 2'nin yeridir; bu sürümde yalnız saklanır. */
+  /** `probeOffline` Faz 2: çevrimdışı yönlendiricinin ucuz yoklaması; varsayılan açık. */
   selfHealing: {
     enabled: boolean;
     probeOffline: boolean;
@@ -95,7 +95,7 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
     },
     selfHealing: {
       enabled: selfHealing.enabled !== false,
-      probeOffline: selfHealing.probeOffline === true
+      probeOffline: selfHealing.probeOffline !== false
     },
     debug: {
       enabled: debug.enabled !== false

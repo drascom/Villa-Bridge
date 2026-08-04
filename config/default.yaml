@@ -16,7 +16,7 @@ alerts:
   lowBatteryThreshold: 15
 selfHealing:
   enabled: true
-  probeOffline: false
+  probeOffline: true
 debug:
   enabled: true
 http:

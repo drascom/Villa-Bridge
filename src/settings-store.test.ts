@@ -25,7 +25,7 @@ test("bağlantı ayarları güvenli protokol, sunucu ve port ile doğrulanır", 
   });
 });
 
-test("otomatik onarım varsayılan olarak açık, çevrimdışı yoklama kapalıdır", () => {
+test("otomatik onarım ve çevrimdışı yoklama varsayılan olarak açıktır", () => {
   const settings = validateConnectionSettings({
     zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 15 },
     mqtt: { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
@@ -33,7 +33,7 @@ test("otomatik onarım varsayılan olarak açık, çevrimdışı yoklama kapalı
     homeAssistant: { discoveryEnabled: false }
   });
 
-  assert.deepEqual(settings.selfHealing, { enabled: true, probeOffline: false });
+  assert.deepEqual(settings.selfHealing, { enabled: true, probeOffline: true });
 });
 
 test("debug mode defaults to enabled during testing", () => {

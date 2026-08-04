@@ -9,6 +9,7 @@ import {
   directBridgeInfo,
   endpointNamesForDevice,
   isRawGenOnOffFrame,
+  isSelfHealProbeTarget,
   isUnresolvedActionMessage,
   parsePermitJoinSeconds,
   shouldPublishDeviceState,
@@ -699,13 +700,25 @@ test("direct Zigbee grupları oluşturulur, yeniden adlandırılır ve kalıcı 
 });
 
 /** Otomatik onarım testleri için sahte koordinatör; canlı donanıma hiç dokunmaz. */
-function selfHealFixture(options: { configure?: () => void | Promise<void> } = {}) {
+function selfHealFixture(options: { configure?: () => void | Promise<void>; read?: () => void } = {}) {
   const calls: string[] = [];
   const coordinatorEndpoint = { ID: 1 };
+  const endpoint = {
+    ID: 1,
+    async read(cluster: string, attributes: string[], readOptions: { timeout?: number }) {
+      calls.push(`read:${cluster}:${attributes.join(",")}:${readOptions.timeout}`);
+      options.read?.();
+      return { zclVersion: 3 };
+    }
+  };
   const device = {
     ieeeAddr: "0x00124b00self",
     type: "Router" as string,
-    endpoints: [] as unknown[],
+    powerSource: "Mains (single phase)" as string | undefined,
+    lastSeen: undefined as number | undefined,
+    meta: {} as Record<string, unknown>,
+    endpoints: [endpoint] as unknown[],
+    getEndpoint: (id: number) => id === 1 ? endpoint : undefined,
     scheduledOta: undefined as unknown,
     interviewState: "SUCCESSFUL",
     async interview() {
@@ -847,4 +860,137 @@ test("otomatik onarım ayarı kapalıyken ilan hiçbir şey tetiklemez", async (
   source.setSelfHealingEnabled(true);
   await announce();
   assert.deepEqual(fixture.calls, ["configure"]);
+});
+
+/** Faz 2 testleri: yoklama yolu. Sahte koordinatör; gerçek cihaz tetiklenmez. */
+function probeSource(
+  directory: string,
+  fixture: ReturnType<typeof selfHealFixture>,
+  store: DeviceStore,
+  probeOffline = true
+): DirectZigbeeSource {
+  const source = new DirectZigbeeSource(
+    {
+      devices: { [fixture.device.ieeeAddr]: { friendly_name: "Hall Switch" } },
+      groups: {},
+      dataDir: directory
+    } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false,
+    new Map(),
+    (async () => fixture.definition) as never,
+    { enabled: true, probeOffline, spacingMs: 0 }
+  );
+  Object.assign(source, { controller: fixture.controller, refreshDevices: async () => undefined });
+  return source;
+}
+
+async function probeRound(source: DirectZigbeeSource): Promise<void> {
+  (source as unknown as { refreshAvailability(): void }).refreshAvailability();
+  await (source as unknown as { selfHeal: { whenIdle(): Promise<void> } }).selfHeal.whenIdle();
+}
+
+/** Yoklama izleri; erişilebilirlik olayları ayıklanır. */
+const selfHealEvents = (store: DeviceStore): string[][] =>
+  store.getEvents(10)
+    .filter((event) => event.property === "self_heal")
+    .map((event) => [event.sourceName, event.property, String(event.value)]);
+
+const availabilityOf = (source: DirectZigbeeSource, id: string): string | undefined =>
+  (source as unknown as { deviceAvailability: Map<string, string> }).deviceAvailability.get(id);
+
+test("yoklama yalnız şebeke beslemeli yönlendiriciyi hedefler", () => {
+  assert.equal(isSelfHealProbeTarget({ type: "Router" }), true);
+  assert.equal(isSelfHealProbeTarget({ type: "Router", powerSource: "Mains (single phase)" }), true);
+  assert.equal(isSelfHealProbeTarget({ type: "Router", powerSource: "Battery" }), false);
+  assert.equal(isSelfHealProbeTarget({ type: "EndDevice", powerSource: "Battery" }), false);
+  assert.equal(isSelfHealProbeTarget({ type: "EndDevice" }), false);
+});
+
+test("çevrimdışı yönlendirici tek ucuz okumayla yoklanır ve eksik yapılandırma yazılır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-probe-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  const store = new DeviceStore(new Map());
+  const source = probeSource(directory, fixture, store);
+
+  await probeRound(source);
+
+  // Beş saniyelik tek `genBasic` okuması; görüşme yok.
+  assert.deepEqual(fixture.calls, ["read:genBasic:zclVersion:5000", "configure"]);
+  assert.equal(availabilityOf(source, fixture.device.ieeeAddr), "online");
+  assert.deepEqual(selfHealEvents(store), [["Hall Switch", "self_heal", "ok"]]);
+});
+
+test("yapılandırma zaten yazılıysa yoklama yalnız erişilebilirliği geri alır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-probe-configured-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  fixture.device.meta = { configured: 1 };
+  const store = new DeviceStore(new Map());
+  const source = probeSource(directory, fixture, store);
+
+  await probeRound(source);
+
+  assert.deepEqual(fixture.calls, ["read:genBasic:zclVersion:5000"]);
+  assert.equal(availabilityOf(source, fixture.device.ieeeAddr), "online");
+  assert.deepEqual(selfHealEvents(store), [["Hall Switch", "self_heal", "ok"]]);
+});
+
+test("pilli cihaz hiç yoklanmaz", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-probe-battery-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  fixture.device.type = "EndDevice";
+  fixture.device.powerSource = "Battery";
+  const store = new DeviceStore(new Map());
+  const source = probeSource(directory, fixture, store);
+
+  await probeRound(source);
+
+  assert.deepEqual(fixture.calls, []);
+
+  // Şebekeye bağlı görünen ama pille beslenen yönlendirici de yoklanmaz.
+  fixture.device.type = "Router";
+  await probeRound(source);
+  assert.deepEqual(fixture.calls, []);
+  assert.deepEqual(selfHealEvents(store), []);
+});
+
+test("yanıtsız yoklama cihaz olay kaydını doldurmaz", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-probe-silent-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture({
+    read: () => {
+      throw new Error("cihaz yanıt vermedi");
+    }
+  });
+  const store = new DeviceStore(new Map());
+  const source = probeSource(directory, fixture, store);
+
+  await probeRound(source);
+
+  assert.deepEqual(fixture.calls, ["read:genBasic:zclVersion:5000"]);
+  assert.equal(availabilityOf(source, fixture.device.ieeeAddr), "offline");
+  assert.deepEqual(selfHealEvents(store), []);
+
+  // İkinci tur geri çekilmeye takılır; ikinci deneme yapılmaz.
+  await probeRound(source);
+  assert.deepEqual(fixture.calls, ["read:genBasic:zclVersion:5000"]);
+});
+
+test("çevrimdışı yoklama kapalıyken hiçbir şey yapılmaz", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-probe-off-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  const store = new DeviceStore(new Map());
+  const source = probeSource(directory, fixture, store, false);
+
+  await probeRound(source);
+  assert.deepEqual(fixture.calls, []);
+
+  source.setSelfHealProbeEnabled(true);
+  await probeRound(source);
+  assert.deepEqual(fixture.calls, ["read:genBasic:zclVersion:5000", "configure"]);
 });

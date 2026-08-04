@@ -58,4 +58,6 @@ export interface ZigbeeSource {
    * uygulanmaz, bu yüzden isteğe bağlıdır.
    */
   setSelfHealingEnabled?(enabled: boolean): void;
+  /** Çevrimdışı cihaz yoklaması (Faz 2); yine yalnız koordinatör sahibinde anlamlıdır. */
+  setSelfHealProbeEnabled?(enabled: boolean): void;
 }

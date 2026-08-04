@@ -176,6 +176,7 @@ if (config.mode === "direct") {
     undefined,
     {
       enabled: config.selfHealing.enabled,
+      probeOffline: config.selfHealing.probeOffline,
       state: await selfHealStateStore.get(),
       persist: (state) => {
         void selfHealStateStore.save(state).catch((error) => {
@@ -1030,6 +1031,7 @@ app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
     config.selfHealing.enabled = settings.selfHealing.enabled;
     config.selfHealing.probeOffline = settings.selfHealing.probeOffline;
     source.setSelfHealingEnabled?.(settings.selfHealing.enabled);
+    source.setSelfHealProbeEnabled?.(settings.selfHealing.probeOffline);
     return { ok: true, settings, restartRequired: true };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
