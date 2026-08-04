@@ -2680,3 +2680,157 @@ test("sonra kapat yükü hedefin kendi kapatma değerinden üretilir", async () 
   assert.equal(line({ mode: "idle", seconds: 120, value: "OFF" }), "automationAutoOffIdleWaitLine");
   assert.equal(helpers.automationAutoOffLine({ deviceId: "0x00124b0011cc22dd", property: "state", value: "ON" }), "");
 });
+
+// Sihirbazı gerçek olay akışıyla sürer: yeni kural yolu (düzenleme değil) baştan sona tıklanır ve
+// her adımda gövdeye basılan HTML toplanır. Diyalog kutusu yerine kayıt tutan sahte düğümler var —
+// canlı uygulama açılmaz.
+type WizardHarness = {
+  bodies: string[];
+  scroll: () => number;
+  setScroll: (value: number) => void;
+  wizard: () => Record<string, unknown>;
+  api: Record<string, (...args: unknown[]) => unknown>;
+};
+
+async function automationWizardHarness(): Promise<WizardHarness> {
+  const source = dashboardScripts(await readFile(dashboardUrl, "utf8"));
+  const start = source.indexOf("const automationWeekDays=");
+  const end = source.indexOf("async function saveAutomationWizard(");
+  assert.ok(start > 0 && end > start);
+  const bodies: string[] = [];
+  const nodes = new Map<string, Record<string, unknown>>();
+  const node = (selector: string): Record<string, unknown> => {
+    const found = nodes.get(selector);
+    if (found) return found;
+    const created: Record<string, unknown> = {
+      scrollTop: 0,
+      hidden: false,
+      disabled: false,
+      textContent: "",
+      open: true,
+      classList: { add() {}, remove() {}, toggle() {} },
+      dataset: {},
+      // Uzun listede kaydırma: adım 2'de aşağı inilmiş bir ekranı taklit eder.
+      scrollIntoView: () => { (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop = 400; },
+      setAttribute() {},
+      focus() {},
+      showModal() {},
+      close() {}
+    };
+    Object.defineProperty(created, "innerHTML", {
+      get: () => "",
+      set: (value: string) => { if (selector === "#automationBody") bodies.push(value); }
+    });
+    nodes.set(selector, created);
+    return created;
+  };
+  const state: Record<string, unknown> = {
+    language: "en",
+    devices: [
+      {
+        id: "0x0011", name: "Corridor light", buttons: [], features: [], state: {},
+        controls: [{ id: "switch:state", property: "state", name: "Corridor light", kind: "switch", valueOn: "ON", valueOff: "OFF", valueToggle: "TOGGLE" }]
+      },
+      { id: "0x0022", name: "Koridor Detektor", buttons: [], features: ["occupancy"], state: { occupancy: false }, controls: [] },
+      { id: "0x0033", name: "Duman dedektörü", buttons: [], features: ["smoke"], state: { smoke: false }, controls: [] }
+    ],
+    events: [],
+    automations: [],
+    automationWizard: null
+  };
+  const stubs: Record<string, unknown> = {
+    t: (key: string) => String(key),
+    esc: (value: unknown) => String(value),
+    state,
+    isProtectedDevice: () => false,
+    deviceKind: () => "kind",
+    ago: () => "now",
+    showToast: () => {},
+    deviceSeenPress: () => true,
+    visiblePresses: () => [],
+    deviceButtonName: () => "button",
+    deviceButtonPressLabel: () => "press",
+    openSimpleLink: () => {},
+    persistAutomations: async () => {},
+    confirm: () => false,
+    $: (selector: string) => node(selector),
+    $$: () => [],
+    // Kendiliğinden ilerleme beklemesi testte anında koşar.
+    setTimeout: (run: () => void) => { run(); return 1; },
+    clearTimeout: () => {}
+  };
+  const names = Object.keys(stubs);
+  const api = new Function(
+    ...names,
+    `${source.slice(start, end)}\n`
+    + "return{openAutomationWizard,chooseAutomationPath,chooseAutomationTrigger,chooseAutomationTriggerDevice,"
+    + "chooseAutomationEvent,chooseAutomationTargetDevice,chooseAutomationAction,chooseAutomationAutoOff};"
+  )(...names.map((name) => stubs[name])) as Record<string, (...args: unknown[]) => unknown>;
+  return {
+    bodies,
+    scroll: () => (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop,
+    setScroll: (value: number) => { (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop = value; },
+    wizard: () => state.automationWizard as Record<string, unknown>,
+    api
+  };
+}
+
+// Yeni kural kurarken (kayıtlı kuralı düzenlerken değil) özet adımı seçenekleri gösterir ve adım
+// değişince gövde başa sarar — seçenekler bir önceki adımın kaydırmasında saklı kalmaz.
+test("yeni kural kurulumunda sonra kapat seçenekleri özet adımında görünür", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  api.chooseAutomationTargetDevice("0x0011");
+  // Adım 2 uzun listede aşağı kaydırılmış durumda.
+  assert.equal(harness.scroll(), 400);
+  api.chooseAutomationAction("0x0011|switch:state|on");
+
+  const wizard = harness.wizard();
+  assert.equal(wizard.id, null);
+  assert.equal(wizard.step, 3);
+  const review = harness.bodies[harness.bodies.length - 1];
+  assert.match(review, /data-automation-autooff="none"/);
+  assert.match(review, /data-automation-autooff="idle"/);
+  assert.match(review, /data-automation-autooff="after"/);
+  // Asıl hata buydu: seçenekler basılıyordu ama ekran bir önceki adımın kaydırmasında kalıyordu.
+  assert.equal(harness.scroll(), 0);
+
+  // Aynı adımda yeniden çizim kullanıcının yerini bozmaz.
+  harness.setScroll(120);
+  api.chooseAutomationAutoOff("after");
+  assert.equal(harness.scroll(), 120);
+  assert.match(harness.bodies[harness.bodies.length - 1], /data-automation-autooff-minutes="5"/);
+});
+
+test("sonra kapat seçenekleri yalnız açan eylemde ve karşıtı olan tetikleyicide sunulur", async () => {
+  const toggle = await automationWizardHarness();
+  toggle.api.openAutomationWizard(null);
+  toggle.api.chooseAutomationPath("rule");
+  toggle.api.chooseAutomationTrigger("sensor");
+  toggle.api.chooseAutomationTriggerDevice("0x0022");
+  toggle.api.chooseAutomationEvent("occupancy=true");
+  toggle.api.chooseAutomationTargetDevice("0x0011");
+  toggle.api.chooseAutomationAction("0x0011|switch:state|toggle");
+  assert.equal(toggle.wizard().step, 3);
+  // "Değiştir" eyleminin geri alınacak yönü yok: blok hiç basılmaz.
+  assert.doesNotMatch(toggle.bodies[toggle.bodies.length - 1], /data-automation-autooff/);
+
+  const smoke = await automationWizardHarness();
+  smoke.api.openAutomationWizard(null);
+  smoke.api.chooseAutomationPath("rule");
+  smoke.api.chooseAutomationTrigger("sensor");
+  smoke.api.chooseAutomationTriggerDevice("0x0033");
+  smoke.api.chooseAutomationTargetDevice("0x0011");
+  smoke.api.chooseAutomationAction("0x0011|switch:state|on");
+  assert.equal(smoke.wizard().step, 3);
+  const review = smoke.bodies[smoke.bodies.length - 1];
+  // Duman tek yönlü bildirir: "hareket bitince" karşılığı yok, yalnız süreyle kapatma kalır.
+  assert.match(review, /data-automation-autooff="none"/);
+  assert.match(review, /data-automation-autooff="after"/);
+  assert.doesNotMatch(review, /data-automation-autooff="idle"/);
+});

@@ -4556,9 +4556,20 @@
     else wizard.targetDeviceId=null;
     renderAutomationWizard();
   }
+  // Adım değişince gövde başa sarar. Uzun listede aşağıda kalan kaydırma yeni adımda korunuyordu:
+  // özet adımının en üstündeki "sonra kapat" seçenekleri ekranın dışında kalıyordu. Kaydırma kutusu
+  // tablette `.modal` (overflow-y:auto), masaüstünde `dialog`; ikisi de başa alınır. Anlık atama
+  // ayrıca bir önceki adımın yumuşak `scrollIntoView` hareketini de keser.
+  function automationScrollTop(){
+    for(const box of [$("#automationDialog"),$("#automationDialog .automation-modal")]){
+      if(box)box.scrollTop=0;
+    }
+  }
   function renderAutomationWizard(){
     const wizard=state.automationWizard;
     if(!wizard)return;
+    const stepChanged=wizard.renderedStep!==wizard.step;
+    wizard.renderedStep=wizard.step;
     const paths=wizard.step===0;
     const mapping=automationMappingMode(wizard);
     const titles=["automationWhenTitle",mapping?"automationTargetTitle":"automationThenTitle",mapping?"automationMapTitle":"automationReviewTitle"];
@@ -4574,6 +4585,7 @@
       ?automationPathHtml()
       :wizard.step===1?automationWhenHtml(wizard)
       :wizard.step===2?automationThenHtml(wizard):automationReviewHtml(wizard);
+    if(stepChanged)automationScrollTop();
     automationBindBody();
     // İlk adımda dönülecek yer yok: düğme diyaloğu kapatır, o yüzden etiketi de "Vazgeç".
     // Alt öğe ekranındayken geri cihaz listesine döner, o yüzden orada etiket "Geri".
