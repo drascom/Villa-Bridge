@@ -211,3 +211,84 @@ test("ağ hatası yutulur ve null döner", async () => {
     assert.equal(await cache.get("TS0013"), null);
   });
 });
+
+test("çevrimdışıyken başarısız model internet dönünce yeniden denenir", async () => {
+  let clock = 0;
+  const directory = await createDirectory();
+  const cache = new DeviceImageCache(directory, 2, 0, () => clock);
+  let online = false;
+  let calls = 0;
+
+  await withFetch(async () => {
+    calls += 1;
+    if (!online) throw new Error("bağlantı yok");
+    return imageResponse(Buffer.from([5]), "image/jpeg");
+  }, async () => {
+    assert.equal(await cache.get("WHD02"), null);
+    assert.equal(calls, 2);
+
+    // Geri çekilme süresi dolmadan tekrar ağa çıkılmaz.
+    clock += 30_000;
+    assert.equal(await cache.get("WHD02"), null);
+    assert.equal(calls, 2);
+
+    // Süre dolunca ve internet dönünce görsel gelir.
+    clock += 31_000;
+    online = true;
+    const image = await cache.get("WHD02");
+    assert.deepEqual(image, { contentType: "image/jpeg", body: Buffer.from([5]) });
+  });
+
+  assert.deepEqual(await readdir(directory), ["WHD02.jpg"]);
+});
+
+test("üst üste ağ hatasında yeniden deneme aralığı büyür", async () => {
+  let clock = 0;
+  const cache = new DeviceImageCache(await createDirectory(), 2, 0, () => clock);
+  let calls = 0;
+
+  await withFetch(async () => {
+    calls += 1;
+    throw new Error("bağlantı yok");
+  }, async () => {
+    assert.equal(await cache.get("TS0011"), null);
+    assert.equal(calls, 2);
+
+    clock += 61_000;
+    assert.equal(await cache.get("TS0011"), null);
+    assert.equal(calls, 4);
+
+    // İkinci hatadan sonra bekleme 2 dakikaya çıkar: 61 saniye yetmez.
+    clock += 61_000;
+    assert.equal(await cache.get("TS0011"), null);
+    assert.equal(calls, 4);
+
+    clock += 60_000;
+    assert.equal(await cache.get("TS0011"), null);
+    assert.equal(calls, 6);
+  });
+});
+
+test("upstream'de olmayan model geçici hata gibi hızlı yeniden denenmez", async () => {
+  let clock = 0;
+  const cache = new DeviceImageCache(await createDirectory(), 2, 0, () => clock);
+  let calls = 0;
+
+  await withFetch(async () => {
+    calls += 1;
+    return notFoundResponse();
+  }, async () => {
+    assert.equal(await cache.get("TS9997"), null);
+    assert.equal(calls, 2);
+
+    clock += 6 * 60 * 60 * 1000;
+    assert.equal(await cache.get("TS9997"), null);
+    await cache.warm(["TS9997"]);
+    assert.equal(calls, 2);
+
+    // Bir gün sonra katalog güncellenmiş olabilir, bir kez daha bakılır.
+    clock += 19 * 60 * 60 * 1000;
+    assert.equal(await cache.get("TS9997"), null);
+    assert.equal(calls, 4);
+  });
+});

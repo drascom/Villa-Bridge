@@ -15,6 +15,23 @@ export interface DeviceImage {
 
 const maximumImageBytes = 2 * 1024 * 1024;
 
+// Upstream'de gerçekten olmayan model: uzun süre yeniden denenmez.
+const notFoundRetryMs = 24 * 60 * 60 * 1000;
+// Ağ/zaman aşımı hatası geçicidir: internet dönünce görsel gelsin diye kısa aralıkla,
+// üst üste başarısızlıkta katlanarak geri çekilerek yeniden denenir.
+const transientRetryMs = 60_000;
+const transientRetryCeilingMs = 30 * 60_000;
+
+interface NegativeCacheEntry {
+  retryAt: number;
+  attempts: number;
+}
+
+interface DownloadResult {
+  image: { extension: string; body: Buffer } | null;
+  transient: boolean;
+}
+
 const contentTypeFor = (extension: string): string =>
   extensions.find((candidate) => candidate.extension === extension)?.contentType ?? "image/jpeg";
 
@@ -25,13 +42,14 @@ const extensionForContentType = (header: string | null): string | null => {
 };
 
 export class DeviceImageCache {
-  private readonly missing = new Set<string>();
+  private readonly missing = new Map<string, NegativeCacheEntry>();
   private warming = false;
 
   constructor(
     private readonly directory: string,
     private readonly warmConcurrency = 2,
-    private readonly warmPauseMs = 250
+    private readonly warmPauseMs = 250,
+    private readonly now: () => number = Date.now
   ) {}
 
   /**
@@ -44,7 +62,7 @@ export class DeviceImageCache {
     this.warming = true;
     try {
       const pending = [...new Set(models)].filter(
-        (model) => safeModelPattern.test(model) && !this.missing.has(model)
+        (model) => safeModelPattern.test(model) && !this.blocked(model)
       );
       for (let index = 0; index < pending.length; index += this.warmConcurrency) {
         const batch = pending.slice(index, index + this.warmConcurrency);
@@ -68,14 +86,31 @@ export class DeviceImageCache {
     if (!safeModelPattern.test(model) || model === "." || model === "..") return null;
     const cached = await this.readFromDisk(model);
     if (cached) return cached;
-    if (this.missing.has(model)) return null;
-    const downloaded = await this.download(model);
-    if (!downloaded) {
-      this.missing.add(model);
+    if (this.blocked(model)) return null;
+    const { image, transient } = await this.download(model);
+    if (!image) {
+      this.rememberFailure(model, transient);
       return null;
     }
-    await this.writeToDisk(model, downloaded.extension, downloaded.body);
-    return { contentType: contentTypeFor(downloaded.extension), body: downloaded.body };
+    this.missing.delete(model);
+    await this.writeToDisk(model, image.extension, image.body);
+    return { contentType: contentTypeFor(image.extension), body: image.body };
+  }
+
+  /** Negatif önbellekteki model, yeniden deneme zamanı gelene kadar ağa çıkarılmaz. */
+  private blocked(model: string): boolean {
+    const entry = this.missing.get(model);
+    return entry !== undefined && entry.retryAt > this.now();
+  }
+
+  private rememberFailure(model: string, transient: boolean): void {
+    if (!transient) {
+      this.missing.set(model, { retryAt: this.now() + notFoundRetryMs, attempts: 0 });
+      return;
+    }
+    const attempts = (this.missing.get(model)?.attempts ?? 0) + 1;
+    const delay = Math.min(transientRetryMs * 2 ** (attempts - 1), transientRetryCeilingMs);
+    this.missing.set(model, { retryAt: this.now() + delay, attempts });
   }
 
   private async readFromDisk(model: string): Promise<DeviceImage | null> {
@@ -91,16 +126,22 @@ export class DeviceImageCache {
     return null;
   }
 
-  private async download(model: string): Promise<{ extension: string; body: Buffer } | null> {
+  private async download(model: string): Promise<DownloadResult> {
+    let transient = false;
     for (const { extension } of extensions) {
       try {
         const response = await fetch(
           `https://www.zigbee2mqtt.io/images/devices/${encodeURIComponent(model)}.${extension}`,
           { signal: AbortSignal.timeout(5000) }
         );
-        if (!response.ok) continue;
+        if (!response.ok) {
+          if (response.status !== 404) transient = true;
+          continue;
+        }
         const actualExtension = extensionForContentType(response.headers.get("content-type"));
         if (!actualExtension) {
+          // Genelde captive portal / vekil sunucu araya girmiştir: geçici say, sonra tekrar dene.
+          transient = true;
           console.error(`Cihaz görseli resim değil (${model}.${extension}): ${response.headers.get("content-type") ?? "bilinmiyor"}`);
           continue;
         }
@@ -109,12 +150,13 @@ export class DeviceImageCache {
           console.error(`Cihaz görseli boyutu geçersiz (${model}.${extension}): ${body.byteLength} bayt`);
           continue;
         }
-        return { extension: actualExtension, body };
+        return { image: { extension: actualExtension, body }, transient: false };
       } catch (error) {
+        transient = true;
         console.error(`Cihaz görseli indirilemedi (${model}.${extension}): ${String(error)}`);
       }
     }
-    return null;
+    return { image: null, transient };
   }
 
   private async writeToDisk(model: string, extension: string, body: Buffer): Promise<void> {

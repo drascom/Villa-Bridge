@@ -332,7 +332,20 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /restoreDeviceFocus\(focusToken\);/);
   assert.match(dashboard, /if\(active&&active!==document\.body&&active!==document\.documentElement\)return/);
   assert.match(dashboard, /if\(match\)match\.focus\(\)/);
-  assert.match(dashboard, /class="device-detail-topline">\$\{linkQualityBadge\(device\)\}/);
+  // Sinyal rozeti ve kalem başlıkta adın yanında; gövdede ayrı bir üst satır kalmadı.
+  assert.doesNotMatch(dashboard, /device-detail-topline/);
+  assert.match(dashboard, /const deviceDetailMetaHtml=device=>`\$\{linkQualityBadge\(device\)\}<button class="device-name-edit"/);
+  assert.match(
+    dashboard,
+    /<div class="device-detail-nameline"><h2 id="deviceDetailName">Device<\/h2><span id="deviceDetailMeta" class="device-detail-meta"><\/span><\/div>/
+  );
+  assert.match(dashboard, /\.device-detail-nameline\{min-width:0;display:flex;align-items:center;gap:10px\}/);
+  assert.match(dashboard, /\.device-detail-meta\{flex:none;display:flex;align-items:center;gap:6px\}/);
+  assert.match(dashboard, /\.device-detail-title h2\{min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap/);
+  assert.match(dashboard, /const metaSignature=`\$\{device\.id\}\|\$\{linkQualityPercent\(device\)\}\|\$\{state\.language\}`/);
+  assert.match(dashboard, /meta\.innerHTML=deviceDetailMetaHtml\(device\);/);
+  assert.match(dashboard, /if\(rename\)rename\.onclick=event=>\{event\.preventDefault\(\);event\.stopPropagation\(\);openRename\(rename\.dataset\.rename\)\}/);
+  assert.match(dashboard, /data-admin-only data-rename="\$\{esc\(device\.id\)\}" aria-label="\$\{esc\(t\("changeName"\)\)\}" title="\$\{esc\(t\("changeName"\)\)\}"/);
   assert.match(dashboard, /const primaryStatusForDevice=/);
   assert.match(dashboard, /value\.smoke!==undefined/);
   assert.match(dashboard, /value\.carbon_monoxide!==undefined/);
