@@ -564,9 +564,13 @@ test("dokunmatik tablette bütün diyaloglar ekranı doldurur, masaüstünde ort
   assert.match(dashboard, /dialog\{width:min\(92vw,560px\)/);
   assert.match(dashboard, /dialog::backdrop\{background:rgba\(15,30,23,\.5\)/);
   assert.match(dashboard, /dialog\.automation-dialog::backdrop\{background:rgba\(12,26,20,\.94\)/);
-  // Dikey padding değişmiyor: yapışkan başlık/eylem şeritlerinin -24px kaydırması yerinde kalır.
+  // Dikey padding değişmiyor: yapışkan başlık şeritlerinin -24px kaydırması yerinde kalır.
   assert.doesNotMatch(dashboard, /dialog>\.modal\{[^}]*padding:\d/);
-  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px/);
+  // Sihirbaz dokunmatikte de sabit tam yükseklik: ortak kural onu yeniden kaydırıcı yapmıyor.
+  assert.match(
+    dashboard,
+    /dialog\.automation-dialog>\.modal\{height:100dvh;max-height:100dvh;overflow:hidden;padding-bottom:calc\(24px \+ env\(safe-area-inset-bottom\)\)\}/
+  );
 });
 
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
@@ -1616,7 +1620,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   // Sihirbaz gezinmesi: sabit ileri/geri şeridi, adım göstergesi, otomatik ilerleme.
   assert.match(dashboard, /<div class="modal-actions automation-actions"><p id="automationNextHint" class="automation-next-hint" hidden><\/p><button id="automationBack" class="secondary" type="button" data-i18n="back">/);
   assert.match(dashboard, /id="automationBack"[\s\S]*?id="automationNext" class="primary"/);
-  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px;z-index:2;flex-wrap:wrap;justify-content:space-between/);
+  assert.match(dashboard, /\.automation-actions\{flex:none;flex-wrap:wrap;justify-content:space-between/);
   assert.match(dashboard, /\.automation-actions button\{min-width:132px;min-height:52px/);
   assert.match(dashboard, /back:"Geri"/);
   assert.match(dashboard, /next:"İleri"/);
@@ -1641,7 +1645,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /automationAdvanceTimer=setTimeout\(\(\)=>\{automationAdvanceTimer=null;run\(\)\},200\)/);
   assert.match(dashboard, /data-automation-trigger\]"\)\.forEach\(button=>button\.onclick=\(\)=>chooseAutomationTrigger\(button\.dataset\.automationTrigger\)\)/);
   // Tür seçilince kartlar kapanır (blok açığı temizlenir) ve sıradaki soru açılır.
-  assert.match(dashboard, /wizard\.triggerKind=kind;[\s\S]{0,120}?wizard\.open=null;\s*renderAutomationWizard\(\);\s*afterAutomationChoice\(automationRevealOpenBlock\);/);
+  assert.match(dashboard, /wizard\.triggerKind=kind;[\s\S]{0,120}?wizard\.open=null;\s*renderAutomationWizard\(\);\s*afterAutomationChoice\(automationFlashOpenBlock\);/);
   assert.match(dashboard, /afterAutomationChoice\(\(\)=>\{nextAutomationStep\(\)\}\)/);
   // Ayar isteyen dokunuşlarda (saat, gün, sekme, arama, eşleme formu) otomatik ilerleme yok: sayılı
   // çağrı yeri var (tanım + tetikleyici türü + cihaz seçimi ×3 + kanal + olay + hedef + eylem +
@@ -1726,14 +1730,25 @@ test("sihirbaz akışı solda tıklanabilir adım rayıyla gösterir", async () 
   assert.match(dashboard, /automationRailLocked:"Önce üstteki adımı tamamlayın"/);
   assert.match(dashboard, /automationRailLocked:"Finish the step above first"/);
 
-  // Dar ekran akordiyon: tek sütun, panel `order` ile aktif adımın altına iner.
-  assert.match(dashboard, /\.automation-flow\{display:flex;flex-direction:column/);
-  assert.match(dashboard, /style="order:\$\{entry\.step\*2\}"/);
-  assert.match(dashboard, /panel\.style\.order=paths\?"":String\(wizard\.step\*2\+1\)/);
-  // Geniş ekran: solda ray sütunu, sağda üç satır boyu uzanan panel.
+  // Modal sabit yükseklikte: içerik adımdan adıma kısalıp uzasa da kutu ve alt şerit yerinde kalır.
+  // Dış kutu kaydırmaz (`overflow:hidden`), kaydırma iç kutuya taşındı.
   assert.match(
     dashboard,
-    /@media\(min-width:760px\)\{\.automation-flow\{display:grid;grid-template-columns:minmax\(0,232px\) minmax\(0,1fr\)[^}]*\}\.automation-flow\.solo\{display:block\}\.automation-rail-step\{grid-column:1\}\.automation-panel\{grid-column:2;grid-row:1\/span 3\}\}/
+    /\.automation-modal\{height:min\(92dvh,880px\);display:flex;flex-direction:column;padding:24px;overflow:hidden\}/
+  );
+  assert.doesNotMatch(dashboard, /\.automation-modal\{[^}]*max-height/);
+  // Tarayıcının kendi `dialog` yükseklik sınırı devrede kalırsa alt eylem şeridi kırpılabilir.
+  assert.match(dashboard, /dialog\.automation-dialog\{width:min\(94vw,680px\);max-height:none;overflow:hidden\}/);
+  assert.doesNotMatch(dashboard, /\.automation-actions\{[^}]*position:sticky/);
+  // Dar ekran akordiyon: tek sütun, panel `order` ile aktif adımın altına iner; kayan kutu ray dahil hepsi.
+  assert.match(dashboard, /\.automation-flow\{display:flex;flex-direction:column/);
+  assert.match(dashboard, /\.automation-flow\{[^}]*flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain\}/);
+  assert.match(dashboard, /style="order:\$\{entry\.step\*2\}"/);
+  assert.match(dashboard, /panel\.style\.order=paths\?"":String\(wizard\.step\*2\+1\)/);
+  // Geniş ekran: solda ray sütunu, sağda tüm yüksekliği kaplayan panel.
+  assert.match(
+    dashboard,
+    /@media\(min-width:760px\)\{\.automation-flow\{display:grid;grid-template-columns:minmax\(0,232px\) minmax\(0,1fr\)[^}]*\}\.automation-flow\.solo\{display:block;overflow-y:auto\}\.automation-rail-step\{grid-column:1\}\.automation-panel\{grid-column:2;grid-row:1\/-1;align-self:stretch;min-height:0;overflow-y:auto[^}]*\}\}/
   );
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
@@ -2050,7 +2065,7 @@ test("düğme tetikleyicisi cihazın gerçekten basış yayıp yaymadığına da
   assert.match(dashboard, /if\(!unproven&&automationTriggerReady\(wizard\)\)\{nextAutomationStep\(\);return\}/);
   // Kanıtsız cihazda blok kapanmaz: uyarı ve alternatif açık kalır, ekran o bloğa kayar.
   assert.match(dashboard, /force:automationButtonUnproven\(wizard,detail\)/);
-  assert.match(dashboard, /if\(!unproven&&automationTriggerReady\(wizard\)\)\{nextAutomationStep\(\);return\}\s*automationRevealOpenBlock\(\);/);
+  assert.match(dashboard, /if\(!unproven&&automationTriggerReady\(wizard\)\)\{nextAutomationStep\(\);return\}\s*automationFlashOpenBlock\(\);/);
 
   // Asıl değerli kısım: durum bildiren cihazda tek dokunuşla "açılınca/kapanınca" yoluna geçiş.
   assert.match(dashboard, /const alternative=unproven&&automationTriggerEvents\(device,"deviceState"\)\.length>0/);
@@ -2436,8 +2451,8 @@ test("sihirbazda tek birincil eylem var ve pasifken nedenini söylüyor", async 
   assert.doesNotMatch(dashboard, /automation-top-next/);
   assert.doesNotMatch(dashboard, /automation-progress/);
   assert.equal(dashboard.match(/id="automation(?:Top)?Next"/g)?.length, 1);
-  // Tek birincil eylem altta ve yapışkan şeritte kalıyor.
-  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px/);
+  // Tek birincil eylem altta, sabit yükseklikli kutunun kaymayan şeridinde kalıyor.
+  assert.match(dashboard, /\.automation-actions\{flex:none;/);
   assert.match(dashboard, /const automationNextButtons=\(\)=>\[\$\("#automationNext"\)\]\.filter\(Boolean\)/);
   assert.match(dashboard, /const label=t\(wizard\.step===3\?"save":"next"\);/);
   // Yol seçimi adımında ilerlenecek bir şey yok: düğme gizlenir.
@@ -2780,6 +2795,8 @@ type WizardHarness = {
   bodies: string[];
   rails: string[];
   scroll: () => number;
+  panelScroll: () => number;
+  scrollIntoViewCalls: () => number;
   setScroll: (value: number) => void;
   wizard: () => Record<string, unknown>;
   body: () => string;
@@ -2794,6 +2811,7 @@ async function automationWizardHarness(): Promise<WizardHarness> {
   assert.ok(start > 0 && end > start);
   const bodies: string[] = [];
   const rails: string[] = [];
+  let scrollIntoViewCalls = 0;
   const nodes = new Map<string, Record<string, unknown>>();
   const node = (selector: string): Record<string, unknown> => {
     const found = nodes.get(selector);
@@ -2811,8 +2829,8 @@ async function automationWizardHarness(): Promise<WizardHarness> {
       querySelectorAll: () => [] as unknown[],
       // Adım rayı panelin önüne basılır: testte basılan işaretleme toplanır.
       insertAdjacentHTML: (_position: string, html: string) => { if (selector === "#automationPanel") rails.push(html); },
-      // Uzun listede kaydırma: adım 2'de aşağı inilmiş bir ekranı taklit eder.
-      scrollIntoView: () => { (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop = 400; },
+      // Blok açılınca kaydırma olmamalı: çağrı sayılır, sıfır kalmalı.
+      scrollIntoView: () => { scrollIntoViewCalls += 1; },
       setAttribute() {},
       focus() {},
       showModal() {},
@@ -2873,8 +2891,15 @@ async function automationWizardHarness(): Promise<WizardHarness> {
   return {
     bodies,
     rails,
-    scroll: () => (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop,
-    setScroll: (value: number) => { (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop = value; },
+    // Kaydırma kutuları artık dış kutu değil: dar düzende `#automationFlow`, iki sütunluda
+    // `#automationPanel`. Sahte DOM ikisini de tutar; `automationScrollTop` ikisini de sıfırlamalı.
+    scroll: () => (node("#automationFlow") as { scrollTop: number }).scrollTop,
+    panelScroll: () => (node("#automationPanel") as { scrollTop: number }).scrollTop,
+    scrollIntoViewCalls: () => scrollIntoViewCalls,
+    setScroll: (value: number) => {
+      (node("#automationFlow") as { scrollTop: number }).scrollTop = value;
+      (node("#automationPanel") as { scrollTop: number }).scrollTop = value;
+    },
     wizard: () => state.automationWizard as Record<string, unknown>,
     body: () => bodies[bodies.length - 1],
     state,
@@ -3025,8 +3050,8 @@ test("yeni kural kurulumunda sonra kapat seçenekleri özet adımında görünü
   api.chooseAutomationTriggerDevice("0x0022");
   api.chooseAutomationEvent("occupancy=true");
   api.chooseAutomationTargetDevice("0x0011");
-  // Adım 2 uzun listede aşağı kaydırılmış durumda.
-  assert.equal(harness.scroll(), 400);
+  // Adım 2 uzun listede kullanıcının kendi elleriyle aşağı kaydırılmış durumda.
+  harness.setScroll(400);
   api.chooseAutomationAction("0x0011|switch:state|on");
 
   const wizard = harness.wizard();
@@ -3037,13 +3062,46 @@ test("yeni kural kurulumunda sonra kapat seçenekleri özet adımında görünü
   assert.match(review, /data-automation-autooff="idle"/);
   assert.match(review, /data-automation-autooff="after"/);
   // Asıl hata buydu: seçenekler basılıyordu ama ekran bir önceki adımın kaydırmasında kalıyordu.
+  // Sabit yükseklikle birlikte kaydırma iç kutuya taşındı; ikisi de başa alınmalı.
   assert.equal(harness.scroll(), 0);
+  assert.equal(harness.panelScroll(), 0);
 
   // Aynı adımda yeniden çizim kullanıcının yerini bozmaz.
   harness.setScroll(120);
   api.chooseAutomationAutoOff("after");
   assert.equal(harness.scroll(), 120);
+  assert.equal(harness.panelScroll(), 120);
   assert.match(harness.bodies[harness.bodies.length - 1], /data-automation-autooff-minutes="5"/);
+});
+
+// Blok açılınca ekran kaydırılmıyordu değil — kaydırılıyordu ve asıl şikâyet buydu: uzun blok
+// ortalanınca listenin üstü ekran dışında kalıyor, kullanıcı seçenekleri göremiyordu. Kural:
+// adım değişince en üste, blok açılınca hiçbir yere.
+test("sihirbazda blok açılınca ekran kaydırılmaz, yalnız adım değişimi başa sarar", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+
+  // Kullanıcı listede aşağı inmiş; kapalı satırı yeniden açmak yerini bozmamalı.
+  harness.setScroll(260);
+  api.openAutomationBlock("kind");
+  assert.equal(harness.scroll(), 260);
+  assert.equal(harness.panelScroll(), 260);
+  // "Değiştir" ile cihaz seçimini temizlemek de kaydırmaz.
+  api.automationPickBack("trigger");
+  assert.equal(harness.scroll(), 260);
+  // Hiçbir yolda `scrollIntoView` çağrılmadı: vurgu kaldı, kaydırma gitti.
+  assert.equal(harness.scrollIntoViewCalls(), 0);
+
+  // Adım değişimi hâlâ başa sarar.
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  assert.equal(harness.wizard().step, 2);
+  assert.equal(harness.scroll(), 0);
+  assert.equal(harness.panelScroll(), 0);
 });
 
 test("sonra kapat seçenekleri yalnız açan eylemde ve karşıtı olan tetikleyicide sunulur", async () => {

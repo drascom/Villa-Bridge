@@ -186,7 +186,10 @@
     .automation-paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:14px;margin:0 0 20px}.automation-paths[hidden]{display:none}.automation-path{min-height:88px;display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:15px;padding:18px;border:1px solid var(--line);border-radius:18px;color:var(--ink);background:var(--surface);box-shadow:var(--card-shadow);text-align:left;touch-action:manipulation}.automation-path:hover,.automation-path:focus-visible{border-color:var(--forest)}.automation-path:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-path[disabled]{opacity:.62}.automation-path-glyph{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;background:var(--forest-soft);font-size:22px}.automation-path-copy{min-width:0}.automation-path strong{display:block;font-size:16px;font-weight:800}.automation-path-lead{display:block;margin-top:5px;color:var(--muted);font-size:13px;line-height:1.35}.automation-soon{display:inline-block;margin-top:9px;padding:3px 9px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:11px;font-weight:850}
     .automation-list{display:grid;gap:12px}.automation-card{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:15px;padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--card-shadow)}.automation-card-glyph{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;color:var(--forest);background:var(--forest-soft);font-size:21px}.automation-card-copy{min-width:0}.automation-card strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-card-note{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.35}.automation-empty{display:grid;justify-items:center;gap:10px;padding:44px 20px}.automation-empty-icon{width:62px;height:62px;display:grid;place-items:center;border-radius:20px;color:var(--forest);background:var(--forest-soft);font-size:30px}.automation-empty h2{margin:4px 0 0;color:var(--ink);font:750 23px/1.1 system-ui,sans-serif}.automation-empty p{max-width:480px;margin:0}
     dialog.simple-link-dialog{width:min(94vw,660px)}.simple-link-modal{max-height:min(92vh,860px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.simple-link-modal .room-filter{margin:16px 0 0}.simple-link-choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:11px;margin-top:16px}.simple-link-choice{min-height:88px;display:grid;align-content:center;gap:6px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.simple-link-choice:hover,.simple-link-choice:focus-visible{border-color:var(--forest)}.simple-link-choice:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.simple-link-choice.active{border-color:var(--forest);background:var(--forest-soft)}.simple-link-choice strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.simple-link-choice small{color:var(--muted);font-size:12px}.simple-link-summary{margin-top:18px;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.simple-link-summary[hidden]{display:none}.simple-link-summary strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.simple-link-summary p{margin:8px 0 0;font-size:13px;line-height:1.4}.simple-link-modal .modal-actions button[hidden]{display:none}
-    dialog.automation-dialog{width:min(94vw,680px)}.automation-modal{max-height:min(92vh,880px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.automation-modal .modal-actions button[hidden]{display:none}.automation-modal .automation-paths{margin:18px 0 0}
+    /* Sihirbaz sabit yükseklikte açılır: içerik adımdan adıma kısalıp uzasa da kutu aynı kalır, alttaki
+       eylem şeridi hiç yer değiştirmez. Kaydırma dış kutuda değil, içeride (`.automation-flow` ya da
+       masaüstünde `.automation-panel`) yapılır. `dvh`: mobil adres çubuğu açılıp kapanınca zıplamasın. */
+    dialog.automation-dialog{width:min(94vw,680px);max-height:none;overflow:hidden}.automation-modal{height:min(92dvh,880px);display:flex;flex-direction:column;padding:24px;overflow:hidden}.automation-modal .modal-actions button[hidden]{display:none}.automation-modal .automation-paths{margin:18px 0 0}
     dialog.automation-dialog::backdrop{background:rgba(12,26,20,.94);backdrop-filter:blur(10px)}
     .automation-tabs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}.automation-tab{min-height:44px;flex:0 0 auto;max-width:100%;padding:10px 16px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;white-space:nowrap;touch-action:manipulation}.automation-tab:hover,.automation-tab:focus-visible{border-color:var(--forest)}.automation-tab.active{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}.automation-tab:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     .automation-search{position:relative;display:flex;margin-top:12px}.automation-search .search{width:100%;min-height:52px;font-size:16px}.automation-pick-list{display:block}
@@ -196,12 +199,14 @@
     .automation-open{display:block;margin-top:18px;border-radius:18px}.automation-open-label{margin:0}.automation-open.flash{animation:automation-open-in .9s ease-out}@keyframes automation-open-in{0%{box-shadow:0 0 0 3px var(--forest-soft)}100%{box-shadow:0 0 0 3px transparent}}@media(prefers-reduced-motion:reduce){.automation-open.flash{animation:none}}
     /* Adım rayı: dar ekranda tek sütun akordiyon (panel `order` ile aktif adımın altına iner),
        geniş ekranda solda ray + sağda panel. Yol seçiminde ray yok, panel tek başına (`solo`). */
-    .automation-flow{display:flex;flex-direction:column;gap:12px;margin-top:4px}.automation-flow.solo{display:block}.automation-panel{min-width:0}
+    .automation-flow{display:flex;flex-direction:column;gap:12px;margin-top:4px;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}.automation-flow.solo{display:block}.automation-panel{min-width:0}
     .automation-rail-step{min-height:64px;display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-rail-step:hover:not([disabled]){border-color:var(--forest)}.automation-rail-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-rail-step[disabled]{opacity:.5;background:transparent;cursor:not-allowed}.automation-rail-step.active{border-color:var(--forest);background:var(--forest-soft);box-shadow:var(--card-shadow)}
     .automation-rail-marker{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;color:var(--muted);background:var(--surface);font:800 14px/1 system-ui,sans-serif}.automation-rail-step.active .automation-rail-marker,.automation-rail-step.done .automation-rail-marker{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
     .automation-rail-copy{min-width:0;display:grid;gap:3px}.automation-rail-label{color:var(--muted);font-size:12px;font-weight:850;letter-spacing:.05em;text-transform:uppercase}.automation-rail-step.active .automation-rail-label{color:var(--forest)}.automation-rail-value{font-size:14px;font-weight:750;line-height:1.3;overflow-wrap:anywhere}.automation-rail-step.active .automation-rail-value{font-size:16px;font-weight:800}
-    @media(min-width:760px){.automation-flow{display:grid;grid-template-columns:minmax(0,232px) minmax(0,1fr);column-gap:26px;row-gap:12px;align-items:start}.automation-flow.solo{display:block}.automation-rail-step{grid-column:1}.automation-panel{grid-column:2;grid-row:1/span 3}}
-    .automation-actions{position:sticky;bottom:-24px;z-index:2;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:24px;padding:16px 0 24px;background:var(--surface)}.automation-actions button{min-width:132px;min-height:52px;font-size:15px}.automation-actions button[disabled]{opacity:.45}.automation-next-hint{flex:1 1 100%;order:-1;margin:0;color:var(--muted);font-size:13px;line-height:1.4;text-align:right}.automation-next-hint[hidden]{display:none}
+    /* İki sütunlu halde kayan taraf içerik sütunu: ray sabit kalır. Dördüncü satır (`minmax(0,1fr)`)
+       artan boşluğu yutar, panel `1/-1` ile tüm yüksekliği kaplar; yoksa panel ray kadar kısa kalırdı. */
+    @media(min-width:760px){.automation-flow{display:grid;grid-template-columns:minmax(0,232px) minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr);column-gap:26px;row-gap:12px;align-items:start;overflow:hidden}.automation-flow.solo{display:block;overflow-y:auto}.automation-rail-step{grid-column:1}.automation-panel{grid-column:2;grid-row:1/-1;align-self:stretch;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}}
+    .automation-actions{flex:none;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:16px;padding:16px 0 0;border-top:1px solid var(--line);background:var(--surface)}.automation-actions button{min-width:132px;min-height:52px;font-size:15px}.automation-actions button[disabled]{opacity:.45}.automation-next-hint{flex:1 1 100%;order:-1;margin:0;color:var(--muted);font-size:13px;line-height:1.4;text-align:right}.automation-next-hint[hidden]{display:none}
     .automation-triggers{display:grid;gap:11px;margin-top:16px}.automation-trigger{min-height:88px;display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-trigger:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-trigger[disabled]{opacity:.62}.automation-trigger.active{border-color:var(--forest);background:var(--forest-soft)}.automation-trigger-glyph{display:grid;place-items:center;font-size:23px}.automation-trigger strong{display:block;font-size:15px;font-weight:800}
     .automation-time{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}.automation-time-unit{display:grid;gap:9px;justify-items:center}.automation-time-value{min-width:88px;font:800 42px/1 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}.automation-time-step{width:88px;min-height:60px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);font-size:27px;font-weight:800;touch-action:manipulation}.automation-time-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-time-colon{font:800 34px/1 system-ui,sans-serif}
     .automation-days{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.automation-day{min-height:44px;padding:9px 15px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;touch-action:manipulation}.automation-day:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-day.active{border-color:var(--forest);background:var(--forest-soft)}
@@ -223,6 +228,8 @@
       dialog>.modal{max-height:100dvh;padding-left:clamp(18px,4vw,44px);padding-right:clamp(18px,4vw,44px);overflow-y:auto;overscroll-behavior:contain}
       /* Sabit yerleşimli içerik (QR, renk çarkı, ağ haritası) genişleyince ortada dağılmasın. */
       dialog>.modal>*{max-width:920px;margin-left:auto;margin-right:auto}
+      /* Sihirbaz burada da sabit: ortak kuralın `overflow-y:auto`su dış kutuyu yeniden kaydırıcı yapmasın. */
+      dialog.automation-dialog>.modal{height:100dvh;max-height:100dvh;overflow:hidden;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
     }
   </style>
 </head>
@@ -4614,14 +4621,14 @@
     else wizard.targetDeviceId=null;
     wizard.open=null;
     renderAutomationWizard();
-    automationRevealOpenBlock();
+    automationFlashOpenBlock();
   }
   // Adım değişince gövde başa sarar. Uzun listede aşağıda kalan kaydırma yeni adımda korunuyordu:
-  // özet adımının en üstündeki "sonra kapat" seçenekleri ekranın dışında kalıyordu. Kaydırma kutusu
-  // tablette `.modal` (overflow-y:auto), masaüstünde `dialog`; ikisi de başa alınır. Anlık atama
-  // ayrıca bir önceki adımın yumuşak `scrollIntoView` hareketini de keser.
+  // özet adımının en üstündeki "sonra kapat" seçenekleri ekranın dışında kalıyordu. Modal artık sabit
+  // yükseklikte ve dışı kaydırmıyor: kaydırma kutusu dar/akordiyon düzende `.automation-flow`,
+  // iki sütunlu düzende `.automation-panel`. İkisi de başa alınır — hangi düzen açıksa o çalışır.
   function automationScrollTop(){
-    for(const box of [$("#automationDialog"),$("#automationDialog .automation-modal")]){
+    for(const box of [$("#automationFlow"),$("#automationPanel")]){
       if(box)box.scrollTop=0;
     }
   }
@@ -4788,13 +4795,14 @@
     cancelAutomationAdvance();
     wizard.open=id;
     renderAutomationWizard();
-    automationRevealOpenBlock();
+    automationFlashOpenBlock();
   }
-  // Yeni açılan soru görünüme gelsin ve kısaca vurgulansın: "ne geldi, ne kalktı" görünür olsun.
-  function automationRevealOpenBlock(){
+  // Yeni açılan soru kısaca vurgulanır: "ne geldi, ne kalktı" görünür olsun. Kaydırma YOK — blok
+  // uzun olduğunda `scrollIntoView` listeyi ortalıyor, üstteki seçenekler ekran dışında kalıyordu.
+  // Kural: adım değişince en üste (automationScrollTop), blok açılınca hiçbir yere kaydırma.
+  function automationFlashOpenBlock(){
     const block=$("#automationBody .automation-open");
     if(!block)return;
-    block.scrollIntoView({behavior:"smooth",block:"center"});
     block.classList.add("flash");
   }
   // Pasif "İleri" sessiz kalmasın: neyin eksik olduğunu düğmenin yanında yazar.
@@ -4880,7 +4888,7 @@
     // Tür seçildi: kartlar kapanır, sıradaki soru açılır.
     wizard.open=null;
     renderAutomationWizard();
-    afterAutomationChoice(automationRevealOpenBlock);
+    afterAutomationChoice(automationFlashOpenBlock);
   }
   function automationClearTriggerDevice(wizard){
     wizard.triggerDeviceId=null;
@@ -4912,7 +4920,7 @@
       renderAutomationWizard();
       afterAutomationChoice(()=>{
         if(automationTriggerReady(wizard)){nextAutomationStep();return}
-        automationRevealOpenBlock();
+        automationFlashOpenBlock();
       });
       return;
     }
@@ -4925,7 +4933,7 @@
     renderAutomationWizard();
     afterAutomationChoice(()=>{
       if(!unproven&&automationTriggerReady(wizard)){nextAutomationStep();return}
-      automationRevealOpenBlock();
+      automationFlashOpenBlock();
     });
   }
   // Durum bildiren cihazda düğme yolundan "açılınca/kapanınca" yoluna geçiş: cihaz seçimi korunur.
@@ -4943,7 +4951,7 @@
     renderAutomationWizard();
     afterAutomationChoice(()=>{
       if(automationTriggerReady(wizard)){nextAutomationStep();return}
-      automationRevealOpenBlock();
+      automationFlashOpenBlock();
     });
   }
   function chooseAutomationChannel(property){
@@ -5005,7 +5013,7 @@
     wizard.open=null;
     if(automationMappingMode(wizard)&&controls.length===1){chooseAutomationTarget(`${deviceId}|${controls[0].id}`);return}
     renderAutomationWizard();
-    afterAutomationChoice(automationRevealOpenBlock);
+    afterAutomationChoice(automationFlashOpenBlock);
   }
   function chooseAutomationAction(token){
     const wizard=state.automationWizard;
