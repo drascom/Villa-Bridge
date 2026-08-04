@@ -3727,6 +3727,8 @@
   const isAutomationControl=control=>control.kind==="switch"&&control.adminOnly!==true;
   const automationControls=device=>isProtectedDevice(device)?[]:(device?.controls||[]).filter(isAutomationControl);
   const isAutomationTarget=device=>automationControls(device).length>0;
+  // §8.2 — döngü korumasının kanonik anahtarı: IEEE adresi + kanal (MQTT özelliği); dost isim değil.
+  const automationChannelKey=(deviceId,property)=>`${String(deviceId||"").toLowerCase()}|${String(property||"")}`;
   const automationControlValue=(control,on)=>on?(control.valueOn??"ON"):(control.valueOff??"OFF");
   // Tek basışta hem açan hem kapatan seçenek yalnızca cihaz bunu bildiriyorsa sunulur.
   const automationCanToggle=control=>control?.valueToggle!==undefined&&control?.valueToggle!==null;
@@ -4238,16 +4240,21 @@
   }
   function automationThenHtml(wizard){
     const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
-    // §8.2 — otomasyonu başlatan cihaz hedef olamaz; döngü daha seçim anında engellenir.
-    const starter=wizard.triggerKind==="time"?null:wizard.triggerDeviceId;
+    // §8.2 — otomasyonu başlatan kanal hedef olamaz; döngü daha seçim anında engellenir.
+    // Çok kanallı anahtarda cihazın komşu kanalları listede kalır: bir kanal tetikler, öbürü yanar.
+    // Buton yolunda kanal (property) yoktur; orada cihazın tamamı elenir.
+    const channelStarter=wizard.triggerKind!=="time"&&wizard.triggerKind!=="button"&&Boolean(wizard.triggerProperty);
+    const starter=wizard.triggerKind==="time"||channelStarter?null:wizard.triggerDeviceId;
+    const starterChannel=channelStarter?automationChannelKey(wizard.triggerDeviceId,wizard.triggerProperty):null;
+    const targetControls=device=>automationControls(device).filter(control=>automationChannelKey(device.id,control.property)!==starterChannel);
     const devices=state.devices
-      .filter(device=>isAutomationTarget(device)&&device.id!==starter&&(!wizard.room||deviceInRoom(device,wizard.room)))
+      .filter(device=>targetControls(device).length>0&&device.id!==starter&&(!wizard.room||deviceInRoom(device,wizard.room)))
       .sort(byName);
     if(!devices.length)return`<div class="empty">${t("automationNoTargets")}</div>`;
     // Anahtar yolunda burada yalnız hedef seçilir; ne yapılacağı eşleme formunda sorulur.
     const mapping=automationMappingMode(wizard);
     const rows=devices.map(device=>{
-      const controls=automationControls(device);
+      const controls=targetControls(device);
       const selected=mapping?wizard.target?.deviceId===device.id:wizard.action?.deviceId===device.id;
       const open=wizard.openDevice===device.id;
       // Tek uygun kontrol sessizce seçilir; kullanıcıya "hangisi?" diye sorulmaz.
@@ -4563,7 +4570,11 @@
     const actions=automationMappingMode(wizard)?automationMapActions(wizard):(wizard.action?[wizard.action]:[]);
     if(!actions.length)return;
     const trigger=automationWizardTrigger(wizard);
-    if(trigger.deviceId&&actions.some(action=>action.deviceId===trigger.deviceId)){showToast(t("automationLoopWarning"),true);return}
+    // §8.2 — yalnız tetikleyen kanalın kendisi engellenir; buton yolunda kanal yok, cihaz engellenir.
+    const loops=trigger.type==="deviceState"
+      ?actions.some(action=>automationChannelKey(action.deviceId,action.property)===automationChannelKey(trigger.deviceId,trigger.property))
+      :trigger.type==="deviceAction"&&actions.some(action=>action.deviceId===trigger.deviceId);
+    if(loops){showToast(t("automationLoopWarning"),true);return}
     const buttons=automationNextButtons();
     buttons.forEach(button=>{button.disabled=true});
     const entry={

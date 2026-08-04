@@ -1758,13 +1758,17 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   assert.match(dashboard, /automationToggles:"açık\/kapalı değişir"/);
   assert.match(dashboard, /automationToggles:"switches on or off"/);
 
-  // §8.2 — döngü: başlatan cihaz hedef listesinde yok, kaydetmede de durduruluyor, hata ham basılmıyor.
-  assert.match(dashboard, /const starter=wizard\.triggerKind==="time"\?null:wizard\.triggerDeviceId;/);
-  assert.match(dashboard, /isAutomationTarget\(device\)&&device\.id!==starter/);
-  assert.match(dashboard, /if\(trigger\.deviceId&&actions\.some\(action=>action\.deviceId===trigger\.deviceId\)\)\{showToast\(t\("automationLoopWarning"\),true\);return\}/);
+  // §8.2 — döngü kanal granülerliğinde: yalnız başlatan kanal hedef listesinden düşer, cihazın
+  // komşu kanalları kalır; kaydetmede de aynı kural işler ve hata ham basılmıyor.
+  assert.match(dashboard, /const starter=wizard\.triggerKind==="time"\|\|channelStarter\?null:wizard\.triggerDeviceId;/);
+  assert.match(dashboard, /const starterChannel=channelStarter\?automationChannelKey\(wizard\.triggerDeviceId,wizard\.triggerProperty\):null;/);
+  assert.match(dashboard, /const targetControls=device=>automationControls\(device\)\.filter\(control=>automationChannelKey\(device\.id,control\.property\)!==starterChannel\);/);
+  assert.match(dashboard, /targetControls\(device\)\.length>0&&device\.id!==starter/);
+  assert.match(dashboard, /\?actions\.some\(action=>automationChannelKey\(action\.deviceId,action\.property\)===automationChannelKey\(trigger\.deviceId,trigger\.property\)\)/);
+  assert.match(dashboard, /if\(loops\)\{showToast\(t\("automationLoopWarning"\),true\);return\}/);
   assert.match(dashboard, /showToast\(automationErrorText\(error\),true\)/);
-  assert.match(dashboard, /automationLoopWarning:"Bu cihaz otomasyonun çalıştırdığı cihazla aynı;/);
-  assert.match(dashboard, /automationLoopWarning:"This device is the one the automation runs,/);
+  assert.match(dashboard, /automationLoopWarning:"Bu, otomasyonu başlatan kanalın kendisi;/);
+  assert.match(dashboard, /automationLoopWarning:"This is the very channel that starts the automation,/);
 
   // Arayüz dili: yeni metinlerde geliştirici sözlüğü yok.
   assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:tetikleyici|koşul|senaryo|kural kur|cluster|endpoint|property)/i);

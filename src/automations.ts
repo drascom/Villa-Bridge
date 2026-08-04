@@ -180,6 +180,14 @@ export const automationTriggerDeviceIds = (automation: Automation): string[] => 
   return ids;
 };
 
+/**
+ * §8.2 — döngü korumasının kanonik anahtarı: IEEE adresi + kanal (MQTT özelliği). Dost isim
+ * kullanılmaz. Çok kanallı anahtarın `state_l1`/`state_l2` uçları ayrı kanal sayılır.
+ */
+const automationChannelKey = (
+  entry: { deviceId: string; property: string }
+): string => `${entry.deviceId}|${entry.property}`;
+
 /** §5.4 — eylem koşulu yalnızca `equals` taşır; fazlası reddedilir. */
 const validateActionWhen = (value: unknown): AutomationActionWhen => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -275,12 +283,19 @@ export const validateAutomations = (
     const triggers = validateTriggers(candidate.triggers);
     const actions = validateActions(candidate.actions, lookup);
     // §8.2 — geri besleme döngüsü kaydetme anında reddedilir, çalışma zamanında değil.
+    // Koruma kanal granülerliğinde: çok kanallı anahtarda bir kanal tetikleyip komşu kanalı
+    // çalıştırmak geçerlidir; yasak olan yalnızca kanalın kendi kendini tetiklemesidir.
+    // Düğme tetikleyicisinde kanal (property) yoktur; orada cihaz granülerliği korunur.
     const actionDeviceIds = new Set(actions.map((action) => action.deviceId));
+    const actionChannels = new Set(actions.map((action) => automationChannelKey(action)));
     for (const trigger of triggers) {
       if (trigger.type === "time") continue;
-      if (actionDeviceIds.has(trigger.deviceId)) {
+      const looped = trigger.type === "deviceState"
+        ? actionChannels.has(automationChannelKey(trigger))
+        : actionDeviceIds.has(trigger.deviceId);
+      if (looped) {
         throw new Error(
-          "Bir otomasyon kendi çalıştırdığı cihaz tarafından tetiklenemez; döngü oluşur."
+          "Bir otomasyon kendi çalıştırdığı kanal tarafından tetiklenemez; döngü oluşur."
         );
       }
     }

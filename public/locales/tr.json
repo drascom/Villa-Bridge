@@ -780,6 +780,6 @@
     "automationCardSummaryMap": "{device} açılınca → {target} {onAction} · kapanınca {offAction}",
     "automationCardSummaryMapOn": "{device} açılınca → {target} {onAction}",
     "automationCardSummaryMapOff": "{device} kapanınca → {target} {offAction}",
-    "automationLoopWarning": "Bu cihaz otomasyonun çalıştırdığı cihazla aynı; kendi kendini başlatamaz. Başka bir cihaz seçin."
+    "automationLoopWarning": "Bu, otomasyonu başlatan kanalın kendisi; kendi kendini başlatamaz. Başka bir hedef seçin."
   }
 }

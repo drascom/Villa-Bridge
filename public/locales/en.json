@@ -780,6 +780,6 @@
     "automationCardSummaryMap": "{device} on → {target} {onAction} · off → {offAction}",
     "automationCardSummaryMapOn": "{device} on → {target} {onAction}",
     "automationCardSummaryMapOff": "{device} off → {target} {offAction}",
-    "automationLoopWarning": "This device is the one the automation runs, so it cannot start itself. Pick another device."
+    "automationLoopWarning": "This is the very channel that starts the automation, so it cannot start itself. Pick another target."
   }
 }

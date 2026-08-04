@@ -261,16 +261,42 @@ test("kilit ve duman tetikleyici olarak serbesttir (§8.1 yalnız eylemi kısıt
   })], lookup)[0]?.triggers.length, 2);
 });
 
-test("otomasyon kendi çalıştırdığı cihaz tarafından tetiklenemez", () => {
+test("otomasyon kendi çalıştırdığı kanal tarafından tetiklenemez", () => {
+  // Aynı cihaz + aynı kanal: gerçek döngü, reddedilir.
   assert.throws(() => validateAutomations([automation({
-    triggers: [{ type: "deviceState", deviceId: lampId, property: "state", equals: "ON" }]
+    triggers: [{ type: "deviceState", deviceId: lampId, property: "state_l1", equals: "ON" }]
   })]), /döngü/);
+  // Düğme tetikleyicisinde kanal yok; cihaz granülerliğindeki koruma sürüyor.
   assert.throws(() => validateAutomations([automation({
     triggers: [{ type: "deviceAction", deviceId: lampId, action: "on" }]
   })]), /döngü/);
   // Farklı cihaz sorunsuz.
   assert.equal(validateAutomations([automation({
     triggers: [{ type: "deviceAction", deviceId: switchId, action: "1_single" }]
+  })]).length, 1);
+});
+
+test("çok kanallı anahtarda bir kanal komşu kanalı çalıştırabilir", () => {
+  // Kullanıcının duvar anahtarı: `state` tetikler, `state_l1`/`state_l2` yanar — döngü değil.
+  const parsed = validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: lampId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state_l1", value: "ON", when: { equals: "ON" } },
+      { type: "device", deviceId: lampId, property: "state_l2", value: "ON", when: { equals: "ON" } }
+    ]
+  })]);
+  assert.equal(parsed[0]?.actions.length, 2);
+  // Aynı kanal eylemler arasına sızarsa kural yine reddedilir — koruma kaybolmadı.
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: lampId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state_l1", value: "ON" },
+      { type: "device", deviceId: lampId, property: "state", value: "ON" }
+    ]
+  })]), /döngü/);
+  // Kanal adı eşleşse bile farklı cihaz ayrı kanaldır.
+  assert.equal(validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state_l1" }]
   })]).length, 1);
 });
 
