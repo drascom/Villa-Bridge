@@ -177,7 +177,7 @@
     @media(min-width:561px){#devices .page-head>.add-device{width:88px;min-width:88px;height:88px;flex:none;align-self:flex-start;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;margin:0;padding:8px 6px;border:1px solid var(--forest);border-radius:16px;color:var(--forest);background:var(--forest-soft);box-shadow:none}#devices .page-head>.add-device .page-action-glyph{display:block;width:26px;height:26px}#devices .page-head>.add-device .page-action-label{position:static;width:auto;height:auto;margin:0;padding:0;overflow:visible;clip:auto;border:0;white-space:normal;font-size:11px;font-weight:800;line-height:1.15;text-align:center}}
     #devices .page-head .lead,#home .page-head .lead{display:none}
     .card-actions-danger{justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
-    .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-controls,.device-detail-media{min-width:0}.device-detail-media{display:grid;align-content:start;gap:14px}.device-detail-media .facts{margin-top:0}.device-detail-media .device-detail-photo{margin:0}
+    .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-controls,.device-detail-media{min-width:0}.device-detail-media{display:grid;align-content:start;gap:14px}.device-detail-media .facts{margin-top:0}.device-detail-media .device-detail-photo{margin:0}.device-detail-media .device-detail-roles{margin-top:0}.device-detail-roles .control-select{min-width:0;max-width:100%}
     @media(min-width:900px) and (orientation:landscape){dialog.device-detail-dialog{width:min(94vw,940px)}.device-detail-layout{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}.device-detail-controls{order:2}.device-detail-media{order:1}.device-detail-photo .device-photo{max-height:min(22vh,150px)}}
     .device-card.device-card-offline{filter:saturate(.7);opacity:.72}.device-attention .device-card.device-card-offline{filter:saturate(.85);opacity:.92}:root[data-theme="dark"] .device-card.device-card-offline{opacity:.8}:root[data-theme="dark"] .device-attention .device-card.device-card-offline{opacity:.95}
     .device-grid.devices-list-view{justify-items:center}.device-grid.devices-list-view>.device-card{width:min(100%,760px)}.device-grid.devices-list-view>.empty{width:100%}
@@ -987,10 +987,12 @@
     const otaButton=device.otaSupported?`<button class="secondary" data-admin-only data-ota-check="${esc(device.id)}"${updateRunning?" disabled":""}>↻ ${t("checkForUpdate")}</button><button class="secondary" data-admin-only data-ota="${esc(device.id)}" data-ota-enabled="${updateScheduled?"false":"true"}"${updateRunning?" disabled":""}>⇧ ${esc(updateLabel)}</button>`:"";
     const photoHtml=`${deviceDetailPhoto(device)}`;
     const factsHtml=deviceFacts.length?`<div class="facts">${deviceFacts.map(fact=>`<span class="fact">${esc(fact)}</span>`).join("")}</div>`:"";
-    const mediaHtml=photoHtml||factsHtml?`<div class="device-detail-media">${photoHtml}${factsHtml}</div>`:"";
+    // Rol satırları resmin altındaki boşluğa oturur; sol sütun resimsiz cihazda da bu blokla dolar.
+    const rolesHtml=`<div class="controls device-detail-roles">${deviceRoleRowsHtml(device)}</div>`;
+    const mediaHtml=`<div class="device-detail-media">${photoHtml}${factsHtml}${rolesHtml}</div>`;
     return`<div class="device-detail-topline">${linkQualityBadge(device)}<button class="device-name-edit" type="button" data-admin-only data-rename="${esc(device.id)}" aria-label="${esc(t("changeName"))}" title="${esc(t("changeName"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L19 9l-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg></button>${preparing?`<span class="device-primary-status muted">${t("preparing")}</span>`:""}</div>
       <div class="device-detail-layout">
-        <div class="device-detail-controls"><div class="controls">${device.controls.length?device.controls.map(control=>controlHtml(device,control)).join(""):`<div class="device-exposed-empty">${t("noExposedControls")}</div>`}${deviceRoleRowsHtml(device)}</div></div>
+        <div class="device-detail-controls"><div class="controls">${device.controls.length?device.controls.map(control=>controlHtml(device,control)).join(""):`<div class="device-exposed-empty">${t("noExposedControls")}</div>`}</div></div>
         ${mediaHtml}
       </div>
       ${deviceButtonsHtml(device)}

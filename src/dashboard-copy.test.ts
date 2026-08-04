@@ -266,7 +266,8 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.doesNotMatch(dashboard, /loading="lazy"/);
   assert.match(dashboard, /const succeed=\(\)=>\{if\(photo\)photo\.hidden=false\}/);
   assert.match(dashboard, /\$\{deviceDetailPhoto\(device\)\}/);
-  assert.match(dashboard, /const mediaHtml=photoHtml\|\|factsHtml\?`<div class="device-detail-media">\$\{photoHtml\}\$\{factsHtml\}<\/div>`:""/);
+  assert.match(dashboard, /const mediaHtml=`<div class="device-detail-media">\$\{photoHtml\}\$\{factsHtml\}\$\{rolesHtml\}<\/div>`/);
+  assert.match(dashboard, /\.device-detail-roles \.control-select\{min-width:0;max-width:100%\}/);
   assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls"><div class="controls">\$\{device\.controls\.length\?/);
   assert.match(dashboard, /#devices \.page-head \.lead,#home \.page-head \.lead\{display:none\}/);
   assert.match(dashboard, /<p class="lead" data-i18n="devicesLead">/);
@@ -2031,10 +2032,19 @@ test("cihaz rolü eşleştirmede sorulur ve cihaz kartındaki özellik listesind
     dashboard,
     /\$\("#deviceRoleDialog"\)\.onclose=\(\)=>\{[\s\S]*?if\(editing\?\.afterPairing\)finishPairingFlow\(editing\.id\)/
   );
-  // Sonradan değiştirme yolu artık cihaz kartındaki özellik listesinin en altında, Options'ta değil.
+  // Sonradan değiştirme yolu cihaz kartında, Options'ta değil: sol sütunda resmin altındaki boşlukta.
   assert.doesNotMatch(dashboard, /id="deviceRoleField"/);
   assert.doesNotMatch(dashboard, /<select id="deviceRole">/);
-  assert.match(dashboard, /device\.controls\.map\(control=>controlHtml\(device,control\)\)\.join\(""\):`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\}\$\{deviceRoleRowsHtml\(device\)\}/);
+  assert.doesNotMatch(dashboard, /noExposedControls"\)\}<\/div>`\}\$\{deviceRoleRowsHtml\(device\)\}/);
+  assert.match(
+    dashboard,
+    /const rolesHtml=`<div class="controls device-detail-roles">\$\{deviceRoleRowsHtml\(device\)\}<\/div>`/
+  );
+  // Sol sütun rol satırıyla her zaman doludur; resimsiz cihazda da blok orada durur.
+  assert.match(
+    dashboard,
+    /const mediaHtml=`<div class="device-detail-media">\$\{photoHtml\}\$\{factsHtml\}\$\{rolesHtml\}<\/div>`/
+  );
   // Satır mevcut ayar satırlarıyla aynı işaretlemeyi kullanır, alt yazısı uygulama ayarı olduğunu söyler.
   assert.match(dashboard, /<div class="control-row admin-control"><div><div class="control-name">\$\{esc\(label\)\}<\/div><div class="control-value">\$\{t\("appSetting"\)\}<\/div><\/div><select class="control-select" data-device-role-select=/);
   assert.match(dashboard, /appSetting:"App setting"/);
