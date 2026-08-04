@@ -223,6 +223,30 @@ test("önemli cihaz hareketleri kısa geçmişte tutulur, sinyal gürültüsü t
   );
 });
 
+test("çok kanallı cihazın kanal durumu da olay üretir", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("Two Gang", Buffer.from('{"state_l1":"OFF","state_l2":"OFF","linkquality":120}'));
+  store.ingest("Two Gang", Buffer.from('{"state_l1":"OFF","state_l2":"ON","linkquality":121}'));
+  store.ingest("Two Gang", Buffer.from('{"state_l1":"OFF","state_l2":"ON","linkquality":122}'));
+  assert.deepEqual(
+    store.getEvents().map(({ property, value }) => ({ property, value })),
+    [
+      // Kanal ekli özellik kenarda olay üretir; aynı değerin tekrarı üretmez.
+      { property: "state_l2", value: "ON" },
+      { property: "state_l2", value: "OFF" },
+      { property: "state_l1", value: "OFF" }
+    ]
+  );
+});
+
+test("kanal ekli tuş olayları da anlık kenar sayılır", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("Scene Switch", Buffer.from('{"action_l1":"single"}'));
+  store.ingest("Scene Switch", Buffer.from('{"action_l1":"single"}'));
+  store.ingest("Scene Switch", Buffer.from('{"action_l1":""}'));
+  assert.equal(store.getEvents().length, 2);
+});
+
 test("aynı düğmeye iki kez basılınca iki olay üretilir ve IEEE adresine çözülür", () => {
   const added: Array<{ sourceName: string; property: string; value: unknown }> = [];
   const store = new DeviceStore(new Map(), undefined, [], (_events, batch) => {

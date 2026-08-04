@@ -181,6 +181,27 @@ function writableFeatures(exposes: unknown): WritableFeature[] {
   return [...features.values()].sort((left, right) => left.property.localeCompare(right.property, "en"));
 }
 
+/** Olay akışına (ve otomasyon tetikleyicilerine) giren taban özellikler. */
+const interestingEventProperties = new Set([
+  "action", "state", "contact", "occupancy", "presence", "smoke",
+  "carbon_monoxide", "battery_low", "alarm", "lock_state", "water_leak"
+]);
+
+/**
+ * Eşleşme **taban ada** göre yapılır: çok kanallı bir cihazın `state_l2` gibi kanal ekli
+ * özellikleri de olay üretmeli. Aksi hâlde sihirbazda kanal seçen kullanıcı hiç ateşlenmeyen,
+ * sessizce ölü bir otomasyon kuruyordu. Kanal adı serbest metindir (`l2`, `left`, `top`),
+ * o yüzden model/satıcı listesi yerine ekin tamamı soyulup taban ad aranır.
+ */
+export function isInterestingEventProperty(property: string): boolean {
+  if (interestingEventProperties.has(property)) return true;
+  const parts = property.split("_");
+  for (let count = parts.length - 1; count >= 1; count -= 1) {
+    if (interestingEventProperties.has(parts.slice(0, count).join("_"))) return true;
+  }
+  return false;
+}
+
 export class DeviceStore {
   private readonly aliases: Map<string, string>;
   private readonly states = new Map<string, StateEntry>();
@@ -301,18 +322,15 @@ export class DeviceStore {
     if (isObject(parsed)) {
       const previous = this.states.get(topic)?.value ?? {};
       const at = new Date();
-      const interesting = new Set([
-        "action", "state", "contact", "occupancy", "presence", "smoke",
-        "carbon_monoxide", "battery_low", "alarm", "lock_state", "water_leak"
-      ]);
       const events: DeviceEventView[] = [];
       for (const [property, value] of Object.entries(parsed)) {
-        if (!interesting.has(property)) continue;
+        if (!isInterestingEventProperty(property)) continue;
         // `action` anlık bir kenar olayıdır ve kalıcı duruma yazılmaz: aynı düğmeye arka arkaya
         // basılırsa iki ayrı olay üretilmeli. Diğer özellikler yalnızca değer değişince olay olur.
-        if (property !== "action" && previous[property] === value) continue;
+        const isAction = property === "action" || property.startsWith("action_");
+        if (!isAction && previous[property] === value) continue;
         if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") continue;
-        if (property === "action" && typeof value === "string" && value.trim() === "") continue;
+        if (isAction && typeof value === "string" && value.trim() === "") continue;
         events.push({ sourceName: topic, property, value, at: at.toISOString() });
       }
       if (typeof parsed.battery === "number") {

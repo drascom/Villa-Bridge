@@ -28,16 +28,48 @@ const automation = (overrides: Record<string, unknown> = {}): Record<string, unk
 class FakeSource {
   readonly calls: Array<{ id: string; command: JsonObject }> = [];
   failNext = false;
+  private gate: (() => void) | null = null;
+  private blockNextCall = false;
+
+  /** Bir sonraki komut, `release` çağrılana kadar askıda kalır (yavaş cihaz benzetimi). */
+  blockNext(): void {
+    this.blockNextCall = true;
+  }
+
+  release(): void {
+    const gate = this.gate;
+    this.gate = null;
+    this.blockNextCall = false;
+    gate?.();
+  }
 
   async setDevice(id: string, command: JsonObject): Promise<void> {
     this.calls.push({ id, command });
     if (this.failNext) throw new Error("Cihaz yanıt vermedi.");
+    if (!this.blockNextCall) return;
+    this.blockNextCall = false;
+    await new Promise<void>((resolve) => {
+      this.gate = resolve;
+    });
   }
 }
 
+/** Olay işleme dosya okuması içerir; koşul sağlanana kadar mikro turlarla bekle. */
+const waitFor = async (predicate: () => boolean): Promise<void> => {
+  for (let attempt = 0; attempt < 200 && !predicate(); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(predicate(), true);
+};
+
+const settle = async (): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, 40));
+};
+
 const harness = async (
   context: { after(fn: () => unknown): void },
-  entries: Array<Record<string, unknown>>
+  entries: Array<Record<string, unknown>>,
+  engineOptions: { actionTimeoutMs?: number } = {}
 ) => {
   const directory = await mkdtemp(join(tmpdir(), "villa-engine-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
@@ -45,12 +77,14 @@ const harness = async (
   await store.save(entries);
   const source = new FakeSource();
   const logs: string[] = [];
+  const notes: string[] = [];
   let clock = new Date("2026-08-03T19:00:05");
   const engine = new AutomationEngine({
     store,
     source,
     now: () => clock,
-    logger: { error: (message) => logs.push(message) }
+    logger: { error: (message) => logs.push(message), info: (message) => notes.push(message) },
+    ...engineOptions
   });
   context.after(() => engine.stop());
   return {
@@ -58,6 +92,7 @@ const harness = async (
     source,
     engine,
     logs,
+    notes,
     setClock: (value: string) => {
       clock = new Date(value);
     }
@@ -364,6 +399,106 @@ test("elle çalıştırma yalnızca koşullu eylem varsa atlanır", async (conte
   assert.equal(await engine.run("aksam-salon"), "skipped");
   assert.equal(source.calls.length, 0);
   assert.equal((await store.get())[0]?.lastRunAt, null);
+});
+
+/** Rocker anahtar: aynı düğme sırayla ON/OFF üretir; her basış gerçek kullanıcı niyetidir. */
+const rocker = (): Record<string, unknown> => automation({
+  triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }],
+  actions: [
+    { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "ON" } },
+    { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "OFF" } }
+  ]
+});
+
+const stateEvent = (value: string) => [{ deviceId: switchId, property: "state", value }];
+
+test("ON'un hemen ardından gelen OFF düşmez — ters yön gürültü değildir", async (context) => {
+  const { engine, source, notes } = await harness(context, [rocker()]);
+
+  // Saat ilerlemiyor: iki basış da aynı 2 saniyelik pencerede. Eskiden OFF sessizce düşerdi.
+  await engine.handleDeviceEvents(stateEvent("ON"));
+  await engine.handleDeviceEvents(stateEvent("OFF"));
+
+  assert.deepEqual(source.calls, [
+    { id: lampId, command: { state: "ON" } },
+    { id: lampId, command: { state: "OFF" } }
+  ]);
+  assert.equal(notes.length, 0);
+});
+
+test("aynı eylem kümesinin gerçek tekrarı hâlâ bastırılır ve loglanır", async (context) => {
+  const { engine, source, notes } = await harness(context, [automation({
+    triggers: [
+      { type: "deviceState", deviceId: switchId, property: "state" },
+      { type: "deviceState", deviceId: sensorId, property: "occupancy" }
+    ],
+    actions: [{ type: "device", deviceId: lampId, property: "state", value: "ON" }]
+  })]);
+
+  await engine.handleDeviceEvents(stateEvent("ON"));
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: true }]);
+
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "ON" } }]);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0] ?? "", /bastırıldı/);
+});
+
+test("hızlı ON→OFF→ON→OFF dizisi faz kaybı bırakmaz", async (context) => {
+  const { engine, source } = await harness(context, [rocker()]);
+
+  for (const value of ["ON", "OFF", "ON", "OFF"]) {
+    await engine.handleDeviceEvents(stateEvent(value));
+  }
+
+  assert.deepEqual(source.calls.map((call) => call.command), [
+    { state: "ON" }, { state: "OFF" }, { state: "ON" }, { state: "OFF" }
+  ]);
+});
+
+test("koşu sürerken gelen basışlar birleştirilir: son basış kazanır (ON→OFF)", async (context) => {
+  const { engine, source } = await harness(context, [rocker()]);
+  source.blockNext();
+
+  const first = engine.handleDeviceEvents(stateEvent("ON"));
+  await waitFor(() => source.calls.length === 1);
+  // Kilit doluyken gelen ters yön düşmez, sıraya alınır.
+  await engine.handleDeviceEvents(stateEvent("OFF"));
+  await settle();
+  assert.equal(source.calls.length, 1);
+
+  source.release();
+  await first;
+  assert.deepEqual(source.calls.map((call) => call.command), [{ state: "ON" }, { state: "OFF" }]);
+});
+
+test("koşu sürerken ON→OFF→ON gelirse yalnız son basış geçerlidir", async (context) => {
+  const { engine, source } = await harness(context, [rocker()]);
+  source.blockNext();
+
+  const first = engine.handleDeviceEvents(stateEvent("ON"));
+  await waitFor(() => source.calls.length === 1);
+  await engine.handleDeviceEvents(stateEvent("OFF"));
+  await engine.handleDeviceEvents(stateEvent("ON"));
+  source.release();
+  await first;
+  await settle();
+
+  // Ara OFF hiç çalışmaz (lamba yanıp sönmez); sonuç kullanıcının son basışı olan ON'dur.
+  assert.deepEqual(source.calls.map((call) => call.command), [{ state: "ON" }]);
+});
+
+test("yavaş cihaz zaman aşımıyla kuralı kilitlemez", async (context) => {
+  const { engine, source, logs } = await harness(context, [rocker()], { actionTimeoutMs: 20 });
+  source.blockNext();
+
+  await engine.handleDeviceEvents(stateEvent("ON"));
+  assert.equal(source.calls.length, 1);
+  assert.match(logs[0] ?? "", /yanıt vermedi/);
+
+  // Kilit serbest kaldı: sonraki basış normal çalışır.
+  await engine.handleDeviceEvents(stateEvent("OFF"));
+  assert.deepEqual(source.calls.map((call) => call.command), [{ state: "ON" }, { state: "OFF" }]);
+  source.release();
 });
 
 test("start ve stop zamanlayıcıyı sızdırmaz", async (context) => {

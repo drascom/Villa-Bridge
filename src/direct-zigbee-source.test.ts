@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   DirectZigbeeSource,
+  applyEndpointSuffix,
   directBridgeInfo,
   endpointNamesForDevice,
   isRawGenOnOffFrame,
@@ -143,6 +144,95 @@ test("direct yeniden yapılandırma cihazı görüşür ve converter configure �
   await source.reconfigureDevice(device.ieeeAddr);
 
   assert.deepEqual(calls, ["interview:true", "configure", "refresh"]);
+});
+
+test("iyimser durum anahtarları uç nokta ekini korur", () => {
+  const multi = { meta: { multiEndpoint: true, multiEndpointSkip: ["power_on_behavior"] } };
+  assert.deepEqual(
+    applyEndpointSuffix({ state: "ON", power_on_behavior: "on" }, "l2", multi),
+    { state_l2: "ON", power_on_behavior: "on" }
+  );
+  // Uç nokta yoksa ya da cihaz çok kanallı değilse davranış değişmez.
+  assert.deepEqual(applyEndpointSuffix({ state: "ON" }, undefined, multi), { state: "ON" });
+  assert.deepEqual(applyEndpointSuffix({ state: "ON" }, "l2", { meta: {} }), { state: "ON" });
+  // Zaten ek taşıyan anahtar iki kez eklenmez.
+  assert.deepEqual(applyEndpointSuffix({ state_l2: "ON" }, "l2", multi), { state_l2: "ON" });
+});
+
+test("çok kanallı cihazda state_l2 yazımı ana state'i ezmez", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-direct-set-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const ieee = "0x00124b0011cc22dd";
+  const endpoints = new Map([[1, { ID: 1 }], [2, { ID: 2 }]]);
+  const device = {
+    ieeeAddr: ieee,
+    type: "Router",
+    endpoints: [...endpoints.values()],
+    getEndpoint(id: number) {
+      return endpoints.get(id);
+    }
+  };
+  const converted: Array<{ key: string; value: unknown; endpointId: number; endpointName?: string }> = [];
+  const definition = {
+    model: "TEST-2GANG",
+    vendor: "Villa",
+    description: "Two gang switch",
+    exposes: [],
+    meta: { multiEndpoint: true, multiEndpointSkip: ["power_on_behavior"] },
+    endpoint: () => ({ l1: 1, l2: 2 }),
+    toZigbee: [{
+      key: ["state"],
+      async convertSet(
+        endpoint: { ID: number },
+        key: string,
+        value: unknown,
+        meta: { endpoint_name?: string }
+      ) {
+        converted.push({ key, value, endpointId: endpoint.ID, endpointName: meta.endpoint_name });
+        return { state: { state: value, power_on_behavior: "on" } };
+      }
+    }]
+  };
+  const store = new DeviceStore(new Map());
+  const source = new DirectZigbeeSource(
+    {
+      devices: { [ieee]: { friendly_name: "Two Gang" } },
+      groups: {},
+      dataDir: directory
+    } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false
+  );
+  Object.assign(source, {
+    controller: {
+      getDeviceByIeeeAddr(id: string) {
+        return id === ieee ? device : undefined;
+      }
+    },
+    definitions: new Map([[ieee, definition]]),
+    states: new Map([[ieee, { state: "OFF", state_l1: "OFF", state_l2: "OFF" }]])
+  });
+
+  await source.setDevice(ieee, { state_l2: "ON" });
+
+  // Tel üstünde doğru uç nokta kullanıldı.
+  assert.deepEqual(converted, [{ key: "state", value: "ON", endpointId: 2, endpointName: "l2" }]);
+  const persisted = JSON.parse(await readFile(join(directory, "state.json"), "utf8")) as Record<
+    string,
+    Record<string, unknown>
+  >;
+  // Ana `state` ezilmedi, `state_l2` güncellendi, `multiEndpointSkip` anahtarı ek almadı.
+  assert.deepEqual(persisted[ieee], {
+    state: "OFF",
+    state_l1: "OFF",
+    state_l2: "ON",
+    power_on_behavior: "on"
+  });
+  // Olay akışında da kanalın kendisi görünür — sihirbazda seçilen kanal gerçekten ateşlenir.
+  const events = store.getEvents(20);
+  assert.equal(events.some((event) => event.property === "state_l2" && event.value === "ON"), true);
+  assert.equal(events.some((event) => event.property === "state" && event.value === "ON"), false);
 });
 
 test("direct durum debounce yalnız aynı payload'u süre içinde bastırır", () => {

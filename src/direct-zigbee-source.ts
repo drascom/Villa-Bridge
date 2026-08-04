@@ -55,6 +55,32 @@ export interface DeviceStatePublication {
   at: number;
 }
 
+/** `applyEndpointSuffix` için yeterli olan tanım parçası — tam `Definition` gerekmez. */
+export interface EndpointSuffixDefinition {
+  meta?: { multiEndpoint?: boolean; multiEndpointSkip?: string[] };
+}
+
+/**
+ * Zigbee2MQTT ile birebir davranış: çok uç noktalı bir cihaza uç nokta üzerinden komut
+ * yazıldığında dönüştürücünün ürettiği iyimser durum anahtarları `${key}_${endpointName}`
+ * olarak yazılır. Eksik olduğunda `state_l2` yazımı ana `state`'i eziyor, `state_l2` ise hiç
+ * güncellenmiyordu. `meta.multiEndpointSkip` listesindeki anahtarlar cihaz geneli sayılır ve
+ * ek almaz.
+ */
+export function applyEndpointSuffix(
+  update: JsonObject,
+  endpointName: string | undefined,
+  definition: EndpointSuffixDefinition
+): JsonObject {
+  if (!endpointName || definition.meta?.multiEndpoint !== true) return update;
+  const suffix = `_${endpointName}`;
+  const skip = definition.meta?.multiEndpointSkip ?? [];
+  return Object.fromEntries(Object.entries(update).map(([key, value]) =>
+    skip.includes(key) || key.endsWith(suffix)
+      ? [key, value]
+      : [`${key}${suffix}`, value]));
+}
+
 export function isUnresolvedActionMessage(
   message: Pick<Events.MessagePayload, "cluster" | "type">,
   matchingConverterCount: number,
@@ -1125,7 +1151,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const endpoint = (endpointId ? device.getEndpoint(endpointId) : device.getEndpoint(1)) ?? device.endpoints[0];
       if (!endpoint) throw new Error("Cihaz uç noktası bulunamadı.");
       const publish = (update: JsonObject): void => {
-        state = { ...state, ...update };
+        state = { ...state, ...applyEndpointSuffix(update, endpointName, definition) };
         this.states.set(ieeeAddress, state);
       };
       const converterMessage = endpointName
@@ -1143,7 +1169,12 @@ export class DirectZigbeeSource implements ZigbeeSource {
         endpoint_name: endpointName,
         publish
       });
-      if (result?.state) state = { ...state, ...result.state };
+      if (result?.state) {
+        state = {
+          ...state,
+          ...applyEndpointSuffix(result.state as JsonObject, endpointName, definition)
+        };
+      }
     }
     this.states.set(ieeeAddress, state);
     const friendlyName = configured.friendly_name ?? ieeeAddress;

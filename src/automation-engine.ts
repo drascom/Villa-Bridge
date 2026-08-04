@@ -3,8 +3,16 @@ import type { JsonObject, JsonScalar } from "./types.js";
 
 /** Tur aralığı: dakika kilidi sayesinde aynı dakikada yalnızca bir kez çalışır. */
 export const automationTickIntervalMs = 20_000;
-/** §8.2 — düğme gürültüsüne karşı otomasyon başına asgari aralık. */
+/**
+ * §8.2 — düğme gürültüsüne karşı otomasyon başına asgari aralık. Yalnızca **aynı çözümlenmiş
+ * eylem kümesinin** tekrarını bastırır; ON'dan sonra gelen OFF gürültü değil kullanıcı niyetidir.
+ */
 export const automationMinimumRunGapMs = 2_000;
+/**
+ * Tek bir eylemin bekleyebileceği azami süre. Çevrimdışı bir cihaz komutu dakikalarca askıda
+ * kalabiliyor ve kuralın tamamını kilitliyordu; süre dolunca eylem hata sayılır, kural serbest kalır.
+ */
+export const automationActionTimeoutMs = 10_000;
 
 /** `skipped`: kural eşleşti ama `when` yüzünden çalışacak eylem kalmadı — hata değildir. */
 export type AutomationRunResult = "ok" | "failed" | "busy" | "missing" | "skipped";
@@ -19,7 +27,9 @@ export interface AutomationEngineOptions {
   /** Testler gerçek zamanı beklemesin diye saat enjekte edilebilir. */
   now?: () => Date;
   intervalMs?: number;
-  logger?: { error(message: string): void };
+  /** Tek eylem için azami bekleme; 0 verilirse zaman aşımı uygulanmaz. */
+  actionTimeoutMs?: number;
+  logger?: { error(message: string): void; info?(message: string): void };
 }
 
 const pad = (value: number): string => String(value).padStart(2, "0");
@@ -82,19 +92,39 @@ export const automationActionApplies = (
   return event !== undefined && action.when.equals === event.value;
 };
 
+/** Aynı eylem kümesinin tekrarını tanımak için kararlı imza. */
+export const automationActionSignature = (actions: AutomationAction[]): string =>
+  JSON.stringify(actions.map((action) => [action.deviceId, action.property, action.value]));
+
+/** Çalışan iş bitince çalıştırılmak üzere bekletilen (birleştirilen) son istek. */
+interface PendingRun {
+  actions: AutomationAction[];
+  signature: string;
+}
+
 export class AutomationEngine {
   private timer: NodeJS.Timeout | null = null;
   private readonly firedMinutes = new Map<string, string>();
   private readonly running = new Set<string>();
   private readonly lastStartedAt = new Map<string, number>();
+  /** Otomasyon başına en son çalıştırılan eylem kümesinin imzası. */
+  private readonly lastSignatures = new Map<string, string>();
+  /** Otomasyon başına bekleyen son istek — kilit doluyken düşürmek yerine birleştiririz. */
+  private readonly pending = new Map<string, PendingRun>();
   /** `deviceId|property` → son görülen değer; `deviceState` kenar tetiklemesi için. */
   private readonly lastStateValues = new Map<string, JsonScalar>();
   private readonly now: () => Date;
-  private readonly logger: { error(message: string): void };
+  private readonly logger: { error(message: string): void; info?(message: string): void };
 
   constructor(private readonly options: AutomationEngineOptions) {
     this.now = options.now ?? (() => new Date());
     this.logger = options.logger ?? { error: (message) => console.error(message) };
+  }
+
+  /** Teşhis kaydı: düşürülen/bastırılan çalıştırmalar iz bırakmalı, ama hata sayılmamalı. */
+  private note(message: string): void {
+    if (this.logger.info) this.logger.info(message);
+    else console.info(message);
   }
 
   start(): void {
@@ -158,7 +188,8 @@ export class AutomationEngine {
 
   /** `action` anlık kenar olayıdır, hiç bastırılmaz; durum özellikleri değer değişince geçer. */
   private isEdge(event: AutomationDeviceEvent): boolean {
-    if (event.property === "action") return true;
+    // Çok kanallı cihazlarda tuş olayı `action_l1` gibi kanal ekiyle de gelebilir.
+    if (event.property === "action" || event.property.startsWith("action_")) return true;
     const key = `${event.deviceId}|${event.property}`;
     if (this.lastStateValues.get(key) === event.value) return false;
     this.lastStateValues.set(key, event.value);
@@ -186,25 +217,64 @@ export class AutomationEngine {
   ): Promise<AutomationRunResult> {
     const actions = automation.actions.filter((action) => automationActionApplies(action, event));
     // Hiçbir eylem eşleşmediyse çalıştırma sayılmaz: ne kilit alınır ne de `lastRunOk` bozulur.
-    if (actions.length === 0) return "skipped";
-    if (this.running.has(automation.id)) return "busy";
-    const startedAt = this.now().getTime();
-    const previousStart = this.lastStartedAt.get(automation.id);
-    if (previousStart !== undefined && startedAt - previousStart < automationMinimumRunGapMs) {
+    if (actions.length === 0) {
+      this.note(`Otomasyon "${automation.name}" atlandı: koşullara uyan eylem yok.`);
+      return "skipped";
+    }
+    const signature = automationActionSignature(actions);
+    // Kilit doluyken düşürmek yerine birleştir: çalışan iş bitince bu istek çalışır.
+    if (this.running.has(automation.id)) {
+      this.pending.set(automation.id, { actions, signature });
+      this.note(`Otomasyon "${automation.name}" meşgul: son istek sıraya alındı (birleştirildi).`);
       return "busy";
     }
+    if (this.suppressedAsRepeat(automation, signature)) return "busy";
+    return this.runQueue(automation, { actions, signature });
+  }
+
+  /** Asgari aralık yalnızca aynı eylem kümesinin tekrarını bastırır — ters yön niyettir. */
+  private suppressedAsRepeat(automation: Automation, signature: string): boolean {
+    const previousStart = this.lastStartedAt.get(automation.id);
+    if (previousStart === undefined) return false;
+    if (this.lastSignatures.get(automation.id) !== signature) return false;
+    if (this.now().getTime() - previousStart >= automationMinimumRunGapMs) return false;
+    this.note(
+      `Otomasyon "${automation.name}" bastırıldı: aynı eylem `
+      + `${automationMinimumRunGapMs} ms içinde tekrarlandı.`
+    );
+    return true;
+  }
+
+  /** Kilidi alır, isteği çalıştırır ve bu sırada birikmiş son isteği de boşaltır. */
+  private async runQueue(automation: Automation, first: PendingRun): Promise<AutomationRunResult> {
     this.running.add(automation.id);
-    this.lastStartedAt.set(automation.id, startedAt);
+    let result: AutomationRunResult = "ok";
+    try {
+      let current: PendingRun | undefined = first;
+      while (current) {
+        result = await this.runOnce(automation, current);
+        const next = this.pending.get(automation.id);
+        this.pending.delete(automation.id);
+        current = next && !this.suppressedAsRepeat(automation, next.signature) ? next : undefined;
+      }
+    } finally {
+      this.running.delete(automation.id);
+      this.pending.delete(automation.id);
+    }
+    return result;
+  }
+
+  private async runOnce(automation: Automation, run: PendingRun): Promise<AutomationRunResult> {
+    this.lastStartedAt.set(automation.id, this.now().getTime());
+    this.lastSignatures.set(automation.id, run.signature);
     let ok = true;
     try {
-      for (const action of actions) {
-        await this.options.source.setDevice(action.deviceId, { [action.property]: action.value });
+      for (const action of run.actions) {
+        await this.setDevice(action.deviceId, { [action.property]: action.value });
       }
     } catch (error) {
       ok = false;
       this.logger.error(`Otomasyon "${automation.name}" çalıştırılamadı: ${String(error)}`);
-    } finally {
-      this.running.delete(automation.id);
     }
     try {
       await this.options.store.markRun(automation.id, ok, this.now());
@@ -212,5 +282,30 @@ export class AutomationEngine {
       this.logger.error(`Otomasyon son çalışma bilgisi yazılamadı: ${String(error)}`);
     }
     return ok ? "ok" : "failed";
+  }
+
+  /**
+   * Yavaş ya da çevrimdışı bir cihaz kuralın tamamını kilitlemesin diye eylem başına zaman aşımı.
+   * Komut iptal edilemez; yalnızca beklemeyi bırakırız.
+   */
+  private async setDevice(deviceId: string, command: JsonObject): Promise<void> {
+    const timeoutMs = this.options.actionTimeoutMs ?? automationActionTimeoutMs;
+    const call = this.options.source.setDevice(deviceId, command);
+    if (timeoutMs <= 0) return call;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        call,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`Cihaz ${timeoutMs} ms içinde yanıt vermedi.`)),
+            timeoutMs
+          );
+          timer.unref?.();
+        })
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 }
