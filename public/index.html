@@ -203,7 +203,8 @@
     .automation-events{display:grid;gap:9px;margin-top:14px}.automation-event{display:block;min-height:60px;padding:17px 15px;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font-size:15px;font-weight:750;text-align:left;touch-action:manipulation}.automation-event::first-letter{text-transform:uppercase}.automation-event:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-event.active{border-color:var(--forest);background:var(--forest-soft)}
     .automation-hint{margin:14px 0 0;padding:11px 13px;border-radius:13px;color:var(--muted);background:var(--surface-soft);font-size:13px;line-height:1.4}
     .automation-pick-head{margin:16px 0 0;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}.automation-pick.unproven{border-style:dashed}.automation-pick.unproven small{color:var(--sun);font-weight:750}.automation-warning{margin:14px 0 0;padding:12px 14px;border:1px solid var(--sun);border-radius:13px;color:var(--ink);background:var(--surface-soft);font-size:13px;line-height:1.45;font-weight:700}.automation-alt{display:grid;gap:10px;justify-items:start;margin-top:12px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.automation-alt p{margin:0;font-size:13px;line-height:1.45}
-    .automation-sentence{margin-top:18px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);font:750 18px/1.45 system-ui,sans-serif}.automation-name-field{display:grid;gap:8px;margin-top:16px}.automation-name-field label{font-size:13px;font-weight:750;color:var(--muted)}
+    .automation-sentence{margin-top:18px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);font:750 18px/1.45 system-ui,sans-serif}.automation-name-field{display:grid;gap:8px;margin-top:16px}.automation-name-field label{font-size:13px;font-weight:750;color:var(--muted)}.automation-sentence-line{display:block;margin-top:8px;color:var(--muted);font-size:15px;font-weight:700}
+    .automation-autooff{display:grid;gap:2px;margin-top:4px}.automation-autooff-choices{justify-content:flex-start;margin-top:10px}.automation-autooff .automation-control-choice{flex:1 1 132px;min-height:52px}.automation-autooff-label{margin:18px 0 0;color:var(--muted);font-size:13px;font-weight:800}.automation-autooff .automation-time{margin-top:10px}.automation-autooff .automation-days{margin-top:14px}.automation-time-unit-label{color:var(--muted);font-size:15px;font-weight:750}
     .automation-card-chip{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:11px;font-weight:800}.automation-card-chip.warn{color:var(--danger)}.automation-card.off{opacity:.62}.automation-card-actions{display:flex;align-items:center;gap:12px}.automation-card-menu{width:48px;height:48px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:15px;background:var(--surface-soft);color:var(--muted);font-size:23px;font-weight:800;line-height:1;cursor:pointer}.automation-card-menu:hover{border-color:var(--forest);color:var(--forest)}
     @media(max-width:560px){.simple-link-choices{grid-template-columns:1fr}.automation-card{grid-template-columns:46px minmax(0,1fr);row-gap:12px}.automation-card .danger-button{grid-column:1/-1}.automation-card-actions{grid-column:1/-1;justify-content:flex-end}.automation-control-row{grid-template-columns:minmax(0,1fr)}}
     @media(max-width:900px){.toast{bottom:calc(96px + env(safe-area-inset-bottom))}}@media(orientation:landscape) and (max-width:900px) and (max-height:700px){.toast{bottom:24px}}
@@ -4001,6 +4002,22 @@
       automationSentenceValues(trigger,action,actionKey)
     );
   };
+  // §9 "sonra kapat" — açan kural kendi kapanışını da taşır, kullanıcı iki kural kurmaz.
+  const automationAutoOffModes=["none","idle","after"];
+  const automationDurationText=seconds=>{
+    const minutes=Math.max(1,Math.round(Number(seconds||0)/60));
+    return minutes===1?t("automationDurationMinute"):t("automationDurationMinutes",{count:minutes});
+  };
+  // Tam şablon anahtarı — cümle parça birleştirilerek kurulmuyor (TR/EN kelime sırası farklı).
+  const automationAutoOffLine=action=>{
+    const auto=action?.autoOff;
+    if(!auto)return"";
+    const device=automationActionName(action);
+    if(auto.mode==="after")return t("automationAutoOffAfterLine",{duration:automationDurationText(auto.seconds),device});
+    return auto.seconds>=60
+      ?t("automationAutoOffIdleWaitLine",{duration:automationDurationText(auto.seconds),device})
+      :t("automationAutoOffIdleLine",{device});
+  };
   const automationRunChip=automation=>{
     if(!automation.lastRunAt)return`<span class="automation-card-chip">${t("automationNeverRan")}</span>`;
     const failed=automation.lastRunOk===false;
@@ -4015,7 +4032,9 @@
     const line=map
       ?automationMapCardLine(automationTriggerDeviceName(map.trigger),automationActionName(map.target),map.onMode,map.offMode)
       :automationCardLine(trigger,action);
-    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><span class="automation-card-glyph" aria-hidden="true">🧩</span><div class="automation-card-copy"><strong>${esc(automation.name)}</strong><span class="automation-card-note">${esc(line)}</span>${automationRunChip(automation)}</div><div class="automation-card-actions"><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}"><span aria-hidden="true">⋯</span></button><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button></div></article>`;
+    // Kapanış sözü ayrı bir cümle olarak görünür; kart özeti sihirbazdaki cümleyle tutarlı kalır.
+    const autoOff=map?"":automationAutoOffLine(action);
+    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><span class="automation-card-glyph" aria-hidden="true">🧩</span><div class="automation-card-copy"><strong>${esc(automation.name)}</strong><span class="automation-card-note">${esc(line)}</span>${autoOff?`<span class="automation-card-note">${esc(autoOff)}</span>`:""}${automationRunChip(automation)}</div><div class="automation-card-actions"><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}"><span aria-hidden="true">⋯</span></button><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button></div></article>`;
   };
   function renderAutomations(){
     const container=$("#automationList");
@@ -4187,6 +4206,10 @@
       triggerProperty:trigger?.type==="deviceState"?trigger.property:null,
       triggerEquals:trigger?.type==="deviceState"?trigger.equals:null,
       action:action?{...action}:null,
+      // §9 — "sonra kapat" ilk eyleme yazılır; alanı olmayan eski kurallarda kapalıdır.
+      autoOffMode:action?.autoOff?action.autoOff.mode:"none",
+      autoOffMinutes:action?.autoOff?.mode==="after"?Math.max(1,Math.round(action.autoOff.seconds/60)):5,
+      autoOffIdleMinutes:action?.autoOff?.mode==="idle"?Math.max(0,Math.round(action.autoOff.seconds/60)):0,
       target:seed?.target||null,
       // Varsayılan takip: açıldığında Aç, kapandığında Kapat.
       mapOn:seed?seed.onMode:"on",
@@ -4395,13 +4418,79 @@
     };
     return`<div class="automation-map">${row("on","automationMapWhenOn",wizard.mapOn)}${row("off","automationMapWhenOff",wizard.mapOff)}</div>`;
   }
+  // Geri alma yalnız "Aç" eyleminde anlamlıdır: kapatan ya da değiştiren eylemin geri alınacak yönü yok.
+  const automationAutoOffControl=wizard=>automationMappingMode(wizard)?null:automationControl(wizard?.action);
+  const automationAutoOffAvailable=wizard=>{
+    const control=automationAutoOffControl(wizard);
+    return Boolean(control)&&automationActionMode(wizard.action)==="on";
+  };
+  // "Hareket bitince" ölçütü tanım verisinden gelir: tetikleyici özelliğin aynı listede bir
+  // "boş/hareketsiz" karşılığı varsa sunulur. Sensör modeline bakan hiçbir kural yok; bildirmeyen
+  // bir özellikte seçenek hiç görünmez.
+  const automationAutoOffIdleAvailable=wizard=>{
+    if(!wizard||wizard.triggerKind!=="sensor")return false;
+    if(!wizard.triggerProperty||wizard.triggerEquals===null||wizard.triggerEquals===undefined)return false;
+    const device=state.devices.find(item=>item.id===wizard.triggerDeviceId)||null;
+    return automationTriggerEvents(device,"sensor")
+      .some(row=>row.property===wizard.triggerProperty&&row.equals!==wizard.triggerEquals);
+  };
+  const automationAutoOffMinutes=wizard=>wizard.autoOffMode==="idle"?wizard.autoOffIdleMinutes:wizard.autoOffMinutes;
+  const automationAutoOffPayload=wizard=>{
+    if(!automationAutoOffAvailable(wizard))return null;
+    const mode=wizard.autoOffMode;
+    if(mode!=="after"&&mode!=="idle")return null;
+    if(mode==="idle"&&!automationAutoOffIdleAvailable(wizard))return null;
+    const minutes=mode==="after"?Math.max(1,wizard.autoOffMinutes):Math.max(0,wizard.autoOffIdleMinutes);
+    return{mode,seconds:minutes*60,value:automationControlValue(automationAutoOffControl(wizard),false)};
+  };
+  const automationAutoOffSentence=wizard=>{
+    const payload=automationAutoOffPayload(wizard);
+    return payload?automationAutoOffLine({...wizard.action,autoOff:payload}):"";
+  };
+  const automationAutoOffPresetValues=wizard=>wizard.autoOffMode==="idle"?[0,1,2,5,10]:[1,2,5,10,15,30];
+  const automationAutoOffPresets=wizard=>{
+    const current=automationAutoOffMinutes(wizard);
+    return automationAutoOffPresetValues(wizard).map(value=>{
+      const active=current===value;
+      const label=value===0?t("automationAutoOffNoWait"):automationDurationText(value*60);
+      return`<button class="automation-day${active?" active":""}" type="button" data-automation-autooff-minutes="${value}" aria-pressed="${active}">${esc(label)}</button>`;
+    }).join("");
+  };
+  // Süre girişi dokunmatikte rahat olsun: saat seçicideki büyük +/− düğmeleri ve hazır süre çipleri.
+  function automationAutoOffHtml(wizard){
+    if(!automationAutoOffAvailable(wizard))return"";
+    const mode=automationAutoOffModes.includes(wizard.autoOffMode)?wizard.autoOffMode:"none";
+    const choice=(value,key)=>`<button class="automation-control-choice${mode===value?" active":""}" type="button" data-automation-autooff="${value}" aria-pressed="${mode===value}">${t(key)}</button>`;
+    const choices=`${choice("none","automationAutoOffNever")}${automationAutoOffIdleAvailable(wizard)?choice("idle","automationAutoOffIdle"):""}${choice("after","automationAutoOffAfter")}`;
+    const step=(amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-autooff-step="${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
+    const timer=mode==="none"?"":`<p class="automation-autooff-label">${t(mode==="idle"?"automationAutoOffIdleWaitLabel":"automationAutoOffAfterLabel")}</p><div class="automation-time" role="group" aria-label="${esc(t("automationAutoOffTimeLabel"))}"><div class="automation-time-unit">${step(1,"automationAutoOffMinutesUp","+")}<span class="automation-time-value">${automationAutoOffMinutes(wizard)}</span>${step(-1,"automationAutoOffMinutesDown","−")}</div><span class="automation-time-unit-label">${t("automationAutoOffMinutesUnit")}</span></div><div class="automation-days">${automationAutoOffPresets(wizard)}</div>`;
+    const hint=mode==="none"?"":`<p class="automation-hint">${t(mode==="idle"?"automationAutoOffIdleHint":"automationAutoOffAfterHint")}</p>`;
+    return`<div class="automation-autooff"><p class="automation-pick-head">${t("automationAutoOffTitle")}</p><div class="automation-control-choices automation-autooff-choices">${choices}</div>${timer}${hint}</div>`;
+  }
+  function chooseAutomationAutoOff(mode){
+    const wizard=state.automationWizard;
+    if(!wizard||!automationAutoOffModes.includes(mode))return;
+    if(mode==="idle"&&!automationAutoOffIdleAvailable(wizard))return;
+    wizard.autoOffMode=mode;
+    renderAutomationWizard();
+  }
+  function setAutomationAutoOffMinutes(value){
+    const wizard=state.automationWizard;
+    if(!wizard||!Number.isFinite(value))return;
+    const idle=wizard.autoOffMode==="idle";
+    const next=Math.min(240,Math.max(idle?0:1,Math.round(value)));
+    if(idle)wizard.autoOffIdleMinutes=next;else wizard.autoOffMinutes=next;
+    renderAutomationWizard();
+  }
+  const stepAutomationAutoOff=amount=>setAutomationAutoOffMinutes(automationAutoOffMinutes(state.automationWizard||{})+amount);
   function automationReviewHtml(wizard){
     const mapping=automationMappingMode(wizard);
     const empty=mapping&&wizard.mapOn==="none"&&wizard.mapOff==="none";
     const sentence=empty?t("automationMapEmpty")
       :mapping?automationWizardMapSentence(wizard)
       :automationSentence(automationWizardTrigger(wizard),wizard.action);
-    return`${mapping?automationMapHtml(wizard):""}<div class="automation-sentence">${esc(sentence)}</div><div class="automation-name-field"><label for="automationName">${t("automationNameLabel")}</label><input id="automationName" type="text" maxlength="64" value="${esc(automationWizardName(wizard))}" data-i18n-placeholder="automationNamePlaceholder" placeholder="${esc(t("automationNamePlaceholder"))}"></div>`;
+    const autoOff=mapping?"":automationAutoOffSentence(wizard);
+    return`${mapping?automationMapHtml(wizard):automationAutoOffHtml(wizard)}<div class="automation-sentence">${esc(sentence)}${autoOff?`<span class="automation-sentence-line">${esc(autoOff)}</span>`:""}</div><div class="automation-name-field"><label for="automationName">${t("automationNameLabel")}</label><input id="automationName" type="text" maxlength="64" value="${esc(automationWizardName(wizard))}" data-i18n-placeholder="automationNamePlaceholder" placeholder="${esc(t("automationNamePlaceholder"))}"></div>`;
   }
   // Yol seçimi sihirbazın ilk adımı: liste ile "yeni ekleme" ayrı yerler olduğu böyle anlaşılır.
   function automationPathHtml(){
@@ -4416,6 +4505,9 @@
     $$("[data-automation-channel]").forEach(button=>button.onclick=()=>chooseAutomationChannel(button.dataset.automationChannel));
     $$("[data-automation-target]").forEach(button=>button.onclick=()=>chooseAutomationTarget(button.dataset.automationTarget));
     $$("[data-automation-map]").forEach(button=>button.onclick=()=>chooseAutomationMap(button.dataset.automationMap));
+    $$("[data-automation-autooff]").forEach(button=>button.onclick=()=>chooseAutomationAutoOff(button.dataset.automationAutooff));
+    $$("[data-automation-autooff-step]").forEach(button=>button.onclick=()=>stepAutomationAutoOff(Number(button.dataset.automationAutooffStep)));
+    $$("[data-automation-autooff-minutes]").forEach(button=>button.onclick=()=>setAutomationAutoOffMinutes(Number(button.dataset.automationAutooffMinutes)));
     $$("[data-automation-trigger]").forEach(button=>button.onclick=()=>chooseAutomationTrigger(button.dataset.automationTrigger));
     $$("[data-automation-time]").forEach(button=>button.onclick=()=>{
       const [unit,amount]=button.dataset.automationTime.split(":");
@@ -4721,8 +4813,11 @@
     const wizard=state.automationWizard;
     if(!wizard)return;
     // Anahtar yolunda eylemler eşleme formundan üretilir; "Bir şey yapma" seçilen yön yazılmaz.
-    const actions=automationMappingMode(wizard)?automationMapActions(wizard):(wizard.action?[wizard.action]:[]);
+    const actions=automationMappingMode(wizard)?automationMapActions(wizard):(wizard.action?[{...wizard.action}]:[]);
     if(!actions.length)return;
+    // §9 — kapanış sözü açan eylemin üstüne yazılır; ikinci bir kural kurulmaz.
+    const autoOff=automationAutoOffPayload(wizard);
+    if(autoOff)actions[0]={...actions[0],autoOff};
     const trigger=automationWizardTrigger(wizard);
     // §8.2 — yalnız tetikleyen kanalın kendisi engellenir; buton yolunda kanal yok, cihaz engellenir.
     const loops=trigger.type==="deviceState"

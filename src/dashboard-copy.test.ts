@@ -1577,7 +1577,11 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
 
   // Ekran 3: özet cümlesi tam şablon anahtarıyla kuruluyor, parça birleştirme yok.
   assert.match(dashboard, /automationEveryDay\(trigger\.days\)\?"automationSummaryTime":"automationSummaryTimeDays",/);
-  assert.match(dashboard, /<div class="automation-sentence">\$\{esc\(sentence\)\}<\/div>/);
+  // Kapanış sözü ayrı bir tam cümledir; özet cümlesine parça olarak eklenmiyor.
+  assert.match(
+    dashboard,
+    /<div class="automation-sentence">\$\{esc\(sentence\)\}\$\{autoOff\?`<span class="automation-sentence-line">\$\{esc\(autoOff\)\}<\/span>`:""\}<\/div>/
+  );
   assert.match(dashboard, /automationSummaryTime:"Every day at \{time\}, \{device\} will \{action\}\."/);
   assert.match(dashboard, /automationSummaryTime:"Her gün saat \{time\} olduğunda \{device\} \{action\}\."/);
   assert.match(dashboard, /automationSummaryTimeDays:"On \{days\} at \{time\}, \{device\} will \{action\}\."/);
@@ -1651,7 +1655,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /triggers:\[trigger\],\s*conditions:\[\],\s*actions,/);
   assert.match(
     dashboard,
-    /const actions=automationMappingMode\(wizard\)\?automationMapActions\(wizard\):\(wizard\.action\?\[wizard\.action\]:\[\]\);/
+    /const actions=automationMappingMode\(wizard\)\?automationMapActions\(wizard\):\(wizard\.action\?\[\{\.\.\.wizard\.action\}\]:\[\]\);/
   );
   assert.doesNotMatch(dashboard, /data-automation-condition/);
   assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:koşul|senaryo|tetikleyici|property|endpoint)/i);
@@ -2526,4 +2530,153 @@ test("tek kanallı cihazda kanal kalemi çıkmaz, çok kanallıda her kanal ayr�
     assert.equal(helpers.renameControlButton(device, control), "");
     assert.equal(helpers.channelDisplayName(device, control), control.name);
   }
+});
+
+test("sihirbaz tek kuralda 'sonra kapat' sorar", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // İki seçenek de formda: hareket bitince ve süre sonunda.
+  assert.match(dashboard, /const automationAutoOffModes=\["none","idle","after"\]/);
+  assert.match(dashboard, /data-automation-autooff="\$\{value\}"/);
+  assert.match(dashboard, /automationAutoOffIdle:"Hareket bitince"/);
+  assert.match(dashboard, /automationAutoOffIdle:"When motion stops"/);
+  assert.match(dashboard, /automationAutoOffAfter:"Süre sonunda"/);
+  assert.match(dashboard, /automationAutoOffAfter:"After a set time"/);
+
+  // "Hareket bitince" ölçütü tanım verisinden gelir; sensör modeli listesi yok.
+  assert.match(
+    dashboard,
+    /automationTriggerEvents\(device,"sensor"\)\s*\.some\(row=>row\.property===wizard\.triggerProperty&&row\.equals!==wizard\.triggerEquals\)/
+  );
+  assert.match(dashboard, /\$\{automationAutoOffIdleAvailable\(wizard\)\?choice\("idle","automationAutoOffIdle"\):""\}/);
+
+  // Geri alma yalnız "Aç" eyleminde anlamlıdır.
+  assert.match(dashboard, /return Boolean\(control\)&&automationActionMode\(wizard\.action\)==="on"/);
+
+  // Kanonik kayıt: alan ilk eylemin üstüne yazılır, ikinci bir kural kurulmaz.
+  assert.match(dashboard, /const autoOff=automationAutoOffPayload\(wizard\);\s*if\(autoOff\)actions\[0\]=\{\.\.\.actions\[0\],autoOff\}/);
+  assert.match(dashboard, /return\{mode,seconds:minutes\*60,value:automationControlValue\(automationAutoOffControl\(wizard\),false\)\}/);
+
+  // Süre girişi dokunmatikte rahat: saat seçicideki büyük +/− düğmeleri ve hazır süre çipleri.
+  assert.match(dashboard, /data-automation-autooff-step="\$\{amount\}"/);
+  assert.match(dashboard, /data-automation-autooff-minutes="\$\{value\}"/);
+  assert.match(dashboard, /class="automation-time-step"/);
+
+  // Özet cümleleri tam şablon anahtarıyla; TR/EN kelime sırası ayrı ayrı yazılmış.
+  assert.match(dashboard, /automationAutoOffAfterLine:"\{duration\} sonra \{device\} kapanır\."/);
+  assert.match(dashboard, /automationAutoOffAfterLine:"Turns \{device\} off after \{duration\}\."/);
+  assert.match(dashboard, /automationAutoOffIdleLine:"Hareket bitince \{device\} kapanır\."/);
+  assert.match(dashboard, /automationAutoOffIdleLine:"Turns \{device\} off when motion stops\."/);
+  assert.match(dashboard, /automationAutoOffIdleWaitLine:"Hareket bittikten \{duration\} sonra \{device\} kapanır\."/);
+  assert.match(dashboard, /automationAutoOffIdleWaitLine:"Turns \{device\} off \{duration\} after motion stops\."/);
+
+  // Kart özeti de aynı cümleyi gösterir: sihirbazla tutarlı.
+  assert.match(dashboard, /const autoOff=map\?"":automationAutoOffLine\(action\)/);
+});
+
+test("sonra kapat yükü hedefin kendi kapatma değerinden üretilir", async () => {
+  const dashboard = await readDashboardBundle();
+  const source = dashboardScripts(dashboard);
+  const start = source.indexOf("const automationWeekDays=");
+  const end = source.indexOf("function automationReviewHtml(");
+  assert.ok(start > 0 && end > start);
+  const helpers = new Function(
+    "t",
+    "esc",
+    "state",
+    "isProtectedDevice",
+    `${source.slice(start, end)}`
+    + "return{automationAutoOffPayload,automationAutoOffLine,automationAutoOffIdleAvailable};"
+  )(
+    (key: string) => key,
+    (value: unknown) => String(value),
+    {
+      language: "tr",
+      groups: [],
+      devices: [
+        {
+          id: "0x00124b0011cc22dd",
+          name: "Koridor lambası",
+          controls: [{ id: "switch:state", property: "state", name: "Koridor lambası", kind: "switch", valueOn: "ON", valueOff: "OFF" }]
+        },
+        {
+          id: "0x00124b0022ab34cd",
+          name: "Koridor sensörü",
+          features: ["occupancy"],
+          state: { occupancy: false },
+          controls: []
+        },
+        {
+          id: "0x00124b0022ab34ce",
+          name: "Duman dedektörü",
+          features: ["smoke"],
+          state: { smoke: false },
+          controls: []
+        }
+      ]
+    },
+    () => false
+  ) as {
+    automationAutoOffPayload: (wizard: unknown) => { mode: string; seconds: number; value: string } | null;
+    automationAutoOffLine: (action: unknown) => string;
+    automationAutoOffIdleAvailable: (wizard: unknown) => boolean;
+  };
+
+  const wizard = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    triggerKind: "sensor",
+    triggerDeviceId: "0x00124b0022ab34cd",
+    triggerProperty: "occupancy",
+    triggerEquals: true,
+    action: { type: "device", deviceId: "0x00124b0011cc22dd", property: "state", controlId: "switch:state", value: "ON" },
+    autoOffMode: "after",
+    autoOffMinutes: 5,
+    autoOffIdleMinutes: 0,
+    ...overrides
+  });
+
+  // Kapatma değeri kontrolün kendi `valueOff` alanından gelir; model tahmini yok.
+  assert.deepEqual(helpers.automationAutoOffPayload(wizard()), { mode: "after", seconds: 300, value: "OFF" });
+  assert.deepEqual(
+    helpers.automationAutoOffPayload(wizard({ autoOffMode: "idle", autoOffIdleMinutes: 2 })),
+    { mode: "idle", seconds: 120, value: "OFF" }
+  );
+  assert.equal(helpers.automationAutoOffPayload(wizard({ autoOffMode: "none" })), null);
+
+  // Kapatan eylemin geri alınacak yönü yok.
+  const offAction = { type: "device", deviceId: "0x00124b0011cc22dd", property: "state", controlId: "switch:state", value: "OFF" };
+  assert.equal(helpers.automationAutoOffPayload(wizard({ action: offAction })), null);
+
+  // "Hareket bitince" yalnızca tetikleyici özelliğin tanımda bir karşıt değeri varsa sunulur.
+  assert.equal(helpers.automationAutoOffIdleAvailable(wizard()), true);
+  assert.equal(
+    helpers.automationAutoOffIdleAvailable(wizard({
+      triggerDeviceId: "0x00124b0022ab34ce",
+      triggerProperty: "smoke"
+    })),
+    false
+  );
+  // Sunulmuyorsa kaydedilmez de: seçenek gizliyken idle yükü üretilmez.
+  assert.equal(
+    helpers.automationAutoOffPayload(wizard({
+      triggerDeviceId: "0x00124b0022ab34ce",
+      triggerProperty: "smoke",
+      autoOffMode: "idle"
+    })),
+    null
+  );
+
+  // Zaman tetikleyicisinde yalnız süreyle kapatma kalır.
+  assert.equal(helpers.automationAutoOffIdleAvailable(wizard({ triggerKind: "time" })), false);
+  assert.deepEqual(
+    helpers.automationAutoOffPayload(wizard({ triggerKind: "time", autoOffMinutes: 1 })),
+    { mode: "after", seconds: 60, value: "OFF" }
+  );
+
+  // Cümle tam şablon anahtarıyla kuruluyor.
+  const line = (autoOff: Record<string, unknown>): string =>
+    helpers.automationAutoOffLine({ deviceId: "0x00124b0011cc22dd", property: "state", value: "ON", autoOff });
+  assert.equal(line({ mode: "after", seconds: 300, value: "OFF" }), "automationAutoOffAfterLine");
+  assert.equal(line({ mode: "idle", seconds: 0, value: "OFF" }), "automationAutoOffIdleLine");
+  assert.equal(line({ mode: "idle", seconds: 120, value: "OFF" }), "automationAutoOffIdleWaitLine");
+  assert.equal(helpers.automationAutoOffLine({ deviceId: "0x00124b0011cc22dd", property: "state", value: "ON" }), "");
 });

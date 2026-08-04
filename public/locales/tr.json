@@ -797,6 +797,24 @@
     "automationCardSummaryMap": "{device} açılınca → {target} {onAction} · kapanınca {offAction}",
     "automationCardSummaryMapOn": "{device} açılınca → {target} {onAction}",
     "automationCardSummaryMapOff": "{device} kapanınca → {target} {offAction}",
-    "automationLoopWarning": "Bu, otomasyonu başlatan kanalın kendisi; kendi kendini başlatamaz. Başka bir hedef seçin."
+    "automationLoopWarning": "Bu, otomasyonu başlatan kanalın kendisi; kendi kendini başlatamaz. Başka bir hedef seçin.",
+    "automationAutoOffTitle": "Sonra kendi kendine kapansın mı?",
+    "automationAutoOffNever": "Kapanmasın",
+    "automationAutoOffIdle": "Hareket bitince",
+    "automationAutoOffAfter": "Süre sonunda",
+    "automationAutoOffAfterLabel": "Ne kadar sonra kapansın?",
+    "automationAutoOffIdleWaitLabel": "Hareket bittikten sonra ne kadar beklesin?",
+    "automationAutoOffTimeLabel": "Kapanma süresi",
+    "automationAutoOffMinutesUnit": "dakika",
+    "automationAutoOffNoWait": "Beklemeden",
+    "automationAutoOffMinutesUp": "Süreyi uzat",
+    "automationAutoOffMinutesDown": "Süreyi kısalt",
+    "automationAutoOffIdleHint": "Sayaç sürerken yeni hareket gelirse süre baştan başlar. Sensörünüz hareketin bittiğini bildirmiyorsa bunun yerine süre sonunda kapatmayı seçin.",
+    "automationAutoOffAfterHint": "Kural yeniden çalışırsa süre baştan başlar. Bu sırada lambaya elle dokunursanız (panel, Alexa, Apple Home ya da duvar anahtarı) otomatik kapatma iptal olur.",
+    "automationAutoOffAfterLine": "{duration} sonra {device} kapanır.",
+    "automationAutoOffIdleLine": "Hareket bitince {device} kapanır.",
+    "automationAutoOffIdleWaitLine": "Hareket bittikten {duration} sonra {device} kapanır.",
+    "automationDurationMinute": "1 dakika",
+    "automationDurationMinutes": "{count} dakika"
   }
 }

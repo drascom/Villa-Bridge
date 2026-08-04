@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  AutomationAutoOffStore,
   AutomationsStore,
   automationTriggerDeviceIds,
   maxAutomationActions,
   maxAutomations,
   removeDeviceFromAutomations,
+  validateAutomationAutoOffEntries,
   validateAutomations
 } from "./automations.js";
 import type { Automation, AutomationDeviceLookup } from "./automations.js";
@@ -357,4 +359,90 @@ test("otomasyonlar atomik olarak yazılır ve geri okunur", async (context) => {
 
   assert.deepEqual(await store.removeDevice(lampId), []);
   assert.deepEqual(await store.get(), []);
+});
+
+/** §9 — hareket sensörü kuralı; "sonra kapat" bu kuralın içinde yaşar. */
+const motionRule = (autoOff: unknown): Record<string, unknown> => automation({
+  triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true }],
+  actions: [{ type: "device", deviceId: lampId, property: "state_l1", value: "ON", autoOff }]
+});
+
+test("sonra kapat alanı süreyle ve hareket bitişiyle kaydedilir", () => {
+  const timed = validateAutomations([motionRule({ mode: "after", seconds: 300, value: "OFF" })]);
+  assert.deepEqual(timed[0]?.actions[0]?.autoOff, { mode: "after", seconds: 300, value: "OFF" });
+
+  const idle = validateAutomations([motionRule({ mode: "idle", seconds: 0, value: "OFF" })]);
+  assert.deepEqual(idle[0]?.actions[0]?.autoOff, { mode: "idle", seconds: 0, value: "OFF" });
+
+  // Alanı hiç taşımayan eski kural aynen geçer ve alan uydurulmaz.
+  const legacy = validateAutomations([automation()]);
+  assert.equal(legacy[0]?.actions[0]?.autoOff, undefined);
+  assert.equal("autoOff" in (legacy[0]?.actions[0] ?? {}), false);
+});
+
+test("hareket bitince kapatma durum tetikleyicisi olmadan reddedilir", () => {
+  // Zaman tetikleyicisinde "hareket bitti" diye bir an yok.
+  assert.throws(
+    () => validateAutomations([automation({
+      actions: [{
+        type: "device", deviceId: lampId, property: "state_l1", value: "ON",
+        autoOff: { mode: "idle", seconds: 0, value: "OFF" }
+      }]
+    })]),
+    /durum bildiren bir tetikleyici/
+  );
+  // Her değişimde tetiklenen kuralda da "tetikleyen değerden çıkış" tanımsızdır.
+  assert.throws(
+    () => validateAutomations([automation({
+      triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy" }],
+      actions: [{
+        type: "device", deviceId: lampId, property: "state_l1", value: "ON",
+        autoOff: { mode: "idle", seconds: 0, value: "OFF" }
+      }]
+    })]),
+    /durum bildiren bir tetikleyici/
+  );
+});
+
+test("bozuk sonra kapat ayarları reddedilir", () => {
+  assert.throws(() => validateAutomations([motionRule({ mode: "sonra", seconds: 60, value: "OFF" })]), /türü geçersiz/);
+  assert.throws(() => validateAutomations([motionRule({ mode: "after", seconds: 0, value: "OFF" })]), /süresi geçersiz/);
+  assert.throws(() => validateAutomations([motionRule({ mode: "after", seconds: 86_401, value: "OFF" })]), /süresi geçersiz/);
+  assert.throws(() => validateAutomations([motionRule({ mode: "after", seconds: 1.5, value: "OFF" })]), /süresi geçersiz/);
+  assert.throws(() => validateAutomations([motionRule({ mode: "after", seconds: 60, value: "ON" })]), /aynı olamaz/);
+  assert.throws(() => validateAutomations([motionRule({ mode: "after", seconds: 60, value: "OFF", extra: 1 })]), /bilinmeyen alan/);
+  assert.throws(() => validateAutomations([motionRule("hemen")]), /ayarı geçersiz/);
+});
+
+test("bekleyen otomatik kapatmalar atomik yazılır ve doğrulanır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-auto-off-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, "automation-auto-off.json");
+  const store = new AutomationAutoOffStore(path);
+
+  assert.deepEqual(await store.get(), []);
+  const entry = {
+    automationId: "koridor-hareket",
+    automationName: "Koridor hareket",
+    deviceId: lampId,
+    property: "state_l1",
+    value: "OFF" as const,
+    appliedValue: "ON" as const,
+    mode: "idle" as const,
+    seconds: 60,
+    dueAt: null,
+    watch: { deviceId: sensorId, property: "occupancy", activeValue: true }
+  };
+  await store.save([entry]);
+  assert.deepEqual(await store.get(), [entry]);
+  assert.deepEqual(JSON.parse(await readFile(path, "utf8")), [entry]);
+
+  assert.throws(
+    () => validateAutomationAutoOffEntries([{ ...entry, deviceId: "lamba" }]),
+    /cihaz UID/
+  );
+  assert.throws(
+    () => validateAutomationAutoOffEntries([{ ...entry, dueAt: "yarın" }]),
+    /zamanı geçersiz/
+  );
 });

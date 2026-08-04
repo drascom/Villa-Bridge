@@ -57,6 +57,21 @@ export interface AutomationActionWhen {
   equals: JsonScalar;
 }
 
+/**
+ * §9 — "sonra kapat". Eylem çalıştıktan sonra hedefi kendiliğinden geri alır; kullanıcı biri açan
+ * biri kapatan iki ayrı kural kurmak zorunda kalmaz.
+ * - `after`: eylemden `seconds` saniye sonra geri alınır.
+ * - `idle`: tetikleyici kanal tetikleyen değerinden çıkınca (hareket bitince) geri alınır;
+ *   `seconds` burada isteğe bağlı **ek bekleme**dir, 0 olabilir.
+ */
+export interface AutomationAutoOff {
+  mode: "after" | "idle";
+  /** `after` için 1..86400; `idle` için 0..86400 ek bekleme. */
+  seconds: number;
+  /** Geri alınırken hedefe yazılacak değer (genelde kapatma değeri). */
+  value: JsonScalar;
+}
+
 export interface AutomationDeviceAction {
   type: "device";
   /** IEEE adresi — otomasyonun kalıcı bağı. */
@@ -68,6 +83,8 @@ export interface AutomationDeviceAction {
   value: JsonScalar;
   /** Yoksa eylem her zaman çalışır — geriye tam uyumluluk. */
   when?: AutomationActionWhen;
+  /** Yoksa geri alma yok — geriye tam uyumluluk. */
+  autoOff?: AutomationAutoOff;
 }
 
 export type AutomationAction = AutomationDeviceAction;
@@ -92,6 +109,10 @@ export const maxAutomationTriggers = 8;
 export const maxAutomationConditions = 4;
 export const maxAutomationActions = 8;
 export const maxAutomationNameLength = 64;
+/** Bir gün — bundan uzun bir "sonra kapat" süresi kullanıcı hatasıdır. */
+export const maxAutomationAutoOffSeconds = 86_400;
+/** Bekleyen kapatma sayısı; durum dosyası şişmesin. */
+export const maxAutomationAutoOffEntries = 128;
 
 /** §8.1 — otomasyonu onaylayacak insan yok; bu kontroller eylem olamaz. */
 export const forbiddenAutomationControlKinds: ReadonlySet<string> = new Set(["lock", "siren"]);
@@ -203,6 +224,42 @@ const validateActionWhen = (value: unknown): AutomationActionWhen => {
   return { equals: candidate.equals };
 };
 
+/** §9 — "sonra kapat" yalnızca üç alan tanır; fazlası reddedilir. */
+const validateAutoOff = (value: unknown, actionValue: JsonScalar): AutomationAutoOff => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Otomasyon otomatik kapatma ayarı geçersiz.");
+  }
+  const candidate = value as Record<string, unknown>;
+  for (const key of Object.keys(candidate)) {
+    if (key !== "mode" && key !== "seconds" && key !== "value") {
+      throw new Error("Otomasyon otomatik kapatma ayarında bilinmeyen alan var.");
+    }
+  }
+  if (candidate.mode !== "after" && candidate.mode !== "idle") {
+    throw new Error("Otomasyon otomatik kapatma türü geçersiz.");
+  }
+  const seconds = candidate.seconds;
+  if (
+    typeof seconds !== "number"
+    || !Number.isInteger(seconds)
+    || seconds < 0
+    || seconds > maxAutomationAutoOffSeconds
+  ) {
+    throw new Error("Otomasyon otomatik kapatma süresi geçersiz.");
+  }
+  // Süreyle kapatmada 0 saniye anlamsızdır; hareket bitince kapatmada 0 = ek bekleme yok.
+  if (candidate.mode === "after" && seconds < 1) {
+    throw new Error("Otomasyon otomatik kapatma süresi geçersiz.");
+  }
+  if (!isJsonScalar(candidate.value)) {
+    throw new Error("Otomasyon otomatik kapatma değeri geçersiz.");
+  }
+  if (candidate.value === actionValue) {
+    throw new Error("Otomasyon otomatik kapatma değeri eylemin değeriyle aynı olamaz.");
+  }
+  return { mode: candidate.mode, seconds, value: candidate.value };
+};
+
 const validateActions = (value: unknown, lookup?: AutomationDeviceLookup): AutomationAction[] => {
   if (!Array.isArray(value) || value.length === 0 || value.length > maxAutomationActions) {
     throw new Error("Otomasyon eylemleri geçersiz.");
@@ -232,6 +289,9 @@ const validateActions = (value: unknown, lookup?: AutomationDeviceLookup): Autom
     }
     if (candidate.when !== undefined && candidate.when !== null) {
       action.when = validateActionWhen(candidate.when);
+    }
+    if (candidate.autoOff !== undefined && candidate.autoOff !== null) {
+      action.autoOff = validateAutoOff(candidate.autoOff, action.value);
     }
     const control = lookup?.(deviceId)?.controls.find((item) => item.property === property);
     if (control && forbiddenAutomationControlKinds.has(control.kind)) {
@@ -282,6 +342,18 @@ export const validateAutomations = (
     }
     const triggers = validateTriggers(candidate.triggers);
     const actions = validateActions(candidate.actions, lookup);
+    // §9 — "hareket bitince kapat" ölçütü jeneriktir: kuralın kendi tetikleyicisinin **tetikleyen
+    // değerinden çıkması** demektir. Bu yüzden `equals` taşıyan bir durum tetikleyicisi şart;
+    // sensör modeli listesi yoktur. Her değişimde tetiklenen kuralda "bitiş" tanımsızdır.
+    if (actions.some((action) => action.autoOff?.mode === "idle")) {
+      const watchable = triggers.some((trigger) =>
+        trigger.type === "deviceState" && trigger.equals !== undefined);
+      if (!watchable) {
+        throw new Error(
+          "Hareket bitince kapatma için durum bildiren bir tetikleyici gerekir."
+        );
+      }
+    }
     // §8.2 — geri besleme döngüsü kaydetme anında reddedilir, çalışma zamanında değil.
     // Koruma kanal granülerliğinde: çok kanallı anahtarda bir kanal tetikleyip komşu kanalı
     // çalıştırmak geçerlidir; yasak olan yalnızca kanalın kendi kendini tetiklemesidir.
@@ -331,6 +403,131 @@ export const removeDeviceFromAutomations = (
     }))
     .filter((automation) => automation.actions.length > 0 && automation.triggers.length > 0);
 };
+
+/**
+ * Bekleyen bir "sonra kapat" — süreç yeniden başlasa da unutulmaz. Işığı açan komut zaten
+ * çalıştı; kapatma sözü o komutun parçasıdır, bu yüzden kalıcı tutulur.
+ */
+export interface AutomationAutoOffEntry {
+  automationId: string;
+  /** Yalnızca günlük metni için; kural silinse bile söz yerine getirilir. */
+  automationName: string;
+  deviceId: string;
+  property: string;
+  /** Geri alınırken yazılacak değer. */
+  value: JsonScalar;
+  /** Eylemin yazdığı değer — hedef bunun dışına çıktıysa niyet kullanıcınındır. */
+  appliedValue: JsonScalar;
+  mode: "after" | "idle";
+  seconds: number;
+  /** Sayaç işliyorsa bitiş anı (ISO); `idle` hareket beklerken null. */
+  dueAt: string | null;
+  /** `idle` için izlenen tetikleyici kanal. */
+  watch: { deviceId: string; property: string; activeValue: JsonScalar } | null;
+}
+
+const autoOffDeviceId = (value: unknown, label: string): string => {
+  const deviceId = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!deviceIdPattern.test(deviceId)) throw new Error(`${label} cihaz UID'si geçersiz.`);
+  return deviceId;
+};
+
+const autoOffProperty = (value: unknown, label: string): string => {
+  const property = typeof value === "string" ? value.trim() : "";
+  if (!propertyPattern.test(property)) throw new Error(`${label} cihaz özelliği geçersiz.`);
+  return property;
+};
+
+export const validateAutomationAutoOffEntries = (value: unknown): AutomationAutoOffEntry[] => {
+  if (!Array.isArray(value) || value.length > maxAutomationAutoOffEntries) {
+    throw new Error("Bekleyen otomatik kapatmalar geçersiz.");
+  }
+  return value.map((entry) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new Error("Bekleyen otomatik kapatma geçersiz.");
+    }
+    const candidate = entry as Record<string, unknown>;
+    const automationId = typeof candidate.automationId === "string"
+      ? candidate.automationId.trim().toLowerCase()
+      : "";
+    if (!automationIdPattern.test(automationId)) {
+      throw new Error("Bekleyen otomatik kapatma otomasyon kimliği geçersiz.");
+    }
+    if (!isJsonScalar(candidate.value) || !isJsonScalar(candidate.appliedValue)) {
+      throw new Error("Bekleyen otomatik kapatma değeri geçersiz.");
+    }
+    if (candidate.mode !== "after" && candidate.mode !== "idle") {
+      throw new Error("Bekleyen otomatik kapatma türü geçersiz.");
+    }
+    const seconds = candidate.seconds;
+    if (
+      typeof seconds !== "number"
+      || !Number.isInteger(seconds)
+      || seconds < 0
+      || seconds > maxAutomationAutoOffSeconds
+    ) {
+      throw new Error("Bekleyen otomatik kapatma süresi geçersiz.");
+    }
+    const dueAt = candidate.dueAt;
+    if (dueAt !== undefined && dueAt !== null) {
+      if (typeof dueAt !== "string" || Number.isNaN(Date.parse(dueAt))) {
+        throw new Error("Bekleyen otomatik kapatma zamanı geçersiz.");
+      }
+    }
+    let watch: AutomationAutoOffEntry["watch"] = null;
+    if (candidate.watch !== undefined && candidate.watch !== null) {
+      const raw = candidate.watch;
+      if (typeof raw !== "object" || Array.isArray(raw)) {
+        throw new Error("Bekleyen otomatik kapatma izlemesi geçersiz.");
+      }
+      const source = raw as Record<string, unknown>;
+      if (!isJsonScalar(source.activeValue)) {
+        throw new Error("Bekleyen otomatik kapatma izleme değeri geçersiz.");
+      }
+      watch = {
+        deviceId: autoOffDeviceId(source.deviceId, "Bekleyen otomatik kapatma izlemesi"),
+        property: autoOffProperty(source.property, "Bekleyen otomatik kapatma izlemesi"),
+        activeValue: source.activeValue
+      };
+    }
+    const name = typeof candidate.automationName === "string"
+      ? candidate.automationName.trim().slice(0, maxAutomationNameLength)
+      : "";
+    return {
+      automationId,
+      automationName: name || automationId,
+      deviceId: autoOffDeviceId(candidate.deviceId, "Bekleyen otomatik kapatma"),
+      property: autoOffProperty(candidate.property, "Bekleyen otomatik kapatma"),
+      value: candidate.value,
+      appliedValue: candidate.appliedValue,
+      mode: candidate.mode,
+      seconds,
+      dueAt: typeof dueAt === "string" ? dueAt : null,
+      watch
+    } satisfies AutomationAutoOffEntry;
+  });
+};
+
+/** Bekleyen kapatmaların durum dosyası — `aliases.ts` deseniyle atomik yazılır. */
+export class AutomationAutoOffStore {
+  constructor(private readonly path: string) {}
+
+  async get(): Promise<AutomationAutoOffEntry[]> {
+    try {
+      return validateAutomationAutoOffEntries(JSON.parse(await readFile(this.path, "utf8")));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
+    }
+  }
+
+  async save(entries: AutomationAutoOffEntry[]): Promise<void> {
+    const validated = validateAutomationAutoOffEntries(entries);
+    const temporary = `${this.path}.tmp-${process.pid}`;
+    await writeFile(temporary, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, this.path);
+  }
+}
 
 export class AutomationsStore {
   constructor(

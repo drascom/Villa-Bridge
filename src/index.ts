@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { registerAccessControl } from "./access-control.js";
 import { loadAliases, saveAliases } from "./aliases.js";
 import { AutomationEngine } from "./automation-engine.js";
-import { AutomationsStore } from "./automations.js";
+import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { hexToXy, soleSwitchChannelId } from "./device-controls.js";
@@ -191,7 +191,14 @@ if (config.mode === "direct") {
 } else {
   source = new MqttShadowSource(config.mqtt, store);
 }
-const automationEngine = new AutomationEngine({ store: automationsStore, source });
+const automationEngine = new AutomationEngine({
+  store: automationsStore,
+  source,
+  // Bekleyen "sonra kapat" kayıtları yeniden başlatmayı atlatır (§9).
+  autoOffStore: new AutomationAutoOffStore(
+    resolve(dirname(configPath), "automation-auto-off.json")
+  )
+});
 const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
   secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true"
@@ -1192,6 +1199,8 @@ try {
   applyCoordinatorStatus("ready");
   coordinatorError = null;
   automationEngine.start();
+  // Kaynak ayaktayken: süresi geçmiş kapatmalar hemen uygulanır, kalanlar kaldığı yerden sürer.
+  await automationEngine.restoreAutoOff();
 } catch (error) {
   // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
   applyCoordinatorStatus("coordinator-unavailable");

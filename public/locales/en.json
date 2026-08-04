@@ -797,6 +797,24 @@
     "automationCardSummaryMap": "{device} on → {target} {onAction} · off → {offAction}",
     "automationCardSummaryMapOn": "{device} on → {target} {onAction}",
     "automationCardSummaryMapOff": "{device} off → {target} {offAction}",
-    "automationLoopWarning": "This is the very channel that starts the automation, so it cannot start itself. Pick another target."
+    "automationLoopWarning": "This is the very channel that starts the automation, so it cannot start itself. Pick another target.",
+    "automationAutoOffTitle": "Should it turn itself off later?",
+    "automationAutoOffNever": "Leave it on",
+    "automationAutoOffIdle": "When motion stops",
+    "automationAutoOffAfter": "After a set time",
+    "automationAutoOffAfterLabel": "How long until it turns off?",
+    "automationAutoOffIdleWaitLabel": "How long to wait after motion stops?",
+    "automationAutoOffTimeLabel": "Auto-off delay",
+    "automationAutoOffMinutesUnit": "minutes",
+    "automationAutoOffNoWait": "No wait",
+    "automationAutoOffMinutesUp": "Longer",
+    "automationAutoOffMinutesDown": "Shorter",
+    "automationAutoOffIdleHint": "New motion starts the countdown over. If your sensor never reports that motion stopped, pick the timed option instead.",
+    "automationAutoOffAfterHint": "Running the rule again starts the countdown over. If you touch the light yourself meanwhile (panel, Alexa, Apple Home or the wall switch), the automatic turn-off is cancelled.",
+    "automationAutoOffAfterLine": "Turns {device} off after {duration}.",
+    "automationAutoOffIdleLine": "Turns {device} off when motion stops.",
+    "automationAutoOffIdleWaitLine": "Turns {device} off {duration} after motion stops.",
+    "automationDurationMinute": "1 minute",
+    "automationDurationMinutes": "{count} minutes"
   }
 }

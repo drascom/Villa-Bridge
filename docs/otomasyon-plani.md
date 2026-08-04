@@ -173,7 +173,8 @@ arayüzünün iç API'si. Ve `apps/runtime` (Android tablet / Pi) kurulumunda Ho
   "conditions": [],
   "actions": [
     { "type": "device", "deviceId": "0x00124b0011cc22dd",
-      "property": "state", "value": "ON", "revertAfterSeconds": null }
+      "property": "state", "value": "ON",
+      "autoOff": { "mode": "idle", "seconds": 0, "value": "OFF" } }
   ],
   "lastRunAt": "2026-08-01T16:00:00.000Z"
 }
@@ -242,8 +243,9 @@ anahtarı sonradan eklenir; veri modelinde `conditionMode: "all" | "any"` alanı
 | `scene` | `groupId`, `sceneId` | `source.groupScene(id, sceneId, "recall")` — **zaten var** |
 | `delay` | `seconds` (1–300) | Alexa'nın "Wait"'i; motor içinde |
 
-Her eylem ayrıca isteğe bağlı **`revertAfterSeconds?: number`** taşır — §9'daki B kararının yer
-tutucusu. Faz 0 ve Faz 1'de alan yazılmaz, motor da okumaz; **Faz 2'de dolar**.
+Her eylem ayrıca isteğe bağlı **`autoOff?: { mode: "after" | "idle"; seconds: number; value }`**
+taşır — §9'daki B kararının gerçekleşmiş hâli (plandaki `revertAfterSeconds` yer tutucusunun
+yerini aldı; iki seçenek gerektiği için tek sayı yetmedi). Alan yoksa geri alma yoktur.
 
 #### Eylem koşulu: `when` — anahtar durumunu eyleme eşleme
 
@@ -412,15 +414,21 @@ Tek kural yeter, ama modele geri-alma kavramı girer.
 **Seçilen: B.** Gerekçe: tek kural ev halkı için doğal olan ifade biçimi ve zaten ana senaryo bu —
 "ışık yansın, biraz sonra kendi kendine kapansın" iki ayrı otomasyon olarak düşünülmüyor.
 
-**Maliyeti (motorda karşılanacak):**
-- Eylem çalışmadan **önceki durumu sakla** (cihazın ilgili property'sinin son değeri).
-- Süre dolunca önceki duruma dön; **zamanlayıcı otomasyon+cihaz başına tekil** olmalı.
-- Aynı otomasyon süre dolmadan **yeniden tetiklenirse zamanlayıcı sıfırlanır** (geri alma ertelenir),
-  ikinci bir zamanlayıcı açılmaz.
-- Yeniden başlatmada bekleyen geri almalar telafi edilmez.
+**Gerçekleşen hâli (`autoOff`, §5.4):** kullanıcı iki seçenekten birini kurar —
+**`after`** (şu kadar süre sonra) ya da **`idle`** (hareket bitince, isteğe bağlı ek beklemeyle).
 
-**Kapsam: Faz 2.** Veri modelinde yeri şimdiden ayrıldı: eylem seviyesinde
-`revertAfterSeconds?: number` (§5.1, §5.4). Faz 0 ve Faz 1'de yazılmaz ve okunmaz.
+- Geri alınacak değer kuralda yazılıdır (`value`); "önceki durum" tahmin edilmez.
+- **Zamanlayıcı otomasyon + cihaz + kanal başına tekildir**; kural yeniden tetiklenirse sayaç
+  sıfırlanır, ikinci zamanlayıcı açılmaz.
+- **`idle` ölçütü jeneriktir:** kuralın kendi `deviceState` tetikleyicisinin `equals` değerinden
+  çıkış demektir. Bu yüzden doğrulama `equals` taşıyan bir durum tetikleyicisi şart koşar;
+  sensör modeli listesi yoktur.
+- **Elle müdahale iptal eder:** hedef kanal bizim yazdığımız değerden başka bir değere geçtiyse
+  (panel, Alexa, Apple Home, duvar anahtarı — hepsi aynı olay akışı) bekleyen kapatma düşer.
+- **Yeniden başlatmada bekleyen kapatmalar telafi edilir:** kayıt yapılandırmanın yanındaki
+  `automation-auto-off.json`'da atomik tutulur; süresi geçmişse hemen uygulanır, geçmemişse kalan
+  süreyle devam eder. Hareket bekleyen kayıtlarda bir dakikalık üst sınır devreye girer — ışık
+  sonsuza kadar açık kalmaz, yeni hareket sayacı yine sıfırlar.
 
 ---
 
@@ -463,9 +471,13 @@ sihirbaz (`public/index.html`).
 doğrulaması, `DeviceStore` olay akışına bağlı motor (poll yok), `action` için kenar davranışı
 (aynı basış arka arkaya iki kez tetikler), `deviceState` için değer değişimi kontrolü, kaydetme
 anında geri besleme döngüsü reddi. `DeviceView.actionTypes` + `state` sihirbaz için yeterli,
-yeni endpoint açılmadı. Kalan (sonraki tur): `group`/`delay`/`scene` eylemleri, `timeRange`
-koşulu, çoklu tetikleyici arayüzü, `revertAfterSeconds` geri alma, `sun` tetikleyicisi ve
-sihirbazın tetikleyici ekranı (`public/index.html`).
+yeni endpoint açılmadı.
+
+**"Sonra kapat" tamam** ✅ — eylem seviyesinde `autoOff` (`after` / `idle`), motorda otomasyon +
+kanal başına tekil zamanlayıcı, yeni tetiklemede sayaç sıfırlama, elle müdahalede iptal, yeniden
+başlatmada sürdürme (`automation-auto-off.json`) ve sihirbazın son adımındaki form. Kalan
+(sonraki tur): `group`/`delay`/`scene` eylemleri, `timeRange` koşulu, çoklu tetikleyici arayüzü,
+`sun` tetikleyicisi.
 
 ### Faz 3 — Cila
 `sun` tetikleyicisi (config'e lat/lon), `scene` eylemi, boş ekrandaki 4 hazır şablon çipi,

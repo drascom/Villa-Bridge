@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { AutomationEngine } from "./automation-engine.js";
-import { AutomationsStore } from "./automations.js";
+import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import type { JsonObject } from "./types.js";
 
 const lampId = "0x00124b0011cc22dd";
@@ -54,6 +54,42 @@ class FakeSource {
   }
 }
 
+/**
+ * Sahte zamanlayıcı — testler gerçek `setTimeout` beklemez, saat elle ilerletilir.
+ * Otomatik kapatma sayaçları bunun üzerinden çalışır.
+ */
+class FakeTimers {
+  private next = 1;
+  private readonly entries = new Map<number, { at: number; handler: () => void }>();
+
+  constructor(private readonly clock: () => number) {}
+
+  set(handler: () => void, ms: number): unknown {
+    const id = this.next;
+    this.next += 1;
+    this.entries.set(id, { at: this.clock() + ms, handler });
+    return id;
+  }
+
+  clear(handle: unknown): void {
+    this.entries.delete(handle as number);
+  }
+
+  get size(): number {
+    return this.entries.size;
+  }
+
+  /** Zamanı gelen sayaçları çalıştırır. */
+  fire(): void {
+    const now = this.clock();
+    for (const [id, entry] of [...this.entries]) {
+      if (entry.at > now) continue;
+      this.entries.delete(id);
+      entry.handler();
+    }
+  }
+}
+
 /** Olay işleme dosya okuması içerir; koşul sağlanana kadar mikro turlarla bekle. */
 const waitFor = async (predicate: () => boolean): Promise<void> => {
   for (let attempt = 0; attempt < 200 && !predicate(); attempt += 1) {
@@ -79,10 +115,14 @@ const harness = async (
   const logs: string[] = [];
   const notes: string[] = [];
   let clock = new Date("2026-08-03T19:00:05");
+  const timers = new FakeTimers(() => clock.getTime());
+  const autoOffStore = new AutomationAutoOffStore(join(directory, "automation-auto-off.json"));
   const engine = new AutomationEngine({
     store,
     source,
     now: () => clock,
+    timers,
+    autoOffStore,
     logger: { error: (message) => logs.push(message), info: (message) => notes.push(message) },
     ...engineOptions
   });
@@ -93,8 +133,17 @@ const harness = async (
     engine,
     logs,
     notes,
+    timers,
+    autoOffStore,
+    directory,
     setClock: (value: string) => {
       clock = new Date(value);
+    },
+    /** Saati ilerletip zamanı gelen sayaçları çalıştırır — gerçek bekleme yok. */
+    advance: async (ms: number) => {
+      clock = new Date(clock.getTime() + ms);
+      timers.fire();
+      await settle();
     }
   };
 };
@@ -507,4 +556,232 @@ test("start ve stop zamanlayıcıyı sızdırmaz", async (context) => {
   engine.start();
   engine.stop();
   engine.stop();
+});
+
+/** §9 — hareket sensörü lambayı açar; kapanış aynı kuralın içindedir. */
+const motionRule = (autoOff: Record<string, unknown>): Record<string, unknown> => automation({
+  id: "koridor-hareket",
+  name: "Koridor hareket",
+  triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true }],
+  actions: [{ type: "device", deviceId: lampId, property: "state", value: "ON", autoOff }]
+});
+
+const motion = (value: boolean): Array<{ deviceId: string; property: string; value: boolean }> =>
+  [{ deviceId: sensorId, property: "occupancy", value }];
+
+test("süre dolunca hedef kendiliğinden kapanır", async (context) => {
+  const { engine, source, advance, timers } = await harness(context, [
+    motionRule({ mode: "after", seconds: 300, value: "OFF" })
+  ]);
+
+  await engine.handleDeviceEvents(motion(true));
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "ON" } }]);
+  assert.equal(timers.size, 1);
+
+  // Süre dolmadan hiçbir şey olmaz.
+  await advance(299_000);
+  assert.equal(source.calls.length, 1);
+
+  await advance(1_000);
+  assert.deepEqual(source.calls.map((call) => call.command), [{ state: "ON" }, { state: "OFF" }]);
+  assert.equal(timers.size, 0);
+});
+
+test("sayaç sürerken yeni hareket sayacı sıfırlar", async (context) => {
+  const { engine, source, advance } = await harness(context, [
+    motionRule({ mode: "after", seconds: 300, value: "OFF" })
+  ]);
+
+  await engine.handleDeviceEvents(motion(true));
+  await advance(200_000);
+  // Kenar kuralı: önce boşalma, sonra yeni hareket.
+  await engine.handleDeviceEvents(motion(false));
+  await engine.handleDeviceEvents(motion(true));
+  assert.equal(source.calls.length, 2);
+
+  // İlk sayaç dolsaydı burada kapanırdı; sıfırlandığı için kapanmaz.
+  await advance(120_000);
+  assert.equal(source.calls.length, 2);
+
+  await advance(200_000);
+  assert.deepEqual(source.calls.map((call) => call.command).at(-1), { state: "OFF" });
+});
+
+test("elle müdahale otomatik kapatmayı iptal eder", async (context) => {
+  const { engine, source, advance, notes, timers } = await harness(context, [
+    motionRule({ mode: "after", seconds: 300, value: "OFF" })
+  ]);
+
+  await engine.handleDeviceEvents(motion(true));
+  // Kaynağı önemli değil: panel, Alexa, Apple Home ya da duvar anahtarı — hepsi aynı olay akışı.
+  await engine.handleDeviceEvents([{ deviceId: lampId, property: "state", value: "OFF" }]);
+  assert.equal(timers.size, 0);
+  assert.ok(notes.some((note) => /iptal edildi/.test(note)));
+
+  await advance(600_000);
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "ON" } }]);
+});
+
+test("kendi yazdığımız değerin yankısı otomatik kapatmayı iptal etmez", async (context) => {
+  const { engine, source, advance } = await harness(context, [
+    motionRule({ mode: "after", seconds: 60, value: "OFF" })
+  ]);
+
+  await engine.handleDeviceEvents(motion(true));
+  await engine.handleDeviceEvents([{ deviceId: lampId, property: "state", value: "ON" }]);
+
+  await advance(60_000);
+  assert.deepEqual(source.calls.map((call) => call.command), [{ state: "ON" }, { state: "OFF" }]);
+});
+
+test("hareket bitince kapatma tetikleyicinin kendi değerinden türer", async (context) => {
+  const { engine, source, advance, timers } = await harness(context, [
+    motionRule({ mode: "idle", seconds: 0, value: "OFF" })
+  ]);
+
+  await engine.handleDeviceEvents(motion(true));
+  // Hareket sürerken sayaç hiç açılmaz.
+  assert.equal(timers.size, 0);
+  await advance(3_600_000);
+  assert.equal(source.calls.length, 1);
+
+  await engine.handleDeviceEvents(motion(false));
+  await advance(0);
+  assert.deepEqual(source.calls.map((call) => call.command), [{ state: "ON" }, { state: "OFF" }]);
+});
+
+test("hareket bitince kapatmada ek bekleme yeni hareketle sıfırlanır", async (context) => {
+  const { engine, source, advance, notes } = await harness(context, [
+    motionRule({ mode: "idle", seconds: 120, value: "OFF" })
+  ]);
+
+  await engine.handleDeviceEvents(motion(true));
+  await engine.handleDeviceEvents(motion(false));
+  await advance(60_000);
+  assert.equal(source.calls.length, 1);
+
+  // Odada biri var: sayaç sıfırlanır, ışık sönmez.
+  await engine.handleDeviceEvents(motion(true));
+  assert.ok(notes.some((note) => /sıfırlandı/.test(note)));
+  await advance(120_000);
+  assert.equal(source.calls.length, 2);
+
+  await engine.handleDeviceEvents(motion(false));
+  await advance(120_000);
+  assert.deepEqual(source.calls.map((call) => call.command).at(-1), { state: "OFF" });
+});
+
+test("otomatik kapatmasız kurallar zamanlayıcı bırakmaz", async (context) => {
+  const { engine, source, timers } = await harness(context, [automation()]);
+
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+  assert.equal(timers.size, 0);
+});
+
+test("yeniden başlatmada bekleyen kapatma sürdürülür", async (context) => {
+  const first = await harness(context, [motionRule({ mode: "after", seconds: 600, value: "OFF" })]);
+  await first.engine.handleDeviceEvents(motion(true));
+  await settle();
+  first.engine.stop();
+
+  const entries = await first.autoOffStore.get();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.mode, "after");
+
+  // İkinci süreç aynı durum dosyasını okur: kalan süreyle devam eder.
+  const store = new AutomationsStore(join(first.directory, "automations.json"));
+  const source = new FakeSource();
+  let clock = new Date("2026-08-03T19:05:05");
+  const timers = new FakeTimers(() => clock.getTime());
+  const engine = new AutomationEngine({
+    store,
+    source,
+    now: () => clock,
+    timers,
+    autoOffStore: first.autoOffStore,
+    logger: { error: () => {}, info: () => {} }
+  });
+  context.after(() => engine.stop());
+  await engine.restoreAutoOff();
+
+  clock = new Date("2026-08-03T19:09:00");
+  timers.fire();
+  await settle();
+  assert.equal(source.calls.length, 0);
+
+  // 19:00:05'te başlayan 600 saniye 19:10:05'te dolar.
+  clock = new Date("2026-08-03T19:10:06");
+  timers.fire();
+  await settle();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "OFF" } }]);
+  assert.deepEqual(await first.autoOffStore.get(), []);
+});
+
+test("süresi geçmiş bekleyen kapatma yeniden başlatmada hemen uygulanır", async (context) => {
+  const first = await harness(context, [motionRule({ mode: "after", seconds: 60, value: "OFF" })]);
+  await first.engine.handleDeviceEvents(motion(true));
+  await settle();
+  first.engine.stop();
+
+  const store = new AutomationsStore(join(first.directory, "automations.json"));
+  const source = new FakeSource();
+  // Süreç uzun süre kapalı kaldı: ışık sonsuza kadar açık kalmaz.
+  const clock = new Date("2026-08-03T21:00:00");
+  const timers = new FakeTimers(() => clock.getTime());
+  const engine = new AutomationEngine({
+    store,
+    source,
+    now: () => clock,
+    timers,
+    autoOffStore: first.autoOffStore,
+    logger: { error: () => {}, info: () => {} }
+  });
+  context.after(() => engine.stop());
+  await engine.restoreAutoOff();
+  timers.fire();
+  await settle();
+
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "OFF" } }]);
+});
+
+test("hareket bekleyen kayıt yeniden başlatmada üst sınırla kapanır", async (context) => {
+  const first = await harness(context, [motionRule({ mode: "idle", seconds: 0, value: "OFF" })]);
+  await first.engine.handleDeviceEvents(motion(true));
+  await settle();
+  first.engine.stop();
+
+  const entries = await first.autoOffStore.get();
+  assert.equal(entries[0]?.dueAt, null);
+  assert.deepEqual(entries[0]?.watch, {
+    deviceId: sensorId,
+    property: "occupancy",
+    activeValue: true
+  });
+
+  const store = new AutomationsStore(join(first.directory, "automations.json"));
+  const source = new FakeSource();
+  let clock = new Date("2026-08-03T19:05:00");
+  const timers = new FakeTimers(() => clock.getTime());
+  const engine = new AutomationEngine({
+    store,
+    source,
+    now: () => clock,
+    timers,
+    autoOffStore: first.autoOffStore,
+    logger: { error: () => {}, info: () => {} }
+  });
+  context.after(() => engine.stop());
+  await engine.restoreAutoOff();
+
+  // Hareketin bittiği haberini kimse saklamıyor; bir dakikalık üst sınır devreye girer.
+  clock = new Date("2026-08-03T19:05:59");
+  timers.fire();
+  await settle();
+  assert.equal(source.calls.length, 0);
+
+  clock = new Date("2026-08-03T19:06:01");
+  timers.fire();
+  await settle();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "OFF" } }]);
 });
