@@ -648,7 +648,7 @@
     "automationNoTargets": "No lights or sockets were found here.",
     "automationTurnOn": "Turn on",
     "automationTurnOff": "Turn off",
-    "automationTurnToggle": "Turn on or off",
+    "automationTurnToggle": "Toggle",
     "automationNameLabel": "Name",
     "automationNamePlaceholder": "Give it a name",
     "automationDefaultName": "{device} {time}",

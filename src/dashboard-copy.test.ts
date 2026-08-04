@@ -533,6 +533,24 @@ test("Settings rehberleri, eşit güvenlik kartları ve tek bağlantı kartıyla
   assert.match(dashboard, /\.zigbee-settings-section\+\.zigbee-settings-section\{border-top:1px solid var\(--line\)\}/);
 });
 
+test("dokunmatik tablette bütün diyaloglar ekranı doldurur, masaüstünde ortalanmış kalır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Tek tek diyaloğa değil, ortak `dialog`/`.modal` kuralına yazılıyor: yeni diyaloglar da uyar.
+  assert.match(dashboard, /@media\(pointer:coarse\) and \(max-width:1400px\)\{/);
+  assert.match(dashboard, /dialog\{width:100vw!important;max-width:100vw!important;margin:0;border-radius:0\}/);
+  assert.match(dashboard, /dialog>\.modal\{max-height:100dvh;padding-left:clamp\(18px,4vw,44px\);padding-right:clamp\(18px,4vw,44px\);overflow-y:auto;overscroll-behavior:contain\}/);
+  // Sabit yerleşimli içerik (QR, renk çarkı) genişleyince dağılmasın.
+  assert.match(dashboard, /dialog>\.modal>\*\{max-width:920px;margin-left:auto;margin-right:auto\}/);
+  // Masaüstü hali ve backdrop kurgusu bozulmadı.
+  assert.match(dashboard, /dialog\{width:min\(92vw,560px\)/);
+  assert.match(dashboard, /dialog::backdrop\{background:rgba\(15,30,23,\.5\)/);
+  assert.match(dashboard, /dialog\.automation-dialog::backdrop\{background:rgba\(12,26,20,\.94\)/);
+  // Dikey padding değişmiyor: yapışkan başlık/eylem şeritlerinin -24px kaydırması yerinde kalır.
+  assert.doesNotMatch(dashboard, /dialog>\.modal\{[^}]*padding:\d/);
+  assert.match(dashboard, /\.automation-progress\{position:sticky;top:-24px/);
+});
+
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
   const dashboard = await readDashboardBundle();
 
@@ -1713,8 +1731,10 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   assert.match(dashboard, /const automationCardKeys=\{on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles"\}/);
   assert.match(dashboard, /const actionKey=automationSentenceKeys\[automationActionMode\(action\)\];/);
   assert.match(dashboard, /const actionKey=automationCardKeys\[automationActionMode\(action\)\];/);
+  // Aynı kelime iki yerde aynı kalır: eylem kartı ve eşleme formu "Değiştir" / "Toggle" der.
   assert.match(dashboard, /automationTurnToggle:"Değiştir"/);
-  assert.match(dashboard, /automationTurnToggle:"Turn on or off"/);
+  assert.match(dashboard, /automationTurnToggle:"Toggle"/);
+  assert.doesNotMatch(dashboard, /automationTurnToggle:"Turn on or off"/);
   assert.match(dashboard, /automationWillToggle:"açıksa kapanacak, kapalıysa açılacak"/);
   assert.match(dashboard, /automationWillToggle:"switch on or off"/);
   assert.match(dashboard, /automationToggles:"açık\/kapalı değişir"/);
@@ -1801,7 +1821,7 @@ interface PickDevice {
   name: string;
   sourceName: string;
   lastAction?: { action: string } | null;
-  controls?: Array<{ kind: string }>;
+  controls?: Array<{ id: string; kind: string }>;
   features?: string[];
 }
 
@@ -1811,27 +1831,26 @@ interface PickGroup {
   extra?: boolean;
 }
 
-/** Kanıt ölçütünü ve kümelemeyi sayfadan çıkarıp çalıştırır — sıralama metinle değil koşarak kanıtlanır. */
-function pickGrouping(dashboard: string): (events: Array<{ sourceName: string; property: string }>) => {
+interface PickApi {
   deviceSeenPress: (device: PickDevice) => boolean;
   automationPickGroups: (devices: PickDevice[], kind: string) => PickGroup[];
-} {
+  automationLightLike: (device: PickDevice) => boolean;
+}
+
+/** Kanıt ölçütünü ve kümelemeyi sayfadan çıkarıp çalıştırır — sıralama metinle değil koşarak kanıtlanır. */
+function pickGrouping(dashboard: string): (events: Array<{ sourceName: string; property: string }>) => PickApi {
   const scripts = dashboardScripts(dashboard);
   const seen = /const deviceSeenPress=device=>[\s\S]*?item\.property==="action"\);/.exec(scripts);
-  const light = /const automationLightLike=device=>[\s\S]*?feature==="effect"\);/.exec(scripts);
+  const light = /const automationChannelSwitches=device=>[\s\S]*?const automationLightLike=device=>\{[\s\S]*?\n  \};/.exec(scripts);
   const groups = /const automationPickGroups=\(devices,kind\)=>[\s\S]*?:\[\{devices,proven:true\}\];/.exec(scripts);
   assert.ok(seen, "kanıt ölçütü bulunamadı");
-  assert.ok(light, "lamba ölçütü bulunamadı");
+  assert.ok(light, "anahtar/lamba ölçütü bulunamadı");
   assert.ok(groups, "kümeleme kaynağı bulunamadı");
   const build = new Function(
     "state",
-    `${seen[0]}\n${light[0]}\n${groups[0]}\nreturn {deviceSeenPress,automationPickGroups};`
+    `${seen[0]}\n${light[0]}\n${groups[0]}\nreturn {deviceSeenPress,automationPickGroups,automationLightLike};`
   );
-  return (events) =>
-    build({ events }) as {
-      deviceSeenPress: (device: PickDevice) => boolean;
-      automationPickGroups: (devices: PickDevice[], kind: string) => PickGroup[];
-    };
+  return (events) => build({ events }) as PickApi;
 }
 
 test("düğme tetikleyicisi cihazın gerçekten basış yayıp yaymadığına dayanır", async () => {
@@ -1942,35 +1961,87 @@ test("basış yaymamış cihaz listede geride kalır, yayan cihaz uyarısız ön
   );
 });
 
-test("anahtar yolunda lamba gibi görünenler geride kalır, belirsiz cihaz uygun sayılır", async () => {
+test("anahtar yolunda gerçek duvar anahtarları üstte, lambalar altta kalır", async () => {
   const dashboard = await readDashboardBundle();
-  // Kullanıcının Garden 3 Way Switch'i aslında bir dimmer: parlaklık bildirir ama lamba değildir.
-  const dimmer: PickDevice = {
-    id: "0xdimmer",
-    name: "Garden 3 Way Switch",
-    sourceName: "garden",
-    controls: [{ kind: "switch" }, { kind: "level" }],
-    features: ["state", "brightness"]
+  // Cihaz şekilleri evin kendi Zigbee2MQTT verisinden alındı (model + yayımlanan özellikler).
+  // TS0601 _TZE284_tgeqdjgk duvar anahtarı: üç kanal (state/state_l1/state_l2) + parlaklık +
+  // color_temp. `color_temp` tek başına lamba ölçütü OLAMAZ — bu cihaz da bildiriyor.
+  const wallSwitch = (id: string, name: string): PickDevice => ({
+    id,
+    name,
+    sourceName: name,
+    controls: [
+      { id: "main", kind: "switch" },
+      { id: "l1", kind: "switch" },
+      { id: "l2", kind: "switch" },
+      { id: "main:brightness", kind: "level" },
+      { id: "main:temperature", kind: "temperature" }
+    ],
+    features: ["state", "state_l1", "state_l2", "brightness", "color_temp", "mode", "switch_mode_l1", "switch_mode_l2", "adjustment_mode"]
+  });
+  const garden = wallSwitch("0xf84477fffeab048e", "Garden 3 Way Switch");
+  const livingRoom = wallSwitch("0xf074bffffe1f9884", "Living Room Wall Switch");
+  // TS0001 _TZ3000_i9oy2rdq röle: tek kanal, parlaklık yok.
+  const relay: PickDevice = {
+    id: "0xa4c138b950918de3",
+    name: "Corridor light",
+    sourceName: "corridor",
+    controls: [{ id: "main", kind: "switch" }],
+    features: ["state", "countdown", "switch_type", "power_on_behavior"]
   };
-  const plug: PickDevice = { id: "0xplug", name: "Balcony plug", sourceName: "plug", controls: [{ kind: "switch" }], features: ["state"] };
-  const bulb: PickDevice = {
-    id: "0xbulb",
-    name: "Balcony bulb",
-    sourceName: "bulb",
-    controls: [{ kind: "switch" }, { kind: "level" }, { kind: "color" }],
-    features: ["state", "brightness", "color_temp", "effect"]
+  // GLEDOPTO GL-C-006P ve eWeLight ZB-CT01: tek kanal + parlaklık/renk sıcaklığı, anahtar işareti yok.
+  const balcony: PickDevice = {
+    id: "0xa4c138ea872c2c8e",
+    name: "Balkon lambası",
+    sourceName: "balkon",
+    controls: [
+      { id: "main", kind: "switch" },
+      { id: "main:brightness", kind: "level" },
+      { id: "main:temperature", kind: "temperature" }
+    ],
+    features: ["state", "brightness", "color_temp", "color_temp_startup", "power_on_behavior", "effect"]
+  };
+  const kitchenLed: PickDevice = {
+    id: "0xa4c138462c230400",
+    name: "Mutfak led sağ",
+    sourceName: "mutfakled",
+    controls: [
+      { id: "main", kind: "switch" },
+      { id: "main:brightness", kind: "level" },
+      { id: "main:temperature", kind: "temperature" }
+    ],
+    features: ["state", "brightness", "color_temp"]
   };
 
   const grouping = pickGrouping(dashboard)([]);
-  const groups = grouping.automationPickGroups([dimmer, plug, bulb], "deviceState");
-  // Belirsizse uygun sayılır: dimmer ilk kümede kalır, yalnız açık lamba işareti taşıyan geri düşer.
+  // Doğrudan ölçüt: anahtar cihazları lamba SAYILMAZ, gerçek lambalar sayılır.
+  assert.equal(grouping.automationLightLike(garden), false);
+  assert.equal(grouping.automationLightLike(livingRoom), false);
+  assert.equal(grouping.automationLightLike(relay), false);
+  assert.equal(grouping.automationLightLike(balcony), true);
+  assert.equal(grouping.automationLightLike(kitchenLed), true);
+
+  const groups = grouping.automationPickGroups([garden, livingRoom, relay, balcony, kitchenLed], "deviceState");
   assert.deepEqual(
-    groups.map((group) => [Boolean(group.extra), group.devices.map((device) => device.id)]),
+    groups.map((group) => [Boolean(group.extra), group.devices.map((device) => device.name)]),
     [
-      [false, ["0xdimmer", "0xplug"]],
-      [true, ["0xbulb"]]
+      [false, ["Garden 3 Way Switch", "Living Room Wall Switch", "Corridor light"]],
+      [true, ["Balkon lambası", "Mutfak led sağ"]]
     ]
   );
+
+  // Belirsiz cihaz üst kümede kalır: parlaklık bildiren ama anahtar donanımı işareti taşıyan tek kanallı
+  // cihaz da anahtar sayılır.
+  const knobDimmer: PickDevice = {
+    id: "0xa4c1380000000001",
+    name: "Knob dimmer switch",
+    sourceName: "knob",
+    controls: [{ id: "main", kind: "switch" }, { id: "main:brightness", kind: "level" }],
+    features: ["state", "brightness", "switch_type"]
+  };
+  assert.equal(grouping.automationLightLike(knobDimmer), false);
+  // Kontrolü bilinmeyen cihaz da lamba sayılmaz.
+  assert.equal(grouping.automationLightLike({ id: "0x0", name: "?", sourceName: "?" }), false);
 
   // Eleme değil katlama: geride kalanlar "Tüm cihazları göster" ile açılır.
   assert.match(dashboard, /data-automation-show-all="1"/);
