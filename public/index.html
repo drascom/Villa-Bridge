@@ -186,14 +186,14 @@
     .automation-paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:14px;margin:0 0 20px}.automation-paths[hidden]{display:none}.automation-path{min-height:88px;display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:15px;padding:18px;border:1px solid var(--line);border-radius:18px;color:var(--ink);background:var(--surface);box-shadow:var(--card-shadow);text-align:left;touch-action:manipulation}.automation-path:hover,.automation-path:focus-visible{border-color:var(--forest)}.automation-path:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-path[disabled]{opacity:.62}.automation-path-glyph{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;background:var(--forest-soft);font-size:22px}.automation-path-copy{min-width:0}.automation-path strong{display:block;font-size:16px;font-weight:800}.automation-path-lead{display:block;margin-top:5px;color:var(--muted);font-size:13px;line-height:1.35}.automation-soon{display:inline-block;margin-top:9px;padding:3px 9px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:11px;font-weight:850}
     .automation-list{display:grid;gap:12px}.automation-card{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:15px;padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--card-shadow)}.automation-card-glyph{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;color:var(--forest);background:var(--forest-soft);font-size:21px}.automation-card-copy{min-width:0}.automation-card strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-card-note{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.35}.automation-empty{display:grid;justify-items:center;gap:10px;padding:44px 20px}.automation-empty-icon{width:62px;height:62px;display:grid;place-items:center;border-radius:20px;color:var(--forest);background:var(--forest-soft);font-size:30px}.automation-empty h2{margin:4px 0 0;color:var(--ink);font:750 23px/1.1 system-ui,sans-serif}.automation-empty p{max-width:480px;margin:0}
     dialog.simple-link-dialog{width:min(94vw,660px)}.simple-link-modal{max-height:min(92vh,860px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.simple-link-modal .room-filter{margin:16px 0 0}.simple-link-choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:11px;margin-top:16px}.simple-link-choice{min-height:88px;display:grid;align-content:center;gap:6px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.simple-link-choice:hover,.simple-link-choice:focus-visible{border-color:var(--forest)}.simple-link-choice:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.simple-link-choice.active{border-color:var(--forest);background:var(--forest-soft)}.simple-link-choice strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.simple-link-choice small{color:var(--muted);font-size:12px}.simple-link-summary{margin-top:18px;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.simple-link-summary[hidden]{display:none}.simple-link-summary strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.simple-link-summary p{margin:8px 0 0;font-size:13px;line-height:1.4}.simple-link-modal .modal-actions button[hidden]{display:none}
-    dialog.automation-dialog{width:min(94vw,680px)}.automation-modal{max-height:min(92vh,880px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.automation-modal .modal-actions button[hidden]{display:none}.automation-progress button[hidden]{display:none}.automation-modal .automation-paths{margin:18px 0 0}
+    dialog.automation-dialog{width:min(94vw,680px)}.automation-modal{max-height:min(92vh,880px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.automation-modal .modal-actions button[hidden]{display:none}.automation-modal .automation-paths{margin:18px 0 0}
     dialog.automation-dialog::backdrop{background:rgba(12,26,20,.94);backdrop-filter:blur(10px)}
-    .automation-tabs{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:16px;padding-bottom:2px;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none}.automation-tabs::-webkit-scrollbar{display:none}.automation-tab{min-height:44px;flex:0 0 auto;padding:10px 16px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;white-space:nowrap;touch-action:manipulation}.automation-tab:hover,.automation-tab:focus-visible{border-color:var(--forest)}.automation-tab.active{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}.automation-tab:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
+    .automation-tabs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}.automation-tab{min-height:44px;flex:0 0 auto;max-width:100%;padding:10px 16px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;white-space:nowrap;touch-action:manipulation}.automation-tab:hover,.automation-tab:focus-visible{border-color:var(--forest)}.automation-tab.active{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}.automation-tab:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     .automation-search{position:relative;display:flex;margin-top:12px}.automation-search .search{width:100%;min-height:52px;font-size:16px}.automation-pick-list{display:block}
-    .automation-subhead{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft)}.automation-subback{width:48px;height:48px;flex:none;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:14px;color:var(--ink);background:var(--surface);font:850 22px/1 system-ui,sans-serif;touch-action:manipulation}.automation-subback:hover,.automation-subback:focus-visible{border-color:var(--forest);color:var(--forest)}.automation-subback:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-subhead-copy{min-width:0;display:grid;gap:3px}.automation-subhead-copy strong{font-size:16px;font-weight:850;overflow-wrap:anywhere}.automation-subhead-copy small{color:var(--muted);font-size:12px}
     .automation-subitems{margin-top:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft);overflow:hidden}.automation-subitems .automation-control-row{padding:14px}.automation-subitems .automation-control-row+.automation-control-row{border-top:1px solid var(--line)}
     .automation-map{display:grid;gap:12px;margin-top:4px}.automation-map-row{display:grid;gap:10px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft)}.automation-map-label{font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-map-row .automation-control-choices{justify-content:flex-start}.automation-map-row .automation-control-choice{min-height:52px;flex:1 1 132px}
-    .automation-progress{position:sticky;top:-24px;z-index:2;display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:24px 0 12px;margin-top:-24px;background:var(--surface)}.automation-top-next{min-width:120px;min-height:48px;font-size:15px}.automation-top-next[disabled]{opacity:.45}
+    .automation-done-row{width:100%;min-height:60px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-done-row:hover,.automation-done-row:focus-visible{border-color:var(--forest)}.automation-done-row:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-done-copy{min-width:0;display:grid;gap:3px}.automation-done-label{color:var(--muted);font-size:12px;font-weight:850;letter-spacing:.05em;text-transform:uppercase}.automation-done-value{font-size:15px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}.automation-done-change{flex:none;color:var(--forest);font-size:13px;font-weight:850;white-space:nowrap}
+    .automation-open{display:block;margin-top:18px;border-radius:18px}.automation-open-label{margin:0}.automation-open.flash{animation:automation-open-in .9s ease-out}@keyframes automation-open-in{0%{box-shadow:0 0 0 3px var(--forest-soft)}100%{box-shadow:0 0 0 3px transparent}}@media(prefers-reduced-motion:reduce){.automation-open.flash{animation:none}}
     /* Adım rayı: dar ekranda tek sütun akordiyon (panel `order` ile aktif adımın altına iner),
        geniş ekranda solda ray + sağda panel. Yol seçiminde ray yok, panel tek başına (`solo`). */
     .automation-flow{display:flex;flex-direction:column;gap:12px;margin-top:4px}.automation-flow.solo{display:block}.automation-panel{min-width:0}
@@ -201,7 +201,7 @@
     .automation-rail-marker{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;color:var(--muted);background:var(--surface);font:800 14px/1 system-ui,sans-serif}.automation-rail-step.active .automation-rail-marker,.automation-rail-step.done .automation-rail-marker{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
     .automation-rail-copy{min-width:0;display:grid;gap:3px}.automation-rail-label{color:var(--muted);font-size:12px;font-weight:850;letter-spacing:.05em;text-transform:uppercase}.automation-rail-step.active .automation-rail-label{color:var(--forest)}.automation-rail-value{font-size:14px;font-weight:750;line-height:1.3;overflow-wrap:anywhere}.automation-rail-step.active .automation-rail-value{font-size:16px;font-weight:800}
     @media(min-width:760px){.automation-flow{display:grid;grid-template-columns:minmax(0,232px) minmax(0,1fr);column-gap:26px;row-gap:12px;align-items:start}.automation-flow.solo{display:block}.automation-rail-step{grid-column:1}.automation-panel{grid-column:2;grid-row:1/span 3}}
-    .automation-actions{position:sticky;bottom:-24px;z-index:2;justify-content:space-between;gap:12px;margin-top:24px;padding:16px 0 24px;background:var(--surface)}.automation-actions button{min-width:132px;min-height:52px;font-size:15px}.automation-actions button[disabled]{opacity:.45}
+    .automation-actions{position:sticky;bottom:-24px;z-index:2;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:24px;padding:16px 0 24px;background:var(--surface)}.automation-actions button{min-width:132px;min-height:52px;font-size:15px}.automation-actions button[disabled]{opacity:.45}.automation-next-hint{flex:1 1 100%;order:-1;margin:0;color:var(--muted);font-size:13px;line-height:1.4;text-align:right}.automation-next-hint[hidden]{display:none}
     .automation-triggers{display:grid;gap:11px;margin-top:16px}.automation-trigger{min-height:88px;display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.automation-trigger:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-trigger[disabled]{opacity:.62}.automation-trigger.active{border-color:var(--forest);background:var(--forest-soft)}.automation-trigger-glyph{display:grid;place-items:center;font-size:23px}.automation-trigger strong{display:block;font-size:15px;font-weight:800}
     .automation-time{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}.automation-time-unit{display:grid;gap:9px;justify-items:center}.automation-time-value{min-width:88px;font:800 42px/1 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}.automation-time-step{width:88px;min-height:60px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);font-size:27px;font-weight:800;touch-action:manipulation}.automation-time-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-time-colon{font:800 34px/1 system-ui,sans-serif}
     .automation-days{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.automation-day{min-height:44px;padding:9px 15px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;touch-action:manipulation}.automation-day:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-day.active{border-color:var(--forest);background:var(--forest-soft)}
@@ -385,7 +385,7 @@
 <dialog id="weatherLocationDialog"><div class="modal location-modal"><h2 data-i18n="chooseWeatherLocation">Choose weather location</h2><p data-i18n="chooseWeatherLocationLead">Search for a city or use this tablet’s current location.</p><button id="useCurrentWeatherLocation" class="secondary location-current" type="button" data-i18n="weatherUseLocation">Use current location</button><div class="location-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="weatherLocationSearch" type="search" autocomplete="off" data-i18n-placeholder="searchCity" placeholder="Search city…"></div><div id="weatherSearchStatus" class="location-search-status"></div><div id="weatherSearchResults" class="location-results"></div><div class="modal-actions"><button id="closeWeatherLocationDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
 <dialog id="widgetDialog"><div class="modal add-modal"><h2 data-i18n="addToDashboard">Add to dashboard</h2><div class="modal-tabs" role="tablist" data-i18n-aria="addToDashboard" aria-label="Add to dashboard"><button id="addTabWidgets" class="modal-tab" type="button" role="tab" aria-selected="true" aria-controls="addPanelWidgets" data-add-tab="widgets" data-i18n="addWidgetsTab">Widgets</button><button id="addTabGroups" class="modal-tab" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="groupForm" data-add-tab="groups" data-i18n="addGroupsTab">Device groups</button></div><section id="addPanelWidgets" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabWidgets" tabindex="0"><p data-i18n="addWidgetLead">Choose compact widgets for the information you want to see at a glance.</p><div id="widgetCatalog" class="widget-catalog"></div><div class="modal-actions"><button id="closeWidgetDialog" class="quiet" type="button" data-i18n="close">Close</button></div></section><form id="groupForm" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabGroups" tabindex="0" hidden><h2 id="groupDialogTitle" data-i18n="createDeviceGroup">Create device group</h2><p data-i18n="groupDialogLead">Give the widget a simple name, then choose its controls.</p><div class="field"><label for="groupName" data-i18n="groupName">Group name</label><input id="groupName" minlength="2" maxlength="32" autocomplete="off" required data-i18n-placeholder="groupNamePlaceholder" placeholder="Living room"><span class="room-suggest-hint" data-i18n="roomSuggestHint">Pick a suggestion or type your own name.</span><div id="roomSuggestions" class="room-suggestions"></div></div><div id="groupOrderRow" class="group-order-row" hidden><span data-i18n="groupOrder">Order</span><div class="group-order-actions"><button id="groupMoveLeft" class="secondary" type="button" data-i18n-aria="moveGroupEarlier" aria-label="Move earlier">←</button><span id="groupOrderPosition" class="group-order-position"></span><button id="groupMoveRight" class="secondary" type="button" data-i18n-aria="moveGroupLater" aria-label="Move later">→</button></div></div><div class="group-picker-head"><strong data-i18n="groupDevices">Devices and controls</strong><span id="groupSelectionCount"></span></div><div id="groupDeviceChoices" class="group-device-choices"></div><div class="modal-actions group-modal-actions"><button id="deleteGroup" class="danger-button" type="button" data-i18n="deleteGroup" hidden>Delete group</button><div><button id="cancelGroup" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveGroup" class="primary" type="submit" data-i18n="saveGroup">Save group</button></div></div></form></div></dialog>
 <dialog id="groupDeleteDialog"><div class="modal"><h2 data-i18n="deleteGroupTitle">Delete this room?</h2><p id="groupDeleteLead" class="danger-copy"></p><p class="group-delete-note" data-i18n="deleteGroupNote">The devices themselves stay untouched — only the room disappears.</p><div class="modal-actions"><button id="cancelGroupDelete" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmGroupDelete" class="danger-button" type="button" data-i18n="deleteGroup">Delete group</button></div></div></dialog>
-<dialog id="automationDialog" class="automation-dialog"><div class="modal automation-modal"><div class="automation-progress"><button id="automationTopNext" class="primary automation-top-next" type="button" data-i18n="next">Next</button></div><div id="automationFlow" class="automation-flow"><div id="automationPanel" class="automation-panel"><h2 id="automationTitle" data-i18n="automationWhenTitle">When should it run?</h2><p id="automationLead" data-i18n="automationWhenLead">Pick the moment that starts it.</p><div id="automationBody"></div></div></div><div class="modal-actions automation-actions"><button id="automationBack" class="secondary" type="button" data-i18n="back">Back</button><button id="automationNext" class="primary" type="button" data-i18n="next">Next</button></div></div></dialog>
+<dialog id="automationDialog" class="automation-dialog"><div class="modal automation-modal"><div id="automationFlow" class="automation-flow"><div id="automationPanel" class="automation-panel"><h2 id="automationTitle" data-i18n="automationWhenTitle">When should it run?</h2><p id="automationLead" data-i18n="automationWhenLead">Pick the moment that starts it.</p><div id="automationBody"></div></div></div><div class="modal-actions automation-actions"><p id="automationNextHint" class="automation-next-hint" hidden></p><button id="automationBack" class="secondary" type="button" data-i18n="back">Back</button><button id="automationNext" class="primary" type="button" data-i18n="next">Next</button></div></div></dialog>
 <dialog id="automationActionDialog"><div class="modal device-action-modal"><div class="device-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg></div><h2 id="automationActionName">Automation</h2><p data-i18n="automationActionLead">Choose what you want to do with this automation.</p><div class="modal-actions"><button id="closeAutomationActions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="runAutomationNow" class="secondary" type="button" data-i18n="automationRunNow">Run now</button><button id="editAutomation" class="primary" type="button" data-i18n="automationEdit">Edit</button><button id="deleteAutomation" class="danger-button" type="button" data-i18n="automationDelete">Delete</button></div></div></dialog>
 <dialog id="simpleLinkDialog" class="simple-link-dialog"><div class="modal simple-link-modal"><div id="simpleLinkStep" class="eyebrow"></div><h2 id="simpleLinkTitle" data-i18n="simpleLinkStepOneTitle">Which button?</h2><p id="simpleLinkLead" data-i18n="simpleLinkStepOneLead">Choose the button or remote that should start it.</p><div id="simpleLinkRooms" class="room-filter" data-i18n-aria="roomFilterLabel" role="group" aria-label="Filter by room" hidden></div><div id="simpleLinkChoices" class="simple-link-choices"></div><div id="simpleLinkSummary" class="simple-link-summary" hidden></div><div class="modal-actions"><button id="simpleLinkBack" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="simpleLinkSave" class="primary" type="button" data-i18n="save" disabled hidden>Save</button></div></div></dialog>
 <dialog id="matterDialog"><div class="modal"><h2 data-i18n="connectPlatform">Connect Matter system</h2><p data-i18n="matterLead">Choose “Add Matter device” in Alexa, Apple Home or a compatible Matter controller and scan this code.</p><div id="qr" class="qr"></div><div id="manualCode" class="code"></div><div id="matterWaiting" class="matter-waiting"><span class="matter-waiting-dot" aria-hidden="true"></span><span data-i18n="matterPairingWaiting">Waiting for pairing…</span></div><p class="matter-hint" data-i18n="matterEcosystemHint">Each ecosystem needs its own code: close this window and press the button again to add another controller such as Alexa.</p><div class="modal-actions"><button id="closeMatter" class="quiet" data-i18n="close">Close</button></div></div></dialog>
@@ -4071,7 +4071,8 @@
     });
   }
   // İleri/Kaydet iki yerde durur (üstte ve altta) ama tek davranıştır; Geri yalnız altta kalır.
-  const automationNextButtons=()=>[$("#automationTopNext"),$("#automationNext")].filter(Boolean);
+  // Tek birincil eylem: alttaki düğme. Üstteki kopya kaldırıldı, hangisinin asıl olduğu sorusu bitti.
+  const automationNextButtons=()=>[$("#automationNext")].filter(Boolean);
   // Son basış ipucu yoklama turuyla tazelenir; yalnız 1. adımda ve düğme yolunda, metin alanı yok.
   function refreshAutomationHint(){
     const wizard=state.automationWizard;
@@ -4211,6 +4212,13 @@
       hour:timed?Number(trigger.at.slice(0,2)):19,
       minute:timed?Number(trigger.at.slice(3,5)):0,
       days:timed?[...trigger.days]:[...automationWeekDays],
+      // Cevaplanmış sayılan sorular kapalı satır olur. Kayıtlı kuralda hepsi cevaplıdır: düzenleme
+      // ekranı tek tek kapalı satırlarla açılır, kullanıcı yalnız değiştireceğine dokunur.
+      timeTouched:timed,
+      autoOffTouched:Boolean(existing),
+      autoOffCustom:false,
+      // Kullanıcı bir kapalı satıra basınca o soru yeniden açılır; başka soru açılınca temizlenir.
+      open:null,
       triggerDeviceId:trigger?.deviceId||null,
       triggerAction:trigger?.type==="deviceAction"?trigger.action:null,
       triggerProperty:trigger?.type==="deviceState"?trigger.property:null,
@@ -4236,11 +4244,14 @@
     if(!dialog.open)dialog.showModal();
     renderAutomationWizard();
   }
-  function automationWhenHtml(wizard){
+  function automationTriggerChoicesHtml(wizard){
     const triggers=automationTriggerChoices.map(entry=>{
       const picked=wizard.triggerKind===entry.kind;
       return`<button class="automation-trigger${picked?" active":""}" type="button" data-automation-trigger="${entry.kind}" aria-pressed="${picked}"${entry.ready?"":' disabled aria-disabled="true"'}><span class="automation-trigger-glyph" aria-hidden="true">${entry.glyph}</span><span class="automation-path-copy"><strong>${t(entry.label)}</strong>${entry.ready?"":`<span class="automation-soon">${t("comingSoon")}</span>`}</span></button>`;
     }).join("");
+    return`<div class="automation-triggers">${triggers}</div>`;
+  }
+  function automationTimeHtml(wizard){
     const unit=(name,value,amount,upKey,downKey)=>`<div class="automation-time-unit"><button class="automation-time-step" type="button" data-automation-time="${name}:${amount}" aria-label="${esc(t(upKey))}">+</button><span class="automation-time-value">${String(value).padStart(2,"0")}</span><button class="automation-time-step" type="button" data-automation-time="${name}:-${amount}" aria-label="${esc(t(downKey))}">−</button></div>`;
     const everyDay=automationEveryDay(wizard.days);
     const days=[
@@ -4250,9 +4261,7 @@
         return`<button class="automation-day${active?" active":""}" type="button" data-automation-day="${day}" aria-pressed="${active}">${esc(automationDayLabel(day))}</button>`;
       })
     ].join("");
-    if(automationDeviceKinds.includes(wizard.triggerKind))return`<div class="automation-triggers">${triggers}</div>${automationTriggerPickHtml(wizard)}`;
-    if(wizard.triggerKind!=="time")return`<div class="automation-triggers">${triggers}</div>`;
-    return`<div class="automation-triggers">${triggers}</div><div class="automation-time" role="group" aria-label="${esc(t("automationTimeLabel"))}">${unit("hour",wizard.hour,1,"automationHourUp","automationHourDown")}<span class="automation-time-colon" aria-hidden="true">:</span>${unit("minute",wizard.minute,5,"automationMinuteUp","automationMinuteDown")}</div><div class="automation-days" role="group" aria-label="${esc(t("automationDaysLabel"))}">${days}</div>`;
+    return`<div class="automation-time" role="group" aria-label="${esc(t("automationTimeLabel"))}">${unit("hour",wizard.hour,1,"automationHourUp","automationHourDown")}<span class="automation-time-colon" aria-hidden="true">:</span>${unit("minute",wizard.minute,5,"automationMinuteUp","automationMinuteDown")}</div><div class="automation-days" role="group" aria-label="${esc(t("automationDaysLabel"))}">${days}</div>`;
   }
   // Cihaz olay akışından son basış — uydurma çağrı yok, mevcut /api/overview verisi okunuyor.
   const automationButtonHint=device=>{
@@ -4347,8 +4356,17 @@
     const search=`<div class="automation-search"><input class="search" type="search" data-automation-search="${scope}" value="${esc(query)}" placeholder="${esc(t("automationSearchPlaceholder"))}" aria-label="${esc(t("automationSearchPlaceholder"))}" autocomplete="off" autocapitalize="none"></div>`;
     return`<div class="automation-picker">${automationTabsHtml(wizard,scope,devices)}${search}<div class="automation-pick-list" data-automation-pick-list="${scope}">${automationPickListHtml(wizard,scope)}</div></div>`;
   }
-  // Alt öğe ekranının başlığı: kanalların hangi cihaza ait olduğu renkle değil, adıyla yazar.
-  const automationPickHeadHtml=(device,scope)=>`<div class="automation-subhead"><button class="automation-subback" type="button" data-automation-pick-back="${scope}" aria-label="${esc(t("automationPickBack"))}" title="${esc(t("automationPickBack"))}"><span aria-hidden="true">‹</span></button><span class="automation-subhead-copy"><strong>${esc(device.name)}</strong><small>${esc(deviceKind(device))}</small></span></div><p class="automation-pick-head">${esc(t("automationPickParts",{device:device.name}))}</p>`;
+  // Cevaplanmış soru tek satıra iner: ne seçildiği görünür kalır, diğer seçenekler kapanır.
+  // Satırın kendisi düğmedir; `aria-expanded` taşır, klavyeyle gezilir, "Değiştir" geri açar.
+  const automationDoneRow=(label,value,hook)=>`<button class="automation-done-row" type="button" ${hook} aria-expanded="false"><span class="automation-done-copy"><span class="automation-done-label">${esc(label)}</span>${value?`<span class="automation-done-value">${esc(value)}</span>`:""}</span><span class="automation-done-change">${esc(t("automationChange"))}</span></button>`;
+  // O an cevaplanacak tek soru: üstünde neyin sorulduğunu yazan küçük başlıkla açık durur.
+  const automationOpenBlockHtml=(label,body)=>`<section class="automation-open"><p class="eyebrow automation-open-label">${esc(label)}</p>${body}</section>`;
+  // Seçilmiş cihaz satırı: "Değiştir" cihaz listesine döner (seçim temizlenir, alt öğe sorusu kalkar).
+  const automationPickHeadHtml=(device,scope)=>automationDoneRow(
+    t(scope==="target"?"automationBlockTarget":"automationBlockDevice"),
+    automationRailJoin(device.name,deviceKind(device)),
+    `data-automation-pick-back="${scope}"`
+  );
   // Alt öğe ekranı yalnız gerçek bir seçim varsa açılır: tek alt öğeli cihazda bu adım atlanır.
   // Kanıtsız düğmede uyarı ve durum alternatifi okunmadan geçilmesin diye ekran yine açılır.
   const automationTriggerChoiceCount=(wizard,device)=>automationMappingMode(wizard)
@@ -4359,17 +4377,14 @@
     if(!device)return null;
     return automationTriggerChoiceCount(wizard,device)>1||automationButtonUnproven(wizard,device)?device:null;
   };
-  function automationTriggerPickHtml(wizard){
-    const device=automationTriggerDetailDevice(wizard);
-    if(!device)return automationPickerHtml(wizard,"trigger");
-    const head=automationPickHeadHtml(device,"trigger");
+  function automationTriggerDetailHtml(wizard,device){
     if(automationMappingMode(wizard)){
       // Durum sorulmaz; yalnız çok kanallı anahtarda hangi kanal olduğu sorulur.
       const channels=automationStateControls(device).map(control=>{
         const active=wizard.triggerProperty===control.property;
         return`<button class="automation-event${active?" active":""}" type="button" data-automation-channel="${esc(control.property)}" aria-pressed="${active}">${esc(control.name)}</button>`;
       }).join("");
-      return`${head}<div class="automation-events">${channels}</div>`;
+      return`<div class="automation-events">${channels}</div>`;
     }
     const events=automationTriggerEvents(device,wizard.triggerKind,wizard.triggerAction);
     // Alt varlık kuralı (§5.1.1): her düğme ve her özellik ayrı bir hedeftir.
@@ -4385,18 +4400,17 @@
       ?`<div class="automation-alt"><p>${esc(t("automationButtonStateAlternative"))}</p><button class="secondary" type="button" data-automation-state-instead="${esc(device.id)}">${esc(t("automationButtonStateAlternativeAction"))}</button></div>`
       :"";
     const hint=device&&wizard.triggerKind==="button"?`<p class="automation-hint">${esc(automationButtonHint(device))}</p>`:"";
-    return`${head}${warning}${alternative}${events.length?`<div class="automation-events">${list}</div>`:""}${hint}`;
+    return`${warning}${alternative}${events.length?`<div class="automation-events">${list}</div>`:""}${hint}`;
   }
   // Seçili hedef cihaz artık listede değilse (tetikleyici değişmiş olabilir) alt öğe ekranı açılmaz.
   const automationTargetDetailDevice=wizard=>{
     if(!wizard.targetDeviceId)return null;
     return automationTargetScope(wizard).devices.find(item=>item.id===wizard.targetDeviceId)||null;
   };
-  // Adım 2 de iki ekrandır: önce cihaz, sonra o cihazın kanalları. Başlık hangi cihaz olduğunu yazar.
-  function automationThenHtml(wizard){
+  // Adım 2 de iki sorudur: önce cihaz, sonra o cihazın kanalları. Cihaz seçilince liste kapanır,
+  // yerine tek satırlık "seçildi" satırı gelir ve altında yalnız kanal sorusu açık kalır.
+  function automationTargetPartsHtml(wizard,device){
     const scope=automationTargetScope(wizard);
-    const device=scope.devices.find(item=>item.id===wizard.targetDeviceId)||null;
-    if(!device)return automationPickerHtml(wizard,"target");
     const controls=scope.targetControls(device);
     // Anahtar yolunda burada yalnız hedef seçilir; ne yapılacağı eşleme formunda sorulur.
     const mapping=automationMappingMode(wizard);
@@ -4414,7 +4428,7 @@
       const toggle=automationCanToggle(control)?choice("toggle","automationTurnToggle",mode==="toggle"):"";
       return`<div class="automation-control-row"><span>${single?"":esc(control.name)}</span><div class="automation-control-choices">${choice("on","automationTurnOn",mode==="on")}${choice("off","automationTurnOff",mode==="off")}${toggle}</div></div>`;
     }).join("");
-    return`${automationPickHeadHtml(device,"target")}<div class="automation-subitems">${rows}</div>`;
+    return`<div class="automation-subitems">${rows}</div>`;
   }
   // Eşleme formu: her yön için ne yapılacağını kullanıcı seçer. Tablette geniş satır, geniş düğme.
   function automationMapHtml(wizard){
@@ -4458,41 +4472,71 @@
     return payload?automationAutoOffLine({...wizard.action,autoOff:payload}):"";
   };
   const automationAutoOffPresetValues=wizard=>wizard.autoOffMode==="idle"?[0,1,2,5,10]:[1,2,5,10,15,30];
+  // Aynı değeri iki ayrı yoldan girmek karışıklık yaratıyordu. Tek yol: hazır süre çipleri.
+  // Sayaç yalnız "Başka süre" seçilince açılır — listede olmayan bir süre için tek çıkış yolu.
+  const automationAutoOffCustom=wizard=>Boolean(wizard.autoOffCustom)||!automationAutoOffPresetValues(wizard).includes(automationAutoOffMinutes(wizard));
   const automationAutoOffPresets=wizard=>{
     const current=automationAutoOffMinutes(wizard);
-    return automationAutoOffPresetValues(wizard).map(value=>{
-      const active=current===value;
+    const custom=automationAutoOffCustom(wizard);
+    const chips=automationAutoOffPresetValues(wizard).map(value=>{
+      const active=!custom&&current===value;
       const label=value===0?t("automationAutoOffNoWait"):automationDurationText(value*60);
       return`<button class="automation-day${active?" active":""}" type="button" data-automation-autooff-minutes="${value}" aria-pressed="${active}">${esc(label)}</button>`;
-    }).join("");
+    });
+    chips.push(`<button class="automation-day${custom?" active":""}" type="button" data-automation-autooff-custom="1" aria-pressed="${custom}">${esc(t("automationAutoOffCustom"))}</button>`);
+    return chips.join("");
   };
-  // Süre girişi dokunmatikte rahat olsun: saat seçicideki büyük +/− düğmeleri ve hazır süre çipleri.
+  const automationAutoOffValue=wizard=>{
+    if(wizard.autoOffMode==="none")return t("automationAutoOffNever");
+    const duration=automationDurationText(automationAutoOffMinutes(wizard)*60);
+    return wizard.autoOffMode==="idle"
+      ?automationRailJoin(t("automationAutoOffIdle"),automationAutoOffMinutes(wizard)?duration:"")
+      :duration;
+  };
+  // Süre girişi dokunmatikte rahat olsun: geniş hazır süre çipleri, gerekirse büyük +/− sayaç.
   function automationAutoOffHtml(wizard){
     if(!automationAutoOffAvailable(wizard))return"";
     const mode=automationAutoOffModes.includes(wizard.autoOffMode)?wizard.autoOffMode:"none";
+    if(!automationAutoOffOpen(wizard))return automationDoneRow(t("automationAutoOffTitle"),automationAutoOffValue(wizard),'data-automation-open-block="autooff"');
     const choice=(value,key)=>`<button class="automation-control-choice${mode===value?" active":""}" type="button" data-automation-autooff="${value}" aria-pressed="${mode===value}">${t(key)}</button>`;
     const choices=`${choice("none","automationAutoOffNever")}${automationAutoOffIdleAvailable(wizard)?choice("idle","automationAutoOffIdle"):""}${choice("after","automationAutoOffAfter")}`;
     const step=(amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-autooff-step="${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
-    const timer=mode==="none"?"":`<p class="automation-autooff-label">${t(mode==="idle"?"automationAutoOffIdleWaitLabel":"automationAutoOffAfterLabel")}</p><div class="automation-time" role="group" aria-label="${esc(t("automationAutoOffTimeLabel"))}"><div class="automation-time-unit">${step(1,"automationAutoOffMinutesUp","+")}<span class="automation-time-value">${automationAutoOffMinutes(wizard)}</span>${step(-1,"automationAutoOffMinutesDown","−")}</div><span class="automation-time-unit-label">${t("automationAutoOffMinutesUnit")}</span></div><div class="automation-days">${automationAutoOffPresets(wizard)}</div>`;
+    const counter=automationAutoOffCustom(wizard)?`<div class="automation-time" role="group" aria-label="${esc(t("automationAutoOffTimeLabel"))}"><div class="automation-time-unit">${step(1,"automationAutoOffMinutesUp","+")}<span class="automation-time-value">${automationAutoOffMinutes(wizard)}</span>${step(-1,"automationAutoOffMinutesDown","−")}</div><span class="automation-time-unit-label">${t("automationAutoOffMinutesUnit")}</span></div>`:"";
+    const timer=mode==="none"?"":`<p class="automation-autooff-label">${t(mode==="idle"?"automationAutoOffIdleWaitLabel":"automationAutoOffAfterLabel")}</p><div class="automation-days">${automationAutoOffPresets(wizard)}</div>${counter}`;
     const hint=mode==="none"?"":`<p class="automation-hint">${t(mode==="idle"?"automationAutoOffIdleHint":"automationAutoOffAfterHint")}</p>`;
-    return`<div class="automation-autooff"><p class="automation-pick-head">${t("automationAutoOffTitle")}</p><div class="automation-control-choices automation-autooff-choices">${choices}</div>${timer}${hint}</div>`;
+    return automationOpenBlockHtml(t("automationAutoOffTitle"),`<div class="automation-autooff"><div class="automation-control-choices automation-autooff-choices">${choices}</div>${timer}${hint}</div>`);
   }
+  // "Sonra kapat" bloğu: kullanıcı dokunana kadar açık, dokunduktan sonra da açık kalır — kapalı
+  // satıra ancak kayıtlı bir kural düzenlenirken düşer, "Değiştir" ile geri açılır.
+  const automationAutoOffOpen=wizard=>wizard.open==="autooff"||!wizard.autoOffTouched;
   function chooseAutomationAutoOff(mode){
     const wizard=state.automationWizard;
     if(!wizard||!automationAutoOffModes.includes(mode))return;
     if(mode==="idle"&&!automationAutoOffIdleAvailable(wizard))return;
     wizard.autoOffMode=mode;
+    wizard.autoOffCustom=false;
+    automationTouchAutoOff(wizard);
     renderAutomationWizard();
   }
-  function setAutomationAutoOffMinutes(value){
+  const automationTouchAutoOff=wizard=>{wizard.autoOffTouched=true;wizard.open="autooff"};
+  function setAutomationAutoOffMinutes(value,custom){
     const wizard=state.automationWizard;
     if(!wizard||!Number.isFinite(value))return;
     const idle=wizard.autoOffMode==="idle";
     const next=Math.min(240,Math.max(idle?0:1,Math.round(value)));
     if(idle)wizard.autoOffIdleMinutes=next;else wizard.autoOffMinutes=next;
+    wizard.autoOffCustom=Boolean(custom);
+    automationTouchAutoOff(wizard);
     renderAutomationWizard();
   }
-  const stepAutomationAutoOff=amount=>setAutomationAutoOffMinutes(automationAutoOffMinutes(state.automationWizard||{})+amount);
+  const stepAutomationAutoOff=amount=>setAutomationAutoOffMinutes(automationAutoOffMinutes(state.automationWizard||{})+amount,true);
+  function openAutomationAutoOffCustom(){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    wizard.autoOffCustom=true;
+    automationTouchAutoOff(wizard);
+    renderAutomationWizard();
+  }
   function automationReviewHtml(wizard){
     const mapping=automationMappingMode(wizard);
     const empty=mapping&&wizard.mapOn==="none"&&wizard.mapOff==="none";
@@ -4518,7 +4562,9 @@
     $$("[data-automation-map]").forEach(button=>button.onclick=()=>chooseAutomationMap(button.dataset.automationMap));
     $$("[data-automation-autooff]").forEach(button=>button.onclick=()=>chooseAutomationAutoOff(button.dataset.automationAutooff));
     $$("[data-automation-autooff-step]").forEach(button=>button.onclick=()=>stepAutomationAutoOff(Number(button.dataset.automationAutooffStep)));
-    $$("[data-automation-autooff-minutes]").forEach(button=>button.onclick=()=>setAutomationAutoOffMinutes(Number(button.dataset.automationAutooffMinutes)));
+    $$("[data-automation-autooff-minutes]").forEach(button=>button.onclick=()=>setAutomationAutoOffMinutes(Number(button.dataset.automationAutooffMinutes),false));
+    $$("[data-automation-autooff-custom]").forEach(button=>button.onclick=()=>openAutomationAutoOffCustom());
+    $$("[data-automation-open-block]").forEach(button=>button.onclick=()=>openAutomationBlock(button.dataset.automationOpenBlock));
     $$("[data-automation-trigger]").forEach(button=>button.onclick=()=>chooseAutomationTrigger(button.dataset.automationTrigger));
     $$("[data-automation-time]").forEach(button=>button.onclick=()=>{
       const [unit,amount]=button.dataset.automationTime.split(":");
@@ -4555,17 +4601,20 @@
     else wizard.targetTab=tab;
     renderAutomationWizard();
   }
-  // Alt öğe ekranı açıksa geri düğmesi adımı değiştirmez, cihaz listesine döner.
-  const automationDetailOpen=wizard=>wizard.step===1
+  // Alt öğe ekranı ya da elle açılmış bir kapalı satır varsa geri düğmesi adımı değiştirmez:
+  // önce o soruyu kapatır, sonra cihaz listesine döner. Etiket de bu yüzden "Geri" olur.
+  const automationDetailOpen=wizard=>Boolean(wizard.open)||(wizard.step===1
     ?Boolean(automationTriggerDetailDevice(wizard))
-    :wizard.step===2?Boolean(automationTargetDetailDevice(wizard)):false;
+    :wizard.step===2?Boolean(automationTargetDetailDevice(wizard)):false);
   function automationPickBack(scope){
     const wizard=state.automationWizard;
     if(!wizard)return;
     cancelAutomationAdvance();
     if(scope==="trigger")automationClearTriggerDevice(wizard);
     else wizard.targetDeviceId=null;
+    wizard.open=null;
     renderAutomationWizard();
+    automationRevealOpenBlock();
   }
   // Adım değişince gövde başa sarar. Uzun listede aşağıda kalan kaydırma yeni adımda korunuyordu:
   // özet adımının en üstündeki "sonra kapat" seçenekleri ekranın dışında kalıyordu. Kaydırma kutusu
@@ -4644,6 +4693,121 @@
     const again=focused?flow.querySelector(`[data-automation-goto="${focused}"]`):null;
     if(again&&!again.disabled)again.focus();
   }
+  // Kapalı satırda yalnız o sorunun cevabı yazar: cihaz adı zaten bir üstteki satırda duruyor.
+  const automationEventValue=wizard=>{
+    if(automationMappingMode(wizard))return automationRailChannel(wizard);
+    const device=automationTriggerDevice({deviceId:wizard.triggerDeviceId});
+    if(wizard.triggerKind==="button")return wizard.triggerAction?automationButtonLabel(device,wizard.triggerAction):"";
+    return wizard.triggerProperty
+      ?automationEventLabel({deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty,equals:wizard.triggerEquals})
+      :"";
+  };
+  const automationActionValue=wizard=>{
+    const ref=automationWizardActionRef(wizard);
+    if(!ref)return"";
+    const control=automationControl(ref);
+    const channel=control&&automationControls(automationDevice(ref)).length>1?control.name:"";
+    return automationMappingMode(wizard)
+      ?automationRailJoin(channel,t("automationTargetPicked"))
+      :automationRailJoin(channel,t(automationRailModeKeys[automationActionMode(wizard.action)]));
+  };
+  // Her adım sıralı sorulardan oluşur. Cevaplanmış soru tek satıra iner, sıradaki soru açık durur,
+  // sırası gelmemiş soru hiç basılmaz — böylece ekranda aynı anda tek soru olur.
+  function automationStepBlocks(wizard){
+    const blocks=[];
+    if(wizard.step===1){
+      blocks.push({
+        id:"kind",label:t("automationBlockTrigger"),value:automationTriggerKindLabel(wizard),
+        done:Boolean(wizard.triggerKind),hook:'data-automation-open-block="kind"',
+        body:()=>automationTriggerChoicesHtml(wizard)
+      });
+      if(wizard.triggerKind==="time")blocks.push({
+        id:"time",label:t("automationBlockTime"),value:automationRailWhenValue(wizard),
+        done:Boolean(wizard.timeTouched),hook:'data-automation-open-block="time"',
+        body:()=>automationTimeHtml(wizard)
+      });
+      else if(automationDeviceKinds.includes(wizard.triggerKind)){
+        blocks.push({
+          id:"device",label:t("automationBlockDevice"),value:"",done:Boolean(wizard.triggerDeviceId),
+          hook:'data-automation-pick-back="trigger"',body:()=>automationPickerHtml(wizard,"trigger")
+        });
+        const detail=automationTriggerDetailDevice(wizard);
+        // Kanıtsız düğmede blok kapanmaz: uyarı ve durum alternatifi okunmadan geçilmesin.
+        if(detail)blocks.push({
+          id:"event",label:t("automationPickParts",{device:detail.name}),value:automationEventValue(wizard),
+          done:automationTriggerReady(wizard),force:automationButtonUnproven(wizard,detail),
+          hook:'data-automation-open-block="event"',body:()=>automationTriggerDetailHtml(wizard,detail)
+        });
+      }
+      return blocks;
+    }
+    if(wizard.step===2){
+      blocks.push({
+        id:"target",label:t("automationBlockTarget"),value:"",done:Boolean(wizard.targetDeviceId),
+        hook:'data-automation-pick-back="target"',body:()=>automationPickerHtml(wizard,"target")
+      });
+      const device=automationTargetDetailDevice(wizard);
+      if(device)blocks.push({
+        id:"action",label:t("automationPickParts",{device:device.name}),value:automationActionValue(wizard),
+        done:Boolean(automationMappingMode(wizard)?wizard.target:wizard.action),
+        hook:'data-automation-open-block="action"',body:()=>automationTargetPartsHtml(wizard,device)
+      });
+    }
+    return blocks;
+  }
+  // Açık soru: kullanıcı bir satıra basıp geri açtıysa o, yoksa sırası gelen ilk cevapsız soru.
+  // Hepsi cevaplıysa hiçbiri açılmaz — düzenleme ekranı bu yüzden baştan sona kapalı satırdır.
+  const automationOpenBlockId=(wizard,blocks)=>{
+    if(wizard.open&&blocks.some(block=>block.id===wizard.open))return wizard.open;
+    return(blocks.find(block=>block.force)||blocks.find(block=>!block.done))?.id||null;
+  };
+  function automationBlocksHtml(wizard){
+    const blocks=automationStepBlocks(wizard);
+    const open=automationOpenBlockId(wizard,blocks);
+    // Cihaz satırının kapalı hali seçilen cihazın adını yazar; diğerleri kendi cevabını.
+    const doneValue=block=>block.id==="device"||block.id==="target"
+      ?automationPickDoneValue(wizard,block.id==="device"?"trigger":"target")
+      :block.value;
+    return blocks.map(block=>block.id===open
+      ?automationOpenBlockHtml(block.label,block.body())
+      :automationDoneRow(block.label,doneValue(block),block.hook)).join("");
+  }
+  const automationPickDoneValue=(wizard,scope)=>{
+    const id=scope==="trigger"?wizard.triggerDeviceId:wizard.targetDeviceId;
+    const device=state.devices.find(item=>item.id===id)||null;
+    return device?automationRailJoin(device.name,deviceKind(device)):"";
+  };
+  const automationTriggerKindLabel=wizard=>{
+    const choice=automationTriggerChoices.find(entry=>entry.kind===wizard.triggerKind);
+    return choice?t(choice.label):"";
+  };
+  // Kapalı satıra basınca o soru yeniden açılır; seçim silinmez, yalnız seçenekler geri gelir.
+  function openAutomationBlock(id){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    cancelAutomationAdvance();
+    wizard.open=id;
+    renderAutomationWizard();
+    automationRevealOpenBlock();
+  }
+  // Yeni açılan soru görünüme gelsin ve kısaca vurgulansın: "ne geldi, ne kalktı" görünür olsun.
+  function automationRevealOpenBlock(){
+    const block=$("#automationBody .automation-open");
+    if(!block)return;
+    block.scrollIntoView({behavior:"smooth",block:"center"});
+    block.classList.add("flash");
+  }
+  // Pasif "İleri" sessiz kalmasın: neyin eksik olduğunu düğmenin yanında yazar.
+  const automationBlockedReason=wizard=>{
+    if(automationStepReady(wizard))return"";
+    if(wizard.step===1){
+      if(!wizard.triggerKind)return"automationNeedTrigger";
+      if(!automationDeviceKinds.includes(wizard.triggerKind))return"";
+      return wizard.triggerDeviceId?"automationNeedEvent":"automationNeedDevice";
+    }
+    if(wizard.step===2)return wizard.targetDeviceId?"automationNeedAction":"automationNeedTarget";
+    return automationMappingMode(wizard)?"automationNeedMap":"";
+  };
   function goToAutomationStep(step){
     const wizard=state.automationWizard;
     const target=Number(step);
@@ -4651,6 +4815,7 @@
     cancelAutomationAdvance();
     if(target===wizard.step||!automationStepUnlocked(wizard,target))return;
     wizard.step=target;
+    wizard.open=null;
     renderAutomationWizard();
   }
   function renderAutomationWizard(){
@@ -4667,20 +4832,25 @@
     $("#automationLead").textContent=t(paths?"automationPathLead":leads[wizard.step-1]);
     $("#automationBody").innerHTML=paths
       ?automationPathHtml()
-      :wizard.step===1?automationWhenHtml(wizard)
-      :wizard.step===2?automationThenHtml(wizard):automationReviewHtml(wizard);
+      :wizard.step===3?automationReviewHtml(wizard):automationBlocksHtml(wizard);
     if(stepChanged)automationScrollTop();
     automationBindBody();
     // İlk adımda dönülecek yer yok: düğme diyaloğu kapatır, o yüzden etiketi de "Vazgeç".
     // Alt öğe ekranındayken geri cihaz listesine döner, o yüzden orada etiket "Geri".
     $("#automationBack").textContent=t(wizard.step<=1&&!automationDetailOpen(wizard)?"cancel":"back");
-    // Aynı düğme hem üstte hem altta: uzun ekranda kaydetmek için kaydırmak gerekmiyor.
+    // Tek birincil eylem alttadır. Pasifse neden pasif olduğu yanında yazar.
     const label=t(wizard.step===3?"save":"next");
     const ready=automationStepReady(wizard);
     for(const next of automationNextButtons()){
       next.hidden=paths;
       next.textContent=label;
       next.disabled=!ready;
+    }
+    const hint=$("#automationNextHint");
+    if(hint){
+      const reason=paths?"":automationBlockedReason(wizard);
+      hint.textContent=reason?t(reason):"";
+      hint.hidden=!reason;
     }
   }
   function chooseAutomationPath(path){
@@ -4707,11 +4877,10 @@
     if(!wizard||!choice?.ready)return;
     if(wizard.triggerKind!==kind)automationClearTriggerDevice(wizard);
     wizard.triggerKind=kind;
+    // Tür seçildi: kartlar kapanır, sıradaki soru açılır.
+    wizard.open=null;
     renderAutomationWizard();
-    afterAutomationChoice(()=>{
-      const target=$("#automationBody .automation-time")||$("#automationBody .automation-picks");
-      if(target)target.scrollIntoView({behavior:"smooth",block:"center"});
-    });
+    afterAutomationChoice(automationRevealOpenBlock);
   }
   function automationClearTriggerDevice(wizard){
     wizard.triggerDeviceId=null;
@@ -4735,6 +4904,7 @@
     if(!wizard)return;
     automationClearTriggerDevice(wizard);
     wizard.triggerDeviceId=deviceId;
+    wizard.open=null;
     const device=state.devices.find(item=>item.id===deviceId)||null;
     if(automationMappingMode(wizard)){
       automationApplySingleChannel(wizard,device);
@@ -4742,8 +4912,7 @@
       renderAutomationWizard();
       afterAutomationChoice(()=>{
         if(automationTriggerReady(wizard)){nextAutomationStep();return}
-        const list=$("#automationBody .automation-events");
-        if(list)list.scrollIntoView({behavior:"smooth",block:"center"});
+        automationRevealOpenBlock();
       });
       return;
     }
@@ -4756,8 +4925,7 @@
     renderAutomationWizard();
     afterAutomationChoice(()=>{
       if(!unproven&&automationTriggerReady(wizard)){nextAutomationStep();return}
-      const list=$("#automationBody .automation-warning")||$("#automationBody .automation-events");
-      if(list)list.scrollIntoView({behavior:"smooth",block:"center"});
+      automationRevealOpenBlock();
     });
   }
   // Durum bildiren cihazda düğme yolundan "açılınca/kapanınca" yoluna geçiş: cihaz seçimi korunur.
@@ -4767,6 +4935,7 @@
     automationClearTriggerDevice(wizard);
     wizard.triggerKind="deviceState";
     wizard.triggerDeviceId=deviceId;
+    wizard.open=null;
     const device=state.devices.find(item=>item.id===deviceId)||null;
     automationApplySingleChannel(wizard,device);
     if(wizard.action?.deviceId===deviceId)wizard.action=null;
@@ -4774,8 +4943,7 @@
     renderAutomationWizard();
     afterAutomationChoice(()=>{
       if(automationTriggerReady(wizard)){nextAutomationStep();return}
-      const list=$("#automationBody .automation-events");
-      if(list)list.scrollIntoView({behavior:"smooth",block:"center"});
+      automationRevealOpenBlock();
     });
   }
   function chooseAutomationChannel(property){
@@ -4783,6 +4951,7 @@
     if(!wizard)return;
     wizard.triggerProperty=property;
     wizard.triggerEquals=null;
+    wizard.open=null;
     renderAutomationWizard();
     afterAutomationChoice(()=>{nextAutomationStep()});
   }
@@ -4794,6 +4963,7 @@
     // Seçim engellenmez ama uyarı bir kez daha yüzeye çıkar: kullanıcı sonucu bilerek ilerlesin.
     if(automationButtonUnproven(wizard,device))showToast(t("automationButtonUnprovenWarning"),true);
     automationApplyEvent(wizard,event);
+    wizard.open=null;
     renderAutomationWizard();
     afterAutomationChoice(()=>{nextAutomationStep()});
   }
@@ -4802,8 +4972,11 @@
     if(!wizard||!Number.isFinite(amount))return;
     if(unit==="hour")wizard.hour=(wizard.hour+amount+24)%24;
     else wizard.minute=(wizard.minute+amount+60)%60;
+    automationTouchTime(wizard);
     renderAutomationWizard();
   }
+  // Saat ayarlanırken blok kapanmasın: kullanıcı +/− tuşlarken altındaki seçenekler yerinde kalır.
+  const automationTouchTime=wizard=>{wizard.timeTouched=true;wizard.open="time"};
   function toggleAutomationDay(value){
     const wizard=state.automationWizard;
     if(!wizard)return;
@@ -4816,6 +4989,7 @@
         wizard.days=days.length?days:[day];
       }
     }
+    automationTouchTime(wizard);
     renderAutomationWizard();
   }
   // Hedefte de önce cihaz seçilir, sonra alt öğesi. Eşleme yolunda tek kanallı cihazda alt öğe
@@ -4828,12 +5002,10 @@
     if(!device)return;
     const controls=scope.targetControls(device);
     wizard.targetDeviceId=deviceId;
+    wizard.open=null;
     if(automationMappingMode(wizard)&&controls.length===1){chooseAutomationTarget(`${deviceId}|${controls[0].id}`);return}
     renderAutomationWizard();
-    afterAutomationChoice(()=>{
-      const list=$("#automationBody .automation-subitems");
-      if(list)list.scrollIntoView({behavior:"smooth",block:"center"});
-    });
+    afterAutomationChoice(automationRevealOpenBlock);
   }
   function chooseAutomationAction(token){
     const wizard=state.automationWizard;
@@ -4845,6 +5017,7 @@
     if(mode==="toggle"&&!automationCanToggle(control))return;
     const value=mode==="toggle"?control.valueToggle:automationControlValue(control,mode==="on");
     wizard.action={type:"device",deviceId,property:control.property,controlId:control.id,value};
+    wizard.open=null;
     renderAutomationWizard();
     afterAutomationChoice(()=>{nextAutomationStep()});
   }
@@ -4857,6 +5030,7 @@
     const control=device?automationControls(device).find(item=>item.id===controlId):null;
     if(!control)return;
     wizard.target={deviceId,property:control.property,controlId:control.id};
+    wizard.open=null;
     // Hedef "Değiştir"i desteklemiyorsa eşleme takip yönüne düşer.
     if(!automationCanToggle(control)){
       if(wizard.mapOn==="toggle")wizard.mapOn="on";
@@ -4887,10 +5061,13 @@
   function stepBackAutomation(){
     const wizard=state.automationWizard;
     cancelAutomationAdvance();
+    // Kullanıcı kapalı bir satırı yeniden açtıysa geri o satırı kapatır: seçim silinmez.
+    if(wizard?.open){wizard.open=null;renderAutomationWizard();return}
     // Alt öğe ekranından geri: adım değişmez, cihaz listesine dönülür.
     if(wizard&&automationDetailOpen(wizard)){automationPickBack(wizard.step===1?"trigger":"target");return}
     if(!wizard||wizard.step<=1){$("#automationDialog").close();return}
     wizard.step-=1;
+    wizard.open=null;
     renderAutomationWizard();
   }
   async function nextAutomationStep(){
@@ -4899,6 +5076,7 @@
     if(!wizard||wizard.step===0||!automationStepReady(wizard))return;
     if(wizard.step===3){await saveAutomationWizard();return}
     wizard.step+=1;
+    wizard.open=null;
     renderAutomationWizard();
   }
   // Sunucu döngüyü reddederse ham hata metni yerine anlaşılır bir cümle gösterilir (§8.2).
@@ -5468,7 +5646,6 @@
   bindBackdropClose("#simpleLinkDialog",".simple-link-modal",()=>$("#simpleLinkDialog").close());
   $("#automationBack").onclick=stepBackAutomation;
   $("#automationNext").onclick=nextAutomationStep;
-  $("#automationTopNext").onclick=nextAutomationStep;
   $("#automationDialog").addEventListener("close",()=>{cancelAutomationAdvance();state.automationWizard=null});
   bindBackdropClose("#automationDialog",".automation-modal",()=>$("#automationDialog").close());
   $("#closeAutomationActions").onclick=()=>$("#automationActionDialog").close();

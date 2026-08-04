@@ -566,7 +566,7 @@ test("dokunmatik tablette bütün diyaloglar ekranı doldurur, masaüstünde ort
   assert.match(dashboard, /dialog\.automation-dialog::backdrop\{background:rgba\(12,26,20,\.94\)/);
   // Dikey padding değişmiyor: yapışkan başlık/eylem şeritlerinin -24px kaydırması yerinde kalır.
   assert.doesNotMatch(dashboard, /dialog>\.modal\{[^}]*padding:\d/);
-  assert.match(dashboard, /\.automation-progress\{position:sticky;top:-24px/);
+  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px/);
 });
 
 test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekler", async () => {
@@ -1614,9 +1614,9 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /api\(`\/api\/automations\/\$\{encodeURIComponent\(id\)\}\/run`,\{method:"POST"\}\)/);
 
   // Sihirbaz gezinmesi: sabit ileri/geri şeridi, adım göstergesi, otomatik ilerleme.
-  assert.match(dashboard, /<div class="modal-actions automation-actions"><button id="automationBack" class="secondary" type="button" data-i18n="back">/);
+  assert.match(dashboard, /<div class="modal-actions automation-actions"><p id="automationNextHint" class="automation-next-hint" hidden><\/p><button id="automationBack" class="secondary" type="button" data-i18n="back">/);
   assert.match(dashboard, /id="automationBack"[\s\S]*?id="automationNext" class="primary"/);
-  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px;z-index:2;justify-content:space-between/);
+  assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px;z-index:2;flex-wrap:wrap;justify-content:space-between/);
   assert.match(dashboard, /\.automation-actions button\{min-width:132px;min-height:52px/);
   assert.match(dashboard, /back:"Geri"/);
   assert.match(dashboard, /next:"İleri"/);
@@ -1640,7 +1640,8 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   // Tek dokunuşluk seçimler ~200 ms sonra kendiliğinden ilerler.
   assert.match(dashboard, /automationAdvanceTimer=setTimeout\(\(\)=>\{automationAdvanceTimer=null;run\(\)\},200\)/);
   assert.match(dashboard, /data-automation-trigger\]"\)\.forEach\(button=>button\.onclick=\(\)=>chooseAutomationTrigger\(button\.dataset\.automationTrigger\)\)/);
-  assert.match(dashboard, /wizard\.triggerKind=kind;\s*renderAutomationWizard\(\);\s*afterAutomationChoice\(/);
+  // Tür seçilince kartlar kapanır (blok açığı temizlenir) ve sıradaki soru açılır.
+  assert.match(dashboard, /wizard\.triggerKind=kind;[\s\S]{0,120}?wizard\.open=null;\s*renderAutomationWizard\(\);\s*afterAutomationChoice\(automationRevealOpenBlock\);/);
   assert.match(dashboard, /afterAutomationChoice\(\(\)=>\{nextAutomationStep\(\)\}\)/);
   // Ayar isteyen dokunuşlarda (saat, gün, sekme, arama, eşleme formu) otomatik ilerleme yok: sayılı
   // çağrı yeri var (tanım + tetikleyici türü + cihaz seçimi ×3 + kanal + olay + hedef + eylem +
@@ -1690,7 +1691,7 @@ test("sihirbaz akışı solda tıklanabilir adım rayıyla gösterir", async () 
   // Tamamlanan ve aktif adıma atlama; kilitli adım sessizce reddedilir.
   assert.match(
     dashboard,
-    /function goToAutomationStep\(step\)\{[\s\S]*?cancelAutomationAdvance\(\);\s*if\(target===wizard\.step\|\|!automationStepUnlocked\(wizard,target\)\)return;\s*wizard\.step=target;\s*renderAutomationWizard\(\);/
+    /function goToAutomationStep\(step\)\{[\s\S]*?cancelAutomationAdvance\(\);\s*if\(target===wizard\.step\|\|!automationStepUnlocked\(wizard,target\)\)return;\s*wizard\.step=target;\s*wizard\.open=null;\s*renderAutomationWizard\(\);/
   );
   // Adım değişince gövde başa sarar (ray ile atlarken de).
   assert.match(dashboard, /if\(stepChanged\)automationScrollTop\(\);/);
@@ -1744,7 +1745,9 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   // Üç yeni yol açık, gün doğumu hâlâ "yakında".
   assert.match(dashboard, /\{kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:false\}/);
   assert.match(dashboard, /const automationDeviceKinds=\["button","sensor","deviceState"\]/);
-  assert.match(dashboard, /if\(automationDeviceKinds\.includes\(wizard\.triggerKind\)\)return`<div class="automation-triggers">\$\{triggers\}<\/div>\$\{automationTriggerPickHtml\(wizard\)\}`/);
+  // Tür kartları kendi bloğunda; cihaz sorusu ayrı bir blok olarak sıraya girer.
+  assert.match(dashboard, /else if\(automationDeviceKinds\.includes\(wizard\.triggerKind\)\)\{/);
+  assert.match(dashboard, /body:\(\)=>automationPickerHtml\(wizard,"trigger"\)/);
 
   // Cihaz seçimi kart ızgarası, açılır liste değil; dokunma hedefi 88 px.
   assert.match(dashboard, /data-automation-trigger-device="\$\{esc\(device\.id\)\}"/);
@@ -2045,7 +2048,9 @@ test("düğme tetikleyicisi cihazın gerçekten basış yayıp yaymadığına da
   // Uyarı okunmadan adım atlanmasın: kanıtsız cihazda sessiz seçim ve otomatik ilerleme kapalı.
   assert.match(dashboard, /if\(events\.length===1&&!unproven\)automationApplyEvent\(wizard,events\[0\]\);/);
   assert.match(dashboard, /if\(!unproven&&automationTriggerReady\(wizard\)\)\{nextAutomationStep\(\);return\}/);
-  assert.match(dashboard, /const list=\$\("#automationBody \.automation-warning"\)\|\|\$\("#automationBody \.automation-events"\);/);
+  // Kanıtsız cihazda blok kapanmaz: uyarı ve alternatif açık kalır, ekran o bloğa kayar.
+  assert.match(dashboard, /force:automationButtonUnproven\(wizard,detail\)/);
+  assert.match(dashboard, /if\(!unproven&&automationTriggerReady\(wizard\)\)\{nextAutomationStep\(\);return\}\s*automationRevealOpenBlock\(\);/);
 
   // Asıl değerli kısım: durum bildiren cihazda tek dokunuşla "açılınca/kapanınca" yoluna geçiş.
   assert.match(dashboard, /const alternative=unproven&&automationTriggerEvents\(device,"deviceState"\)\.length>0/);
@@ -2205,7 +2210,9 @@ test("sihirbaz cihazı elemek yerine sekme ve aramayla buldurur", async () => {
   // Dokunmatik hedefler: sekme 44 px, arama kutusu 52 px.
   assert.match(dashboard, /\.automation-tab\{min-height:44px/);
   assert.match(dashboard, /\.automation-search \.search\{width:100%;min-height:52px;font-size:16px\}/);
-  assert.match(dashboard, /\.automation-tabs\{[^}]*overflow-x:auto/);
+  // Sekmeler kırpılmasın: sığmayan sekme sağdan kesilmek yerine alt satıra sarar.
+  assert.match(dashboard, /\.automation-tabs\{[^}]*flex-wrap:wrap/);
+  assert.doesNotMatch(dashboard, /\.automation-tabs\{[^}]*overflow-x:auto/);
 
   // Arama hem tetikleyici hem hedef adımında aynı kutudan gelir ve yalnız listeyi tazeler.
   assert.match(dashboard, /data-automation-search="\$\{scope\}"/);
@@ -2234,14 +2241,15 @@ test("sihirbaz cihazı elemek yerine sekme ve aramayla buldurur", async () => {
   assert.equal(picker.automationSearchMatches(light, "koridor"), false);
   assert.equal(picker.automationSearchMatches(other, "oturma"), false);
 
-  // İki adımlı seçim: cihaz seçilince ekran alt öğelere geçer, başlıkta cihazın adı ve geri düğmesi olur.
-  assert.match(dashboard, /const automationPickHeadHtml=\(device,scope\)=>`<div class="automation-subhead">/);
+  // İki adımlı seçim: cihaz seçilince liste kapanır, yerine tek satırlık "seçildi" satırı gelir.
+  // "Değiştir" cihaz listesine döner; satırın kendisi düğmedir ve aria-expanded taşır.
+  assert.match(dashboard, /const automationPickHeadHtml=\(device,scope\)=>automationDoneRow\(/);
   assert.match(dashboard, /data-automation-pick-back="\$\{scope\}"/);
-  assert.match(dashboard, /<span class="automation-subhead-copy"><strong>\$\{esc\(device\.name\)\}<\/strong><small>\$\{esc\(deviceKind\(device\)\)\}<\/small><\/span>/);
+  assert.match(dashboard, /automationRailJoin\(device\.name,deviceKind\(device\)\)/);
   assert.match(dashboard, /automationPickParts:"\{device\} düğmeleri ve kanalları"/);
   assert.match(dashboard, /automationPickParts:"Buttons and channels of \{device\}"/);
-  assert.match(dashboard, /automationPickBack:"Cihaz listesine dön"/);
-  assert.match(dashboard, /\.automation-subback\{width:48px;height:48px/);
+  assert.match(dashboard, /\.automation-done-row\{width:100%;min-height:60px/);
+  assert.doesNotMatch(dashboard, /automation-subhead|automation-subback/);
 
   // Tek alt öğeli cihazda bu adım atlanır: tetikleyicide olay tek ise ekran hiç açılmaz,
   // eşleme yolunda tek kanallı hedef doğrudan seçilip ilerlenir.
@@ -2420,26 +2428,35 @@ test("otomasyon kartı tek dokunuşla düzenlemeyi açar, çalıştır ve sil g�
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
 
-test("sihirbazda kaydet düğmesi hem üstte hem altta erişilebilir", async () => {
+test("sihirbazda tek birincil eylem var ve pasifken nedenini söylüyor", async () => {
   const dashboard = await readDashboardBundle();
 
-  // Üstte ikinci bir İleri/Kaydet düğmesi; başlık şeridi yapışkan, uzun ekranda kaybolmuyor.
-  assert.match(dashboard, /<button id="automationTopNext" class="primary automation-top-next" type="button" data-i18n="next">Next<\/button>/);
-  assert.match(dashboard, /\.automation-progress\{position:sticky;top:-24px;z-index:2/);
-  assert.match(dashboard, /\.automation-top-next\{min-width:120px;min-height:48px/);
-  // Alt eylem şeridi de yapışkan kalmaya devam ediyor.
+  // Üstteki kopya İleri/Kaydet kaldırıldı: hangi düğmenin asıl eylem olduğu belirsiz kalmıyor.
+  assert.doesNotMatch(dashboard, /automationTopNext/);
+  assert.doesNotMatch(dashboard, /automation-top-next/);
+  assert.doesNotMatch(dashboard, /automation-progress/);
+  assert.equal(dashboard.match(/id="automation(?:Top)?Next"/g)?.length, 1);
+  // Tek birincil eylem altta ve yapışkan şeritte kalıyor.
   assert.match(dashboard, /\.automation-actions\{position:sticky;bottom:-24px/);
-
-  // Tek davranış, iki düğme: metin, kilit ve tıklama aynı.
-  assert.match(dashboard, /const automationNextButtons=\(\)=>\[\$\("#automationTopNext"\),\$\("#automationNext"\)\]\.filter\(Boolean\)/);
+  assert.match(dashboard, /const automationNextButtons=\(\)=>\[\$\("#automationNext"\)\]\.filter\(Boolean\)/);
   assert.match(dashboard, /const label=t\(wizard\.step===3\?"save":"next"\);/);
-  // Yol seçimi adımında ilerlenecek bir şey yok: iki düğme de gizlenir.
+  // Yol seçimi adımında ilerlenecek bir şey yok: düğme gizlenir.
   assert.match(dashboard, /for\(const next of automationNextButtons\(\)\)\{\s*next\.hidden=paths;\s*next\.textContent=label;\s*next\.disabled=!ready;\s*\}/);
-  assert.match(dashboard, /\.automation-progress button\[hidden\]\{display:none\}/);
-  assert.match(dashboard, /\$\("#automationNext"\)\.onclick=nextAutomationStep;\s*\$\("#automationTopNext"\)\.onclick=nextAutomationStep;/);
-  // Kayıt sırasında ikisi de kilitlenir, hata olursa ikisi de açılır.
+  assert.match(dashboard, /\$\("#automationNext"\)\.onclick=nextAutomationStep;/);
+  // Kayıt sırasında kilitlenir, hata olursa açılır.
   assert.match(dashboard, /const buttons=automationNextButtons\(\);\s*buttons\.forEach\(button=>\{button\.disabled=true\}\);/);
   assert.match(dashboard, /buttons\.forEach\(button=>\{button\.disabled=false\}\);showToast\(automationErrorText\(error\),true\)/);
+
+  // Sessiz pasif düğme yok: eksik olan şey düğmenin yanında yazıyor.
+  assert.match(dashboard, /<p id="automationNextHint" class="automation-next-hint" hidden><\/p>/);
+  assert.match(dashboard, /const reason=paths\?"":automationBlockedReason\(wizard\);\s*hint\.textContent=reason\?t\(reason\):"";\s*hint\.hidden=!reason;/);
+  assert.match(dashboard, /automationNeedTrigger:"Kuralı neyin başlatacağını seçin\."/);
+  assert.match(dashboard, /automationNeedTrigger:"Pick what should start the rule\."/);
+  assert.match(dashboard, /automationNeedDevice:"Önce cihazı seçin\."/);
+  assert.match(dashboard, /automationNeedEvent:"Pick which button or event starts it\."/);
+  assert.match(dashboard, /automationNeedTarget:"Çalışacak cihazı seçin\."/);
+  assert.match(dashboard, /automationNeedAction:"Pick what it should do\."/);
+  assert.match(dashboard, /automationNeedMap:"En az bir iş seçin\."/);
 
   // Faz 1'in Geri/İleri deseni bozulmadı: Geri düğmesi yerinde.
   assert.match(dashboard, /<button id="automationBack" class="secondary" type="button" data-i18n="back">Back<\/button>/);
@@ -2765,6 +2782,8 @@ type WizardHarness = {
   scroll: () => number;
   setScroll: (value: number) => void;
   wizard: () => Record<string, unknown>;
+  body: () => string;
+  state: Record<string, unknown>;
   api: Record<string, (...args: unknown[]) => unknown>;
 };
 
@@ -2848,7 +2867,8 @@ async function automationWizardHarness(): Promise<WizardHarness> {
     `${source.slice(start, end)}\n`
     + "return{openAutomationWizard,chooseAutomationPath,chooseAutomationTrigger,chooseAutomationTriggerDevice,"
     + "chooseAutomationEvent,chooseAutomationTargetDevice,chooseAutomationAction,chooseAutomationAutoOff,"
-    + "goToAutomationStep,automationStepUnlocked,automationRailSteps};"
+    + "goToAutomationStep,automationStepUnlocked,automationRailSteps,openAutomationBlock,automationPickBack,"
+    + "setAutomationAutoOffMinutes,openAutomationAutoOffCustom,automationBlockedReason};"
   )(...names.map((name) => stubs[name])) as Record<string, (...args: unknown[]) => unknown>;
   return {
     bodies,
@@ -2856,9 +2876,143 @@ async function automationWizardHarness(): Promise<WizardHarness> {
     scroll: () => (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop,
     setScroll: (value: number) => { (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop = value; },
     wizard: () => state.automationWizard as Record<string, unknown>,
+    body: () => bodies[bodies.length - 1],
+    state,
     api
   };
 }
+
+// Sihirbazın asıl kusuru: seçim yapılınca seçenekler kapanmıyordu, sayfa her tıklamada büyüyordu.
+// Artık cevaplanan soru tek satırlık "seçildi" satırına iner ve ekranda tek soru açık kalır.
+test("sihirbazda seçim yapılınca o soru kapanır, ekranda tek soru açık kalır", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+
+  // 1. soru: tetikleyici türü. Cihaz listesi henüz yok — sırası gelmemiş soru hiç basılmaz.
+  assert.match(harness.body(), /data-automation-trigger="sensor"/);
+  assert.doesNotMatch(harness.body(), /data-automation-trigger-device=/);
+
+  // Tür seçilince beş kart kapanır: yerine tek satır gelir, altında yalnız cihaz sorusu açılır.
+  api.chooseAutomationTrigger("sensor");
+  assert.doesNotMatch(harness.body(), /data-automation-trigger="sensor"/);
+  assert.match(harness.body(), /data-automation-open-block="kind" aria-expanded="false"/);
+  assert.match(harness.body(), /automationTriggerSensor/);
+  assert.match(harness.body(), /data-automation-trigger-device="0x0022"/);
+
+  // Cihaz seçilince kart ızgarası da kapanır: kalan tek açık soru olayın kendisi.
+  api.chooseAutomationTriggerDevice("0x0022");
+  assert.doesNotMatch(harness.body(), /data-automation-trigger-device=/);
+  assert.match(harness.body(), /data-automation-pick-back="trigger" aria-expanded="false"/);
+  assert.match(harness.body(), /data-automation-event="occupancy=true"/);
+  assert.equal(harness.body().match(/class="automation-open"/g)?.length, 1);
+
+  // "Değiştir": kapalı satır geri açılır, seçim silinmez, diğer sorular kapalı satır olarak kalır.
+  api.openAutomationBlock("kind");
+  assert.match(harness.body(), /data-automation-trigger="sensor"/);
+  assert.equal(harness.wizard().triggerDeviceId, "0x0022");
+  assert.equal(harness.body().match(/class="automation-open"/g)?.length, 1);
+
+  // Cihaz satırının "Değiştir"i listeye döner ve seçimi temizler.
+  api.automationPickBack("trigger");
+  assert.equal(harness.wizard().triggerDeviceId, null);
+  assert.match(harness.body(), /data-automation-trigger-device="0x0022"/);
+  assert.doesNotMatch(harness.body(), /data-automation-event=/);
+
+  // Hedef adımı da iki soruludur: cihaz seçilince liste kapanır, kanal soruları açılır.
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  assert.equal(harness.wizard().step, 2);
+  assert.match(harness.body(), /data-automation-target-device="0x0011"/);
+  api.chooseAutomationTargetDevice("0x0011");
+  assert.doesNotMatch(harness.body(), /data-automation-target-device=/);
+  assert.match(harness.body(), /data-automation-pick-back="target" aria-expanded="false"/);
+  assert.match(harness.body(), /data-automation-action="0x0011\|switch:state\|on"/);
+});
+
+// Düzenleme akışı: her şey zaten seçilidir, o yüzden bütün sorular kapalı satır olarak açılır.
+test("kayıtlı kural düzenlenirken bütün sorular kapalı satır olarak gelir", async () => {
+  const harness = await automationWizardHarness();
+  (harness.state.automations as unknown[]).push({
+    id: "rule1",
+    name: "Koridor",
+    enabled: true,
+    triggers: [{ type: "deviceState", deviceId: "0x0022", property: "occupancy", equals: true }],
+    conditions: [],
+    actions: [{ type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON" }]
+  });
+  harness.api.openAutomationWizard("rule1");
+
+  assert.equal(harness.wizard().step, 1);
+  // Hiçbir seçenek listesi basılmaz: yalnız kapalı satırlar.
+  assert.doesNotMatch(harness.body(), /class="automation-open"/);
+  assert.doesNotMatch(harness.body(), /data-automation-trigger="/);
+  assert.doesNotMatch(harness.body(), /data-automation-trigger-device=/);
+  assert.match(harness.body(), /data-automation-open-block="kind" aria-expanded="false"/);
+  assert.match(harness.body(), /data-automation-pick-back="trigger" aria-expanded="false"/);
+  assert.match(harness.body(), /data-automation-open-block="event" aria-expanded="false"/);
+
+  // Hedef adımı da kapalı gelir; "sonra kapat" da tek satıra iner.
+  harness.api.goToAutomationStep(2);
+  assert.doesNotMatch(harness.body(), /class="automation-open"/);
+  harness.api.goToAutomationStep(3);
+  assert.doesNotMatch(harness.body(), /data-automation-autooff="none"/);
+  assert.match(harness.body(), /data-automation-open-block="autooff" aria-expanded="false"/);
+  harness.api.openAutomationBlock("autooff");
+  assert.match(harness.body(), /data-automation-autooff="none"/);
+});
+
+// Aynı değeri iki ayrı yoldan girme kalktı: hazır süre çipleri asıl yol, sayaç yalnız "Başka süre".
+test("otomatik kapatma süresi tek yoldan girilir", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("after");
+
+  // Hazır çipler var, sayaç yok.
+  assert.match(harness.body(), /data-automation-autooff-minutes="5"/);
+  assert.match(harness.body(), /data-automation-autooff-custom="1"/);
+  assert.doesNotMatch(harness.body(), /data-automation-autooff-step=/);
+
+  // "Başka süre" seçilince sayaç açılır, çipler seçili görünmez.
+  api.openAutomationAutoOffCustom();
+  assert.match(harness.body(), /data-automation-autooff-step="1"/);
+  assert.match(harness.body(), /data-automation-autooff-custom="1" aria-pressed="true"/);
+
+  // Hazır çipe dönülünce sayaç yeniden kapanır.
+  api.setAutomationAutoOffMinutes(10, false);
+  assert.equal(harness.wizard().autoOffMinutes, 10);
+  assert.doesNotMatch(harness.body(), /data-automation-autooff-step=/);
+});
+
+// Pasif birincil düğme sessiz kalmaz: eksik olan şeyi söyler.
+test("ileri düğmesi pasifken nedenini söyler", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  const reason = () => api.automationBlockedReason(harness.wizard());
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  assert.equal(reason(), "automationNeedTrigger");
+  api.chooseAutomationTrigger("sensor");
+  assert.equal(reason(), "automationNeedDevice");
+  api.chooseAutomationTriggerDevice("0x0022");
+  assert.equal(reason(), "automationNeedEvent");
+  api.chooseAutomationEvent("occupancy=true");
+  assert.equal(harness.wizard().step, 2);
+  assert.equal(reason(), "automationNeedTarget");
+  api.chooseAutomationTargetDevice("0x0011");
+  assert.equal(reason(), "automationNeedAction");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  assert.equal(harness.wizard().step, 3);
+  assert.equal(reason(), "");
+});
 
 // Yeni kural kurarken (kayıtlı kuralı düzenlerken değil) özet adımı seçenekleri gösterir ve adım
 // değişince gövde başa sarar — seçenekler bir önceki adımın kaydırmasında saklı kalmaz.
