@@ -268,7 +268,7 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /\$\{deviceDetailPhoto\(device\)\}/);
   assert.match(dashboard, /const mediaHtml=`<div class="device-detail-media">\$\{photoHtml\}\$\{factsHtml\}\$\{rolesHtml\}<\/div>`/);
   assert.match(dashboard, /\.device-detail-roles \.control-select\{min-width:0;max-width:100%\}/);
-  assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls"><div class="controls">\$\{device\.controls\.length\?/);
+  assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls"><div class="controls">\$\{controlsBodyHtml\|\|/);
   assert.match(dashboard, /#devices \.page-head \.lead,#home \.page-head \.lead\{display:none\}/);
   assert.match(dashboard, /<p class="lead" data-i18n="devicesLead">/);
   assert.match(dashboard, /<div class="card-actions card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="\$\{esc\(device\.id\)\}">/);
@@ -1778,7 +1778,17 @@ test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla göste
   // Bölüm yalnızca sunucu düğme türettiyse çıkar; boş listede hiç render edilmez.
   assert.match(dashboard, /const deviceButtonsHtml=device=>\{\s*const buttons=device\.buttons\|\|\[\];\s*if\(!buttons\.length\)return"";/);
   assert.match(dashboard, /<div class="device-buttons"><div class="device-buttons-head">\$\{t\("deviceButtons"\)\}<\/div>\$\{deviceButtonLastLine\(device\)\}\$\{rows\}<\/div>/);
-  assert.match(dashboard, /\$\{deviceButtonsHtml\(device\)\}\s*\$\{deviceRoomsHtml\(device\)\}/);
+  // Düğmeler kontrol sütununun içinde, kontrollerin altında durur; ayrı bir alt blokta tekrarlanmaz.
+  assert.match(
+    dashboard,
+    /const controlsBodyHtml=device\.controls\.map\(control=>controlHtml\(device,control\)\)\.join\(""\)\+deviceButtonsHtml\(device\);/
+  );
+  assert.match(
+    dashboard,
+    /<div class="device-detail-controls"><div class="controls">\$\{controlsBodyHtml\|\|`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\}<\/div><\/div>/
+  );
+  assert.doesNotMatch(dashboard, /\$\{deviceButtonsHtml\(device\)\}\s*\$\{deviceRoomsHtml\(device\)\}/);
+  assert.match(dashboard, /\.device-detail-controls \.controls>\.device-buttons\{margin-top:0\}/);
 
   // Her düğme kendi satırında: ad + desteklediği basışlar.
   assert.match(dashboard, /<div class="device-button-row\$\{deviceButtonPressed\(device,button\)\?" pressed":""\}" data-device-button="\$\{esc\(button\.id\)\}">/);
