@@ -59,7 +59,8 @@ const switchDiscovery = (
     payload_on: JSON.stringify({ [control.property]: control.valueOn ?? "ON" }),
     payload_off: JSON.stringify({ [control.property]: control.valueOff ?? "OFF" }),
     state_on: control.valueOn ?? "ON",
-    state_off: control.valueOff ?? "OFF"
+    state_off: control.valueOff ?? "OFF",
+    entity_category: control.adminOnly ? "config" : undefined
   });
 };
 

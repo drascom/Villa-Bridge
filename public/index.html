@@ -662,10 +662,13 @@
   // Alt yazı önce sunucunun sınıfına bakar (tahmin ya da kullanıcının seçtiği rol); sınıf
   // belirsizse eski kontrol tabanlı yedeğe düşer, böylece hiçbir cihaz etiketsiz kalmaz.
   const deviceCategoryLabels={light:"lightDevice",switch:"switchDevice",cover:"coverDevice",climate:"climateDevice",lock:"lockDevice",fan:"fanDevice"};
+  // Sınıfı yalnız ana kontroller belirler: `find_switch` gibi ayar niteliğindeki (adminOnly)
+  // aç/kapa alanları sayılmaz, yoksa bir varlık sensörü "Controller" diye etiketlenir.
+  const hasMainControl=(device,...kinds)=>device.controls.some(control=>kinds.includes(control.kind)&&control.adminOnly!==true);
   const deviceKind=device=>{
     const labelled=deviceCategoryLabels[device.category];
-    if(labelled&&!device.controls.some(control=>control.kind==="siren"))return t(labelled);
-    return device.controls.some(control=>control.kind==="cover"||control.kind==="position")?t("coverDevice"):device.controls.some(control=>control.kind==="climate")?t("climateDevice"):device.controls.some(control=>control.kind==="lock")?t("lockDevice"):device.controls.some(control=>control.kind==="fan")?t("fanDevice"):device.controls.some(control=>control.kind==="siren")?t("sirenDevice"):device.controls.some(control=>control.kind==="switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
+    if(labelled&&!hasMainControl(device,"siren"))return t(labelled);
+    return hasMainControl(device,"cover","position")?t("coverDevice"):device.controls.some(control=>control.kind==="climate")?t("climateDevice"):hasMainControl(device,"lock")?t("lockDevice"):hasMainControl(device,"fan")?t("fanDevice"):hasMainControl(device,"siren")?t("sirenDevice"):hasMainControl(device,"switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
   };
   // Bir kanal gösteriliyorsa sınıf o kanalın rolünden gelir: çok kanallı anahtarda bir kanal
   // lamba, diğeri priz olabilir. Kanal yoksa cihazın (kanallardan türetilen) sınıfı kullanılır.

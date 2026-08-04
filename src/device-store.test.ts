@@ -204,6 +204,67 @@ test("iç içe cihaz expose bilgisi tip, aralık ve admin kategorisini korur", (
   );
 });
 
+test("varlık sensörünün ayar anahtarı ana kontrol ya da kanal sayılmaz", () => {
+  // ZY-M100 sınıfı mmWave sensörün gerçek expose kümesi: hiçbir özellik tipli bir expose'un
+  // (light/switch/…) içinde değil, `category` alanı da yok. `find_switch` cihazı fiziksel olarak
+  // bulmaya yarayan bir ayardır; cihazın asıl işlevi varlık algılamadır.
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xradar",
+    friendly_name: "Koridor Detektor",
+    type: "Router",
+    definition: {
+      model: "ZY-M100-24GV3",
+      exposes: [
+        { type: "enum", name: "state", property: "state", access: 1, values: ["none", "presence", "move"] },
+        { type: "binary", name: "presence", property: "presence", access: 1, value_on: true, value_off: false },
+        { type: "binary", name: "find_switch", property: "find_switch", access: 3, value_on: "ON", value_off: "OFF" },
+        { type: "numeric", name: "presence_timeout", property: "presence_timeout", access: 3, value_min: 1, value_max: 15000 }
+      ]
+    }
+  }])));
+  store.ingest("Koridor Detektor", Buffer.from('{"state":"presence","presence":true,"find_switch":"OFF","presence_timeout":5}'));
+
+  const device = store.getDevices()[0];
+  const find = device.controls.find((control) => control.property === "find_switch");
+  assert.ok(find, "ayar erişilebilir kalmalı");
+  assert.equal(find.adminOnly, true);
+  // Ayar bir kanal değildir: rol taşımaz ve cihaz sınıfını belirlemez.
+  assert.equal(find.role, undefined);
+  assert.equal(find.category, undefined);
+  assert.equal(device.category, "unknown");
+  assert.equal(device.detectedCategory, "unknown");
+});
+
+test("kullanıcının seçtiği kanal rolü ayar satırlarından etkilenmez", () => {
+  const store = new DeviceStore(new Map(), undefined, [], undefined, new Map([["0xpriz", "switch"]]));
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0xpriz",
+    friendly_name: "Priz",
+    type: "Router",
+    definition: {
+      model: "TS011F",
+      exposes: [
+        {
+          type: "switch",
+          name: "switch",
+          features: [{ type: "binary", name: "state", property: "state", access: 7, value_on: "ON", value_off: "OFF" }]
+        },
+        { type: "binary", name: "child_lock", property: "child_lock", access: 3, value_on: "LOCK", value_off: "UNLOCK" }
+      ]
+    }
+  }])));
+  store.ingest("Priz", Buffer.from('{"state":"ON","child_lock":"UNLOCK"}'));
+
+  const controls = store.getDevices()[0].controls;
+  const main = controls.find((control) => control.id === "main");
+  assert.equal(main?.adminOnly, false);
+  assert.equal(main?.role, "switch");
+  assert.equal(main?.category, "switch");
+  assert.equal(controls.find((control) => control.property === "child_lock")?.adminOnly, true);
+  assert.equal(store.getDevices()[0].category, "switch");
+});
+
 test("önemli cihaz hareketleri kısa geçmişte tutulur, sinyal gürültüsü tutulmaz", () => {
   const store = new DeviceStore(new Map());
   store.ingest("Hall Button", Buffer.from('{"action":"single","linkquality":120}'));

@@ -2834,3 +2834,42 @@ test("sonra kapat seçenekleri yalnız açan eylemde ve karşıtı olan tetikley
   assert.match(review, /data-automation-autooff="after"/);
   assert.doesNotMatch(review, /data-automation-autooff="idle"/);
 });
+
+test("cihaz sınıfı ayar niteliğindeki aç/kapa alanlarını saymaz", async () => {
+  const dashboard = await readDashboardBundle();
+  const source = dashboardScripts(dashboard);
+  const start = source.indexOf("const deviceCategoryLabels=");
+  const end = source.indexOf("const deviceIconKind=");
+  assert.ok(start > 0 && end > start);
+  const deviceKind = new Function(
+    "t",
+    `${source.slice(start, end)}return deviceKind;`
+  )((key: string) => key) as (device: {
+    category?: string | null;
+    features: string[];
+    controls: Array<{ kind: string; adminOnly?: boolean }>;
+  }) => string;
+
+  // Yalnız ayar niteliğinde (adminOnly) bir aç/kapa taşıyan varlık sensörü "Controller" değildir.
+  assert.equal(
+    deviceKind({ category: null, features: ["presence"], controls: [{ kind: "switch", adminOnly: true }] }),
+    "motionSensor"
+  );
+  // Ayar niteliğindeki perde/kilit/fan/siren alanları da sınıfı çalmaz.
+  for (const kind of ["cover", "lock", "fan", "siren"]) {
+    assert.equal(deviceKind({ category: null, features: ["occupancy"], controls: [{ kind, adminOnly: true }] }), "motionSensor");
+  }
+  // Ayar niteliğindeki siren, sunucunun verdiği sınıfı da bozmaz.
+  assert.equal(
+    deviceKind({ category: "light", features: [], controls: [{ kind: "siren", adminOnly: true }] }),
+    "lightDevice"
+  );
+  // Gerçek ana kontroller eskisi gibi sınıfı belirler.
+  assert.equal(deviceKind({ category: null, features: [], controls: [{ kind: "switch" }] }), "controller");
+  assert.equal(deviceKind({ category: null, features: [], controls: [{ kind: "cover" }] }), "coverDevice");
+  assert.equal(deviceKind({ category: null, features: [], controls: [{ kind: "siren" }] }), "sirenDevice");
+  assert.equal(
+    deviceKind({ category: null, features: ["presence"], controls: [{ kind: "switch", adminOnly: true }, { kind: "switch" }] }),
+    "controller"
+  );
+});

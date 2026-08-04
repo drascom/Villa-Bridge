@@ -1,6 +1,7 @@
 import type {
   BridgeDevice,
   BridgeGroup,
+  DeviceControlView,
   DeviceEventView,
   DeviceView,
   GroupView,
@@ -449,8 +450,12 @@ export class DeviceStore {
         // Rol kanal başınadır: her aç/kapa kanalı kendi sınıfını taşır, kanalın kaydı yoksa eski
         // cihaz seviyesi kayda düşer. Cihazın tek sınıfı gerektiğinde kanallardan türetilir —
         // lamba anahtarı yener, çünkü "anahtar" her açılıp kapanan kanalda çıkar.
+        // Cihaz ayarı olarak işaretlenen aç/kapa satırları kanal değildir ("cihazı bul", çocuk
+        // kilidi gibi): rol taşımazlar ve cihazın sınıfını belirlemezler.
+        const isChannelControl = (control: DeviceControlView): boolean =>
+          control.kind === "switch" && control.adminOnly !== true;
         const controls = deviceControls(id, name, writable, stateValue, this.aliases).map((control) => {
-          if (control.kind !== "switch") return control;
+          if (!isChannelControl(control)) return control;
           const channelRole = resolveChannelRole(this.roles, id, control.id);
           return {
             ...control,
@@ -460,7 +465,7 @@ export class DeviceStore {
           };
         });
         const channelCategories = controls
-          .filter((control) => control.kind === "switch")
+          .filter(isChannelControl)
           .map((control) => control.category);
         const effectiveRole: DeviceRole = channelCategories.includes("light")
           ? "light"

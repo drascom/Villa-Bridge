@@ -153,6 +153,62 @@ test("cihaz yapılandırma alanları admin kontrolü olarak işaretlenir", () =>
   assert.equal(delay.adminOnly, true);
 });
 
+test("tipli expose'a bağlı olmayan ikili özellik ana kontrol değil, cihaz ayarıdır", () => {
+  // Varlık sensörü: `find_switch` üst düzeyde duran jenerik bir `binary` expose — cihazı fiziksel
+  // olarak bulmaya yarayan bir ayar. Tanım `category` alanını doldurmuyor; ölçüt, onu sarmalayan
+  // tipli bir expose'un (light/switch/…) bulunmaması.
+  const controls = deviceControls(
+    "0xradar",
+    "Koridor Detektor",
+    [
+      { property: "find_switch", name: "find_switch", type: "binary", valueOn: "ON", valueOff: "OFF" },
+      { property: "presence_timeout", name: "presence_timeout", type: "numeric", min: 1, max: 15000, unit: "s" }
+    ],
+    { find_switch: "OFF", presence: true, presence_timeout: 5 },
+    new Map()
+  );
+
+  const find = controls.find((control) => control.property === "find_switch");
+  // Ayar kaybolmaz: hâlâ kumanda edilebilir bir satır, yalnız ana kontrol değil.
+  assert.ok(find);
+  assert.equal(find.kind, "switch");
+  assert.equal(find.adminOnly, true);
+  assert.equal(controls.find((control) => control.property === "presence_timeout")?.adminOnly, true);
+  // Cihazın hiç ana kontrolü yoktur; ayarlar listenin başına geçemez.
+  assert.deepEqual(controls.filter((control) => control.adminOnly !== true), []);
+});
+
+test("tipli expose altındaki özellikler ana kontrol olmayı sürdürür", () => {
+  const controls = deviceControls(
+    "0xlamba",
+    "Salon lambası",
+    [
+      { property: "state", name: "state", type: "binary", parentType: "light", parentName: "light" },
+      { property: "brightness", name: "brightness", type: "numeric", parentType: "light", parentName: "light" },
+      { property: "power_on_behavior", name: "power on behavior", type: "enum", values: ["off", "on", "previous"] }
+    ],
+    { state: "ON", brightness: 200, power_on_behavior: "previous" },
+    new Map()
+  );
+
+  assert.equal(controls.find((control) => control.property === "state")?.adminOnly, false);
+  assert.equal(controls.find((control) => control.property === "brightness")?.adminOnly, false);
+  assert.equal(controls.find((control) => control.property === "power_on_behavior")?.adminOnly, true);
+  assert.equal(soleSwitchChannelId(controls), "main");
+});
+
+test("tanılama kategorisi de cihaz ayarı sayılır", () => {
+  const [control] = deviceControls(
+    "0xtani",
+    "Tanılama",
+    [{ property: "action_group", name: "action group", type: "numeric", category: "diagnostic" }],
+    { action_group: 3 },
+    new Map()
+  );
+
+  assert.equal(control.adminOnly, true);
+});
+
 test("tek aç/kapa kanallı cihazın kanalı cihazın kendisidir", () => {
   const controls = deviceControls("0xlamba", "Salon lambası", ["state", "brightness"], { state: "ON", brightness: 120 }, new Map());
 

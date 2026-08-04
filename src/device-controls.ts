@@ -153,6 +153,28 @@ export function deviceControls(
     `${feature?.parentType ?? ""} ${feature?.parentName ?? ""}`.toLowerCase();
   const isSpecial = (feature: WritableFeature | undefined): boolean =>
     /\b(cover|climate|lock|fan|siren)\b/.test(descriptorKind(feature));
+  const isPrimaryContext = (feature: WritableFeature | undefined): boolean =>
+    /\b(light|switch|cover|climate|lock|fan|siren)\b/.test(descriptorKind(feature));
+  /**
+   * Ayar mı, asıl işlev mi? Ölçüt tanım verisidir, özellik adı değil:
+   *
+   * 1. Expose açıkça `category: "config" | "diagnostic"` diyorsa ayardır.
+   * 2. Zigbee tanım sözleşmesinde cihazın asıl işlevi **tipli** bir expose'un içinde yayımlanır
+   *    (`light`, `switch`, `cover`, `lock`, `fan`, `climate`, `siren`). Üst düzeyde tek başına
+   *    duran jenerik expose'lar (`binary`, `numeric`, `enum`, `text`) cihaz ayarı ya da
+   *    tanılamasıdır: hassasiyet, algılama mesafesi, çocuk kilidi, "cihazı bul" düğmesi… Birçok
+   *    tanım `category` alanını doldurmaz; sarmalayan tipli expose'un yokluğu ölçütün kendisidir.
+   *
+   * Ayar kaybolmaz — yalnız ana kontrol olmaktan çıkar, listenin ayar bölümüne iner.
+   * `state`/`brightness`/`color_temp` kanalları bu kuralın dışındadır: onlar sözleşme gereği
+   * zaten asıl işlevdir, tanım onları sarmalamamış olsa bile.
+   */
+  const isDeviceSetting = (feature: WritableFeature | undefined): boolean =>
+    feature?.category === "config"
+    || feature?.category === "diagnostic"
+    || !isPrimaryContext(feature);
+  const isSettingCategory = (category: string | undefined): boolean =>
+    category === "config" || category === "diagnostic";
   const labelFor = (feature: WritableFeature, fallback: string): string =>
     feature.name && feature.name !== feature.property
       ? feature.name.replaceAll("_", " ")
@@ -183,7 +205,7 @@ export function deviceControls(
       valueOn,
       valueOff,
       valueToggle: descriptor?.valueToggle ?? (canToggle ? "TOGGLE" : undefined),
-      adminOnly: descriptor?.category === "config"
+      adminOnly: isSettingCategory(descriptor?.category)
     });
   }
 
@@ -204,7 +226,7 @@ export function deviceControls(
       max: descriptor?.max ?? 254,
       step: descriptor?.step,
       unit: descriptor?.unit,
-      adminOnly: descriptor?.category === "config"
+      adminOnly: isSettingCategory(descriptor?.category)
     });
   }
 
@@ -223,7 +245,7 @@ export function deviceControls(
       max: descriptor?.max ?? 500,
       step: descriptor?.step,
       unit: descriptor?.unit,
-      adminOnly: descriptor?.category === "config"
+      adminOnly: isSettingCategory(descriptor?.category)
     });
   }
 
@@ -254,7 +276,7 @@ export function deviceControls(
       valueOn: feature.valueOn,
       valueOff: feature.valueOff,
       valueToggle: feature.valueToggle,
-      adminOnly: feature.category === "config"
+      adminOnly: isDeviceSetting(feature)
     };
     if (/\bcover\b/.test(context)) {
       add({
