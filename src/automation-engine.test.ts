@@ -217,6 +217,155 @@ test("eşleşmeyen olaylar otomasyon dosyasını okumaya bile gerek bırakmaz", 
   assert.equal(source.calls.length, 0);
 });
 
+test("equals'sız deviceState tetikleyicisi her değişimde çalışır, tekrarda çalışmaz", async (context) => {
+  const { engine, source, setClock } = await harness(context, [automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }]
+  })]);
+
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "ON" }]);
+  assert.equal(source.calls.length, 1);
+
+  // Aynı değer yeniden bildirilirse kenar yok — tetiklenmez.
+  setClock("2026-08-03T19:00:30");
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "ON" }]);
+  assert.equal(source.calls.length, 1);
+
+  // Kapanış da bir değişimdir; equals verilmediği için o da tetikler.
+  setClock("2026-08-03T19:01:00");
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "OFF" }]);
+  assert.equal(source.calls.length, 2);
+});
+
+test("takip senaryosu: anahtar açılınca lamba açılır, kapanınca kapanır", async (context) => {
+  const { engine, source, store, setClock } = await harness(context, [automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "ON" } },
+      { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "OFF" } }
+    ]
+  })]);
+
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "ON" }]);
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "ON" } }]);
+
+  setClock("2026-08-03T19:00:30");
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "OFF" }]);
+  assert.deepEqual(source.calls[1], { id: lampId, command: { state: "OFF" } });
+  assert.equal(source.calls.length, 2);
+
+  assert.equal((await store.get())[0]?.lastRunOk, true);
+});
+
+test("ters senaryo: kullanıcı açılışta kapatmayı seçebilir", async (context) => {
+  const { engine, source, setClock } = await harness(context, [automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "ON" } },
+      { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "OFF" } }
+    ]
+  })]);
+
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "ON" }]);
+  setClock("2026-08-03T19:00:30");
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "OFF" }]);
+  assert.deepEqual(source.calls, [
+    { id: lampId, command: { state: "OFF" } },
+    { id: lampId, command: { state: "ON" } }
+  ]);
+});
+
+test("when taşımayan eylem her durumda çalışır (geriye uyumluluk)", async (context) => {
+  const { engine, source, setClock } = await harness(context, [automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state_l1", value: "ON" },
+      { type: "device", deviceId: lampId, property: "state_l2", value: "ON", when: { equals: "ON" } }
+    ]
+  })]);
+
+  // Açılışta ikisi de çalışır.
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "ON" }]);
+  assert.equal(source.calls.length, 2);
+
+  // Kapanışta yalnızca koşulsuz eylem çalışır; koşullu olan atlanır.
+  setClock("2026-08-03T19:00:30");
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "OFF" }]);
+  assert.deepEqual(source.calls[2], { id: lampId, command: { state_l1: "ON" } });
+  assert.equal(source.calls.length, 3);
+});
+
+test("kullanıcının canlıdaki equals taşıyan kuralları aynen çalışır", async (context) => {
+  const { engine, source, store, setClock } = await harness(context, [
+    automation({
+      id: "bahce-anahtari",
+      name: "Bahçe anahtarı",
+      triggers: [{ type: "deviceState", deviceId: switchId, property: "state", equals: "ON" }],
+      actions: [{ type: "device", deviceId: lampId, property: "state", value: "TOGGLE" }]
+    }),
+    automation({
+      id: "salon-sensoru",
+      name: "Salon sensörü",
+      triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true }],
+      actions: [{ type: "device", deviceId: lampId, property: "state_l1", value: "ON" }]
+    })
+  ]);
+
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "ON" }]);
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "TOGGLE" } }]);
+
+  // equals eşleşmeyen değer eskisi gibi hiçbir şey yapmaz.
+  setClock("2026-08-03T19:00:30");
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "OFF" }]);
+  assert.equal(source.calls.length, 1);
+
+  setClock("2026-08-03T19:01:00");
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: true }]);
+  assert.deepEqual(source.calls[1], { id: lampId, command: { state_l1: "ON" } });
+  assert.equal((await store.get())[1]?.lastRunOk, true);
+});
+
+test("hiçbir when eşleşmezse çalıştırma başarısız sayılmaz", async (context) => {
+  const { engine, source, store } = await harness(context, [automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "ON" } }
+    ]
+  })]);
+
+  await engine.handleDeviceEvents([{ deviceId: switchId, property: "state", value: "OFF" }]);
+  assert.equal(source.calls.length, 0);
+  // lastRunOk/lastRunAt dokunulmadan kalır — atlama hata değildir.
+  const saved = await store.get();
+  assert.equal(saved[0]?.lastRunOk, null);
+  assert.equal(saved[0]?.lastRunAt, null);
+});
+
+test("zaman tetikleyicisinde when taşıyan eylem atlanır", async (context) => {
+  const { engine, source, store } = await harness(context, [automation({
+    actions: [
+      { type: "device", deviceId: lampId, property: "state_l1", value: "ON" },
+      { type: "device", deviceId: lampId, property: "state_l2", value: "ON", when: { equals: "ON" } }
+    ]
+  })]);
+
+  // Zaman tetikleyicisinde eşleşecek bir olay değeri yoktur; koşullu eylem atlanır.
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+  assert.equal((await store.get())[0]?.lastRunOk, true);
+});
+
+test("elle çalıştırma yalnızca koşullu eylem varsa atlanır", async (context) => {
+  const { engine, source, store } = await harness(context, [automation({
+    actions: [
+      { type: "device", deviceId: lampId, property: "state_l1", value: "ON", when: { equals: "ON" } }
+    ]
+  })]);
+
+  assert.equal(await engine.run("aksam-salon"), "skipped");
+  assert.equal(source.calls.length, 0);
+  assert.equal((await store.get())[0]?.lastRunAt, null);
+});
+
 test("start ve stop zamanlayıcıyı sızdırmaz", async (context) => {
   const { engine } = await harness(context, [automation()]);
   engine.start();

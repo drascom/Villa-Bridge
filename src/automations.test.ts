@@ -199,9 +199,57 @@ test("bozuk düğme ve sensör tetikleyicileri reddedilir", () => {
   assert.throws(() => validateAutomations([automation({
     triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: { on: true } }]
   })]), /hedef değeri/);
+});
+
+test("deviceState tetikleyicisinde equals opsiyoneldir — yoksa her değişim tetikler", () => {
+  const parsed = validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }]
+  })]);
+  assert.deepEqual(parsed[0]?.triggers, [
+    { type: "deviceState", deviceId: switchId, property: "state" }
+  ]);
+  // null da "verilmemiş" sayılır.
+  assert.deepEqual(validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state", equals: null }]
+  })])[0]?.triggers, [{ type: "deviceState", deviceId: switchId, property: "state" }]);
+});
+
+test("eylem koşulu (when) doğrulanır ve bilinmeyen alan reddedilir", () => {
+  const parsed = validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: switchId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "ON" } },
+      { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "OFF" } }
+    ]
+  })], lookup);
+  assert.deepEqual(parsed[0]?.actions, [
+    { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "ON" } },
+    { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "OFF" } }
+  ]);
+
   assert.throws(() => validateAutomations([automation({
-    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy" }]
-  })]), /hedef değeri/);
+    actions: [{ type: "device", deviceId: lampId, property: "state", value: "ON", when: "ON" }]
+  })]), /koşulu geçersiz/);
+  assert.throws(() => validateAutomations([automation({
+    actions: [{
+      type: "device", deviceId: lampId, property: "state", value: "ON",
+      when: { equals: "ON", not: "OFF" }
+    }]
+  })]), /bilinmeyen alan/);
+  assert.throws(() => validateAutomations([automation({
+    actions: [{ type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: { a: 1 } } }]
+  })]), /koşul değeri/);
+  // `when` yoksa eylem eskisi gibi kabul edilir; alan da yazılmaz.
+  assert.equal("when" in (validateAutomations([automation()])[0]?.actions[0] ?? {}), false);
+});
+
+test("döngü doğrulaması when taşıyan eylemlerde de çalışır", () => {
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: lampId, property: "state" }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "ON" } }
+    ]
+  })]), /döngü/);
 });
 
 test("kilit ve duman tetikleyici olarak serbesttir (§8.1 yalnız eylemi kısıtlar)", () => {

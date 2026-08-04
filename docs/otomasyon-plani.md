@@ -214,9 +214,16 @@ Hedef **`deviceId` + `property`** ikilisidir. Çok gangli anahtarların her kana
 |---|---|---|
 | `time` | `at "HH:MM"`, `days: number[]` | **Evet**, sunucu değişikliği gerekmez |
 | `sun` | `event: "sunrise"\|"sunset"`, `offsetMinutes` | **Kısmen** — `config/default.yaml`'a `latitude`/`longitude` eklenmeli. Güneş hesabı ~40 satır, bağımlılık gerekmez. Faz 3'e ertelenebilir. |
-| `deviceState` | `deviceId`, `property`, `equals` | **Evet** — `src/device-store.ts` içindeki "interesting" kümesi zaten izleniyor: `action`, `state`, `contact`, `occupancy`, `presence`, `smoke`, `carbon_monoxide`, `battery_low`, `alarm`, `lock_state`, `water_leak` |
+| `deviceState` | `deviceId`, `property`, `equals?` | **Evet** — `src/device-store.ts` içindeki "interesting" kümesi zaten izleniyor: `action`, `state`, `contact`, `occupancy`, `presence`, `smoke`, `carbon_monoxide`, `battery_low`, `alarm`, `lock_state`, `water_leak` |
 | `deviceAction` | `deviceId`, `action` | **Evet ve iyi bir tetikleyici** — `DeviceView.actionTypes` cihazın desteklediği buton eylemlerini zaten taşıyor. **Uyarı:** `action` anlık bir kenar olayıdır; motor bunu son-değer karşılaştırmasıyla değil, olay akışından dinlemeli. |
 | `battery` | `deviceId`, `low: true` | **Evet** — türetilmiş `battery_threshold` olayı zaten üretiliyor |
+
+#### `deviceState` içinde `equals` opsiyoneldir
+
+`equals` **verilirse** yalnızca o değere geçişte tetiklenir — eski davranışın aynısı, mevcut
+kurallar bozulmaz. `equals` **verilmezse** özelliğin **her** değişimi tetikler; böylece bir duvar
+anahtarının hem açılışı hem kapanışı tek kuralla yakalanır. Kenar kuralı her iki halde de geçerli:
+aynı değer yeniden bildirilirse tetiklenmez. `equals: null` "verilmemiş" sayılır.
 
 ### 5.3 Koşul türleri (v1'de ikisi yeter, yalnızca VE)
 
@@ -237,6 +244,37 @@ anahtarı sonradan eklenir; veri modelinde `conditionMode: "all" | "any"` alanı
 
 Her eylem ayrıca isteğe bağlı **`revertAfterSeconds?: number`** taşır — §9'daki B kararının yer
 tutucusu. Faz 0 ve Faz 1'de alan yazılmaz, motor da okumaz; **Faz 2'de dolar**.
+
+#### Eylem koşulu: `when` — anahtar durumunu eyleme eşleme
+
+Her eylem isteğe bağlı **`when?: { equals: JsonScalar }`** taşıyabilir. Eylem yalnızca **tetikleyen
+olayın değeri** `when.equals`'a eşitse çalışır:
+
+```jsonc
+"triggers": [{ "type": "deviceState", "deviceId": "0xf844…", "property": "state" }],
+"actions": [
+  { "type": "device", "deviceId": "0xa4c1…", "property": "state", "value": "ON",  "when": { "equals": "ON"  } },
+  { "type": "device", "deviceId": "0xa4c1…", "property": "state", "value": "OFF", "when": { "equals": "OFF" } }
+]
+```
+
+- `when` **yoksa** eylem her zaman çalışır → geriye tam uyumluluk.
+- `when` yalnızca `equals` alanını tanır; başka alan **reddedilir**.
+- **Zaman tetikleyicisinde ve elle çalıştırmada** eşleşecek bir olay değeri yoktur, bu yüzden
+  `when` taşıyan eylemler **atlanır**.
+- Hiçbir eylem eşleşmezse çalıştırma **başarısız sayılmaz**: motor `skipped` döner, kilit alınmaz,
+  `lastRunAt`/`lastRunOk` dokunulmadan kalır. `POST /api/automations/:id/run` bu halde
+  `{ ok: true, skipped: true }` verir.
+- §8.2 döngü doğrulaması `when`'den bağımsızdır — eylem hedefi tetikleyici cihazla aynıysa kural
+  yine kaydedilemez.
+
+#### Akış kararı: durum sorma, sonra eşleme formu
+
+Sihirbazda tetikleyici adımında kullanıcıya **"hangi durumda?"** sorulmaz. Kullanıcı **anahtarı**
+seçer, **hedefi** seçer; ardından bir **eşleme formu** açılır ve anahtarın her durumu için ne
+yapılacağı orada seçilir. Varsayılan **takip**: açılınca Aç, kapanınca Kapat. Kullanıcı isterse
+tersine çevirebilir (buton kapalıyken lambayı açmak gibi). Form bunu `equals`'sız bir tetikleyici
+ve `when` taşıyan iki eyleme çevirir.
 
 **Zincirleme:** "bu tetiklenince şu, o da başkasını tetiklesin" ihtiyacı **tek kuralda sıralı
 eylemlerle** karşılanır. Kural-kurala tetikleme birincil yol **değildir**; §8.2'deki döngü koruması

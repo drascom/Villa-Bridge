@@ -21,14 +21,18 @@ export interface AutomationDeviceActionTrigger {
   action: string;
 }
 
-/** Sensör/cihaz durumu — yalnızca değer hedefe geçtiğinde tetiklenir. */
+/**
+ * Sensör/cihaz durumu — yalnızca kenarda, yani değer değiştiğinde tetiklenir.
+ * `equals` verilirse yalnızca o değere geçişte, verilmezse **her** değişimde tetiklenir (§5.2).
+ */
 export interface AutomationDeviceStateTrigger {
   type: "deviceState";
   /** IEEE adresi — kanonik bağ. */
   deviceId: string;
   /** MQTT özellik anahtarı, örn. "occupancy". */
   property: string;
-  equals: JsonScalar;
+  /** Yoksa özelliğin her değişimi tetikler. */
+  equals?: JsonScalar;
 }
 
 export type AutomationTrigger =
@@ -44,6 +48,15 @@ export type AutomationEventTrigger =
 /** Faz 1'de koşul türü yok; alan veri modelinde yer tutucu olarak duruyor. */
 export type AutomationCondition = never;
 
+/**
+ * Eylem koşulu (§5.4) — eylemi **tetikleyen olayın değerine** bağlar. Anahtar durumu eylemlere
+ * böyle eşlenir: `ON` gelince Aç, `OFF` gelince Kapat. Tek alanlı tutulur; başka alan yoktur.
+ */
+export interface AutomationActionWhen {
+  /** Tetikleyen olayın değeri buna eşitse eylem çalışır. */
+  equals: JsonScalar;
+}
+
 export interface AutomationDeviceAction {
   type: "device";
   /** IEEE adresi — otomasyonun kalıcı bağı. */
@@ -53,6 +66,8 @@ export interface AutomationDeviceAction {
   /** DeviceControlView.id — yalnızca sunum için, opsiyonel. */
   controlId?: string;
   value: JsonScalar;
+  /** Yoksa eylem her zaman çalışır — geriye tam uyumluluk. */
+  when?: AutomationActionWhen;
 }
 
 export type AutomationAction = AutomationDeviceAction;
@@ -125,15 +140,15 @@ const validateTriggers = (value: unknown): AutomationTrigger[] => {
       if (!propertyPattern.test(property)) {
         throw new Error("Otomasyon tetikleyicisi cihaz özelliği geçersiz.");
       }
-      if (!isJsonScalar(candidate.equals)) {
-        throw new Error("Otomasyon tetikleyicisi hedef değeri geçersiz.");
+      const trigger: AutomationDeviceStateTrigger = { type: "deviceState", deviceId, property };
+      // `equals` opsiyoneldir: yoksa özelliğin her değişimi tetikler.
+      if (candidate.equals !== undefined && candidate.equals !== null) {
+        if (!isJsonScalar(candidate.equals)) {
+          throw new Error("Otomasyon tetikleyicisi hedef değeri geçersiz.");
+        }
+        trigger.equals = candidate.equals;
       }
-      return {
-        type: "deviceState",
-        deviceId,
-        property,
-        equals: candidate.equals
-      } satisfies AutomationDeviceStateTrigger;
+      return trigger;
     }
     if (candidate.type !== "time") {
       throw new Error("Otomasyon tetikleyici türü bu sürümde desteklenmiyor.");
@@ -165,6 +180,21 @@ export const automationTriggerDeviceIds = (automation: Automation): string[] => 
   return ids;
 };
 
+/** §5.4 — eylem koşulu yalnızca `equals` taşır; fazlası reddedilir. */
+const validateActionWhen = (value: unknown): AutomationActionWhen => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Otomasyon eylemi koşulu geçersiz.");
+  }
+  const candidate = value as Record<string, unknown>;
+  for (const key of Object.keys(candidate)) {
+    if (key !== "equals") throw new Error("Otomasyon eylemi koşulunda bilinmeyen alan var.");
+  }
+  if (!isJsonScalar(candidate.equals)) {
+    throw new Error("Otomasyon eylemi koşul değeri geçersiz.");
+  }
+  return { equals: candidate.equals };
+};
+
 const validateActions = (value: unknown, lookup?: AutomationDeviceLookup): AutomationAction[] => {
   if (!Array.isArray(value) || value.length === 0 || value.length > maxAutomationActions) {
     throw new Error("Otomasyon eylemleri geçersiz.");
@@ -191,6 +221,9 @@ const validateActions = (value: unknown, lookup?: AutomationDeviceLookup): Autom
         : "";
       if (!controlIdPattern.test(controlId)) throw new Error("Otomasyon eylemi kontrol kimliği geçersiz.");
       action.controlId = controlId;
+    }
+    if (candidate.when !== undefined && candidate.when !== null) {
+      action.when = validateActionWhen(candidate.when);
     }
     const control = lookup?.(deviceId)?.controls.find((item) => item.property === property);
     if (control && forbiddenAutomationControlKinds.has(control.kind)) {

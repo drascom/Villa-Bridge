@@ -1,4 +1,4 @@
-import type { Automation, AutomationsStore } from "./automations.js";
+import type { Automation, AutomationAction, AutomationsStore } from "./automations.js";
 import type { JsonObject, JsonScalar } from "./types.js";
 
 /** Tur aralığı: dakika kilidi sayesinde aynı dakikada yalnızca bir kez çalışır. */
@@ -6,7 +6,8 @@ export const automationTickIntervalMs = 20_000;
 /** §8.2 — düğme gürültüsüne karşı otomasyon başına asgari aralık. */
 export const automationMinimumRunGapMs = 2_000;
 
-export type AutomationRunResult = "ok" | "failed" | "busy" | "missing";
+/** `skipped`: kural eşleşti ama `when` yüzünden çalışacak eylem kalmadı — hata değildir. */
+export type AutomationRunResult = "ok" | "failed" | "busy" | "missing" | "skipped";
 
 export interface AutomationEngineSource {
   setDevice(id: string, command: JsonObject): Promise<void>;
@@ -60,12 +61,26 @@ export const automationMatchesEvent = (
       && trigger.action === event.value;
   }
   if (trigger.type === "deviceState") {
+    // `equals` yoksa özelliğin her değişimi tetikler; kenar kontrolü çağırana aittir.
     return trigger.deviceId === event.deviceId
       && trigger.property === event.property
-      && trigger.equals === event.value;
+      && (trigger.equals === undefined || trigger.equals === event.value);
   }
   return false;
 });
+
+/**
+ * §5.4 — `when` taşımayan eylem her zaman çalışır (geriye uyumluluk). `when` taşıyan eylem
+ * yalnızca tetikleyen olayın değeri eşleşince çalışır; olay yoksa (zaman tetikleyicisi ya da
+ * elle çalıştırma) eşleşecek değer de yoktur, eylem atlanır.
+ */
+export const automationActionApplies = (
+  action: AutomationAction,
+  event?: AutomationDeviceEvent
+): boolean => {
+  if (!action.when) return true;
+  return event !== undefined && action.when.equals === event.value;
+};
 
 export class AutomationEngine {
   private timer: NodeJS.Timeout | null = null;
@@ -136,7 +151,7 @@ export class AutomationEngine {
       for (const automation of automations) {
         if (!automation.enabled) continue;
         if (!automationMatchesEvent(automation, event)) continue;
-        await this.execute(automation);
+        await this.execute(automation, event);
       }
     }
   }
@@ -165,7 +180,13 @@ export class AutomationEngine {
     return this.execute(automation);
   }
 
-  private async execute(automation: Automation): Promise<AutomationRunResult> {
+  private async execute(
+    automation: Automation,
+    event?: AutomationDeviceEvent
+  ): Promise<AutomationRunResult> {
+    const actions = automation.actions.filter((action) => automationActionApplies(action, event));
+    // Hiçbir eylem eşleşmediyse çalıştırma sayılmaz: ne kilit alınır ne de `lastRunOk` bozulur.
+    if (actions.length === 0) return "skipped";
     if (this.running.has(automation.id)) return "busy";
     const startedAt = this.now().getTime();
     const previousStart = this.lastStartedAt.get(automation.id);
@@ -176,7 +197,7 @@ export class AutomationEngine {
     this.lastStartedAt.set(automation.id, startedAt);
     let ok = true;
     try {
-      for (const action of automation.actions) {
+      for (const action of actions) {
         await this.options.source.setDevice(action.deviceId, { [action.property]: action.value });
       }
     } catch (error) {

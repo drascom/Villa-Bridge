@@ -670,6 +670,8 @@ app.post<{ Params: { id: string } }>("/api/automations/:id/run", async (request,
   if (result === "failed") {
     return reply.code(503).send({ ok: false, error: "Otomasyon çalıştırılamadı." });
   }
+  // Elle çalıştırmada tetikleyen olay yoktur; `when` taşıyan eylemler atlanır — hata değildir.
+  if (result === "skipped") return { ok: true, skipped: true };
   return { ok: true };
 });
 
