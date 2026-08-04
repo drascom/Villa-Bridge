@@ -501,3 +501,65 @@ test("kapalı oturum ve farklı cihaz görüşmesi eşleştirme sonucu üretmez"
     reconnected: false
   });
 });
+
+test("cihaz sınıfı standart expose tipinden gelir, kullanıcı rolü onu ezer", () => {
+  const roles = new Map<string, "auto" | "light" | "switch">();
+  const store = new DeviceStore(new Map(), undefined, [], undefined, roles);
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([
+      {
+        // Farklı satıcı, farklı model: ölçüt yalnız `exposes[].type`.
+        ieee_address: "0x000d6ffffe111111",
+        friendly_name: "Bedroom bulb",
+        type: "Router",
+        supported: true,
+        interview_completed: true,
+        definition: {
+          model: "LED1949C5",
+          vendor: "IKEA",
+          exposes: [{ type: "light", features: [{ name: "state", property: "state", access: 7 }] }]
+        }
+      },
+      {
+        // Lambayı süren röle: donanım anahtar der. Kullanıcı bunu lamba olarak kullanıyor.
+        ieee_address: "0xa4c138b950918de3",
+        friendly_name: "Corridor relay",
+        type: "Router",
+        supported: true,
+        interview_completed: true,
+        definition: {
+          model: "TS0001",
+          vendor: "Tuya",
+          exposes: [{ type: "switch", features: [{ name: "state", property: "state", access: 7 }] }]
+        }
+      },
+      {
+        // Tanımı bilinmeyen cihaz: belirsiz kalır, eleme yapılmaz.
+        ieee_address: "0xa4c1380000000009",
+        friendly_name: "Unknown module",
+        type: "EndDevice",
+        supported: false,
+        interview_completed: true
+      }
+    ]))
+  );
+
+  const byId = new Map(store.getDevices().map((device) => [device.id, device]));
+  assert.equal(byId.get("0x000d6ffffe111111")?.detectedCategory, "light");
+  assert.equal(byId.get("0x000d6ffffe111111")?.category, "light");
+  assert.equal(byId.get("0xa4c138b950918de3")?.detectedCategory, "switch");
+  assert.equal(byId.get("0xa4c138b950918de3")?.category, "switch");
+  assert.equal(byId.get("0xa4c1380000000009")?.detectedCategory, "unknown");
+  assert.equal(byId.get("0xa4c1380000000009")?.role, "auto");
+
+  // Kullanıcı rolü seçince tahmin ezilir; tahmin ayrıca saklandığı için geri dönülebilir.
+  roles.set("0xa4c138b950918de3", "light");
+  const relay = store.getDevice("0xa4c138b950918de3");
+  assert.equal(relay?.role, "light");
+  assert.equal(relay?.category, "light");
+  assert.equal(relay?.detectedCategory, "switch");
+
+  roles.delete("0xa4c138b950918de3");
+  assert.equal(store.getDevice("0xa4c138b950918de3")?.category, "switch");
+});

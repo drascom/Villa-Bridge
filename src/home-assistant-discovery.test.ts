@@ -8,6 +8,9 @@ const light: DeviceView = {
   sourceName: "Kitchen Light",
   name: "Kitchen Light",
   type: "Router",
+  category: "light",
+  detectedCategory: "light",
+  role: "auto",
   model: "RGB-CCT",
   image: {
     model: "RGB-CCT",

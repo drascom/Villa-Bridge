@@ -1,3 +1,5 @@
+import type { DeviceCategory, DeviceRole } from "./device-category.js";
+
 export type JsonObject = Record<string, unknown>;
 export type JsonScalar = string | number | boolean;
 
@@ -47,6 +49,12 @@ export interface DeviceView {
   sourceName: string;
   name: string;
   type: string;
+  /** Arayüzde geçerli olan sınıf: kullanıcı rol seçtiyse o, seçmediyse tahmin. */
+  category: DeviceCategory;
+  /** Tanımdan çıkan tahmin — rolü "Otomatik"e döndürmek için saklanır. */
+  detectedCategory: DeviceCategory;
+  /** Kullanıcının seçimi; `auto` tahmini olduğu gibi bırakır. */
+  role: DeviceRole;
   model: string | null;
   image: DeviceImageView;
   vendor: string | null;

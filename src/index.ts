@@ -13,6 +13,7 @@ import { DeviceImageCache } from "./device-image-cache.js";
 import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
 import { DeviceNotesStore } from "./device-notes.js";
+import { loadDeviceRoles, removeDeviceRole, setDeviceRole } from "./device-roles.js";
 import { DeviceStore } from "./device-store.js";
 import {
   HomeFavoritesStore,
@@ -58,6 +59,9 @@ const imagesStore = new DeviceImagesStore(resolve(dirname(configPath), "device-i
 const imageCache = new DeviceImageCache(resolve(dirname(configPath), "device-image-cache"));
 let imagePreferences = await imagesStore.get();
 const deviceEventsStore = new DeviceEventsStore(resolve(dirname(configPath), "device-events.json"));
+// Kullanıcının seçtiği cihaz rolleri — IEEE adresine göre, yapılandırmanın yanındaki JSON'da.
+const deviceRolesPath = resolve(dirname(configPath), "device-roles.json");
+const deviceRoles = await loadDeviceRoles(deviceRolesPath);
 const store = new DeviceStore(
   aliases,
   imagePreferences,
@@ -75,7 +79,8 @@ const store = new DeviceStore(
     void automationEngine.handleDeviceEvents(deviceEvents).catch((error) => {
       console.error(`Otomasyon olayı işlenemedi: ${String(error)}`);
     });
-  }
+  },
+  deviceRoles
 );
 store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
@@ -235,6 +240,35 @@ app.put<{ Params: { id: string }; Body?: { note?: unknown } }>("/api/devices/:id
   if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
   try {
     return { ok: true, note: await deviceNotesStore.set(id, request.body?.note) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+// Rol yalnız Villa Bridge arayüzünü etkiler: sihirbaz kümeleri, kart etiketi ve simgesi.
+// Matter, Alexa, Apple Home ve Home Assistant tarafına bilerek yansıtılmaz.
+app.get<{ Params: { id: string } }>("/api/devices/:id/role", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  const device = store.getDevice(id);
+  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  return {
+    ok: true,
+    role: device.role,
+    category: device.category,
+    detectedCategory: device.detectedCategory
+  };
+});
+app.put<{ Params: { id: string }; Body?: { role?: unknown } }>("/api/devices/:id/role", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  try {
+    await setDeviceRole(deviceRolesPath, deviceRoles, id, request.body?.role);
+    const device = store.getDevice(id);
+    return {
+      ok: true,
+      role: device?.role ?? "auto",
+      category: device?.category ?? "unknown",
+      detectedCategory: device?.detectedCategory ?? "unknown"
+    };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -870,6 +904,9 @@ app.delete<{
       console.error(`Otomasyonlardan cihaz düşürülemedi: ${String(error)}`);
     });
     await deviceNotesStore.removeDevice(id);
+    await removeDeviceRole(deviceRolesPath, deviceRoles, id).catch((error) => {
+      console.error(`Cihaz rolü silinemedi: ${String(error)}`);
+    });
     return { ok: true, force, favorites, groups };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });

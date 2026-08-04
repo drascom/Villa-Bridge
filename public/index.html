@@ -97,7 +97,7 @@
     .light-modal{padding:24px}.light-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.light-modal-head h2{margin:0;font:600 30px/1.1 Georgia,serif}.light-modal-head button{width:38px;height:38px;border:0;border-radius:50%;background:#f1f2ef;color:var(--ink)}.light-hero{display:grid;place-items:center;padding:20px 0 24px}.light-power{width:112px;height:112px;display:grid;place-items:center;border:0;border-radius:50%;color:var(--muted);background:#edf0ed;box-shadow:inset 0 0 0 1px var(--line);transition:.25s}.light-power.on{color:var(--forest);background:#fff3c9;box-shadow:0 0 0 12px rgba(241,181,84,.12),0 14px 38px rgba(225,153,46,.25)}.power-glyph{width:34px;height:34px;border:3px solid currentColor;border-top-color:transparent;border-radius:50%;position:relative}.power-glyph::before{content:"";position:absolute;left:50%;top:-8px;width:3px;height:19px;border-radius:3px;background:currentColor;transform:translateX(-50%)}.light-controls{display:grid;gap:18px}.light-control{display:grid;gap:9px}.light-control-head{display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:750}.light-control output{color:var(--muted);font-weight:650}.light-control input[type=range]{width:100%;height:38px}.brightness-slider{accent-color:#e9a23b}.temperature-slider{appearance:none;height:12px!important;border-radius:99px;background:linear-gradient(90deg,#c5dcff,#fff3d2,#ffb45f)}.temperature-slider::-webkit-slider-thumb{appearance:none;width:28px;height:28px;border:3px solid white;border-radius:50%;background:var(--forest);box-shadow:0 2px 8px #0003}.color-picker{width:100%;height:52px;border:0;border-radius:12px;padding:0;background:transparent}.color-picker::-webkit-color-swatch-wrapper{padding:0}.color-picker::-webkit-color-swatch{border:0;border-radius:12px}.light-modal-actions{display:flex;justify-content:flex-end;margin-top:22px}
     .pairing-banner{display:none;align-items:center;justify-content:space-between;gap:16px;background:#fff3d9;border-left:4px solid var(--sun);padding:15px 18px;margin-bottom:20px}.pairing-banner.show{display:flex}.pairing-banner-actions{display:flex;gap:8px}.pairing-banner-actions button[hidden],.modal-actions button[hidden]{display:none}
     .pairing-modal{text-align:center}.pairing-visual{position:relative;width:128px;height:128px;margin:2px auto 22px;display:grid;place-items:center}.pairing-core{position:relative;z-index:3;width:48px;height:48px;border-radius:50%;background:var(--forest);box-shadow:0 8px 20px rgba(24,77,59,.2)}.pairing-core::before,.pairing-core::after{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:white;transform:translate(-13px,-50%);box-shadow:13px 0 white,26px 0 white}.pairing-ring{position:absolute;inset:0;border:2px solid rgba(24,77,59,.24);border-radius:50%;animation:pairing-scan 2s ease-out infinite}.pairing-ring:nth-child(2){inset:18px;animation-delay:.45s}.pairing-ring:nth-child(3){inset:36px;animation-delay:.9s}.pairing-visual.found .pairing-ring{border-color:rgba(44,154,104,.45);animation-duration:1.15s}.pairing-visual.ready .pairing-ring{animation:none;opacity:0}.pairing-visual.timed-out .pairing-ring{animation:none;opacity:.12}.pairing-visual.ready .pairing-core::before{width:20px;height:10px;border:0;border-left:3px solid white;border-bottom:3px solid white;border-radius:0;background:transparent;box-shadow:none;transform:translate(-50%,-65%) rotate(-45deg)}.pairing-visual.ready .pairing-core::after{display:none}.pairing-device{margin:18px 0 2px;padding:14px;border:1px solid var(--line);background:#f7f9f6}.pairing-device span{display:block;color:var(--muted);font-size:12px}.pairing-device strong{display:block;margin-top:3px;font-size:18px}.pairing-device[hidden]{display:none}@keyframes pairing-scan{0%{opacity:.7;transform:scale(.62)}75%,100%{opacity:0;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.pairing-ring{animation:none}.pairing-ring:first-child{opacity:.4}}
-    .image-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}.image-choice{min-height:148px;display:grid;place-items:center;align-content:center;gap:8px;padding:14px;border:2px solid var(--line);border-radius:12px;background:#fafbf9;color:var(--ink);font-weight:750}.image-choice.selected{border-color:var(--forest);background:var(--forest-soft);box-shadow:0 0 0 3px rgba(24,77,59,.08)}.image-choice .device-visual{width:78px;height:78px}.image-choice small{color:var(--muted);font-weight:650}.image-family{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--muted);font-size:13px}.image-family input{margin-top:2px;accent-color:var(--forest)}
+    .image-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}.device-role-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}.device-role-choice{min-height:96px;display:grid;place-items:center;align-content:center;gap:7px;padding:14px;border:2px solid var(--line);border-radius:12px;background:#fafbf9;color:var(--ink);font-weight:750}.device-role-choice[aria-pressed="true"]{border-color:var(--forest);background:var(--forest-soft)}.device-role-choice .device-type-svg{width:30px;height:30px}.device-role-choice small{color:var(--muted);font-size:11px;font-weight:650}.device-role-hint{display:block;margin-top:6px;color:var(--muted);font-size:12px}.image-choice{min-height:148px;display:grid;place-items:center;align-content:center;gap:8px;padding:14px;border:2px solid var(--line);border-radius:12px;background:#fafbf9;color:var(--ink);font-weight:750}.image-choice.selected{border-color:var(--forest);background:var(--forest-soft);box-shadow:0 0 0 3px rgba(24,77,59,.08)}.image-choice .device-visual{width:78px;height:78px}.image-choice small{color:var(--muted);font-weight:650}.image-family{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--muted);font-size:13px}.image-family input{margin-top:2px;accent-color:var(--forest)}
     :root[data-theme="dark"] aside{background:rgba(17,24,20,.94)}
     :root[data-theme="dark"] .quiet,:root[data-theme="dark"] .light-modal-head button{background:#26322c}
     :root[data-theme="dark"] .device-icon,:root[data-theme="dark"] .device-fallback{background:#223029}
@@ -361,7 +361,8 @@
 <div id="authLoginDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authLoginTitle" hidden><form id="authLoginForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><div><h2 id="authLoginTitle" data-i18n="welcomeBack">Welcome home</h2><p data-i18n="signInLead">Sign in as a home user or administrator.</p></div></div><div class="auth-mode-toggle" role="group"><button id="loginResidentMode" class="active" type="button" data-login-mode="resident" data-i18n="homeUser">Home user</button><button id="loginAdminMode" type="button" data-login-mode="admin" data-i18n="administrator">Administrator</button></div><div class="auth-fields"><div id="loginUsernameField" class="field" hidden><label for="authLoginUsername" data-i18n="adminUsername">Admin username</label><input id="authLoginUsername" autocomplete="username"></div><div class="field"><label id="authLoginSecretLabel" for="authLoginSecret" data-i18n="residentPin">Home user PIN</label><input id="authLoginSecret" type="password" inputmode="numeric" autocomplete="current-password" required></div></div><div id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authLoginSubmit" class="primary auth-submit" type="submit" data-i18n="signIn">Sign in</button></form></div>
 <dialog id="nameDialog"><form id="nameForm" class="modal" method="dialog"><h2 id="nameDialogTitle" data-i18n="changeDisplayName">Change display name</h2><p id="nameDialogLead" data-i18n="displayNameLead">This name will be shared across all home connections.</p><div class="field"><label for="nameInput" data-i18n="newName">New name</label><input id="nameInput" minlength="2" maxlength="32" autocomplete="off" required></div><div class="modal-actions"><button id="cancelName" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveName" class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
 <dialog id="noteDialog"><form id="noteForm" class="modal"><h2 data-i18n="deviceNote">Device note</h2><p id="noteDeviceName"></p><div class="field"><label for="noteInput" data-i18n="note">Note</label><textarea id="noteInput" rows="5" maxlength="500" data-i18n-placeholder="notePlaceholder" placeholder="e.g. Left wall switch"></textarea></div><div class="modal-actions"><button id="cancelNote" class="quiet" type="button" data-i18n="cancel">Cancel</button><button class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
-<dialog id="deviceOptionsDialog"><form id="deviceOptionsForm" class="modal"><h2 data-i18n="deviceOptions">Device options</h2><p id="deviceOptionsName"></p><div class="settings-grid"><div class="field"><label for="deviceTransition" data-i18n="transition">Smooth transition (seconds)</label><input id="deviceTransition" type="number" min="0" max="60" step=".1" value="0"></div><div class="field"><label for="deviceDebounce" data-i18n="debounce">Ignore repeats (seconds)</label><input id="deviceDebounce" type="number" min="0" max="60" step=".1" value="0"></div></div><label class="image-family"><input id="deviceRetain" type="checkbox"><span data-i18n="retainState">Keep the last MQTT state</span></label><div class="modal-actions"><button id="cancelDeviceOptions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
+<dialog id="deviceOptionsDialog"><form id="deviceOptionsForm" class="modal"><h2 data-i18n="deviceOptions">Device options</h2><p id="deviceOptionsName"></p><div class="field" id="deviceRoleField" hidden><label for="deviceRole" data-i18n="deviceRoleLabel">Show this device as</label><select id="deviceRole"><option value="auto" data-i18n="deviceRoleAuto">Automatic</option><option value="light" data-i18n="deviceRoleLight">Light</option><option value="switch" data-i18n="deviceRoleSwitch">Switch or plug</option></select><small class="device-role-hint" id="deviceRoleHint" data-i18n="deviceRoleHint">Only changes how Villa Bridge shows the device.</small></div><div class="settings-grid"><div class="field"><label for="deviceTransition" data-i18n="transition">Smooth transition (seconds)</label><input id="deviceTransition" type="number" min="0" max="60" step=".1" value="0"></div><div class="field"><label for="deviceDebounce" data-i18n="debounce">Ignore repeats (seconds)</label><input id="deviceDebounce" type="number" min="0" max="60" step=".1" value="0"></div></div><label class="image-family"><input id="deviceRetain" type="checkbox"><span data-i18n="retainState">Keep the last MQTT state</span></label><div class="modal-actions"><button id="cancelDeviceOptions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
+<dialog id="deviceRoleDialog"><div class="modal"><h2 data-i18n="deviceRoleTitle">What is this device?</h2><p id="deviceRoleLead"></p><div id="deviceRoleChoices" class="device-role-choices"></div><div class="modal-actions"><button id="skipDeviceRole" class="quiet" type="button" data-i18n="skip">Skip</button></div></div></dialog>
 <dialog id="imageDialog"><form id="imageForm" class="modal" method="dialog"><h2 data-i18n="chooseDeviceImage">Which one looks like your device?</h2><p id="imageDialogLead"></p><div id="imageChoices" class="image-choices"></div><label class="image-family"><input id="applyImageToModel" type="checkbox"><span data-i18n="useForSameModel">Use this picture automatically for devices with the same model.</span></label><div class="modal-actions"><button id="cancelImage" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveImage" class="primary" type="submit" data-i18n="saveImage">Save picture</button></div></form></dialog>
 <dialog id="pairingDialog"><div class="modal pairing-modal"><div id="pairingVisual" class="pairing-visual" aria-hidden="true"><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-core"></span></div><div class="eyebrow" id="pairingPhase" data-i18n="pairingSearching">Searching</div><h2 id="pairingModalTitle" data-i18n="pairingTitle">Searching for new devices</h2><p id="pairingModalText" data-i18n="pairingHint">Put the nearby device into pairing mode.</p><div id="pairingDevice" class="pairing-device" hidden><span data-i18n="deviceFound">Device found</span><strong id="pairingDeviceName">—</strong></div><div class="modal-actions"><button id="hidePairing" class="quiet" type="button" data-i18n="hidePairing">Hide</button><button id="cancelPairing" class="secondary" type="button" data-i18n="stopSearch">Stop searching</button></div></div></dialog>
 <dialog id="removeDialog"><div class="modal"><h2 data-i18n="removeDeviceTitle">Remove from Zigbee network?</h2><p id="removeDeviceWarning" class="danger-copy"></p><p class="force-remove-copy" data-i18n="forceRemoveLead">If the device no longer responds, force delete removes only its stale coordinator record.</p><div class="field"><label id="removeDeviceInstruction" for="removeConfirmation"></label><input id="removeConfirmation" autocomplete="off" autocapitalize="none" spellcheck="false"></div><div class="modal-actions remove-actions"><button id="cancelRemove" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmRemove" class="danger-button" type="button" data-i18n="removePermanently" disabled>Remove permanently</button><button id="forceRemove" class="danger-button force-delete-button" type="button" data-i18n="forceRemove" disabled>Force delete record</button></div></div></dialog>
@@ -434,7 +435,7 @@
     return known.some(id=>!fixedDashboardWidgets.has(id))?known:[...defaultDashboardWidgets];
   }catch{return[...defaultDashboardWidgets]}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],favorites:[],editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailTechnicalOpen:false,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),pendingGroups:new Set(),usage:savedUsage,quickOrder:null,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,groups:savedGroups,dashboardEditing:false,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],favorites:[],editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailTechnicalOpen:false,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),pendingGroups:new Set(),usage:savedUsage,quickOrder:null,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,groups:savedGroups,dashboardEditing:false,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   const weatherState={location:savedWeatherLocation,data:null,error:null,loading:false,updatedAt:0};
   const localTimeZone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC"}catch{return "UTC"}})();
@@ -651,25 +652,35 @@
     if(event.property==="state")return{icon:"◉",label:enabled?t("on"):t("off")};
     return{icon:"•",label:String(event.value).replaceAll("_"," ")};
   };
-  const deviceKind=device=>device.controls.some(control=>control.kind==="cover"||control.kind==="position")?t("coverDevice"):device.controls.some(control=>control.kind==="climate")?t("climateDevice"):device.controls.some(control=>control.kind==="lock")?t("lockDevice"):device.controls.some(control=>control.kind==="fan")?t("fanDevice"):device.controls.some(control=>control.kind==="siren")?t("sirenDevice"):device.controls.some(control=>control.kind==="switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
+  // Alt yazı önce sunucunun sınıfına bakar (tahmin ya da kullanıcının seçtiği rol); sınıf
+  // belirsizse eski kontrol tabanlı yedeğe düşer, böylece hiçbir cihaz etiketsiz kalmaz.
+  const deviceCategoryLabels={light:"lightDevice",switch:"switchDevice",cover:"coverDevice",climate:"climateDevice",lock:"lockDevice",fan:"fanDevice"};
+  const deviceKind=device=>{
+    const labelled=deviceCategoryLabels[device.category];
+    if(labelled&&!device.controls.some(control=>control.kind==="siren"))return t(labelled);
+    return device.controls.some(control=>control.kind==="cover"||control.kind==="position")?t("coverDevice"):device.controls.some(control=>control.kind==="climate")?t("climateDevice"):device.controls.some(control=>control.kind==="lock")?t("lockDevice"):device.controls.some(control=>control.kind==="fan")?t("fanDevice"):device.controls.some(control=>control.kind==="siren")?t("sirenDevice"):device.controls.some(control=>control.kind==="switch")?t("controller"):device.features.includes("contact")?t("doorSensor"):device.features.some(x=>x==="presence"||x==="occupancy")?t("motionSensor"):device.features.includes("smoke")?t("smokeSensor"):device.features.includes("carbon_monoxide")?t("coSensor"):t("sensor");
+  };
   const deviceIconKind=device=>{
     const features=device.features||[];
     const identity=`${device.name||""} ${device.model||""}`.toLowerCase();
+    const category=device.category;
     if(features.includes("smoke")||features.includes("carbon_monoxide"))return"smoke";
-    if(device.controls.some(control=>control.kind==="cover"||control.kind==="position"))return"cover";
-    if(device.controls.some(control=>control.kind==="lock"))return"lock";
-    if(device.controls.some(control=>control.kind==="fan"))return"fan";
+    if(category==="cover"||device.controls.some(control=>control.kind==="cover"||control.kind==="position"))return"cover";
+    if(category==="lock"||device.controls.some(control=>control.kind==="lock"))return"lock";
+    if(category==="fan"||device.controls.some(control=>control.kind==="fan"))return"fan";
     if(device.controls.some(control=>control.kind==="siren"))return"siren";
     if(features.includes("contact"))return"door";
     if(features.some(feature=>feature==="presence"||feature==="occupancy"))return"motion";
-    if(features.some(feature=>["brightness","color","color_temp"].includes(feature))||/\b(light|lamp|bulb|led|ışık|lamba)\b/.test(identity))return"light";
+    if(category==="light")return"light";
     if(/\b(remote|kumanda)\b/.test(identity))return"remote";
     if(/\b(plug|socket|outlet|priz)\b/.test(identity))return"plug";
+    if(category==="switch")return"switch";
+    if(features.some(feature=>["brightness","color","color_temp"].includes(feature))||/\b(light|lamp|bulb|led|ışık|lamba)\b/.test(identity))return"light";
     if(device.controls.some(control=>control.kind==="switch"))return"switch";
     if(features.some(feature=>["temperature","humidity","illuminance"].includes(feature)))return"climate";
     return"sensor";
   };
-  const deviceTypeIcon=device=>{
+  const deviceIconSvg=kind=>{
     const icons={
       light:'<path d="M9 18h6m-5 3h4m-6.1-7.1A6 6 0 1 1 16.1 14c-.8.7-1.1 1.4-1.1 2H9c0-.7-.3-1.4-1.1-2.1Z"/>',
       switch:'<path d="M12 3v8m-4.9-5.1a7 7 0 1 0 9.8 0"/>',
@@ -685,8 +696,9 @@
       siren:'<path d="M8 18v-7a4 4 0 0 1 8 0v7M5 21h14M4 10H2m20 0h-2M6 4 4.5 2.5M18 4l1.5-1.5M12 3V1"/>',
       sensor:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>'
     };
-    return`<svg class="device-type-svg" viewBox="0 0 24 24" aria-hidden="true">${icons[deviceIconKind(device)]}</svg>`;
+    return`<svg class="device-type-svg" viewBox="0 0 24 24" aria-hidden="true">${icons[kind]||icons.sensor}</svg>`;
   };
+  const deviceTypeIcon=device=>deviceIconSvg(deviceIconKind(device));
   const deviceVisualFor=(device,imageModel)=>{
     const fallback=`<span class="device-fallback"${imageModel?" hidden":""}>${deviceTypeIcon(device)}</span>`;
     if(!imageModel)return`<div class="device-visual">${fallback.replace(" hidden","")}</div>`;
@@ -2306,7 +2318,8 @@
       openImageChooser(id,true);
       return;
     }
-    finishPairingFlow(id);
+    // Son adım: "Bu cihaz ne?" — atlanırsa rol Otomatik (tahmin) kalır.
+    askDeviceRole(id,true);
   }
   function openPairingName(id,reconnected=false){
     const device=state.devices.find(item=>item.id===id);
@@ -3132,11 +3145,57 @@
     }catch(error){showToast(error.message,true)}
     finally{if(button)button.disabled=false}
   }
+  // Rol yalnız lamba↔anahtar karışıklığını çözer. Perde, kilit, sensör gibi tipler otomatik
+  // tanımadan gelmeye devam eder; onlarda seçenek hiç gösterilmez.
+  const deviceRoleOptions=["auto","light","switch"];
+  const deviceRoleLabels={auto:"deviceRoleAuto",light:"deviceRoleLight",switch:"deviceRoleSwitch"};
+  const deviceRoleIcons={auto:"sensor",light:"light",switch:"switch"};
+  const deviceRoleAskable=device=>Boolean(device)&&(device.category==="light"||device.category==="switch"
+    ||(device.category==="unknown"&&(device.controls||[]).some(control=>control.kind==="switch")));
+  async function saveDeviceRole(id,role){
+    const data=await api(`/api/devices/${encodeURIComponent(id)}/role`,{method:"PUT",body:JSON.stringify({role})});
+    const device=state.devices.find(item=>item.id===id);
+    if(device){device.role=data.role;device.category=data.category;device.detectedCategory=data.detectedCategory}
+    return data;
+  }
+  function renderDeviceRoleDialog(){
+    const editing=state.roleEditing;
+    const device=editing?state.devices.find(item=>item.id===editing.id):null;
+    if(!device)return;
+    $("#deviceRoleLead").textContent=t("deviceRoleLead",{name:device.name});
+    const guess=deviceCategoryLabels[device.detectedCategory];
+    $("#deviceRoleChoices").innerHTML=deviceRoleOptions.map(role=>{
+      const selected=(device.role||"auto")===role;
+      const note=role==="auto"
+        ?`<small>${esc(guess?t("deviceRoleAutoGuess",{kind:t(guess)}):t("deviceRoleAutoUnknown"))}</small>`
+        :"";
+      return`<button class="device-role-choice" type="button" data-device-role="${role}" aria-pressed="${selected}">${deviceIconSvg(deviceRoleIcons[role])}<span>${esc(t(deviceRoleLabels[role]))}</span>${note}</button>`;
+    }).join("");
+    $$("[data-device-role]").forEach(button=>button.onclick=()=>chooseDeviceRole(button.dataset.deviceRole));
+  }
+  async function chooseDeviceRole(role){
+    const editing=state.roleEditing;
+    if(!editing)return;
+    try{
+      await saveDeviceRole(editing.id,role);
+      showToast(t("deviceRoleSaved"));
+      $("#deviceRoleDialog").close();
+    }catch(error){showToast(error.message,true)}
+  }
+  function askDeviceRole(id,afterPairing=false){
+    const device=state.devices.find(item=>item.id===id);
+    if(!deviceRoleAskable(device)){if(afterPairing)finishPairingFlow(id);return}
+    state.roleEditing={id,afterPairing};
+    renderDeviceRoleDialog();
+    $("#deviceRoleDialog").showModal();
+  }
   function openDeviceOptions(id){
     const device=state.devices.find(item=>item.id===id);
     if(!device)return;
     state.optionsDevice=id;
     $("#deviceOptionsName").textContent=device.name;
+    $("#deviceRoleField").hidden=!deviceRoleAskable(device);
+    $("#deviceRole").value=device.role||"auto";
     $("#deviceTransition").value=String(device.options?.transition??0);
     $("#deviceDebounce").value=String(device.options?.debounce??0);
     $("#deviceRetain").checked=device.options?.retain===true;
@@ -3146,16 +3205,19 @@
     event.preventDefault();
     const id=state.optionsDevice;
     if(!id)return;
+    const device=state.devices.find(item=>item.id===id);
+    const role=$("#deviceRole").value;
     try{
       const data=await api(`/api/devices/${encodeURIComponent(id)}/options`,{method:"PUT",body:JSON.stringify({
         transition:Number($("#deviceTransition").value),
         debounce:Number($("#deviceDebounce").value),
         retain:$("#deviceRetain").checked
       })});
-      const device=state.devices.find(item=>item.id===id);
       if(device)device.options={...device.options,...data.options};
+      if(!$("#deviceRoleField").hidden&&role!==(device?.role||"auto"))await saveDeviceRole(id,role);
       $("#deviceOptionsDialog").close();
       showToast(t("optionsSaved"));
+      render();
     }catch(error){showToast(error.message,true)}
   }
   async function saveDeviceNote(event){
@@ -3596,25 +3658,10 @@
   const automationControlValue=(control,on)=>on?(control.valueOn??"ON"):(control.valueOff??"OFF");
   // Tek basışta hem açan hem kapatan seçenek yalnızca cihaz bunu bildiriyorsa sunulur.
   const automationCanToggle=control=>control?.valueToggle!==undefined&&control?.valueToggle!==null;
-  // Kanal anahtarları: `state`/`state_l1`/`state_l2`'den türeyenler (id'de iki nokta yok).
-  // `switch:find_switch` gibi ayar amaçlı ikili kontroller kanal sayılmaz.
-  const automationChannelSwitches=device=>(device?.controls||[])
-    .filter(control=>control.kind==="switch"&&!control.id.includes(":"));
-  // Duvar anahtarı/dimmer donanımının Zigbee2MQTT işaretleri; lambalarda çıkmaz.
-  const automationSwitchMarkers=["switch_type","switch_mode","indicator_mode","backlight_mode","relay_status","power_outage_memory","countdown","mode","adjustment_mode"];
-  const automationSwitchHardware=device=>(device?.features||[]).some(feature=>
-    automationSwitchMarkers.some(marker=>feature===marker||feature.startsWith(`${marker}_`)));
-  // Lamba sayılması için ÜÇÜ birden gerekli: tek kanal + ışık çıkışı + anahtar donanımı işareti yok.
-  // `color_temp` tek başına ölçüt DEĞİL: TS0601 _TZE284_tgeqdjgk duvar anahtarı da bildiriyor.
-  // Çok kanallı cihaz (state_l1/state_l2) her zaman anahtardır — dimmer olsa bile anahtardır.
-  // Belirsiz kalan her cihaz anahtar sayılır, yani üst kümede kalır.
-  const automationLightLike=device=>{
-    if(!device)return false;
-    if(automationChannelSwitches(device).length!==1)return false;
-    if(automationSwitchHardware(device))return false;
-    return (device.controls||[]).some(control=>
-      control.kind==="level"||control.kind==="temperature"||control.kind==="color");
-  };
+  // Sınıflandırma sunucudan gelir: `category` standart `definition.exposes[].type` tahminidir,
+  // kullanıcı rol seçtiyse onunla ezilmiştir. İstemcide model listesi ya da satıcıya özgü
+  // özellik adına bakan hiçbir kural yok — öyle bir kural yalnız tek bir evde çalışır.
+  const automationLightLike=device=>device?.category==="light";
   const automationDevice=action=>state.devices.find(device=>device.id===action?.deviceId)||null;
   // Kanonik hedef property; controlId ve ad yalnızca sunum verisi (§5.1.1).
   const automationControl=action=>automationDevice(action)?.controls.find(control=>control.property===action?.property)||null;
@@ -4747,6 +4794,7 @@
     $("#closeLight").setAttribute("aria-label",t("close"));
     if($("#nameDialog").open)configureNameDialog(state.editing?.afterPairing===true,state.editing?.reconnected===true);
     if($("#imageDialog").open)renderImageChooser();
+    if($("#deviceRoleDialog").open)renderDeviceRoleDialog();
     if($("#widgetDialog").open){$("#groupDialogTitle").textContent=t(state.groupEditing?.id?"editGroup":"createDeviceGroup");renderRoomSuggestions();updateGroupOrderControls();renderGroupDeviceChoices();renderWidgetCatalog()}
     if($("#clockDialog").open){renderSelectedClockCities();renderLocationSearchResults("clock")}
     if($("#weatherLocationDialog").open)renderLocationSearchResults("weather");
@@ -4935,7 +4983,9 @@
   $("#deviceOptionsDialog").onclose=()=>{state.optionsDevice=null};
   $("#imageForm").onsubmit=event=>{event.preventDefault();saveImage()};
   $("#cancelImage").onclick=()=>$("#imageDialog").close();
-  $("#imageDialog").onclose=()=>{const editing=state.imageEditing;state.imageEditing=null;$("#saveImage").disabled=false;if(editing?.afterPairing)finishPairingFlow(editing.id)};
+  $("#imageDialog").onclose=()=>{const editing=state.imageEditing;state.imageEditing=null;$("#saveImage").disabled=false;if(editing?.afterPairing)askDeviceRole(editing.id,true)};
+  $("#skipDeviceRole").onclick=()=>$("#deviceRoleDialog").close();
+  $("#deviceRoleDialog").onclose=()=>{const editing=state.roleEditing;state.roleEditing=null;if(editing?.afterPairing)finishPairingFlow(editing.id);else render()};
   $("#groupForm").onsubmit=event=>{event.preventDefault();saveDashboardGroup()};
   $("#groupName").oninput=updateGroupSelection;
   $("#cancelGroup").onclick=closeAddDialog;

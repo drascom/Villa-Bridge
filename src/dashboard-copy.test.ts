@@ -1823,6 +1823,7 @@ interface PickDevice {
   lastAction?: { action: string } | null;
   controls?: Array<{ id: string; kind: string }>;
   features?: string[];
+  category?: string;
 }
 
 interface PickGroup {
@@ -1841,7 +1842,7 @@ interface PickApi {
 function pickGrouping(dashboard: string): (events: Array<{ sourceName: string; property: string }>) => PickApi {
   const scripts = dashboardScripts(dashboard);
   const seen = /const deviceSeenPress=device=>[\s\S]*?item\.property==="action"\);/.exec(scripts);
-  const light = /const automationChannelSwitches=device=>[\s\S]*?const automationLightLike=device=>\{[\s\S]*?\n  \};/.exec(scripts);
+  const light = /const automationLightLike=device=>device\?\.category==="light";/.exec(scripts);
   const groups = /const automationPickGroups=\(devices,kind\)=>[\s\S]*?:\[\{devices,proven:true\}\];/.exec(scripts);
   assert.ok(seen, "kanıt ölçütü bulunamadı");
   assert.ok(light, "anahtar/lamba ölçütü bulunamadı");
@@ -1961,87 +1962,51 @@ test("basış yaymamış cihaz listede geride kalır, yayan cihaz uyarısız ön
   );
 });
 
-test("anahtar yolunda gerçek duvar anahtarları üstte, lambalar altta kalır", async () => {
+test("anahtar yolunda sınıflandırma sunucudan gelir, eve özel kural kalmaz", async () => {
   const dashboard = await readDashboardBundle();
-  // Cihaz şekilleri evin kendi Zigbee2MQTT verisinden alındı (model + yayımlanan özellikler).
-  // TS0601 _TZE284_tgeqdjgk duvar anahtarı: üç kanal (state/state_l1/state_l2) + parlaklık +
-  // color_temp. `color_temp` tek başına lamba ölçütü OLAMAZ — bu cihaz da bildiriyor.
-  const wallSwitch = (id: string, name: string): PickDevice => ({
+  // Sunucu her cihaza `category` verir: standart `definition.exposes[].type` tahmini ya da
+  // kullanıcının seçtiği rol. Sihirbaz başka hiçbir ölçüte bakmaz.
+  const shape = (id: string, name: string, category: string): PickDevice => ({
     id,
     name,
     sourceName: name,
-    controls: [
-      { id: "main", kind: "switch" },
-      { id: "l1", kind: "switch" },
-      { id: "l2", kind: "switch" },
-      { id: "main:brightness", kind: "level" },
-      { id: "main:temperature", kind: "temperature" }
-    ],
-    features: ["state", "state_l1", "state_l2", "brightness", "color_temp", "mode", "switch_mode_l1", "switch_mode_l2", "adjustment_mode"]
+    category,
+    controls: [{ id: "main", kind: "switch" }]
   });
-  const garden = wallSwitch("0xf84477fffeab048e", "Garden 3 Way Switch");
-  const livingRoom = wallSwitch("0xf074bffffe1f9884", "Living Room Wall Switch");
-  // TS0001 _TZ3000_i9oy2rdq röle: tek kanal, parlaklık yok.
-  const relay: PickDevice = {
-    id: "0xa4c138b950918de3",
-    name: "Corridor light",
-    sourceName: "corridor",
-    controls: [{ id: "main", kind: "switch" }],
-    features: ["state", "countdown", "switch_type", "power_on_behavior"]
-  };
-  // GLEDOPTO GL-C-006P ve eWeLight ZB-CT01: tek kanal + parlaklık/renk sıcaklığı, anahtar işareti yok.
-  const balcony: PickDevice = {
-    id: "0xa4c138ea872c2c8e",
-    name: "Balkon lambası",
-    sourceName: "balkon",
-    controls: [
-      { id: "main", kind: "switch" },
-      { id: "main:brightness", kind: "level" },
-      { id: "main:temperature", kind: "temperature" }
-    ],
-    features: ["state", "brightness", "color_temp", "color_temp_startup", "power_on_behavior", "effect"]
-  };
-  const kitchenLed: PickDevice = {
-    id: "0xa4c138462c230400",
-    name: "Mutfak led sağ",
-    sourceName: "mutfakled",
-    controls: [
-      { id: "main", kind: "switch" },
-      { id: "main:brightness", kind: "level" },
-      { id: "main:temperature", kind: "temperature" }
-    ],
-    features: ["state", "brightness", "color_temp"]
-  };
+  // Farklı satıcılardan iki lamba: biri Tuya LED sürücüsü, biri IKEA ampulü — ikisi de `light`.
+  const balcony = shape("0xa4c138ea872c2c8e", "Balkon lambası", "light");
+  const ikeaBulb = shape("0x000d6ffffe111111", "Bedroom bulb", "light");
+  // Farklı satıcılardan iki anahtar: çok kanallı duvar anahtarı ve tek kanallı röle.
+  const garden = shape("0xf84477fffeab048e", "Garden 3 Way Switch", "switch");
+  const relay = shape("0xa4c138b950918de3", "Corridor relay", "switch");
+  // Tanımı bilinmeyen cihaz belirsiz kalır: elenmez, üst kümede seçilebilir durur.
+  const unknown = shape("0xa4c1380000000001", "Unknown module", "unknown");
 
   const grouping = pickGrouping(dashboard)([]);
-  // Doğrudan ölçüt: anahtar cihazları lamba SAYILMAZ, gerçek lambalar sayılır.
-  assert.equal(grouping.automationLightLike(garden), false);
-  assert.equal(grouping.automationLightLike(livingRoom), false);
-  assert.equal(grouping.automationLightLike(relay), false);
   assert.equal(grouping.automationLightLike(balcony), true);
-  assert.equal(grouping.automationLightLike(kitchenLed), true);
+  assert.equal(grouping.automationLightLike(ikeaBulb), true);
+  assert.equal(grouping.automationLightLike(garden), false);
+  assert.equal(grouping.automationLightLike(relay), false);
+  assert.equal(grouping.automationLightLike(unknown), false);
+  // Kullanıcının rolü tahmini ezdiğinde sunucu `category`yi çevirir; sihirbaz o an lamba der.
+  assert.equal(grouping.automationLightLike({ ...garden, category: "light" }), true);
+  assert.equal(grouping.automationLightLike({ ...balcony, category: "switch" }), false);
+  assert.equal(grouping.automationLightLike({ id: "0x0", name: "?", sourceName: "?" }), false);
 
-  const groups = grouping.automationPickGroups([garden, livingRoom, relay, balcony, kitchenLed], "deviceState");
+  const groups = grouping.automationPickGroups([garden, relay, unknown, balcony, ikeaBulb], "deviceState");
   assert.deepEqual(
     groups.map((group) => [Boolean(group.extra), group.devices.map((device) => device.name)]),
     [
-      [false, ["Garden 3 Way Switch", "Living Room Wall Switch", "Corridor light"]],
-      [true, ["Balkon lambası", "Mutfak led sağ"]]
+      [false, ["Garden 3 Way Switch", "Corridor relay", "Unknown module"]],
+      [true, ["Balkon lambası", "Bedroom bulb"]]
     ]
   );
 
-  // Belirsiz cihaz üst kümede kalır: parlaklık bildiren ama anahtar donanımı işareti taşıyan tek kanallı
-  // cihaz da anahtar sayılır.
-  const knobDimmer: PickDevice = {
-    id: "0xa4c1380000000001",
-    name: "Knob dimmer switch",
-    sourceName: "knob",
-    controls: [{ id: "main", kind: "switch" }, { id: "main:brightness", kind: "level" }],
-    features: ["state", "brightness", "switch_type"]
-  };
-  assert.equal(grouping.automationLightLike(knobDimmer), false);
-  // Kontrolü bilinmeyen cihaz da lamba sayılmaz.
-  assert.equal(grouping.automationLightLike({ id: "0x0", name: "?", sourceName: "?" }), false);
+  // Eve özel mantık geri sızmasın: model listesi ve satıcıya özgü özellik adları ölçüt olamaz.
+  assert.doesNotMatch(dashboard, /automationSwitchMarkers/);
+  assert.doesNotMatch(dashboard, /automationSwitchHardware/);
+  assert.doesNotMatch(dashboard, /automationChannelSwitches/);
+  assert.doesNotMatch(dashboard, /switch_mode_l1|adjustment_mode|indicator_mode/);
 
   // Eleme değil katlama: geride kalanlar "Tüm cihazları göster" ile açılır.
   assert.match(dashboard, /data-automation-show-all="1"/);
@@ -2052,6 +2017,44 @@ test("anahtar yolunda gerçek duvar anahtarları üstte, lambalar altta kalır",
   assert.match(dashboard, /automationOtherDevicesGroup:"Diğer cihazlar"/);
   // Düzenlemede katlanmış kümedeki seçim kaybolmaz.
   assert.match(dashboard, /folded\.devices\.some\(item=>item\.id===wizard\.triggerDeviceId\)/);
+});
+
+test("cihaz rolü eşleştirmede sorulur ve cihaz ayarlarından değiştirilebilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Eşleştirme akışının son adımı: ad → (gerekiyorsa görsel) → "Bu cihaz ne?".
+  assert.match(dashboard, /function continuePairingFlow\(id\)\{[\s\S]*?askDeviceRole\(id,true\);/);
+  assert.match(dashboard, /if\(editing\?\.afterPairing\)askDeviceRole\(editing\.id,true\)/);
+  // Atlanabilir: dialog kapanınca akış rol yazılmadan tamamlanır, rol Otomatik kalır.
+  assert.match(dashboard, /\$\("#skipDeviceRole"\)\.onclick=\(\)=>\$\("#deviceRoleDialog"\)\.close\(\)/);
+  assert.match(
+    dashboard,
+    /\$\("#deviceRoleDialog"\)\.onclose=\(\)=>\{[\s\S]*?if\(editing\?\.afterPairing\)finishPairingFlow\(editing\.id\)/
+  );
+  // Sonradan değiştirme yolu cihaz seçenekleri diyaloğunda.
+  assert.match(dashboard, /id="deviceRoleField"/);
+  assert.match(dashboard, /<select id="deviceRole">/);
+  assert.match(dashboard, /\$\("#deviceRoleField"\)\.hidden=!deviceRoleAskable\(device\);/);
+  // Rol yalnız lamba↔anahtar karışıklığında sorulur; perde, kilit, sensör otomatik kalır.
+  assert.match(
+    dashboard,
+    /const deviceRoleAskable=device=>Boolean\(device\)&&\(device\.category==="light"\|\|device\.category==="switch"/
+  );
+  // UID kuralı: yazma ucu IEEE adresine gider.
+  assert.match(dashboard, /\/api\/devices\/\$\{encodeURIComponent\(id\)\}\/role/);
+
+  // Kart alt yazısı artık her cihazda "Kumanda" demiyor; sınıfı yansıtıyor.
+  assert.match(dashboard, /const deviceCategoryLabels=\{light:"lightDevice",switch:"switchDevice"/);
+  assert.match(dashboard, /lightDevice:"Light"/);
+  assert.match(dashboard, /lightDevice:"Lamba"/);
+  assert.match(dashboard, /switchDevice:"Switch"/);
+  assert.match(dashboard, /switchDevice:"Anahtar"/);
+  assert.match(dashboard, /deviceRoleTitle:"What is this device\?"/);
+  assert.match(dashboard, /deviceRoleTitle:"Bu cihaz ne\?"/);
+  assert.match(dashboard, /deviceRoleSwitch:"Switch or plug"/);
+  assert.match(dashboard, /deviceRoleSwitch:"Anahtar veya priz"/);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
 
 interface PressEntry {

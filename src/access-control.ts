@@ -34,6 +34,9 @@ const residentRoutes = new Set([
   "GET /api/device-image/:model",
   "GET /api/devices/:id/note",
   "PUT /api/devices/:id/note",
+  // Rol yalnız arayüzdeki sunumu değiştirir (lamba mı anahtar mı) — ev sakini de düzeltebilir.
+  "GET /api/devices/:id/role",
+  "PUT /api/devices/:id/role",
   "POST /api/devices/:id/command",
   "POST /api/groups/:id/command",
   "POST /api/auth/logout"

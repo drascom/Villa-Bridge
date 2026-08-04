@@ -8,6 +8,7 @@ import type {
   JsonScalar
 } from "./types.js";
 import { deviceButtons } from "./device-buttons.js";
+import { detectDeviceCategory, resolveDeviceCategory, type DeviceRole } from "./device-category.js";
 import { deviceControls, type WritableFeature } from "./device-controls.js";
 import { canonicalDeviceModel, deviceIdentity } from "./device-identity.js";
 import type { DeviceImagePreferences } from "./device-images.js";
@@ -203,7 +204,9 @@ export class DeviceStore {
     private readonly onEventsChanged?: (
       events: DeviceEventView[],
       added: DeviceEventView[]
-    ) => void
+    ) => void,
+    /** Kullanıcının seçtiği roller; IEEE adresine göre, paylaşılan canlı harita. */
+    private readonly roles: Map<string, DeviceRole> = new Map()
   ) {
     this.aliases = aliases;
     this.events = initialEvents.slice(0, 200);
@@ -411,11 +414,16 @@ export class DeviceStore {
         if (stateValue.carbon_monoxide === true) {
           alerts.push({ code: "carbon_monoxide", severity: "critical" });
         }
+        const detectedCategory = detectDeviceCategory(exposes);
+        const role = this.roles.get(id) ?? "auto";
         return {
           id,
           sourceName,
           name,
           type: device.type ?? "Unknown",
+          category: resolveDeviceCategory(detectedCategory, role),
+          detectedCategory,
+          role,
           model: canonicalDeviceModel(device.definition?.model, device.manufacturer),
           image,
           vendor: device.definition?.vendor ?? null,
