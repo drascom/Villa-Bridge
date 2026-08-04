@@ -14,6 +14,9 @@ homeAssistant:
   discoveryEnabled: false
 alerts:
   lowBatteryThreshold: 15
+selfHealing:
+  enabled: true
+  probeOffline: false
 debug:
   enabled: true
 http:

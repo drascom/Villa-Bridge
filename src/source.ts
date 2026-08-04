@@ -53,4 +53,9 @@ export interface ZigbeeSource {
   removeDevice(id: string, force?: boolean): Promise<void>;
   prepareNetworkBackup(): Promise<PreparedNetworkBackup | null>;
   setHomeAssistantDiscovery(enabled: boolean): void | Promise<void>;
+  /**
+   * Otomatik onarım yalnız koordinatörün sahibi olan kaynakta anlamlıdır; shadow modda
+   * uygulanmaz, bu yüzden isteğe bağlıdır.
+   */
+  setSelfHealingEnabled?(enabled: boolean): void;
 }

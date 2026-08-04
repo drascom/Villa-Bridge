@@ -40,6 +40,7 @@ import { getNetworkInfo } from "./network-info.js";
 import { isDeviceRemovalConfirmation } from "./removal-confirmation.js";
 import { registerRecentErrorApi } from "./recent-error-api.js";
 import { RecentErrorLog } from "./recent-error-log.js";
+import { SelfHealStateStore } from "./self-heal.js";
 import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
@@ -119,6 +120,10 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
     matter: { wsUrl: config.matterbridge.wsUrl },
     homeAssistant: { discoveryEnabled: config.homeAssistant.discoveryEnabled },
     alerts: { lowBatteryThreshold: config.alerts.lowBatteryThreshold },
+    selfHealing: {
+      enabled: config.selfHealing.enabled,
+      probeOffline: config.selfHealing.probeOffline
+    },
     debug: { enabled: config.debug.enabled }
   }
 ) : null;
@@ -159,12 +164,28 @@ let source: ZigbeeSource;
 if (config.mode === "direct") {
   if (!config.zigbee) throw new Error("Doğrudan Zigbee ayarları bulunamadı.");
   const { DirectZigbeeSource } = await import("./direct-zigbee-source.js");
+  const selfHealStateStore = new SelfHealStateStore(
+    resolve(dirname(configPath), "self-heal-state.json")
+  );
   source = new DirectZigbeeSource(
     config.zigbee,
     config.mqtt,
     store,
     config.homeAssistant.discoveryEnabled,
-    aliases
+    aliases,
+    undefined,
+    {
+      enabled: config.selfHealing.enabled,
+      state: await selfHealStateStore.get(),
+      persist: (state) => {
+        void selfHealStateStore.save(state).catch((error) => {
+          console.error(`Otomatik onarım durumu kaydedilemedi: ${String(error)}`);
+        });
+      },
+      recordFailure: (deviceId, message) => {
+        recentErrors.record({ operation: "self-heal", statusCode: 503, message: `${deviceId}: ${message}` });
+      }
+    }
   );
 } else {
   source = new MqttShadowSource(config.mqtt, store);
@@ -1005,6 +1026,10 @@ app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
     });
     store.setLowBatteryThreshold(settings.alerts.lowBatteryThreshold);
     recentErrors.setEnabled(settings.debug.enabled);
+    // Otomatik onarım yeniden başlatma beklemeden açılıp kapanır; kuyruk anında boşalır.
+    config.selfHealing.enabled = settings.selfHealing.enabled;
+    config.selfHealing.probeOffline = settings.selfHealing.probeOffline;
+    source.setSelfHealingEnabled?.(settings.selfHealing.enabled);
     return { ok: true, settings, restartRequired: true };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });

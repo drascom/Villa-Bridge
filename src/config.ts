@@ -26,6 +26,10 @@ interface FileConfig {
   alerts?: {
     lowBatteryThreshold?: number;
   };
+  selfHealing?: {
+    enabled?: boolean;
+    probeOffline?: boolean;
+  };
   debug?: {
     enabled?: boolean;
   };
@@ -118,6 +122,14 @@ export interface AppConfig {
   alerts: {
     lowBatteryThreshold: number;
   };
+  /**
+   * Faz 1 otomatik onarım: cihaz kendini ilan edince raporlama ayarları yeniden yazılır.
+   * `probeOffline` Faz 2'nin yeri — bu sürümde yalnız saklanır, hiçbir davranışı yoktur.
+   */
+  selfHealing: {
+    enabled: boolean;
+    probeOffline: boolean;
+  };
   debug: {
     enabled: boolean;
   };
@@ -181,6 +193,14 @@ export async function loadConfig(): Promise<AppConfig> {
         ?? file.alerts?.lowBatteryThreshold
         ?? 15
       )
+    },
+    selfHealing: {
+      enabled: process.env.VILLA_BRIDGE_SELF_HEALING
+        ? process.env.VILLA_BRIDGE_SELF_HEALING === "true"
+        : file.selfHealing?.enabled !== false,
+      probeOffline: process.env.VILLA_BRIDGE_SELF_HEALING_PROBE_OFFLINE
+        ? process.env.VILLA_BRIDGE_SELF_HEALING_PROBE_OFFLINE === "true"
+        : file.selfHealing?.probeOffline === true
     },
     debug: {
       enabled: process.env.VILLA_BRIDGE_DEBUG

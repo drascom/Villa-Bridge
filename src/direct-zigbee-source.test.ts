@@ -15,6 +15,7 @@ import {
   zigbeeAvailabilityState
 } from "./direct-zigbee-source.js";
 import { DeviceStore } from "./device-store.js";
+import { createZigbeeNetworkBackup, stageZigbeeNetworkRestore } from "./zigbee-backup.js";
 
 test("çözümlenmeyen genOnOff komutları tuş olayı teşhisine alınır", () => {
   const actionMessage = {
@@ -695,4 +696,155 @@ test("direct Zigbee grupları oluşturulur, yeniden adlandırılır ve kalıcı 
   assert.doesNotMatch(saved, /Living Room|Lounge/);
   assert.equal(groups.size, 0);
   assert.deepEqual(config.groups, {});
+});
+
+/** Otomatik onarım testleri için sahte koordinatör; canlı donanıma hiç dokunmaz. */
+function selfHealFixture(options: { configure?: () => void | Promise<void> } = {}) {
+  const calls: string[] = [];
+  const coordinatorEndpoint = { ID: 1 };
+  const device = {
+    ieeeAddr: "0x00124b00self",
+    type: "Router" as string,
+    endpoints: [] as unknown[],
+    scheduledOta: undefined as unknown,
+    interviewState: "SUCCESSFUL",
+    async interview() {
+      calls.push("interview");
+    }
+  };
+  const definition = {
+    model: "TEST",
+    vendor: "Villa",
+    description: "Self heal test",
+    exposes: [],
+    async configure() {
+      calls.push("configure");
+      await options.configure?.();
+    }
+  };
+  const handlers = new Map<string, (payload: never) => void>();
+  const controller = {
+    on(event: string, handler: (payload: never) => void) {
+      handlers.set(event, handler);
+    },
+    getDeviceByIeeeAddr(id: string) {
+      return id === device.ieeeAddr ? device : undefined;
+    },
+    getDevicesByType(type: string) {
+      return type === "Coordinator"
+        ? [{ getEndpoint: () => coordinatorEndpoint, endpoints: [coordinatorEndpoint] }]
+        : [];
+    },
+    getDevicesIterator() {
+      return [device].values();
+    }
+  };
+  return { calls, controller, device, definition, handlers };
+}
+
+test("cihaz kendini ilan edince görüşmeden yapılandırılır ve iz bırakır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-direct-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  const store = new DeviceStore(new Map());
+  const source = new DirectZigbeeSource(
+    { devices: { [fixture.device.ieeeAddr]: { friendly_name: "Hall Switch" } }, groups: {}, dataDir: directory } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false,
+    new Map(),
+    (async () => fixture.definition) as never,
+    { enabled: true, spacingMs: 0 }
+  );
+  Object.assign(source, { controller: fixture.controller, refreshDevices: async () => undefined });
+  (source as unknown as { attachEvents(controller: unknown): void }).attachEvents(fixture.controller);
+
+  fixture.handlers.get("deviceAnnounce")?.({ device: fixture.device } as never);
+  await (source as unknown as { selfHeal: { whenIdle(): Promise<void> } }).selfHeal.whenIdle();
+
+  // Pahalı ve sonuçsuz `interview(true)` yolu otomatik olarak asla çalışmaz.
+  assert.deepEqual(fixture.calls, ["configure"]);
+  assert.deepEqual(
+    store.getEvents(5).map((event) => [event.sourceName, event.property, event.value]),
+    [["Hall Switch", "self_heal", "ok"], ["Hall Switch", "self_heal", "attempt"]]
+  );
+});
+
+test("eşleştirme, OTA ve yedek geri yükleme sırasında otomatik onarım denenmez", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-blocked-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  const store = new DeviceStore(new Map());
+  const source = new DirectZigbeeSource(
+    { devices: {}, groups: {}, dataDir: directory } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false,
+    new Map(),
+    (async () => fixture.definition) as never,
+    { enabled: true, spacingMs: 0 }
+  );
+  Object.assign(source, { controller: fixture.controller, refreshDevices: async () => undefined });
+  (source as unknown as { attachEvents(controller: unknown): void }).attachEvents(fixture.controller);
+  const announce = async () => {
+    fixture.handlers.get("deviceAnnounce")?.({ device: fixture.device } as never);
+    await (source as unknown as { selfHeal: { whenIdle(): Promise<void> } }).selfHeal.whenIdle();
+  };
+
+  Object.assign(source, { pairingState: { permitted: true, time: 180 } });
+  await announce();
+  assert.deepEqual(fixture.calls, []);
+
+  Object.assign(source, { pairingState: { permitted: false, time: 0 } });
+  (source as unknown as { otaUpdates: Set<string> }).otaUpdates.add("0xother");
+  await announce();
+  assert.deepEqual(fixture.calls, []);
+
+  (source as unknown as { otaUpdates: Set<string> }).otaUpdates.clear();
+  fixture.device.scheduledOta = {};
+  await announce();
+  assert.deepEqual(fixture.calls, []);
+
+  fixture.device.scheduledOta = undefined;
+  await writeFile(join(directory, "coordinator_backup.json"), '{"metadata":{}}');
+  await writeFile(join(directory, "database.db"), "{}");
+  await stageZigbeeNetworkRestore(directory, await createZigbeeNetworkBackup(directory));
+  await announce();
+  assert.deepEqual(fixture.calls, []);
+
+  Object.assign(source, { controller: null });
+  await announce();
+  assert.deepEqual(fixture.calls, []);
+
+  // Hiçbir engelli durumda olay akışına da yazılmaz.
+  assert.deepEqual(store.getEvents(5), []);
+});
+
+test("otomatik onarım ayarı kapalıyken ilan hiçbir şey tetiklemez", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-self-heal-off-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  const store = new DeviceStore(new Map());
+  const source = new DirectZigbeeSource(
+    { devices: {}, groups: {}, dataDir: directory } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false,
+    new Map(),
+    (async () => fixture.definition) as never,
+    { enabled: false, spacingMs: 0 }
+  );
+  Object.assign(source, { controller: fixture.controller, refreshDevices: async () => undefined });
+  (source as unknown as { attachEvents(controller: unknown): void }).attachEvents(fixture.controller);
+  const announce = async () => {
+    fixture.handlers.get("deviceAnnounce")?.({ device: fixture.device } as never);
+    await (source as unknown as { selfHeal: { whenIdle(): Promise<void> } }).selfHeal.whenIdle();
+  };
+
+  await announce();
+  assert.deepEqual(fixture.calls, []);
+
+  source.setSelfHealingEnabled(true);
+  await announce();
+  assert.deepEqual(fixture.calls, ["configure"]);
 });

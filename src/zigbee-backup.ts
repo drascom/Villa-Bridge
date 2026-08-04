@@ -128,6 +128,19 @@ export const stageZigbeeNetworkRestore = async (
   await rename(temporary, join(dataDir, pendingName));
 };
 
+/**
+ * Sıraya alınmış bir geri yükleme bekliyorsa `true`. Koordinatöre dokunan arka plan işleri
+ * (otomatik onarım gibi) bu sırada çalışmamalı: veritabanı birazdan değişecek.
+ */
+export const hasPendingZigbeeNetworkRestore = async (dataDir: string): Promise<boolean> => {
+  try {
+    return (await stat(join(dataDir, pendingName))).isFile();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+};
+
 export const applyPendingZigbeeNetworkRestore = async (
   dataDir: string
 ): Promise<boolean> => {

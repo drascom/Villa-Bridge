@@ -14,9 +14,15 @@ import type { AppConfig } from "./config.js";
 import { DeviceStore, featureValues } from "./device-store.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
+import {
+  SelfHealScheduler,
+  type SelfHealDeviceState,
+  type SelfHealOutcome
+} from "./self-heal.js";
 import type { OtaCheckResult, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
 import { decodeTuyaButtonFrame } from "./tuya-button-frames.js";
 import type { BridgeDevice, BridgeGroup, JsonObject } from "./types.js";
+import { hasPendingZigbeeNetworkRestore } from "./zigbee-backup.js";
 
 function messageText(value: string | (() => string)): string {
   return typeof value === "function" ? value() : value;
@@ -156,6 +162,22 @@ export function endpointNamesForDevice(
   );
 }
 
+/**
+ * Otomatik onarımın kurulumu. Mekanizma bilerek yalnız bu sınıfın içinde yaşar: shadow modda
+ * hiç kurulmaz, Android izleyici modunda çekirdek hiç başlamaz — devir sırasında iki koordinatör
+ * sahibinin aynı anda yapılandırma yazması yapısal olarak imkânsız.
+ */
+export interface DirectSelfHealingSetup {
+  enabled: boolean;
+  state?: Map<string, SelfHealDeviceState>;
+  persist?: (state: Map<string, SelfHealDeviceState>) => void;
+  recordFailure?: (deviceId: string, message: string) => void;
+  /** Testler için; üretimde varsayılan zamanlayıcı kullanılır. */
+  spacingMs?: number;
+  wait?: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+
 export class DirectZigbeeSource implements ZigbeeSource {
   private controller: Controller | null = null;
   private readonly definitions = new Map<string, Definition>();
@@ -173,6 +195,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private readonly otaUpdates = new Set<string>();
   /** Tuya tuş çerçevelerinin son ZCL sıra numarası; cihazın tekrarlarını eler. */
   private readonly lastButtonSequences = new Map<string, number>();
+  private readonly selfHeal: SelfHealScheduler;
 
   constructor(
     private readonly config: DirectZigbeeConfig,
@@ -180,8 +203,71 @@ export class DirectZigbeeSource implements ZigbeeSource {
     private readonly store: DeviceStore,
     private homeAssistantDiscoveryEnabled = false,
     private readonly aliases: ReadonlyMap<string, string> = new Map(),
-    private readonly definitionResolver: typeof findByDevice = findByDevice
-  ) {}
+    private readonly definitionResolver: typeof findByDevice = findByDevice,
+    selfHealing: DirectSelfHealingSetup = { enabled: false }
+  ) {
+    this.selfHeal = new SelfHealScheduler({
+      enabled: selfHealing.enabled,
+      initialState: selfHealing.state,
+      persist: selfHealing.persist,
+      blockedReason: (deviceId) => this.selfHealBlockedReason(deviceId),
+      prepare: (deviceId) => this.selfHealPrepare(deviceId),
+      onOutcome: (deviceId, outcome) => this.recordSelfHealEvent(deviceId, outcome),
+      onFailure: selfHealing.recordFailure,
+      ...(selfHealing.spacingMs === undefined ? {} : { spacingMs: selfHealing.spacingMs }),
+      ...(selfHealing.wait ? { wait: selfHealing.wait } : {}),
+      ...(selfHealing.now ? { now: selfHealing.now } : {})
+    });
+  }
+
+  setSelfHealingEnabled(enabled: boolean): void {
+    this.selfHeal.setEnabled(enabled);
+  }
+
+  /**
+   * Otomatik onarımın asla denenmemesi gereken durumlar. Her biri var olan bir duruma bakar;
+   * yeni bayrak icat edilmez.
+   */
+  private async selfHealBlockedReason(deviceId: string): Promise<string | null> {
+    const controller = this.controller;
+    if (!controller) return "Zigbee koordinatörü hazır değil.";
+    if (this.pairingState.permitted) return "Eşleştirme açık.";
+    if (this.otaUpdates.size > 0) return "Kablosuz yazılım güncellemesi sürüyor.";
+    const device = controller.getDeviceByIeeeAddr(deviceId);
+    if (!device) return "Cihaz bulunamadı.";
+    if (device.scheduledOta) return "Cihaz için yazılım güncellemesi planlı.";
+    if (await hasPendingZigbeeNetworkRestore(this.config.dataDir)) {
+      return "Zigbee ağ yedeği geri yüklenmeyi bekliyor.";
+    }
+    return null;
+  }
+
+  /**
+   * Yalnız yerel hazırlık: cihaz tanımını çözer. `interview(true)` **çağrılmaz** — ilan zaten
+   * cihazın erişilebilir olduğunu söyler, pahalı ve sonuçsuz görüşmeye gerek yok.
+   */
+  private async selfHealPrepare(deviceId: string): Promise<(() => Promise<void>) | null> {
+    const controller = this.controller;
+    const device = controller?.getDeviceByIeeeAddr(deviceId);
+    if (!controller || !device || device.type === "Coordinator") return null;
+    if (this.config.devices[deviceId]?.disabled === true) return null;
+    const definition = this.definitions.get(deviceId) ?? await this.definitionResolver(device);
+    if (!definition) return null;
+    this.definitions.set(deviceId, definition);
+    if (!definition.configure) return null;
+    const coordinatorDevice = controller.getDevicesByType("Coordinator")[0];
+    const coordinator = coordinatorDevice?.getEndpoint(1) ?? coordinatorDevice?.endpoints[0];
+    if (!coordinator) return null;
+    return async () => {
+      await definition.configure?.(device, coordinator, definition);
+      await this.refreshDevices();
+    };
+  }
+
+  private recordSelfHealEvent(deviceId: string, outcome: SelfHealOutcome): void {
+    const friendlyName = this.config.devices[deviceId]?.friendly_name ?? deviceId;
+    this.store.recordExternalEvent(friendlyName, "self_heal", outcome);
+  }
 
   async start(): Promise<void> {
     const controller = new Controller({
@@ -528,6 +614,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
   }
 
   async stop(): Promise<void> {
+    this.selfHeal.setEnabled(false);
     this.abort.abort();
     const controller = this.controller;
     this.controller = null;
@@ -596,7 +683,12 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
       this.publish("bridge/event", event);
     };
-    controller.on("deviceAnnounce", ({ device }) => announceKnownDevice(device));
+    // İlan = cihaz güç döngüsünden/rota kurulumundan sonra ağa döndüğünün kanıtı. Zigbee2MQTT
+    // deseni: burada raporlama ayarları yeniden yazılır, görüşme başlatılmaz.
+    controller.on("deviceAnnounce", ({ device }) => {
+      announceKnownDevice(device);
+      this.selfHeal.schedule(device.ieeeAddr);
+    });
     controller.on("lastSeenChanged", ({ device, reason }) => {
       this.setAvailability(device.ieeeAddr, "online");
       if (reason === "deviceJoined") announceKnownDevice(device);

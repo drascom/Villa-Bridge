@@ -336,7 +336,7 @@
       </div>
       <form id="settingsForm" class="setting-card connection-settings-card">
         <div class="connection-settings-grid">
-          <section class="connection-settings-section"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div><div class="setting-field"><label for="zigbeeChannel" data-i18n="zigbeeChannel">Zigbee channel</label><select id="zigbeeChannel"><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option></select><small data-i18n="zigbeeChannelLead">Changing the channel can disconnect devices and requires a service restart.</small></div><div class="setting-field"><label for="lowBatteryThreshold" data-i18n="lowBatteryThreshold">Low battery warning</label><input id="lowBatteryThreshold" type="number" min="5" max="50" step="1" required><small data-i18n="lowBatteryThresholdLead">Create an alert when a battery reaches this percentage.</small></div></section>
+          <section class="connection-settings-section"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div><div class="setting-field"><label for="zigbeeChannel" data-i18n="zigbeeChannel">Zigbee channel</label><select id="zigbeeChannel"><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option></select><small data-i18n="zigbeeChannelLead">Changing the channel can disconnect devices and requires a service restart.</small></div><div class="setting-field"><label for="lowBatteryThreshold" data-i18n="lowBatteryThreshold">Low battery warning</label><input id="lowBatteryThreshold" type="number" min="5" max="50" step="1" required><small data-i18n="lowBatteryThresholdLead">Create an alert when a battery reaches this percentage.</small></div><div class="setting-field"><label for="selfHealingEnabled" data-i18n="selfHealing">Automatic repair</label><select id="selfHealingEnabled"><option value="true" data-i18n="enabled">Enabled</option><option value="false" data-i18n="disabled">Disabled</option></select><small data-i18n="selfHealingLead">When a device announces itself again, refresh its reporting setup automatically. Unreachable devices are never polled.</small></div></section>
           <section class="connection-settings-section"><h2>MQTT</h2><p data-i18n="mqttSettingsLead">Broker and base topic shared by Villa Bridge and Zigbee2MQTT.</p><div class="setting-field"><label for="mqttUrl" data-i18n="mqttUrl">Broker URL</label><input id="mqttUrl" name="mqttUrl" type="url" placeholder="mqtt://127.0.0.1:1883" required></div><div class="setting-field"><label for="mqttBaseTopic" data-i18n="baseTopic">Base topic</label><input id="mqttBaseTopic" name="mqttBaseTopic" spellcheck="false" required></div></section>
           <section class="connection-settings-section"><h2>Matter</h2><p data-i18n="matterSettingsLead">WebSocket connection used to publish devices to Matterbridge.</p><div class="setting-field"><label for="matterWsUrl" data-i18n="matterUrl">Matterbridge URL</label><input id="matterWsUrl" name="matterWsUrl" type="url" placeholder="ws://127.0.0.1:8283" required></div></section>
         </div>
@@ -642,6 +642,8 @@
     ||device.supported===false
     ||device.interviewCompleted===false
     ||isAlert(device);
+  // Otomatik onarım izi: cihaz kendini ilan edince köprünün yazdığı `self_heal` olayı.
+  const selfHealLabelKeys={attempt:"selfHealAttempt",ok:"selfHealOk",failed:"selfHealFailed"};
   const eventPresentation=event=>{
     const enabled=event.value===true||String(event.value).toUpperCase()==="ON";
     if(event.property==="action")return{icon:"◉",label:String(event.value).replaceAll("_"," ")};
@@ -652,6 +654,7 @@
     if(event.property==="battery_low")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
     if(event.property==="battery_threshold")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
     if(event.property==="availability")return{icon:"●",label:event.value==="online"?t("ready"):t("unreachable")};
+    if(event.property==="self_heal")return{icon:"⟳",label:t(selfHealLabelKeys[event.value]||"selfHealAttempt")};
     if(event.property==="state")return{icon:"◉",label:enabled?t("on"):t("off")};
     return{icon:"•",label:String(event.value).replaceAll("_"," ")};
   };
@@ -995,6 +998,12 @@
     const rows=buttons.map(button=>`<div class="device-button-row${deviceButtonPressed(device,button)?" pressed":""}" data-device-button="${esc(button.id)}"><div class="device-button-name">${esc(deviceButtonName(button))}${deviceButtonRenameButton(device,button)}</div><div class="device-button-presses">${esc(deviceButtonPressList(button))}</div></div>`).join("");
     return`<div class="device-buttons"><div class="device-buttons-head">${t("deviceButtons")}</div>${deviceButtonLastLine(device)}${rows}</div>`;
   };
+  // Otomatik onarım sessiz kalmasın: cihazın kendi kartında son denemenin izi görünür.
+  const deviceSelfHealHtml=device=>{
+    const event=(state.events||[]).find(item=>item.sourceName===device.sourceName&&item.property==="self_heal");
+    if(!event)return"";
+    return`<div class="device-buttons-last">${esc(t("selfHealLast",{status:t(selfHealLabelKeys[event.value]||"selfHealAttempt"),time:ago(event.at)}))}</div>`;
+  };
   const deviceDetailBodyHtml=device=>{
     const deviceFacts=facts(device);
     const updateState=device.state.update&&typeof device.state.update==="object"?device.state.update:{};
@@ -1017,6 +1026,7 @@
       </div>
       ${deviceRoomsHtml(device)}
       <details class="technical-details" data-admin-only${state.detailTechnicalOpen?" open":""}><summary>${t("technicalDetails")}</summary><div class="technical-body"><div class="technical">${t("uid")}: ${esc(device.id)}<br>${t("source")}: ${esc(device.sourceName)}<br>${t("model")}: ${esc(device.model||"—")}<br>${t("rawSignal")}: ${typeof device.state.linkquality==="number"?esc(device.state.linkquality):"—"} LQI</div></div></details>
+      ${deviceSelfHealHtml(device)}
       <div class="card-actions"><button class="secondary" data-note="${esc(device.id)}">📝 ${t("note")}</button><button class="secondary" data-admin-only data-options="${esc(device.id)}">⚙ ${t("options")}</button><button class="secondary" data-admin-only data-reconfigure="${esc(device.id)}">${t("repairDevice")}</button>${otaButton}</div>
       <div class="card-actions card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="${esc(device.id)}">${t("removeDevice")}</button></div>`;
   };
@@ -2651,6 +2661,7 @@
       $("#zigbeeAdapterUrl").value=state.settings.zigbee.adapterUrl;
       $("#zigbeeChannel").value=String(state.settings.zigbee.channel);
       $("#lowBatteryThreshold").value=String(state.settings.alerts?.lowBatteryThreshold??15);
+      $("#selfHealingEnabled").value=state.settings.selfHealing?.enabled===false?"false":"true";
       $("#mqttUrl").value=state.settings.mqtt.url;
       $("#mqttBaseTopic").value=state.settings.mqtt.baseTopic;
       $("#matterWsUrl").value=state.settings.matter.wsUrl;
@@ -2681,6 +2692,7 @@
       matter:{wsUrl:state.onboardingDraft.matterWsUrl},
       homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true},
       alerts:{lowBatteryThreshold:state.settings?.alerts?.lowBatteryThreshold??15},
+      selfHealing:{enabled:state.settings?.selfHealing?.enabled!==false,probeOffline:state.settings?.selfHealing?.probeOffline===true},
       debug:{enabled:state.settings?.debug?.enabled!==false}
     };
   }
@@ -3678,6 +3690,7 @@
         matter:{wsUrl:$("#matterWsUrl").value.trim()},
         homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true},
         alerts:{lowBatteryThreshold:Number($("#lowBatteryThreshold").value)},
+        selfHealing:{enabled:$("#selfHealingEnabled").value!=="false",probeOffline:state.settings?.selfHealing?.probeOffline===true},
         debug:{enabled:state.settings?.debug?.enabled!==false}
       };
     const payload=settingsWithChannelConfirmation(settings);

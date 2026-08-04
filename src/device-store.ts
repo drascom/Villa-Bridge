@@ -8,6 +8,7 @@ import type {
   JsonScalar
 } from "./types.js";
 import { deviceButtons } from "./device-buttons.js";
+import { validateDeviceEvents } from "./device-events.js";
 import { detectDeviceCategory, resolveDeviceCategory, type DeviceRole } from "./device-category.js";
 import { deviceControls, type WritableFeature } from "./device-controls.js";
 import { canonicalDeviceModel, deviceIdentity } from "./device-identity.js";
@@ -355,6 +356,16 @@ export class DeviceStore {
 
   getEvents(limit = 20): DeviceEventView[] {
     return this.events.slice(0, Math.max(0, Math.min(100, limit)));
+  }
+
+  /**
+   * Cihaz mesajından değil, köprünün kendi mekanizmalarından doğan olayları akışa yazar
+   * (ör. otomatik onarım). Şema aynıdır: `property` küçük harf ve alt çizgi olmalıdır.
+   */
+  recordExternalEvent(sourceName: string, property: string, value: JsonScalar): void {
+    this.recordEvents(validateDeviceEvents([
+      { sourceName, property, value, at: new Date().toISOString() }
+    ]));
   }
 
   private recordEvents(events: DeviceEventView[]): void {

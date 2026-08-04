@@ -12,6 +12,7 @@ test("bağlantı ayarları güvenli protokol, sunucu ve port ile doğrulanır", 
     matter: { wsUrl: "ws://127.0.0.1:8283" },
     homeAssistant: { discoveryEnabled: false },
     alerts: { lowBatteryThreshold: 15 },
+    selfHealing: { enabled: false, probeOffline: true },
     debug: { enabled: false }
   }), {
     zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 15 },
@@ -19,8 +20,20 @@ test("bağlantı ayarları güvenli protokol, sunucu ve port ile doğrulanır", 
     matter: { wsUrl: "ws://127.0.0.1:8283" },
     homeAssistant: { discoveryEnabled: false },
     alerts: { lowBatteryThreshold: 15 },
+    selfHealing: { enabled: false, probeOffline: true },
     debug: { enabled: false }
   });
+});
+
+test("otomatik onarım varsayılan olarak açık, çevrimdışı yoklama kapalıdır", () => {
+  const settings = validateConnectionSettings({
+    zigbee: { adapterUrl: "tcp://192.168.0.248:6638", channel: 15 },
+    mqtt: { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    matter: { wsUrl: "ws://127.0.0.1:8283" },
+    homeAssistant: { discoveryEnabled: false }
+  });
+
+  assert.deepEqual(settings.selfHealing, { enabled: true, probeOffline: false });
 });
 
 test("debug mode defaults to enabled during testing", () => {

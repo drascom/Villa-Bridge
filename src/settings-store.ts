@@ -21,6 +21,11 @@ export interface ConnectionSettings {
   alerts: {
     lowBatteryThreshold: number;
   };
+  /** `probeOffline` Faz 2'nin yeridir; bu sürümde yalnız saklanır. */
+  selfHealing: {
+    enabled: boolean;
+    probeOffline: boolean;
+  };
   debug: {
     enabled: boolean;
   };
@@ -52,6 +57,7 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
   const matter = objectValue(input.matter);
   const homeAssistant = objectValue(input.homeAssistant);
   const alerts = objectValue(input.alerts);
+  const selfHealing = objectValue(input.selfHealing);
   const debug = objectValue(input.debug);
   const baseTopic = typeof mqtt.baseTopic === "string" ? mqtt.baseTopic.trim() : "";
   const channel = Number(zigbee.channel);
@@ -87,6 +93,10 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
     alerts: {
       lowBatteryThreshold
     },
+    selfHealing: {
+      enabled: selfHealing.enabled !== false,
+      probeOffline: selfHealing.probeOffline === true
+    },
     debug: {
       enabled: debug.enabled !== false
     }
@@ -116,6 +126,7 @@ export class SettingsStore {
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
     const fileAlerts = objectValue(file.alerts);
+    const fileSelfHealing = objectValue(file.selfHealing);
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
@@ -140,6 +151,10 @@ export class SettingsStore {
           fileAlerts.lowBatteryThreshold
           ?? this.fallback.alerts.lowBatteryThreshold
       },
+      selfHealing: {
+        enabled: fileSelfHealing.enabled ?? this.fallback.selfHealing.enabled,
+        probeOffline: fileSelfHealing.probeOffline ?? this.fallback.selfHealing.probeOffline
+      },
       debug: {
         enabled: fileDebug.enabled ?? this.fallback.debug.enabled
       }
@@ -156,6 +171,7 @@ export class SettingsStore {
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
     const fileAlerts = objectValue(file.alerts);
+    const fileSelfHealing = objectValue(file.selfHealing);
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
@@ -180,6 +196,11 @@ export class SettingsStore {
     file.alerts = {
       ...fileAlerts,
       lowBatteryThreshold: settings.alerts.lowBatteryThreshold
+    };
+    file.selfHealing = {
+      ...fileSelfHealing,
+      enabled: settings.selfHealing.enabled,
+      probeOffline: settings.selfHealing.probeOffline
     };
     file.debug = { ...fileDebug, enabled: settings.debug.enabled };
     z2m.mqtt = { ...z2mMqtt, server: settings.mqtt.url, base_topic: settings.mqtt.baseTopic };
