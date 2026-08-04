@@ -1,5 +1,6 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { writeFileAtomic } from "./atomic-file.js";
 
 const safeModelPattern = /^[A-Za-z0-9._-]{1,64}$/;
 
@@ -163,9 +164,7 @@ export class DeviceImageCache {
     try {
       await mkdir(this.directory, { recursive: true });
       const path = resolve(this.directory, `${model}.${extension}`);
-      const temporary = `${path}.tmp-${process.pid}`;
-      await writeFile(temporary, body, { mode: 0o600 });
-      await rename(temporary, path);
+      await writeFileAtomic(path, body, { mode: 0o600 });
     } catch (error) {
       console.error(`Cihaz görseli önbelleğe yazılamadı: ${String(error)}`);
     }

@@ -1,5 +1,6 @@
 import { copyFile, readFile, rename, stat, writeFile } from "node:fs/promises";
 import YAML from "yaml";
+import { atomicTemporaryPath } from "./atomic-file.js";
 
 type YamlObject = Record<string, unknown>;
 
@@ -107,7 +108,7 @@ const readYaml = async (path: string): Promise<YamlObject> =>
   objectValue(YAML.parse(await readFile(path, "utf8")));
 
 const writeYamlTemporary = async (path: string, value: YamlObject): Promise<string> => {
-  const temporary = `${path}.tmp-${process.pid}`;
+  const temporary = atomicTemporaryPath(path);
   const current = await stat(path);
   await writeFile(temporary, YAML.stringify(value), { mode: current.mode });
   return temporary;

@@ -1,4 +1,5 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 import type { DeviceImageCandidate, DeviceImageView } from "./types.js";
 
 export interface DeviceImagePreferences {
@@ -116,9 +117,7 @@ export class DeviceImagesStore {
 
   async save(preferences: DeviceImagePreferences): Promise<DeviceImagePreferences> {
     const validated = validateDeviceImagePreferences(preferences);
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, validated, { mode: 0o600 });
     return validated;
   }
 

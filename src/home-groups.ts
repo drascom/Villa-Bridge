@@ -1,4 +1,5 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 
 export interface HomeGroupItem {
   deviceId: string;
@@ -82,9 +83,7 @@ export class HomeGroupsStore {
 
   async save(value: unknown): Promise<HomeGroup[]> {
     const groups = validateHomeGroups(value);
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(groups, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, groups, { mode: 0o600 });
     return groups;
   }
 

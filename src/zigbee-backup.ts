@@ -9,6 +9,7 @@ import {
   writeFile
 } from "node:fs/promises";
 import { join } from "node:path";
+import { atomicTemporaryPath } from "./atomic-file.js";
 
 const format = "villa-bridge-zigbee-backup";
 const version = 1;
@@ -123,7 +124,7 @@ export const stageZigbeeNetworkRestore = async (
 ): Promise<void> => {
   const { backup } = validateZigbeeNetworkBackup(value);
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
-  const temporary = join(dataDir, `${pendingName}.tmp-${process.pid}`);
+  const temporary = atomicTemporaryPath(join(dataDir, pendingName));
   await writeFile(temporary, `${JSON.stringify(backup)}\n`, { mode: 0o600 });
   await rename(temporary, join(dataDir, pendingName));
 };
@@ -166,7 +167,7 @@ export const applyPendingZigbeeNetworkRestore = async (
     }
   }
   for (const [name, buffer] of decoded) {
-    const temporary = join(dataDir, `${name}.restore-${process.pid}`);
+    const temporary = atomicTemporaryPath(join(dataDir, name));
     await writeFile(temporary, buffer, { mode: 0o600 });
     await rename(temporary, join(dataDir, name));
   }

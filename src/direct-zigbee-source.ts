@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import mqtt, { type MqttClient } from "mqtt";
 import YAML from "yaml";
 import { Controller, setLogger as setHerdsmanLogger, type Events } from "zigbee-herdsman";
@@ -9,6 +9,7 @@ import {
   setLogger as setConverterLogger,
   type Definition
 } from "zigbee-herdsman-converters";
+import { writeFileAtomic, writeJsonAtomic } from "./atomic-file.js";
 import type { DirectZigbeeConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
 import { DeviceStore, featureValues } from "./device-store.js";
@@ -611,9 +612,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     for (const [key, value] of Object.entries(definedOptions)) {
       document.setIn(["devices", id, key], value);
     }
-    const temporaryPath = `${path}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, document.toString(), "utf8");
-    await rename(temporaryPath, path);
+    await writeFileAtomic(path, document.toString());
     this.config.devices[id] = { ...(this.config.devices[id] ?? {}), ...definedOptions };
     await this.refreshDevices();
   }
@@ -1346,7 +1345,13 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const friendlyName = configured.friendly_name ?? ieeeAddress;
     this.store.ingest(friendlyName, Buffer.from(JSON.stringify(state)));
     this.publish(friendlyName, state, configured.retain === true);
-    await this.persistStates();
+    // Komut cihaza gitti; durum önbelleğinin diske yazılamaması komutu başarısız saymamalı.
+    // Hata yutulmuyor, yalnızca çağırana yansımıyor.
+    try {
+      await this.persistStates();
+    } catch (error) {
+      console.warn(`Zigbee durum önbelleği yazılamadı: ${String(error)}`);
+    }
   }
 
   private publishBridgeInfo(): void {
@@ -1369,13 +1374,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
 
   private async persistStates(): Promise<void> {
     const path = join(this.config.dataDir, "state.json");
-    const temporaryPath = `${path}.${process.pid}.tmp`;
-    await writeFile(
-      temporaryPath,
-      `${JSON.stringify(Object.fromEntries(this.states), null, 2)}\n`,
-      "utf8"
-    );
-    await rename(temporaryPath, path);
+    await writeJsonAtomic(path, Object.fromEntries(this.states));
   }
 
   private async persistDeviceConfiguration(id: string, name: string | null): Promise<void> {
@@ -1384,9 +1383,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const document = YAML.parseDocument(await readFile(path, "utf8"));
     if (name === null) document.deleteIn(["devices", id]);
     else document.setIn(["devices", id, "friendly_name"], name);
-    const temporaryPath = `${path}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, document.toString(), "utf8");
-    await rename(temporaryPath, path);
+    await writeFileAtomic(path, document.toString());
   }
 
   private groupByIdentifier(id: string) {
@@ -1408,9 +1405,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const document = YAML.parseDocument(await readFile(path, "utf8"));
     if (name === null) document.deleteIn(["groups", String(id)]);
     else document.setIn(["groups", String(id), "friendly_name"], name);
-    const temporaryPath = `${path}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, document.toString(), "utf8");
-    await rename(temporaryPath, path);
+    await writeFileAtomic(path, document.toString());
   }
 
   private configuredGroupScenes(group: {

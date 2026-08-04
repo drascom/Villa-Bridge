@@ -1,4 +1,5 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 import type { DeviceControlView, JsonScalar } from "./types.js";
 
 export interface AutomationTimeTrigger {
@@ -523,9 +524,7 @@ export class AutomationAutoOffStore {
 
   async save(entries: AutomationAutoOffEntry[]): Promise<void> {
     const validated = validateAutomationAutoOffEntries(entries);
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, validated, { mode: 0o600 });
   }
 }
 
@@ -546,9 +545,7 @@ export class AutomationsStore {
 
   async save(value: unknown): Promise<Automation[]> {
     const automations = validateAutomations(value, this.lookup);
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(automations, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, automations, { mode: 0o600 });
     return automations;
   }
 

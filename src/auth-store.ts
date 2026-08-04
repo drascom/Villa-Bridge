@@ -1,11 +1,11 @@
 import {
   createHash,
   randomBytes,
-  randomUUID,
   scrypt as scryptCallback,
   timingSafeEqual
 } from "node:crypto";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 
 export type AuthRole = "admin" | "resident";
 
@@ -154,9 +154,7 @@ export class AuthStore {
   }
 
   private async save(state: StoredAuthState): Promise<void> {
-    const temporary = `${this.path}.tmp-${process.pid}-${randomUUID()}`;
-    await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, state, { mode: 0o600 });
     this.cachedState = state;
   }
 

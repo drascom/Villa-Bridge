@@ -1,4 +1,5 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 
 export interface InstallationState {
   onboardingComplete: boolean;
@@ -50,9 +51,7 @@ export class InstallationStateStore {
       onboardingComplete: true,
       onboardingCompletedAt: new Date().toISOString()
     };
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, value, { mode: 0o600 });
     return value;
   }
 }

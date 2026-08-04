@@ -1,5 +1,6 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { writeJsonAtomic } from "./atomic-file.js";
 import { isDeviceRole, type DeviceRole } from "./device-category.js";
 
 /**
@@ -61,14 +62,12 @@ export async function loadDeviceRoles(path: string): Promise<DeviceRoleMap> {
 
 export async function saveDeviceRoles(path: string, roles: DeviceRoleMap): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${process.pid}.tmp`;
   const sorted = Object.fromEntries(
     [...roles.entries()]
       .filter(([, role]) => role !== "auto")
       .sort(([left], [right]) => left.localeCompare(right, "en"))
   );
-  await writeFile(temporaryPath, `${JSON.stringify(sorted, null, 2)}\n`, { mode: 0o600 });
-  await rename(temporaryPath, path);
+  await writeJsonAtomic(path, sorted, { mode: 0o600 });
 }
 
 /**

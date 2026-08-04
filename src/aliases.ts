@@ -1,5 +1,6 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { writeJsonAtomic } from "./atomic-file.js";
 
 export async function loadAliases(path?: string): Promise<Map<string, string>> {
   if (!path) return new Map();
@@ -20,12 +21,10 @@ export async function loadAliases(path?: string): Promise<Map<string, string>> {
 export async function saveAliases(path: string | undefined, aliases: Map<string, string>): Promise<void> {
   if (!path) throw new Error("Ortak isim dosyası yapılandırılmamış.");
   await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${process.pid}.tmp`;
   const sorted = Object.fromEntries(
     [...aliases.entries()]
       .filter(([, value]) => value.trim().length > 0)
       .sort(([left], [right]) => left.localeCompare(right, "en"))
   );
-  await writeFile(temporaryPath, `${JSON.stringify(sorted, null, 2)}\n`, "utf8");
-  await rename(temporaryPath, path);
+  await writeJsonAtomic(path, sorted);
 }

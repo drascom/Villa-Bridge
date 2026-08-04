@@ -1,5 +1,6 @@
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { atomicTemporaryPath } from "./atomic-file.js";
 import {
   removeDeviceFromAutomations,
   validateAutomations,
@@ -438,7 +439,7 @@ export class HomeBackupService {
       ...(paths.aliases ? [{ path: paths.aliases, content: serialize(sortedAliases) }] : [])
     ];
 
-    const temporaries = writes.map((write) => `${write.path}.restore-${process.pid}.tmp`);
+    const temporaries = writes.map((write) => atomicTemporaryPath(write.path));
     const backups = writes.map((write) => `${write.path}.bak`);
     const renamed: number[] = [];
     try {

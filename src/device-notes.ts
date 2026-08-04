@@ -1,4 +1,5 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 
 export type DeviceNotes = Record<string, string>;
 
@@ -38,9 +39,7 @@ export class DeviceNotesStore {
     const notes = await this.all();
     if (note) notes[id] = note;
     else delete notes[id];
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(notes, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, notes, { mode: 0o600 });
     return note;
   }
 

@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 import { dirname } from "node:path";
 import type { DeviceEventView, JsonScalar } from "./types.js";
 
@@ -57,9 +58,7 @@ export class DeviceEventsStore {
     const snapshot = validateDeviceEvents(events);
     this.writeQueue = this.writeQueue.catch(() => undefined).then(async () => {
       await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-      const temporary = `${this.path}.tmp-${process.pid}`;
-      await writeFile(temporary, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
-      await rename(temporary, this.path);
+      await writeJsonAtomic(this.path, snapshot, { mode: 0o600 });
     });
     return this.writeQueue;
   }
