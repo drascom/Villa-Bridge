@@ -165,6 +165,13 @@ export interface DeviceControlView {
   valueOff?: JsonScalar;
   valueToggle?: JsonScalar;
   adminOnly?: boolean;
+  /**
+   * Aç/kapa kanalları için sınıf bilgisi. Lamba↔anahtar ayrımı kanal başınadır: çok kanallı bir
+   * duvar anahtarında bir kanal lambayı, diğeri prizi sürüyor olabilir.
+   */
+  role?: DeviceRole;
+  category?: DeviceCategory;
+  detectedCategory?: DeviceCategory;
 }
 
 export interface GroupView {

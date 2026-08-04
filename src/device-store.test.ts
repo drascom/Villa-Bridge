@@ -563,3 +563,56 @@ test("cihaz sınıfı standart expose tipinden gelir, kullanıcı rolü onu ezer
   roles.delete("0xa4c138b950918de3");
   assert.equal(store.getDevice("0xa4c138b950918de3")?.category, "switch");
 });
+
+test("çok kanallı cihazda rol kanal başınadır", () => {
+  const roles = new Map<string, "auto" | "light" | "switch">();
+  const store = new DeviceStore(new Map(), undefined, [], undefined, roles);
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([
+      {
+        ieee_address: "0xa4c138b950918de4",
+        friendly_name: "Hall wall switch",
+        type: "Router",
+        supported: true,
+        interview_completed: true,
+        definition: {
+          model: "TS0012",
+          vendor: "Tuya",
+          exposes: [
+            { type: "switch", features: [{ name: "state", property: "state_l1", access: 7 }] },
+            { type: "switch", features: [{ name: "state", property: "state_l2", access: 7 }] }
+          ]
+        }
+      }
+    ]))
+  );
+  store.ingest("Hall wall switch", Buffer.from('{"state_l1":"ON","state_l2":"OFF"}'));
+
+  const channels = () => new Map(
+    (store.getDevice("0xa4c138b950918de4")?.controls ?? [])
+      .filter((control) => control.kind === "switch")
+      .map((control) => [control.id, control])
+  );
+  assert.deepEqual([...channels().keys()], ["l1", "l2"]);
+  assert.equal(channels().get("l1")?.role, "auto");
+
+  // Kanal 1 lambayı, kanal 2 prizi sürüyor: iki kanal ayrı rol taşır.
+  roles.set("0xa4c138b950918de4:l1", "light");
+  roles.set("0xa4c138b950918de4:l2", "switch");
+  assert.equal(channels().get("l1")?.role, "light");
+  assert.equal(channels().get("l1")?.category, "light");
+  assert.equal(channels().get("l2")?.role, "switch");
+  assert.equal(channels().get("l2")?.category, "switch");
+  // Cihaz seviyesi tek sınıf kanallardan türer: lamba anahtarı yener.
+  assert.equal(store.getDevice("0xa4c138b950918de4")?.category, "light");
+
+  // Eski cihaz seviyesi kayıt geriye uyumlu: kanalın kendi kaydı yoksa ona düşülür.
+  roles.clear();
+  roles.set("0xa4c138b950918de4", "light");
+  assert.equal(channels().get("l1")?.role, "light");
+  assert.equal(channels().get("l2")?.role, "light");
+  roles.set("0xa4c138b950918de4:l2", "switch");
+  assert.equal(channels().get("l2")?.role, "switch");
+  assert.equal(channels().get("l1")?.role, "light");
+});

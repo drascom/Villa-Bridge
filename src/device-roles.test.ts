@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   loadDeviceRoles,
   removeDeviceRole,
+  resolveChannelRole,
   saveDeviceRoles,
   setDeviceRole,
   validateDeviceRole
@@ -33,12 +34,41 @@ test("cihaz rolü IEEE adresine göre kalıcı saklanır", async (context) => {
   assert.equal((await loadDeviceRoles(path)).size, 0);
 });
 
+test("rol kanal başına saklanır, eski cihaz kaydı yedek kalır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-roles-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, "device-roles.json");
+  const roles = await loadDeviceRoles(path);
+  const id = "0xA4C138B950918DE4";
+
+  await setDeviceRole(path, roles, id, "light", "l1");
+  await setDeviceRole(path, roles, id, "switch", "l2");
+  const written = JSON.parse(await readFile(path, "utf8")) as Record<string, string>;
+  // Anahtar IEEE + kanal kimliği; dost isim hiçbir zaman anahtar değil.
+  assert.deepEqual(written, {
+    "0xa4c138b950918de4:l1": "light",
+    "0xa4c138b950918de4:l2": "switch"
+  });
+  assert.equal(resolveChannelRole(roles, id, "l1"), "light");
+  assert.equal(resolveChannelRole(roles, id, "l2"), "switch");
+  assert.equal(resolveChannelRole(roles, id, "l3"), "auto");
+
+  // Eski cihaz seviyesi kayıt kırılmaz: kanalın kendi kaydı yoksa ona düşülür.
+  await setDeviceRole(path, roles, id, "switch");
+  assert.equal(resolveChannelRole(roles, id, "l3"), "switch");
+  assert.equal(resolveChannelRole(roles, id, "l1"), "light");
+  assert.equal((await loadDeviceRoles(path)).get("0xa4c138b950918de4"), "switch");
+
+  await assert.rejects(() => setDeviceRole(path, roles, id, "light", "kanal 1"), /Kanal kimliği geçersiz/);
+});
+
 test("cihaz silinince rolü de düşer", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "villa-roles-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "device-roles.json");
   const roles = await loadDeviceRoles(path);
   await setDeviceRole(path, roles, "0x00124b0000000001", "switch");
+  await setDeviceRole(path, roles, "0x00124b0000000001", "light", "l2");
   await removeDeviceRole(path, roles, "0x00124B0000000001");
   assert.equal(roles.size, 0);
   assert.equal((await loadDeviceRoles(path)).size, 0);

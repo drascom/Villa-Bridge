@@ -267,7 +267,7 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /const succeed=\(\)=>\{if\(photo\)photo\.hidden=false\}/);
   assert.match(dashboard, /\$\{deviceDetailPhoto\(device\)\}/);
   assert.match(dashboard, /const mediaHtml=photoHtml\|\|factsHtml\?`<div class="device-detail-media">\$\{photoHtml\}\$\{factsHtml\}<\/div>`:""/);
-  assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls">\$\{device\.controls\.length\?/);
+  assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls"><div class="controls">\$\{device\.controls\.length\?/);
   assert.match(dashboard, /#devices \.page-head \.lead,#home \.page-head \.lead\{display:none\}/);
   assert.match(dashboard, /<p class="lead" data-i18n="devicesLead">/);
   assert.match(dashboard, /<div class="card-actions card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="\$\{esc\(device\.id\)\}">/);
@@ -816,7 +816,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.quick-control-widget \.quick-card\{min-height:56px;padding:5px 12px\}/);
   assert.match(dashboard, /class="quick-device-icon"/);
   assert.match(dashboard, /\.quick-toggle\{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:26px minmax\(0,1fr\) auto/);
-  assert.match(dashboard, /<button class="quick-toggle \$\{shown\?"on":""\}\$\{pending\?" pending":""\}" \$\{actionAttributes\}[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{preparing\|\|pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
+  assert.match(dashboard, /<button class="quick-toggle \$\{shown\?"on":""\}\$\{pending\?" pending":""\}" \$\{actionAttributes\}[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device,control\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{preparing\|\|pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
   assert.match(dashboard, /\.quick-grid\.grid-view\{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto/);
   assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start\}/);
   assert.match(dashboard, /\.quick-grid \.device-name\{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:15px\}/);
@@ -975,7 +975,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.group-control-copy small\{display:block;margin-top:3px/);
   assert.match(dashboard, /\.group-control-tile\.on \.group-control-visual \.device-status-icon\{color:#7d5210/);
   assert.match(dashboard, /:root\[data-theme="dark"\] \.group-control-tile\.alert \.group-control-visual \.device-status-icon\{color:#ffc0ba/);
-  assert.match(dashboard, /const deviceTypeIcon=device=>/);
+  assert.match(dashboard, /const deviceTypeIcon=\(device,control\)=>/);
   assert.match(dashboard, /function bindGroupControls\(\)\{\s*bindDeviceImages\(\)/);
   assert.match(dashboard, /clock:\{title:"worldClock",lead:"worldClockLead"\}/);
   assert.match(dashboard, /weather:\{title:"weather",lead:"weatherLead"\}/);
@@ -1842,7 +1842,7 @@ interface PickApi {
 function pickGrouping(dashboard: string): (events: Array<{ sourceName: string; property: string }>) => PickApi {
   const scripts = dashboardScripts(dashboard);
   const seen = /const deviceSeenPress=device=>[\s\S]*?item\.property==="action"\);/.exec(scripts);
-  const light = /const automationLightLike=device=>device\?\.category==="light";/.exec(scripts);
+  const light = /const automationLightLike=device=>device\?\.category==="light"[\s\S]*?control\.category==="light"\);/.exec(scripts);
   const groups = /const automationPickGroups=\(devices,kind\)=>[\s\S]*?:\[\{devices,proven:true\}\];/.exec(scripts);
   assert.ok(seen, "kanıt ölçütü bulunamadı");
   assert.ok(light, "anahtar/lamba ölçütü bulunamadı");
@@ -2019,7 +2019,7 @@ test("anahtar yolunda sınıflandırma sunucudan gelir, eve özel kural kalmaz",
   assert.match(dashboard, /folded\.devices\.some\(item=>item\.id===wizard\.triggerDeviceId\)/);
 });
 
-test("cihaz rolü eşleştirmede sorulur ve cihaz ayarlarından değiştirilebilir", async () => {
+test("cihaz rolü eşleştirmede sorulur ve cihaz kartındaki özellik listesinden değiştirilir", async () => {
   const dashboard = await readDashboardBundle();
 
   // Eşleştirme akışının son adımı: ad → (gerekiyorsa görsel) → "Bu cihaz ne?".
@@ -2031,17 +2031,36 @@ test("cihaz rolü eşleştirmede sorulur ve cihaz ayarlarından değiştirilebil
     dashboard,
     /\$\("#deviceRoleDialog"\)\.onclose=\(\)=>\{[\s\S]*?if\(editing\?\.afterPairing\)finishPairingFlow\(editing\.id\)/
   );
-  // Sonradan değiştirme yolu cihaz seçenekleri diyaloğunda.
-  assert.match(dashboard, /id="deviceRoleField"/);
-  assert.match(dashboard, /<select id="deviceRole">/);
-  assert.match(dashboard, /\$\("#deviceRoleField"\)\.hidden=!deviceRoleAskable\(device\);/);
+  // Sonradan değiştirme yolu artık cihaz kartındaki özellik listesinin en altında, Options'ta değil.
+  assert.doesNotMatch(dashboard, /id="deviceRoleField"/);
+  assert.doesNotMatch(dashboard, /<select id="deviceRole">/);
+  assert.match(dashboard, /device\.controls\.map\(control=>controlHtml\(device,control\)\)\.join\(""\):`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\}\$\{deviceRoleRowsHtml\(device\)\}/);
+  // Satır mevcut ayar satırlarıyla aynı işaretlemeyi kullanır, alt yazısı uygulama ayarı olduğunu söyler.
+  assert.match(dashboard, /<div class="control-row admin-control"><div><div class="control-name">\$\{esc\(label\)\}<\/div><div class="control-value">\$\{t\("appSetting"\)\}<\/div><\/div><select class="control-select" data-device-role-select=/);
+  assert.match(dashboard, /appSetting:"App setting"/);
+  assert.match(dashboard, /appSetting:"Uygulama ayarı"/);
+  // Seçim anında kaydedilir; ayrı "Kaydet" adımı yok.
+  assert.match(dashboard, /input\.onchange=\(\)=>changeDeviceRole\(input,input\.dataset\.deviceRoleSelect,input\.dataset\.deviceRoleChannel,input\.value\)/);
+  // Kontrol edilemeyen cihazda seçim sunulmaz: satır tespit edilen sınıfı düz metin gösterir.
+  assert.match(dashboard, /if\(!channels\.length\)\{[\s\S]*?deviceRoleFixed",\{kind:deviceKind\(device\)\}/);
+  assert.match(dashboard, /deviceRoleFixed:"\{kind\} · automatic"/);
+  assert.match(dashboard, /deviceRoleFixed:"\{kind\} · otomatik"/);
   // Rol yalnız lamba↔anahtar karışıklığında sorulur; perde, kilit, sensör otomatik kalır.
   assert.match(
     dashboard,
     /const deviceRoleAskable=device=>Boolean\(device\)&&\(device\.category==="light"\|\|device\.category==="switch"/
   );
-  // UID kuralı: yazma ucu IEEE adresine gider.
+  // UID kuralı: yazma ucu IEEE adresine, kanal seçiliyse IEEE + kanal kimliğine gider.
   assert.match(dashboard, /\/api\/devices\/\$\{encodeURIComponent\(id\)\}\/role/);
+  assert.match(dashboard, /const payload=channel\?\{role,channel\}:\{role\}/);
+  // Kontrol edilebilir her kanal kendi satırını alır; kanal adı kullanıcının verdiği addır.
+  assert.match(dashboard, /const deviceRoleChannels=device=>\(device\?\.controls\|\|\[\]\)\.filter\(control=>control\.kind==="switch"\)/);
+  assert.match(dashboard, /channels\.length>1\?t\("deviceRoleChannelLabel",\{channel:control\.name\}\):t\("deviceRoleLabel"\)/);
+  assert.match(dashboard, /deviceRoleChannelLabel:"Show \{channel\} as"/);
+  assert.match(dashboard, /deviceRoleChannelLabel:"\{channel\} şöyle görünsün"/);
+  // Kümeleme ve simge kanal seviyesindeki rolü kullanır.
+  assert.match(dashboard, /control\.kind==="switch"&&control\.category==="light"/);
+  assert.match(dashboard, /const category=\(control\?\.kind==="switch"&&control\.category\)\|\|device\.category;/);
 
   // Kart alt yazısı artık her cihazda "Kumanda" demiyor; sınıfı yansıtıyor.
   assert.match(dashboard, /const deviceCategoryLabels=\{light:"lightDevice",switch:"switchDevice"/);

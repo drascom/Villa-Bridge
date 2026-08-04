@@ -11,6 +11,7 @@ import { deviceButtons } from "./device-buttons.js";
 import { detectDeviceCategory, resolveDeviceCategory, type DeviceRole } from "./device-category.js";
 import { deviceControls, type WritableFeature } from "./device-controls.js";
 import { canonicalDeviceModel, deviceIdentity } from "./device-identity.js";
+import { resolveChannelRole } from "./device-roles.js";
 import type { DeviceImagePreferences } from "./device-images.js";
 
 interface StateEntry {
@@ -416,12 +417,33 @@ export class DeviceStore {
         }
         const detectedCategory = detectDeviceCategory(exposes);
         const role = this.roles.get(id) ?? "auto";
+        // Rol kanal başınadır: her aç/kapa kanalı kendi sınıfını taşır, kanalın kaydı yoksa eski
+        // cihaz seviyesi kayda düşer. Cihazın tek sınıfı gerektiğinde kanallardan türetilir —
+        // lamba anahtarı yener, çünkü "anahtar" her açılıp kapanan kanalda çıkar.
+        const controls = deviceControls(id, name, writable, stateValue, this.aliases).map((control) => {
+          if (control.kind !== "switch") return control;
+          const channelRole = resolveChannelRole(this.roles, id, control.id);
+          return {
+            ...control,
+            role: channelRole,
+            detectedCategory,
+            category: resolveDeviceCategory(detectedCategory, channelRole)
+          };
+        });
+        const channelCategories = controls
+          .filter((control) => control.kind === "switch")
+          .map((control) => control.category);
+        const effectiveRole: DeviceRole = channelCategories.includes("light")
+          ? "light"
+          : channelCategories.includes("switch")
+          ? "switch"
+          : role;
         return {
           id,
           sourceName,
           name,
           type: device.type ?? "Unknown",
-          category: resolveDeviceCategory(detectedCategory, role),
+          category: resolveDeviceCategory(detectedCategory, effectiveRole),
           detectedCategory,
           role,
           model: canonicalDeviceModel(device.definition?.model, device.manufacturer),
@@ -448,7 +470,7 @@ export class DeviceStore {
           buttons,
           lastAction,
           alerts,
-          controls: deviceControls(id, name, writable, stateValue, this.aliases),
+          controls,
           state: stateValue
         };
       })

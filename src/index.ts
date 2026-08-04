@@ -254,25 +254,57 @@ app.get<{ Params: { id: string } }>("/api/devices/:id/role", async (request, rep
     ok: true,
     role: device.role,
     category: device.category,
-    detectedCategory: device.detectedCategory
+    detectedCategory: device.detectedCategory,
+    // Rol kanal başınadır; cihaz seviyesi alanlar kanallardan türetilmiş özettir.
+    channels: device.controls
+      .filter((control) => control.kind === "switch")
+      .map((control) => ({
+        channel: control.id,
+        name: control.name,
+        role: control.role ?? "auto",
+        category: control.category ?? device.detectedCategory,
+        detectedCategory: control.detectedCategory ?? device.detectedCategory
+      }))
   };
 });
-app.put<{ Params: { id: string }; Body?: { role?: unknown } }>("/api/devices/:id/role", async (request, reply) => {
-  const id = request.params.id.toLowerCase();
-  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
-  try {
-    await setDeviceRole(deviceRolesPath, deviceRoles, id, request.body?.role);
+app.put<{ Params: { id: string }; Body?: { role?: unknown; channel?: unknown } }>(
+  "/api/devices/:id/role",
+  async (request, reply) => {
+    const id = request.params.id.toLowerCase();
     const device = store.getDevice(id);
-    return {
-      ok: true,
-      role: device?.role ?? "auto",
-      category: device?.category ?? "unknown",
-      detectedCategory: device?.detectedCategory ?? "unknown"
-    };
-  } catch (error) {
-    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+    const requestedChannel = request.body?.channel;
+    if (requestedChannel !== undefined && requestedChannel !== null && typeof requestedChannel !== "string") {
+      return reply.code(400).send({ ok: false, error: "Kanal kimliği geçersiz." });
+    }
+    // Kanal kimliği cihazın gerçek aç/kapa kanallarından biri olmalı: uydurma anahtar yazılmaz.
+    if (requestedChannel) {
+      const known = device.controls.some(
+        (control) => control.kind === "switch" && control.id === requestedChannel.toLowerCase()
+      );
+      if (!known) return reply.code(400).send({ ok: false, error: "Kanal bulunamadı." });
+    }
+    try {
+      await setDeviceRole(deviceRolesPath, deviceRoles, id, request.body?.role, requestedChannel ?? null);
+      const updated = store.getDevice(id);
+      const channelControl = requestedChannel
+        ? updated?.controls.find((control) => control.kind === "switch" && control.id === requestedChannel.toLowerCase())
+        : undefined;
+      return {
+        ok: true,
+        channel: requestedChannel ?? null,
+        role: channelControl ? channelControl.role ?? "auto" : updated?.role ?? "auto",
+        category: channelControl
+          ? channelControl.category ?? "unknown"
+          : updated?.category ?? "unknown",
+        detectedCategory: updated?.detectedCategory ?? "unknown",
+        deviceCategory: updated?.category ?? "unknown"
+      };
+    } catch (error) {
+      return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
   }
-});
+);
 app.get<{ Params: { model: string } }>("/api/device-image/:model", async (request, reply) => {
   const image = await imageCache.get(request.params.model);
   if (!image) {
