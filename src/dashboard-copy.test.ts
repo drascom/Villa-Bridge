@@ -1502,9 +1502,10 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /const wizardDialog=\$\("#automationDialog"\);\s*if\(wizardDialog\.open\)wizardDialog\.close\(\);/);
   // Arkadaki liste görünmesin: sihirbazın backdrop'ı opak.
   assert.match(dashboard, /dialog\.automation-dialog::backdrop\{background:rgba\(12,26,20,\.94\)/);
-  // Yol adımında sayaç, noktalar ve İleri düğmeleri gizli — üç adımlı sayaç tutarlı kalır.
-  assert.match(dashboard, /\$\("#automationDots"\)\.hidden=paths;/);
-  assert.match(dashboard, /\.automation-dots\[hidden\]\{display:none\}/);
+  // Yol adımında ray ve İleri düğmeleri yok: panel tek başına kalır.
+  assert.match(dashboard, /flow\.classList\.toggle\("solo",paths\);/);
+  assert.match(dashboard, /if\(paths\)return;\s*panel\.insertAdjacentHTML\("beforebegin",automationRailHtml\(wizard\)\);/);
+  assert.match(dashboard, /\.automation-flow\.solo\{display:block\}/);
   assert.match(dashboard, /automationPathTitle:"Bunu nasıl kurmak istersiniz\?"/);
   assert.match(dashboard, /automationPathTitle:"How do you want to set this up\?"/);
   // Adım 1'de dönülecek yer yok: düğme kapatıyor, etiketi de "Vazgeç". Alt öğe ekranındaysa
@@ -1517,7 +1518,7 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /<dialog id="automationDialog" class="automation-dialog">/);
   assert.match(dashboard, /id="automationBody"/);
   assert.match(dashboard, /id="automationNext" class="primary"/);
-  assert.match(dashboard, /t\("automationStepCount",\{step:wizard\.step,total:3\}\)/);
+  assert.match(dashboard, /t\("automationStepCount",\{step:entry\.step,total:3\}\)/);
   assert.match(dashboard, /automationStepCount:"Step \{step\} of \{total\}"/);
   assert.match(dashboard, /automationStepCount:"Adım \{step\} \/ \{total\}"/);
   assert.match(
@@ -1632,11 +1633,9 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   assert.match(dashboard, /if\(!wizard\|\|wizard\.step===0\|\|!automationStepReady\(wizard\)\)return;/);
   assert.match(dashboard, /\.automation-actions button\[disabled\]\{opacity:\.45\}/);
 
-  // Adım göstergesi: metin + üç nokta.
-  assert.match(dashboard, /<div id="automationDots" class="automation-dots" aria-hidden="true"><span><\/span><span><\/span><span><\/span><\/div>/);
-  assert.match(dashboard, /\$\$\("#automationDots span"\)\.forEach\(\(dot,index\)=>\{/);
-  assert.match(dashboard, /dot\.className=index\+1===wizard\.step\?"active":index\+1<wizard\.step\?"done":""/);
-  assert.match(dashboard, /\.automation-dots span\.active\{width:24px/);
+  // Adım göstergesi artık soldaki ray: ayrı sayaç ve nokta dizisi kalmadı.
+  assert.doesNotMatch(dashboard, /automationDots/);
+  assert.doesNotMatch(dashboard, /id="automationStep"/);
 
   // Tek dokunuşluk seçimler ~200 ms sonra kendiliğinden ilerler.
   assert.match(dashboard, /automationAdvanceTimer=setTimeout\(\(\)=>\{automationAdvanceTimer=null;run\(\)\},200\)/);
@@ -1659,6 +1658,82 @@ test("saat kuralı sihirbazı üç adımda cihaz+özellik çiftini kaydeder", as
   );
   assert.doesNotMatch(dashboard, /data-automation-condition/);
   assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:koşul|senaryo|tetikleyici|property|endpoint)/i);
+
+  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+test("sihirbaz akışı solda tıklanabilir adım rayıyla gösterir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Kabuk: sol ray + sağ panel aynı ızgarada; panel statik, ray her çizimde yenilenir.
+  assert.match(
+    dashboard,
+    /<div id="automationFlow" class="automation-flow"><div id="automationPanel" class="automation-panel"><h2 id="automationTitle"/
+  );
+  assert.match(dashboard, /renderAutomationRail\(wizard,paths\);/);
+  assert.match(dashboard, /flow\.querySelectorAll\("\.automation-rail-step"\)\.forEach\(node=>node\.remove\(\)\);/);
+
+  // Ray adımı gerçek düğme: aktif adım aria-current taşır, kilitli adım devre dışıdır.
+  assert.match(dashboard, /data-automation-goto="\$\{entry\.step\}"\$\{active\?' aria-current="step"':""\}/);
+  assert.match(dashboard, /\$\{open\?"":' disabled aria-disabled="true"'\}/);
+  assert.match(dashboard, /\$\$\("\[data-automation-goto\]"\)\.forEach\(button=>button\.onclick=\(\)=>goToAutomationStep\(button\.dataset\.automationGoto\)\)/);
+  // Dokunmatik hedef 44 px üstünde.
+  assert.match(dashboard, /\.automation-rail-step\{min-height:64px/);
+  assert.match(dashboard, /\.automation-rail-step\.active\{border-color:var\(--forest\);background:var\(--forest-soft\)/);
+  assert.match(dashboard, /\.automation-rail-step\[disabled\]\{opacity:\.5/);
+
+  // Kilit kuralı: tetikleyici seçilmeden 2. adıma, hedef seçilmeden 3. adıma atlanamaz.
+  assert.match(
+    dashboard,
+    /const automationStepUnlocked=\(wizard,step\)=>step<=1\?true\s*:!automationTriggerReady\(wizard\)\?false\s*:step===2\?true\s*:automationMappingMode\(wizard\)\?Boolean\(wizard\.target\):Boolean\(wizard\.action\)/
+  );
+  // Tamamlanan ve aktif adıma atlama; kilitli adım sessizce reddedilir.
+  assert.match(
+    dashboard,
+    /function goToAutomationStep\(step\)\{[\s\S]*?cancelAutomationAdvance\(\);\s*if\(target===wizard\.step\|\|!automationStepUnlocked\(wizard,target\)\)return;\s*wizard\.step=target;\s*renderAutomationWizard\(\);/
+  );
+  // Adım değişince gövde başa sarar (ray ile atlarken de).
+  assert.match(dashboard, /if\(stepChanged\)automationScrollTop\(\);/);
+
+  // Ray özetleri: seçilen değer adımın altında yazar, seçim yoksa satır sade kalır.
+  assert.match(dashboard, /const automationRailJoin=\(\.\.\.parts\)=>parts\.filter\(Boolean\)\.join\(" · "\)/);
+  assert.match(
+    dashboard,
+    /automationTimeText\(wizard\),\s*automationEveryDay\(wizard\.days\)\?t\("automationEveryDayChip"\):automationDayList\(wizard\.days\)/
+  );
+  assert.match(dashboard, /if\(wizard\.triggerKind==="button"\)return automationRailJoin\(name,wizard\.triggerAction\?automationButtonLabel\(device,wizard\.triggerAction\):""\)/);
+  assert.match(
+    dashboard,
+    /const automationRailModeKeys=\{on:"automationTurnOn",off:"automationTurnOff",toggle:"automationTurnToggle"\}/
+  );
+  assert.match(
+    dashboard,
+    /return automationRailJoin\(automationActionName\(wizard\.action\),t\(automationRailModeKeys\[automationActionMode\(wizard\.action\)\]\)\)/
+  );
+  assert.match(dashboard, /const automationRailReviewValue=wizard=>automationStepUnlocked\(wizard,3\)\?automationWizardName\(wizard\):""/);
+  assert.match(dashboard, /const value=entry\.value\?`<span class="automation-rail-value">\$\{esc\(entry\.value\)\}<\/span>`:""/);
+
+  // Etiketler iki dilde ve eşleme yolunda ayrı: "Hangi cihaz" / "Ne olsun".
+  assert.match(dashboard, /\{step:2,label:mapping\?"automationRailTarget":"automationRailThen"/);
+  assert.match(dashboard, /\{step:3,label:mapping\?"automationRailMap":"automationRailReview"/);
+  assert.match(dashboard, /automationRailWhen:"Ne zaman"/);
+  assert.match(dashboard, /automationRailWhen:"When"/);
+  assert.match(dashboard, /automationRailThen:"Ne yapsın"/);
+  assert.match(dashboard, /automationRailThen:"What happens"/);
+  assert.match(dashboard, /automationRailReview:"Özet"/);
+  assert.match(dashboard, /automationRailReview:"Summary"/);
+  assert.match(dashboard, /automationRailLocked:"Önce üstteki adımı tamamlayın"/);
+  assert.match(dashboard, /automationRailLocked:"Finish the step above first"/);
+
+  // Dar ekran akordiyon: tek sütun, panel `order` ile aktif adımın altına iner.
+  assert.match(dashboard, /\.automation-flow\{display:flex;flex-direction:column/);
+  assert.match(dashboard, /style="order:\$\{entry\.step\*2\}"/);
+  assert.match(dashboard, /panel\.style\.order=paths\?"":String\(wizard\.step\*2\+1\)/);
+  // Geniş ekran: solda ray sütunu, sağda üç satır boyu uzanan panel.
+  assert.match(
+    dashboard,
+    /@media\(min-width:760px\)\{\.automation-flow\{display:grid;grid-template-columns:minmax\(0,232px\) minmax\(0,1fr\)[^}]*\}\.automation-flow\.solo\{display:block\}\.automation-rail-step\{grid-column:1\}\.automation-panel\{grid-column:2;grid-row:1\/span 3\}\}/
+  );
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
@@ -2686,6 +2761,7 @@ test("sonra kapat yükü hedefin kendi kapatma değerinden üretilir", async () 
 // canlı uygulama açılmaz.
 type WizardHarness = {
   bodies: string[];
+  rails: string[];
   scroll: () => number;
   setScroll: (value: number) => void;
   wizard: () => Record<string, unknown>;
@@ -2698,6 +2774,7 @@ async function automationWizardHarness(): Promise<WizardHarness> {
   const end = source.indexOf("async function saveAutomationWizard(");
   assert.ok(start > 0 && end > start);
   const bodies: string[] = [];
+  const rails: string[] = [];
   const nodes = new Map<string, Record<string, unknown>>();
   const node = (selector: string): Record<string, unknown> => {
     const found = nodes.get(selector);
@@ -2710,6 +2787,11 @@ async function automationWizardHarness(): Promise<WizardHarness> {
       open: true,
       classList: { add() {}, remove() {}, toggle() {} },
       dataset: {},
+      style: {},
+      querySelector: () => null,
+      querySelectorAll: () => [] as unknown[],
+      // Adım rayı panelin önüne basılır: testte basılan işaretleme toplanır.
+      insertAdjacentHTML: (_position: string, html: string) => { if (selector === "#automationPanel") rails.push(html); },
       // Uzun listede kaydırma: adım 2'de aşağı inilmiş bir ekranı taklit eder.
       scrollIntoView: () => { (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop = 400; },
       setAttribute() {},
@@ -2755,6 +2837,7 @@ async function automationWizardHarness(): Promise<WizardHarness> {
     confirm: () => false,
     $: (selector: string) => node(selector),
     $$: () => [],
+    document: { activeElement: null },
     // Kendiliğinden ilerleme beklemesi testte anında koşar.
     setTimeout: (run: () => void) => { run(); return 1; },
     clearTimeout: () => {}
@@ -2764,10 +2847,12 @@ async function automationWizardHarness(): Promise<WizardHarness> {
     ...names,
     `${source.slice(start, end)}\n`
     + "return{openAutomationWizard,chooseAutomationPath,chooseAutomationTrigger,chooseAutomationTriggerDevice,"
-    + "chooseAutomationEvent,chooseAutomationTargetDevice,chooseAutomationAction,chooseAutomationAutoOff};"
+    + "chooseAutomationEvent,chooseAutomationTargetDevice,chooseAutomationAction,chooseAutomationAutoOff,"
+    + "goToAutomationStep,automationStepUnlocked,automationRailSteps};"
   )(...names.map((name) => stubs[name])) as Record<string, (...args: unknown[]) => unknown>;
   return {
     bodies,
+    rails,
     scroll: () => (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop,
     setScroll: (value: number) => { (node("#automationDialog .automation-modal") as { scrollTop: number }).scrollTop = value; },
     wizard: () => state.automationWizard as Record<string, unknown>,
@@ -2833,6 +2918,60 @@ test("sonra kapat seçenekleri yalnız açan eylemde ve karşıtı olan tetikley
   assert.match(review, /data-automation-autooff="none"/);
   assert.match(review, /data-automation-autooff="after"/);
   assert.doesNotMatch(review, /data-automation-autooff="idle"/);
+});
+
+// Adım rayı: tamamlanan adıma atlanır, koşulu sağlanmamış ileri adım kilitlidir, her satır kendi
+// seçilen değerini özetler.
+test("adım rayı tamamlanan adıma atlar, ileri adımı kilitli tutar", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  const wizard = () => harness.wizard();
+  const rail = () => harness.rails[harness.rails.length - 1];
+  const values = () => (api.automationRailSteps(wizard()) as { value: string }[]).map((entry) => entry.value);
+
+  api.openAutomationWizard(null);
+  // Yol adımında ray basılmaz.
+  assert.equal(harness.rails.length, 0);
+  api.chooseAutomationPath("rule");
+  assert.equal(wizard().step, 1);
+
+  // Tetikleyici seçilmeden 2. ve 3. adım kilitli: atlama denemesi adımı değiştirmez.
+  assert.equal(api.automationStepUnlocked(wizard(), 2), false);
+  assert.equal(api.automationStepUnlocked(wizard(), 3), false);
+  api.goToAutomationStep(2);
+  assert.equal(wizard().step, 1);
+  assert.match(rail(), /data-automation-goto="2" disabled aria-disabled="true"/);
+  assert.match(rail(), /data-automation-goto="1" aria-current="step"/);
+
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  // Tetikleyici tamamlandı: 2. adım açıldı, 3. adım hâlâ kilitli.
+  assert.equal(wizard().step, 2);
+  assert.equal(api.automationStepUnlocked(wizard(), 2), true);
+  assert.equal(api.automationStepUnlocked(wizard(), 3), false);
+  assert.deepEqual(values(), ["Koridor Detektor · automationEventMotion", "", ""]);
+  // Biten adım işaretli, özeti rayda yazıyor.
+  assert.match(rail(), /class="automation-rail-step done"[\s\S]*?Koridor Detektor · automationEventMotion/);
+
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  assert.equal(wizard().step, 3);
+  assert.equal(api.automationStepUnlocked(wizard(), 3), true);
+  assert.deepEqual(values().slice(0, 2), ["Koridor Detektor · automationEventMotion", "Corridor light · automationTurnOn"]);
+  assert.match(rail(), /data-automation-goto="3" aria-current="step"/);
+  assert.doesNotMatch(rail(), /disabled/);
+
+  // Tamamlanan adıma atlama: seçimler korunur, ileri adım açık kalır.
+  api.goToAutomationStep(1);
+  assert.equal(wizard().step, 1);
+  assert.equal(wizard().triggerDeviceId, "0x0022");
+  assert.equal(api.automationStepUnlocked(wizard(), 3), true);
+  // Aktif adıma tıklamak bir şeyi bozmaz.
+  api.goToAutomationStep(1);
+  assert.equal(wizard().step, 1);
+  api.goToAutomationStep(3);
+  assert.equal(wizard().step, 3);
 });
 
 test("cihaz sınıfı ayar niteliğindeki aç/kapa alanlarını saymaz", async () => {
