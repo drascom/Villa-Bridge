@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { deviceControls, hexToXy } from "./device-controls.js";
+import { deviceControls, hexToXy, isNamedChannelControl, soleSwitchChannelId } from "./device-controls.js";
 
 test("ana ve alt Zigbee kanalları UID tabanlı ortak isimlerle sunulur", () => {
   const aliases = new Map([
@@ -151,4 +151,51 @@ test("cihaz yapılandırma alanları admin kontrolü olarak işaretlenir", () =>
   assert.equal(sensitivity.adminOnly, true);
   assert.equal(delay.kind, "number");
   assert.equal(delay.adminOnly, true);
+});
+
+test("tek aç/kapa kanallı cihazın kanalı cihazın kendisidir", () => {
+  const controls = deviceControls("0xlamba", "Salon lambası", ["state", "brightness"], { state: "ON", brightness: 120 }, new Map());
+
+  assert.equal(soleSwitchChannelId(controls), "main");
+  assert.equal(controls.find((control) => control.id === "main")?.name, "Salon lambası");
+});
+
+test("tek kanal `state_l1` üzerinden geliyorsa da tek kanal sayılır", () => {
+  const controls = deviceControls("0xanahtar", "Hol anahtarı", ["state_l1"], { state_l1: "OFF" }, new Map());
+
+  assert.equal(soleSwitchChannelId(controls), "l1");
+});
+
+test("çok kanallı cihazda tek kanal yoktur, her kanal kendi adını taşır", () => {
+  const aliases = new Map([["0xduvar:l1", "Sol lamba"], ["0xduvar:l2", "Sağ lamba"]]);
+  const controls = deviceControls("0xduvar", "Duvar anahtarı", ["state_l1", "state_l2"], { state_l1: "ON", state_l2: "OFF" }, aliases);
+
+  assert.equal(soleSwitchChannelId(controls), null);
+  assert.equal(controls.find((control) => control.id === "l1")?.name, "Sol lamba");
+  assert.equal(controls.find((control) => control.id === "l2")?.name, "Sağ lamba");
+});
+
+test("perde, kilit ve cihazın yayımladığı ikili ayarlar adlandırılabilir kanal değildir", () => {
+  const controls = deviceControls(
+    "0xperde",
+    "Salon perdesi",
+    [
+      { property: "state", name: "state", type: "enum", values: ["OPEN", "STOP", "CLOSE"], parentType: "cover", parentName: "cover" },
+      { property: "child_lock", name: "child lock", type: "binary" }
+    ],
+    { state: "OPEN", child_lock: "OFF" },
+    new Map()
+  );
+
+  assert.deepEqual(controls.filter(isNamedChannelControl), []);
+  assert.equal(soleSwitchChannelId(controls), null);
+  // Tek aç/kapa kanalı olan cihaz, adlandırılamayan ikili ayarların yanında da tek kanal kalır.
+  const mixed = deviceControls(
+    "0xpriz",
+    "Priz",
+    ["state", { property: "child_lock", name: "child lock", type: "binary" }],
+    { state: "ON", child_lock: "OFF" },
+    new Map()
+  );
+  assert.equal(soleSwitchChannelId(mixed), "main");
 });

@@ -795,8 +795,19 @@
   const groupPowerControl=control=>["switch","fan","siren","cover"].includes(control.kind);
   const levelValueHtml=(value,unit)=>`${esc(value)}${unit?`<span class="control-unit">${esc(unit)}</span>`:""}`;
   const renameGlyph=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L19 9l-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg>`;
+  // Ayrı adı olan tek şey aç/kapa kanalıdır: `state`/`state_lN` kanalları `<ieee>:<kanal>` takma adını
+  // okur, kimlikleri de o kanaldır ("main", "l1"). Perde, kilit, fan, siren ve cihazın yayımladığı
+  // ikili ayarların kimliği `cover:...`, `switch:child_lock` gibidir; adları cihazın kendi etiketinden
+  // gelir, takma ad okunmaz — bu satırlarda kalem gösterilmez.
+  const isNamedChannel=control=>control?.kind==="switch"&&!String(control.id||"").includes(":");
+  const deviceNamedChannels=device=>(device?.controls||[]).filter(isNamedChannel);
+  // Tek kanallı cihazda "kanal adı" diye ayrı bir kavram yok: cihaz adı kanalın da adıdır, tek kalem
+  // (başlıktaki) yeter. Ayrı kanal adları yalnız birden çok aç/kapa kanalı olan cihazda anlamlı.
+  const deviceHasChannelNames=device=>deviceNamedChannels(device).length>1;
+  const channelDisplayName=(device,control)=>
+    isNamedChannel(control)&&!deviceHasChannelNames(device)?device.name:control.name;
   const renameControlButton=(device,control)=>{
-    if(!isDashboardControl(control))return"";
+    if(!isNamedChannel(control)||!deviceHasChannelNames(device))return"";
     const label=control.name?`${t("nameChannel")}: ${control.name}`:t("nameChannel");
     return`<button class="control-rename" type="button" data-admin-only data-rename-channel="${esc(device.id)}" data-channel="${esc(control.id)}" aria-label="${esc(label)}" title="${esc(t("nameChannel"))}">${renameGlyph}</button>`;
   };
@@ -808,7 +819,8 @@
       const known=typeof control.value==="boolean";
       const valueLabel=control.value===null?t("unknownState"):active?t("on"):t("off");
       const pending=commandPending(device.id,control.property);
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}${renameControlButton(device,control)}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<button class="switch ${active?"on":""}${pending?" pending":""}" data-command-value="${commandValue(!active)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)}" aria-pressed="${active}"${pending?' aria-busy="true"':""}${pending?" disabled":""}><span></span></button></div></div>`;
+      const name=channelDisplayName(device,control);
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(name)}${renameControlButton(device,control)}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<button class="switch ${active?"on":""}${pending?" pending":""}" data-command-value="${commandValue(!active)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(name)}" aria-pressed="${active}"${pending?' aria-busy="true"':""}${pending?" disabled":""}><span></span></button></div></div>`;
     }
     if(control.kind==="cover"){
       const values=control.values||[];
@@ -816,14 +828,14 @@
       const stopValue=optionValue(values,/STOP/,"STOP");
       const closeValue=optionValue(values,/CLOSE|DOWN/,"CLOSE");
       const current=String(control.value??"").toUpperCase();
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("cover"))}${renameControlButton(device,control)}</div><div class="control-value">${esc(control.value??t("unknownState"))}</div></div><div class="control-icon-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<button class="control-command ${current===String(openValue).toUpperCase()?"active":""}" data-command-value="${commandValue(openValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("open")}" title="${t("open")}">↑</button><button class="control-command stop" data-command-value="${commandValue(stopValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("stop")}" title="${t("stop")}">■</button><button class="control-command close-action ${current===String(closeValue).toUpperCase()?"active":""}" data-command-value="${commandValue(closeValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("close")}" title="${t("close")}">↓</button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("cover"))}</div><div class="control-value">${esc(control.value??t("unknownState"))}</div></div><div class="control-icon-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<button class="control-command ${current===String(openValue).toUpperCase()?"active":""}" data-command-value="${commandValue(openValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("open")}" title="${t("open")}">↑</button><button class="control-command stop" data-command-value="${commandValue(stopValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("stop")}" title="${t("stop")}">■</button><button class="control-command close-action ${current===String(closeValue).toUpperCase()?"active":""}" data-command-value="${commandValue(closeValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("close")}" title="${t("close")}">↓</button></div></div>`;
     }
     if(control.kind==="lock"){
       const values=control.values||[];
       const lockValue=optionValue(values,/^LOCK(?:ED)?$/,"LOCK");
       const unlockValue=optionValue(values,/UNLOCK/,"UNLOCK");
       const locked=/^LOCK(?:ED)?$/.test(String(control.value??"").toUpperCase());
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("lockDevice"))}${renameControlButton(device,control)}</div><div class="control-value">${locked?t("lock"):t("unlock")}</div></div><div class="control-icon-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<button class="control-command ${locked?"active":""}" data-command-value="${commandValue(lockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("lock")}" title="${t("lock")}">▣</button><button class="control-command ${!locked?"active":""}" data-command-value="${commandValue(unlockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("unlock")}" title="${t("unlock")}">□</button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("lockDevice"))}</div><div class="control-value">${locked?t("lock"):t("unlock")}</div></div><div class="control-icon-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<button class="control-command ${locked?"active":""}" data-command-value="${commandValue(lockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("lock")}" title="${t("lock")}">▣</button><button class="control-command ${!locked?"active":""}" data-command-value="${commandValue(unlockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("unlock")}" title="${t("unlock")}">□</button></div></div>`;
     }
     if(control.kind==="select"){
       return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}</div>${control.adminOnly?`<div class="control-value">${t("deviceSetting")}</div>`:""}</div><select class="control-select" data-select="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)}">${(control.values||[]).map(value=>`<option value="${esc(value)}"${String(value)===String(control.value)?" selected":""}>${esc(String(value).replaceAll("_"," "))}</option>`).join("")}</select></div>`;
@@ -831,7 +843,7 @@
     if(control.kind==="color")return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${t("color")}</div><div class="control-value">${esc(control.value)}</div></div><input type="color" value="${esc(control.value||"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("color")}"></div>`;
     const known=typeof control.value==="number";
     const label=control.kind==="position"?t("position"):control.kind==="climate"?t("targetTemperature"):control.name;
-    return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(label)}${renameControlButton(device,control)}</div><div class="control-value">${known?levelValueHtml(control.value,control.unit):t("unknownState")}</div></div><div class="control-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<input type="range" min="${control.min??0}" max="${control.max??100}" step="${control.step??1}" value="${known?control.value:control.min??0}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" data-unit="${esc(control.unit||"")}" aria-label="${esc(label)}"></div></div>`;
+    return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(label)}</div><div class="control-value">${known?levelValueHtml(control.value,control.unit):t("unknownState")}</div></div><div class="control-actions">${isDashboardControl(control)?favoriteButton(device,control):""}<input type="range" min="${control.min??0}" max="${control.max??100}" step="${control.step??1}" value="${known?control.value:control.min??0}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" data-unit="${esc(control.unit||"")}" aria-label="${esc(label)}"></div></div>`;
   };
   // Rol satırı cihazın yayımladığı ayarların en altında, "switch type" gibi görünür. Cihaza yazılmaz,
   // Villa Bridge'in kendi ayarıdır — alt yazısı bunu söyler. Satır her cihazda çıkar; seçim yalnız
@@ -848,8 +860,9 @@
       const guess=deviceCategoryLabels[control.detectedCategory||device.detectedCategory];
       const current=control.role||"auto";
       // Tek kanallı cihazda satır bugünküyle aynı; çoklu kanalda başlık kanalın adını taşır
-      // (kullanıcının verdiği kanal adı varsa o gelir — kanal kimliği şeması ile aynı).
-      const label=channels.length>1?t("deviceRoleChannelLabel",{channel:control.name}):t("deviceRoleLabel");
+      // (kullanıcının verdiği kanal adı varsa o gelir — kanal kimliği şeması ile aynı). Ayrı kanal
+      // adı olmayan satırda cihaz adı kullanılır, kanal adı uydurulmaz.
+      const label=channels.length>1?t("deviceRoleChannelLabel",{channel:channelDisplayName(device,control)}):t("deviceRoleLabel");
       const options=deviceRoleOptions.map(role=>{
         const optionLabel=role!=="auto"
           ?t(deviceRoleLabels[role])
@@ -1004,8 +1017,7 @@
   const quickDeviceHtml=(device,selectedControl=null)=>{
     const control=selectedControl||dashboardControlForDevice(device);
     if(!control)return"";
-    const mainControl=control.id==="main";
-    const displayName=mainControl?device.name:control.name;
+    const displayName=channelDisplayName(device,control);
     const availability=device.availability==="online"?t("ready"):device.availability==="offline"?t("unreachable"):t("standby");
     const preparing=device.preparing===true;
     const action=dashboardControlAction(control);
@@ -1398,7 +1410,7 @@
     const available=entries.filter(({device,control})=>control&&groupPowerControl(control)&&device.availability!=="offline"&&device.preparing!==true);
     const allOn=available.length>0&&available.every(({control})=>dashboardControlAction(control)?.active===true);
     const controls=entries.map(({device,control})=>{
-      const name=control?(control.id==="main"?device.name:control.name):device.name;
+      const name=control?channelDisplayName(device,control):device.name;
       const controlAction=dashboardControlAction(control);
       const preparing=device.preparing===true;
       const pending=Boolean(controlAction&&commandPending(device.id,control.property));
@@ -1954,8 +1966,8 @@
     $("#groupDeviceChoices").innerHTML=choices.length?choices.map(({device,control})=>{
       const key=groupItemKey(device.id,control?.id||groupDeviceControlId);
       const checked=editing.selected.has(key);
-      const name=control?(control.id==="main"?device.name:control.name):device.name;
-      const detail=control?(control.id==="main"?deviceKind(device):device.name):deviceKind(device);
+      const name=control?channelDisplayName(device,control):device.name;
+      const detail=control&&name!==device.name?device.name:deviceKind(device);
       const visualState=control?(device.availability==="offline"?"offline":dashboardControlAction(control)?.active?"on":"off"):groupDeviceVisualState(device);
       return`<label class="group-device-choice"><input type="checkbox" data-group-choice="${esc(key)}"${checked?" checked":""}><span class="group-choice-state ${visualState}" aria-hidden="true"></span><span><strong>${esc(name)}</strong><small>${esc(detail)}</small></span></label>`;
     }).join(""):`<div class="group-empty">${t("groupNoAvailableControls")}</div>`;

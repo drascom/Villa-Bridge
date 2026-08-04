@@ -32,6 +32,26 @@ const defaultChannelName = (deviceName: string, channel: string): string => {
   return number ? `Kanal ${number}` : channel.toUpperCase();
 };
 
+/**
+ * Ayrı adı olan tek şey aç/kapa kanalıdır: `state` / `state_lN` kanalları `<ieee>:<kanal>` takma adını
+ * okur ve kimlikleri o kanaldır ("main", "l1"). Perde, kilit, fan, siren ve cihazın yayımladığı ikili
+ * ayarlar `cover:...`, `switch:child_lock` gibi kimlik taşır; adlarını cihazın kendi etiketinden alır,
+ * takma ad okunmaz.
+ */
+export const isNamedChannelControl = (control: Pick<DeviceControlView, "id" | "kind">): boolean =>
+  control.kind === "switch" && !control.id.includes(":");
+
+/**
+ * Cihazın tek aç/kapa kanalı varsa o kanalın kimliği, yoksa `null`. Tek kanallı cihazda kanal adı diye
+ * ayrı bir kavram yoktur — cihaz adı kanalın da adıdır; birden çok kanalda her kanal kendi adını taşır.
+ */
+export const soleSwitchChannelId = (
+  controls: Array<Pick<DeviceControlView, "id" | "kind">>
+): string | null => {
+  const channels = controls.filter(isNamedChannelControl);
+  return channels.length === 1 ? channels[0].id : null;
+};
+
 const clampByte = (value: number): number => Math.round(Math.max(0, Math.min(255, value)));
 
 const rgbToHex = (red: number, green: number, blue: number): string =>

@@ -282,13 +282,17 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /select,textarea,input:not\(\[type="range"\]\)/);
   assert.match(dashboard, /const deviceDetailBodyHtml=device=>\{/);
   assert.match(dashboard, /class="device-name-edit"[^>]*data-rename=/);
-  assert.match(dashboard, /const renameControlButton=\(device,control\)=>\{\s*if\(!isDashboardControl\(control\)\)return""/);
+  assert.match(dashboard, /const renameControlButton=\(device,control\)=>\{\s*if\(!isNamedChannel\(control\)\|\|!deviceHasChannelNames\(device\)\)return""/);
   assert.match(dashboard, /class="control-rename" type="button" data-admin-only data-rename-channel="\$\{esc\(device\.id\)\}" data-channel="\$\{esc\(control\.id\)\}"/);
   assert.match(dashboard, /\.device-name-edit,\.control-rename\{width:40px;height:40px/);
   assert.match(dashboard, /\.control-rename\{width:44px;height:44px;display:inline-grid;vertical-align:middle;margin-left:7px\}/);
   assert.doesNotMatch(dashboard, /channel-rename/);
-  assert.match(dashboard, /<div class="control-name">\$\{esc\(control\.name\)\}\$\{renameControlButton\(device,control\)\}<\/div>/);
-  assert.match(dashboard, /<div class="control-name">\$\{esc\(label\)\}\$\{renameControlButton\(device,control\)\}<\/div>/);
+  assert.match(dashboard, /<div class="control-name">\$\{esc\(name\)\}\$\{renameControlButton\(device,control\)\}<\/div>/);
+  // Kalem yalnız aç/kapa kanalı satırındadır: perde, kilit ve seviye satırlarında kanal adı diye bir
+  // şey yok, oradaki kalem hiç okunmayan bir takma ad yazıyordu.
+  assert.doesNotMatch(dashboard, /\$\{esc\(label\)\}\$\{renameControlButton\(device,control\)\}/);
+  assert.doesNotMatch(dashboard, /t\("cover"\)\)\}\$\{renameControlButton/);
+  assert.doesNotMatch(dashboard, /t\("lockDevice"\)\)\}\$\{renameControlButton/);
   assert.match(dashboard, /class="device-meta-text"><span class="device-primary-status \$\{primaryStatus\.tone\}">/);
   assert.match(dashboard, /class="device-card-lead">\$\{deviceStatusIcon\(device,primaryStatus\)\}\$\{cardStatusBadge\(device\)\}<\/div>/);
   assert.doesNotMatch(dashboard, /class="device-meta-text">\$\{deviceKind\(device\)\}/);
@@ -2078,7 +2082,7 @@ test("cihaz rolü eşleştirmede sorulur ve cihaz kartındaki özellik listesind
   assert.match(dashboard, /const payload=channel\?\{role,channel\}:\{role\}/);
   // Kontrol edilebilir her kanal kendi satırını alır; kanal adı kullanıcının verdiği addır.
   assert.match(dashboard, /const deviceRoleChannels=device=>\(device\?\.controls\|\|\[\]\)\.filter\(control=>control\.kind==="switch"\)/);
-  assert.match(dashboard, /channels\.length>1\?t\("deviceRoleChannelLabel",\{channel:control\.name\}\):t\("deviceRoleLabel"\)/);
+  assert.match(dashboard, /channels\.length>1\?t\("deviceRoleChannelLabel",\{channel:channelDisplayName\(device,control\)\}\):t\("deviceRoleLabel"\)/);
   assert.match(dashboard, /deviceRoleChannelLabel:"Show \{channel\} as"/);
   assert.match(dashboard, /deviceRoleChannelLabel:"\{channel\} şöyle görünsün"/);
   // Kümeleme ve simge kanal seviyesindeki rolü kullanır.
@@ -2321,4 +2325,60 @@ test("Ayarlar'da yedek al ve geri yükle kartı onay adımı atlanmadan çalış
   assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadAutomations\(\)\]\);\s*render\(\)/);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+test("tek kanallı cihazda kanal kalemi çıkmaz, çok kanallıda her kanal ayrı adlandırılır", async () => {
+  const dashboard = await readDashboardBundle();
+  const source = dashboardScripts(dashboard);
+  const start = source.indexOf("const renameGlyph=");
+  const end = source.indexOf("const controlHtml=");
+  assert.ok(start > 0 && end > start);
+  const helpers = new Function(
+    "t",
+    "esc",
+    `${source.slice(start, end)}return{isNamedChannel,deviceHasChannelNames,channelDisplayName,renameControlButton};`
+  )((key: string) => key, (value: unknown) => String(value)) as {
+    isNamedChannel: (control: { id: string; kind: string }) => boolean;
+    deviceHasChannelNames: (device: { controls: Array<{ id: string; kind: string }> }) => boolean;
+    channelDisplayName: (device: unknown, control: unknown) => string;
+    renameControlButton: (device: unknown, control: unknown) => string;
+  };
+
+  // Tek kanallı cihaz: kanal kalemi yok, kanalın adı cihazın adıdır.
+  const single = { id: "0xlamba", name: "Salon lambası", controls: [{ id: "main", kind: "switch", name: "Salon lambası" }] };
+  assert.equal(helpers.deviceHasChannelNames(single), false);
+  assert.equal(helpers.renameControlButton(single, single.controls[0]), "");
+  assert.equal(helpers.channelDisplayName(single, single.controls[0]), "Salon lambası");
+
+  // Eski veri: tek kanallı cihazda kalmış kanal takma adı gösterimde cihaz adının önüne geçmez.
+  const legacy = { id: "0xpriz", name: "Mutfak prizi", controls: [{ id: "main", kind: "switch", name: "Eskiden yazılmış kanal adı" }] };
+  assert.equal(helpers.renameControlButton(legacy, legacy.controls[0]), "");
+  assert.equal(helpers.channelDisplayName(legacy, legacy.controls[0]), "Mutfak prizi");
+
+  // Çok kanallı cihaz: ana cihaz adı ayrı, her kanalın adı ayrı.
+  const multi = {
+    id: "0xduvar",
+    name: "Duvar anahtarı",
+    controls: [
+      { id: "l1", kind: "switch", name: "Sol lamba" },
+      { id: "l2", kind: "switch", name: "Sağ lamba" }
+    ]
+  };
+  assert.equal(helpers.deviceHasChannelNames(multi), true);
+  assert.equal(helpers.channelDisplayName(multi, multi.controls[0]), "Sol lamba");
+  assert.equal(helpers.channelDisplayName(multi, multi.controls[1]), "Sağ lamba");
+  assert.match(helpers.renameControlButton(multi, multi.controls[0]), /data-rename-channel="0xduvar" data-channel="l1"/);
+  assert.match(helpers.renameControlButton(multi, multi.controls[1]), /data-channel="l2"/);
+
+  // Perde, kilit ve cihazın kendi ikili ayarı kanal değildir: adları kendilerinindir, kalem çıkmaz.
+  for (const control of [
+    { id: "cover:state", kind: "cover", name: "Perde" },
+    { id: "lock:state", kind: "lock", name: "Kilit" },
+    { id: "switch:child_lock", kind: "switch", name: "Çocuk kilidi" }
+  ]) {
+    const device = { id: "0xkarma", name: "Karma cihaz", controls: [...multi.controls, control] };
+    assert.equal(helpers.isNamedChannel(control), false);
+    assert.equal(helpers.renameControlButton(device, control), "");
+    assert.equal(helpers.channelDisplayName(device, control), control.name);
+  }
 });

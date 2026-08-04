@@ -8,7 +8,7 @@ import { AutomationEngine } from "./automation-engine.js";
 import { AutomationsStore } from "./automations.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
-import { hexToXy } from "./device-controls.js";
+import { hexToXy, soleSwitchChannelId } from "./device-controls.js";
 import { DeviceImageCache } from "./device-image-cache.js";
 import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
@@ -897,15 +897,29 @@ app.put<{
     return reply.code(400).send({ ok: false, error: "Kanal bulunamadı." });
   }
   const aliasKey = channel ? `${id}:${channel}` : id;
-  const previousAlias = aliases.get(aliasKey);
+  // Tek aç/kapa kanallı cihazda kanalın ayrı bir adı yoktur; panelde kanal kalemi de çıkmaz. Bu yüzden
+  // cihaz adı değişince tek kanalın adı onunla birlikte gider, yoksa dışarıya (Matter/Alexa/Home
+  // Assistant) eski kanal adı sızmaya devam eder ve düzeltmenin yolu kalmaz. "main" kanalında takma ad
+  // silinir — varsayılanı zaten cihaz adıdır; başka kanalda yeni ad yazılır, yoksa "Kanal 1"e düşerdi.
+  const soleChannelId = channel ? null : soleSwitchChannelId(device.controls);
+  const soleChannelKey = soleChannelId ? `${id}:${soleChannelId}` : null;
+  const previousAliases = new Map(
+    (soleChannelKey ? [aliasKey, soleChannelKey] : [aliasKey]).map((key) => [key, aliases.get(key)])
+  );
   aliases.set(aliasKey, name);
+  if (soleChannelKey) {
+    if (soleChannelId === "main") aliases.delete(soleChannelKey);
+    else aliases.set(soleChannelKey, name);
+  }
   try {
     await saveAliases(config.aliasesFile, aliases);
     if (!channel) await source.renameDevice(id, name);
     return { ok: true, id, channel: channel ?? null, name, matterSyncRequired: true };
   } catch (error) {
-    if (previousAlias === undefined) aliases.delete(aliasKey);
-    else aliases.set(aliasKey, previousAlias);
+    for (const [key, value] of previousAliases) {
+      if (value === undefined) aliases.delete(key);
+      else aliases.set(key, value);
+    }
     await saveAliases(config.aliasesFile, aliases).catch(() => undefined);
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
