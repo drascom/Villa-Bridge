@@ -960,6 +960,7 @@
     "automationRunsTitle": "Çalışma geçmişi",
     "automationRunsLoading": "Yükleniyor…",
     "automationRunsEmpty": "Henüz çalışmadı.",
+    "automationRunsOlderThanLog": "Bu kural bu sürümden önce çalışmış; günlük yeni tutulmaya başlandı.",
     "automationOutcomeOk": "Çalıştı",
     "automationOutcomeFailed": "Hata",
     "automationOutcomeBusy": "Hâlâ meşgul",

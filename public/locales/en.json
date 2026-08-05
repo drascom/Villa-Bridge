@@ -960,6 +960,7 @@
     "automationRunsTitle": "Run history",
     "automationRunsLoading": "Loading…",
     "automationRunsEmpty": "It has not run yet.",
+    "automationRunsOlderThanLog": "This rule ran before this version; the log has only just started.",
     "automationOutcomeOk": "Ran",
     "automationOutcomeFailed": "Failed",
     "automationOutcomeBusy": "Still busy",

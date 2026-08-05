@@ -2717,6 +2717,8 @@ type AutomationSandbox = {
   scrollIntoViewCalls: () => number;
   state: Record<string, unknown>;
   api: Record<string, (...args: unknown[]) => unknown>;
+  // Kaydetme yolunda sunucuya gönderilen son liste; round-trip karşılaştırması buradan okunur.
+  saved: () => Record<string, unknown>[];
 };
 
 const automationExports = [
@@ -2733,15 +2735,17 @@ const automationExports = [
   "chooseAutomationGroupValue", "chooseAutomationSceneGroup", "chooseAutomationScene",
   "automationAutoOffPayload", "automationAutoOffLine", "automationAutoOffIdleAvailable",
   "automationConditionLine", "automationTargetLine", "automationTriggerLine", "automationWizardTrigger",
-  "automationRunRowHtml", "automationReasonText", "automationOutcomeText"
+  "automationRunRowHtml", "automationReasonText", "automationOutcomeText", "saveAutomationWizard"
 ];
 
 function automationSandbox(dashboard: string, devices: unknown[], groups: unknown[] = []): AutomationSandbox {
   const source = dashboardScripts(dashboard);
   const start = source.indexOf("const automationWeekDays=");
-  const end = source.indexOf("async function saveAutomationWizard(");
+  // Kaydetme de dilime girer: kural → sihirbaz → kural dönüşünün ikinci yarısı orada.
+  const end = source.indexOf("async function removeSimpleLink(");
   assert.ok(start > 0 && end > start);
   const bodies: string[] = [];
+  const savedLists: Record<string, unknown>[][] = [];
   let scrollIntoViewCalls = 0;
   const nodes = new Map<string, Record<string, unknown>>();
   const node = (selector: string): Record<string, unknown> => {
@@ -2801,10 +2805,19 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
     deviceButtonName: () => "button",
     deviceButtonPressLabel: () => "press",
     openSimpleLink: () => {},
-    persistAutomations: async () => {},
     renderAutomations: () => {},
     activateView: () => {},
-    api: async () => ({}),
+    // Sunucu yerine bellek: PUT gövdesi diske yazılacak liste, round-trip karşılaştırması odur.
+    api: async (path: string, options?: { method?: string; body?: string }) => {
+      const stored = () => (state.automations as Record<string, unknown>[]).map((item) => ({ ...item }));
+      if (options?.method === "PUT") {
+        const list = JSON.parse(String(options.body)).automations as Record<string, unknown>[];
+        savedLists.push(list);
+        return { automations: list };
+      }
+      return { automations: stored() };
+    },
+    simpleLinks: () => [],
     confirm: () => false,
     $: (selector: string) => node(selector),
     $$: () => [],
@@ -2819,7 +2832,13 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
     `${source.slice(start, end)}\n`
     + `return{${automationExports.join(",")}};`
   )(...names.map((name) => stubs[name])) as Record<string, (...args: unknown[]) => unknown>;
-  return { bodies, scrollIntoViewCalls: () => scrollIntoViewCalls, state, api };
+  return {
+    bodies,
+    scrollIntoViewCalls: () => scrollIntoViewCalls,
+    state,
+    api,
+    saved: () => savedLists[savedLists.length - 1] || []
+  };
 }
 
 function automationHelpers(dashboard: string, devices: unknown[], groups: unknown[] = []): Record<string, (...args: unknown[]) => unknown> {
@@ -2854,6 +2873,217 @@ async function automationWizardHarness(): Promise<WizardHarness> {
     body: () => sandbox.bodies[sandbox.bodies.length - 1]
   };
 }
+
+// Kayıtlı kural → sihirbaz → kayıtlı kural turu. Diskteki kaydın birebir aynısı geri yazılmalı:
+// düzenlemeye açıp hiçbir şeye dokunmadan Kaydet demek kuralı DEĞİŞTİRMEZ.
+async function automationRoundTripHarness(): Promise<WizardHarness> {
+  const dashboard = await readFile(dashboardUrl, "utf8");
+  const sandbox = automationSandbox(
+    dashboard,
+    [
+      {
+        id: "0xa4c138b950918de3", name: "Corridor light", buttons: [], features: [], state: {},
+        controls: [{ id: "main", property: "state", name: "Corridor light", kind: "switch", valueOn: "ON", valueOff: "OFF", valueToggle: "TOGGLE" }]
+      },
+      {
+        id: "0xa4c1389eef9ade7e", name: "Corridor Detector", buttons: [], features: ["presence"], state: { presence: false }, controls: []
+      },
+      {
+        id: "0x0088", name: "Salon Sıcaklık", buttons: [], features: ["temperature"], state: { temperature: 21.4 }, controls: []
+      },
+      {
+        // İki kanallı anahtar: hem eşleme yolunun tetikleyicisi hem de çoklu hedef kaynağı.
+        id: "0x0055", name: "Salon anahtarı", buttons: [], features: [], state: {},
+        controls: [
+          { id: "l1", property: "state_l1", name: "Sol", kind: "switch", valueOn: "ON", valueOff: "OFF" },
+          { id: "l2", property: "state_l2", name: "Sağ", kind: "switch", valueOn: "ON", valueOff: "OFF" }
+        ]
+      },
+      {
+        // Açık/kapalı değerleri dize değil: eşleme kontrol tanımından türetilmeli.
+        id: "0x0066", name: "Bahçe prizi", buttons: [], features: [], state: {},
+        controls: [{ id: "plug", property: "power", name: "Bahçe prizi", kind: "switch", valueOn: true, valueOff: false }]
+      }
+    ],
+    [{ id: "group-7", name: "Salon lambaları", members: 3, memberIds: [], scenes: [{ id: 4, name: "Akşam" }] }]
+  );
+  return {
+    ...sandbox,
+    wizard: () => sandbox.state.automationWizard as Record<string, unknown>,
+    body: () => sandbox.bodies[sandbox.bodies.length - 1]
+  };
+}
+
+type StoredAutomation = Record<string, unknown> & { id: string };
+
+// Kuralı diskteki hâliyle yükler, düzenlemeye açar ve hiçbir şey değiştirmeden kaydeder.
+async function automationRoundTrip(rule: StoredAutomation): Promise<{ harness: WizardHarness; saved: StoredAutomation }> {
+  const harness = await automationRoundTripHarness();
+  (harness.state.automations as unknown[]).push(JSON.parse(JSON.stringify(rule)));
+  harness.api.openAutomationWizard(rule.id);
+  await harness.api.saveAutomationWizard();
+  const saved = harness.saved().find((item) => item.id === rule.id) as StoredAutomation;
+  assert.ok(saved, "kayıt sunucuya gönderilmedi");
+  return { harness, saved };
+}
+
+const storedRule = (overrides: Record<string, unknown>): StoredAutomation => ({
+  id: "rule-round-trip",
+  name: "Corridor Detector → Corridor light",
+  enabled: true,
+  conditions: [],
+  lastRunAt: null,
+  lastRunOk: null,
+  ...overrides
+} as StoredAutomation);
+
+// Evdeki gerçek kural. Kart doğru özetliyordu ama düzenlemeye açınca eylem tersine dönüyor ve
+// otomatik kapatma siliniyordu: kayıtlı kural, anahtar/priz eşleme formuna ait "yön" satırlarına
+// çevriliyor, hedefin `value` alanı düşüyordu. Artık eşleme tohumu yalnız `deviceState` yolunda.
+test("kayıtlı sensör kuralı sihirbaza aynen geri okunur ve aynen geri yazılır", async () => {
+  const rule = storedRule({
+    triggers: [{ type: "deviceState", deviceId: "0xa4c1389eef9ade7e", property: "presence", equals: true }],
+    actions: [{
+      type: "device", deviceId: "0xa4c138b950918de3", property: "state", value: "ON", controlId: "main",
+      autoOff: { mode: "idle", seconds: 60, value: "OFF" }
+    }]
+  });
+  const { harness, saved } = await automationRoundTrip(rule);
+  const wizard = harness.wizard();
+
+  // Hedef satırı "Açılacak" der — değer `"ON"`, pill de açık.
+  assert.equal(wizard.triggerKind, "sensor");
+  assert.deepEqual(wizard.targets, [{
+    kind: "device", deviceId: "0xa4c138b950918de3", property: "state", controlId: "main", value: "ON", mapOn: "on", mapOff: "off"
+  }]);
+
+  // Otomatik kapatma geri geldi: mod, süre ve kapanış değeri.
+  assert.equal(wizard.autoOffMode, "idle");
+  assert.equal(wizard.autoOffIdleMinutes, 1);
+  assert.deepEqual(
+    harness.api.automationAutoOffPayload(wizard, (wizard.targets as unknown[])[0]),
+    { mode: "idle", seconds: 60, value: "OFF" }
+  );
+
+  // Kaydedilen JSON girdinin birebir aynısı.
+  assert.deepEqual(saved, rule);
+});
+
+// Aynı kural düzenleme ekranında da doğru görünür: hedef pill'i ve alt şerit özeti tek kaynaktan.
+test("kayıtlı kuralın hedef pill'i ve sonrası satırı kayıtla aynı şeyi söyler", async () => {
+  const rule = storedRule({
+    triggers: [{ type: "deviceState", deviceId: "0xa4c1389eef9ade7e", property: "presence", equals: true }],
+    actions: [{
+      type: "device", deviceId: "0xa4c138b950918de3", property: "state", value: "ON", controlId: "main",
+      autoOff: { mode: "idle", seconds: 60, value: "OFF" }
+    }]
+  });
+  const harness = await automationRoundTripHarness();
+  (harness.state.automations as unknown[]).push(rule);
+  harness.api.openAutomationWizard(rule.id);
+
+  // Hedef satırı: açık pill'i, kapalı pill'i değil.
+  assert.match(harness.body(), /automation-pill act-on/);
+  assert.doesNotMatch(harness.body(), /automation-pill act-off/);
+  // SONRASI bölümü "hiç kapanmasın" demiyor; hareket bitince kapanma cümlesini gösteriyor.
+  assert.match(harness.body(), /automationAutoOffIdleWaitLine/);
+  assert.doesNotMatch(harness.body(), /automationAutoOffNeverLine/);
+  // Alt şerit özeti hedef satırıyla aynı kaynaktan (wizard.targets) üretilir: aynı yönü söyler.
+  assert.equal(harness.api.automationWizardReady(harness.wizard()), true);
+  const target = (harness.wizard().targets as unknown[])[0];
+  assert.match(String(harness.api.automationTargetLine(harness.wizard(), target)), /automation-pill act-on/);
+});
+
+// Aynı tur bütün kural biçimleri için: hiçbiri düzenlemeye açılıp kaydedilince değişmemeli.
+test("her kural biçimi düzenlemeden geçip aynen geri yazılır", async () => {
+  const light = "0xa4c138b950918de3";
+  const detector = "0xa4c1389eef9ade7e";
+  const cases: Record<string, Record<string, unknown>> = {
+    // Kapatan eylem: pill de kayıt da "kapanacak" demeli, ters dönmemeli.
+    "kapatan eylem": {
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: false }],
+      actions: [{ type: "device", deviceId: light, property: "state", value: "OFF", controlId: "main" }]
+    },
+    // Durum değiştiren eylem.
+    "değiştiren eylem": {
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: true }],
+      actions: [{ type: "device", deviceId: light, property: "state", value: "TOGGLE", controlId: "main" }]
+    },
+    // Açık/kapalı değerleri dize değil: eşleme kontrol tanımından türetilir.
+    "mantıksal değerli kontrol": {
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: true }],
+      actions: [{
+        type: "device", deviceId: "0x0066", property: "power", value: true, controlId: "plug",
+        autoOff: { mode: "after", seconds: 600, value: false }
+      }]
+    },
+    // Süreyle kapatma.
+    "süreyle kapatma": {
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: true }],
+      actions: [{
+        type: "device", deviceId: light, property: "state", value: "ON", controlId: "main",
+        autoOff: { mode: "after", seconds: 300, value: "OFF" }
+      }]
+    },
+    // Çoklu hedef: her açan eylem kendi kapanış sözünü taşır, bekleme araya girer.
+    "çoklu hedef": {
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: true }],
+      actions: [
+        { type: "device", deviceId: light, property: "state", value: "ON", controlId: "main", autoOff: { mode: "idle", seconds: 120, value: "OFF" } },
+        { type: "delay", seconds: 10 },
+        { type: "device", deviceId: "0x0055", property: "state_l2", value: "ON", controlId: "l2", autoOff: { mode: "idle", seconds: 120, value: "OFF" } }
+      ]
+    },
+    // Güneş tetikleyicisi.
+    "güneş": {
+      triggers: [{ type: "sun", event: "sunset", offsetMinutes: -15, days: [1, 2, 3, 4, 5, 6, 7] }],
+      actions: [{ type: "device", deviceId: light, property: "state", value: "ON", controlId: "main" }]
+    },
+    // Saat tetikleyicisi, seçili günlerle.
+    "saat": {
+      triggers: [{ type: "time", at: "19:30", days: [1, 2, 3, 4, 5] }],
+      actions: [{ type: "device", deviceId: light, property: "state", value: "OFF", controlId: "main" }]
+    },
+    // Sayısal eşik.
+    "eşik": {
+      triggers: [{ type: "deviceState", deviceId: "0x0088", property: "temperature", above: 25 }],
+      actions: [{ type: "device", deviceId: light, property: "state", value: "ON", controlId: "main" }]
+    },
+    // Grup eylemi.
+    "grup": {
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: true }],
+      actions: [{ type: "group", groupId: "group-7", property: "state", value: "ON" }]
+    },
+    // Sahne eylemi.
+    "sahne": {
+      triggers: [{ type: "sun", event: "sunrise", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }],
+      actions: [{ type: "scene", groupId: "group-7", sceneId: 4 }]
+    },
+    // Koşullu kural: koşullar da olduğu gibi korunur.
+    "koşullu": {
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: true }],
+      conditions: [
+        { type: "time", from: "18:00", to: "23:30", days: [1, 2, 3, 4, 5, 6, 7] },
+        { type: "deviceState", deviceId: "0x0055", property: "state_l1", equals: "ON", negate: true }
+      ],
+      actions: [{ type: "device", deviceId: light, property: "state", value: "ON", controlId: "main" }]
+    },
+    // Anahtar/priz eşlemesi: yön eylemlerin `when` alanında, tetikleyicide durum yok.
+    "eşleme": {
+      triggers: [{ type: "deviceState", deviceId: "0x0055", property: "state_l1" }],
+      actions: [
+        { type: "device", deviceId: light, property: "state", controlId: "main", value: "ON", when: { equals: "ON" } },
+        { type: "device", deviceId: light, property: "state", controlId: "main", value: "OFF", when: { equals: "OFF" } }
+      ]
+    }
+  };
+
+  for (const [label, body] of Object.entries(cases)) {
+    const rule = storedRule({ id: `rule-${label}`, ...body });
+    const { saved } = await automationRoundTrip(rule);
+    assert.deepEqual(saved, rule, `${label} kuralı düzenlemeden geçince değişti`);
+  }
+});
 
 // Sihirbazın asıl kusuru: seçim yapılınca seçenekler kapanmıyordu, sayfa her tıklamada büyüyordu.
 // Artık cevaplanan soru tek satırlık özet satırına iner ve ekranda tek soru açık kalır.
@@ -3269,4 +3499,60 @@ test("cihaz sınıfı ayar niteliğindeki aç/kapa alanlarını saymaz", async (
     deviceKind({ category: null, features: ["presence"], controls: [{ kind: "switch", adminOnly: true }, { kind: "switch" }] }),
     "controller"
   );
+});
+
+// Görsel testte bulunanlar: odak halkası, hub'ın yerel şehir adı, karanlık temada okunabilirlik
+// ve "son çalışma" ile boş günlüğün çelişkisi. Dördü de tek yerden doğrulanır.
+test("panelde tarayıcı varsayılanı odak halkası kalmaz", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Özgüllüğü sıfır taban kural: kendi halkasını yazan öğeler ezmeye devam eder.
+  assert.match(
+    dashboard,
+    /:where\(a\[href\],area,button,input,select,textarea,summary,\[tabindex\]:not\(\[tabindex="-1"\]\)\):focus-visible\{outline:3px solid var\(--forest-soft\);outline-offset:2px\}/
+  );
+  // Fotoğraf zeminli ana ekranda halka beyaz gövde + koyu yeşil taşma.
+  assert.match(
+    dashboard,
+    /body\[data-active-view="home"\] #home :where\(a\[href\],button,input,select,textarea,summary,\[tabindex\]:not\(\[tabindex="-1"\]\)\):focus-visible\{outline:3px solid var\(--on-forest\)[^}]*box-shadow:0 0 0 6px var\(--forest\)\}/
+  );
+  // Kaydırılabilir saatlik şerit klavyeyle gezilebilir ve kendi halkasını taşır.
+  assert.match(dashboard, /<div class="hub-hours" tabindex="0" role="group" aria-label="\$\{esc\(t\("weatherHourly"\)\)\}">/);
+  assert.match(dashboard, /\.hub-hours:focus-visible\{outline:3px solid var\(--forest-soft\)/);
+});
+
+test("hub yerel şehir adını kullanıcının kaydından okur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Varsayılan "clockLocal" kaydı listede önce geldiği için `find` onu buluyordu; artık elenir.
+  assert.match(
+    dashboard,
+    /const namedZone=worldClockZones\.find\(zone=>zone\.timeZone===localTimeZone&&zone\.label!=="clockLocal"\);\s*const localName=namedZone\?locationName\(namedZone\):localTimeZone\.split\("\/"\)\.pop\(\)/
+  );
+  // Dile gömülü şehir adı tablosu yok: ad kullanıcının verisinden gelir.
+  assert.doesNotMatch(dashboard, /"Istanbul":"İstanbul"/);
+});
+
+test("ana ekran hub'ı fotoğraf zemininden bağımsız okunur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Sabit perde: iki temada ayrı değer, zemin rengine bağlı değil.
+  assert.match(dashboard, /--hub-scrim-strong:rgba\(250,252,251,\.66\);--hub-scrim-soft:rgba\(250,252,251,\.4\)/);
+  assert.match(dashboard, /--hub-scrim-strong:rgba\(6,14,11,\.74\);--hub-scrim-soft:rgba\(6,14,11,\.5\)/);
+  // Kart değil, sönen degrade: kenarlık yok, tıklamayı yemiyor, metnin arkasında duruyor.
+  const scrim = /body\[data-active-view="home"\] #home \.home-hub::before\{content:"";position:absolute;z-index:-1;[^}]*background:linear-gradient\(100deg,var\(--hub-scrim-strong\) 0%,var\(--hub-scrim-soft\) 58%,transparent 100%\);pointer-events:none\}/;
+  assert.match(dashboard, scrim);
+  assert.doesNotMatch(dashboard, /\.home-hub::before\{[^}]*border:/);
+  // Alt satırlar karanlık temada ayrıca yükseltilir; ipucu metni sönük kalmaz.
+  assert.match(dashboard, /--hub-muted:#cddcd4/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.hub-hint\{opacity:1\}/);
+});
+
+test("boş çalışma günlüğü kartın 'son çalışma' bilgisiyle çelişmez", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Cümle yalnız lastRunAt varken değişir; hiç çalışmamış kuralda eski boş durum cümlesi kalır.
+  assert.match(dashboard, /t\(automation\.lastRunAt\?"automationRunsOlderThanLog":"automationRunsEmpty"\)/);
+  assert.match(dashboard, /automationRunsOlderThanLog:"Bu kural bu sürümden önce çalışmış; günlük yeni tutulmaya başlandı\."/);
+  assert.match(dashboard, /automationRunsOlderThanLog:"This rule ran before this version; the log has only just started\."/);
 });
