@@ -3,9 +3,17 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { AutomationEngine } from "./automation-engine.js";
+import {
+  AutomationEngine,
+  automationSunTime,
+  evaluateAutomationConditions
+} from "./automation-engine.js";
+import type { AutomationRunRecord } from "./automation-runs.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
-import type { JsonObject } from "./types.js";
+import type { AutomationCondition } from "./automations.js";
+import type { HomeLocation } from "./location.js";
+import { sunTimes } from "./sun.js";
+import type { JsonObject, JsonScalar } from "./types.js";
 
 const lampId = "0x00124b0011cc22dd";
 /** Kullanıcının TS0043 sahne anahtarı — üç buton, tek IEEE adresi. */
@@ -27,6 +35,8 @@ const automation = (overrides: Record<string, unknown> = {}): Record<string, unk
 /** Sahte kaynak — gerçek koordinatöre veya MQTT'ye dokunmaz. */
 class FakeSource {
   readonly calls: Array<{ id: string; command: JsonObject }> = [];
+  readonly groupCalls: Array<{ id: string; command: JsonObject }> = [];
+  readonly sceneCalls: Array<{ id: string; sceneId: number; action: string }> = [];
   failNext = false;
   private gate: (() => void) | null = null;
   private blockNextCall = false;
@@ -41,6 +51,14 @@ class FakeSource {
     this.gate = null;
     this.blockNextCall = false;
     gate?.();
+  }
+
+  async setGroup(id: string, command: JsonObject): Promise<void> {
+    this.groupCalls.push({ id, command });
+  }
+
+  async groupScene(id: string, sceneId: number, action: string): Promise<void> {
+    this.sceneCalls.push({ id, sceneId, action });
   }
 
   async setDevice(id: string, command: JsonObject): Promise<void> {
@@ -105,7 +123,11 @@ const settle = async (): Promise<void> => {
 const harness = async (
   context: { after(fn: () => unknown): void },
   entries: Array<Record<string, unknown>>,
-  engineOptions: { actionTimeoutMs?: number } = {}
+  engineOptions: {
+    actionTimeoutMs?: number;
+    location?: HomeLocation | null;
+    start?: string;
+  } = {}
 ) => {
   const directory = await mkdtemp(join(tmpdir(), "villa-engine-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
@@ -114,7 +136,12 @@ const harness = async (
   const source = new FakeSource();
   const logs: string[] = [];
   const notes: string[] = [];
-  let clock = new Date("2026-08-03T19:00:05");
+  /** Çalışma günlüğü diske değil belleğe yazılır; testler dosya beklemez. */
+  const runs: AutomationRunRecord[] = [];
+  /** Koşulların okuduğu anlık cihaz durumu — `DeviceStore` yerine sahte harita. */
+  const states = new Map<string, JsonScalar>();
+  let location: HomeLocation | null = engineOptions.location ?? null;
+  let clock = new Date(engineOptions.start ?? "2026-08-03T19:00:05");
   const timers = new FakeTimers(() => clock.getTime());
   const autoOffStore = new AutomationAutoOffStore(join(directory, "automation-auto-off.json"));
   const engine = new AutomationEngine({
@@ -124,7 +151,12 @@ const harness = async (
     timers,
     autoOffStore,
     logger: { error: (message) => logs.push(message), info: (message) => notes.push(message) },
-    ...engineOptions
+    location: () => location,
+    deviceState: (deviceId, property) => states.get(`${deviceId}|${property}`),
+    runLog: { append: (record) => runs.push(record) },
+    ...(engineOptions.actionTimeoutMs === undefined
+      ? {}
+      : { actionTimeoutMs: engineOptions.actionTimeoutMs })
   });
   context.after(() => engine.stop());
   return {
@@ -133,9 +165,16 @@ const harness = async (
     engine,
     logs,
     notes,
+    runs,
     timers,
     autoOffStore,
     directory,
+    setState: (deviceId: string, property: string, value: JsonScalar) => {
+      states.set(`${deviceId}|${property}`, value);
+    },
+    setLocation: (value: HomeLocation | null) => {
+      location = value;
+    },
     setClock: (value: string) => {
       clock = new Date(value);
     },
@@ -784,4 +823,349 @@ test("hareket bekleyen kayıt yeniden başlatmada üst sınırla kapanır", asyn
   timers.fire();
   await settle();
   assert.deepEqual(source.calls, [{ id: lampId, command: { state: "OFF" } }]);
+});
+
+// ---------------------------------------------------------------------------
+// Güneş · koşullar · sayısal eşik · yeni eylemler · çalışma günlüğü
+// ---------------------------------------------------------------------------
+
+/** Kullanıcının evi olabilir; ürün çok evli olduğu için koordinat testten geliyor. */
+const istanbul = { latitude: 41.0082, longitude: 28.9784 };
+/** Kutup dairesinin üstü — yaz gündönümünde güneş batmaz. */
+const tromso = { latitude: 69.6492, longitude: 18.9553 };
+
+/** Beklenen yerel an, astronomi testinin değil motor yolunun sınandığından emin olmak için. */
+const sunMoment = (
+  location: HomeLocation,
+  year: number,
+  month: number,
+  day: number,
+  event: "sunrise" | "sunset",
+  offsetMinutes: number
+): Date => {
+  const times = sunTimes(new Date(year, month - 1, day, 12, 0, 0), location.latitude, location.longitude);
+  const base = event === "sunrise" ? times.sunrise : times.sunset;
+  assert.ok(base, "Güneş anı hesaplanamadı.");
+  return new Date(base.getTime() + offsetMinutes * 60_000);
+};
+
+const sunRule = (offsetMinutes: number): Record<string, unknown> => automation({
+  id: "gun-batimi",
+  name: "Gün batımı",
+  triggers: [{ type: "sun", event: "sunset", offsetMinutes }]
+});
+
+test("güneş tetikleyicisi hesaplanan yerel dakikada çalışır", async (context) => {
+  const target = sunMoment(istanbul, 2026, 6, 21, "sunset", -30);
+  const { engine, source, setClock } = await harness(context, [sunRule(-30)], {
+    location: istanbul,
+    start: new Date(target.getTime() - 5 * 60_000).toISOString()
+  });
+
+  // Beş dakika önce: zamanı gelmedi.
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+
+  setClock(target.toISOString());
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+
+  // Aynı dakikada ikinci tur: dakika kilidi tutuyor.
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+});
+
+test("konum yoksa güneş kuralı çalışmaz ve sebebi günde bir kez günlüğe düşer", async (context) => {
+  const target = sunMoment(istanbul, 2026, 6, 21, "sunset", 0);
+  const { engine, source, runs, notes, setClock } = await harness(context, [sunRule(0)], {
+    start: target.toISOString()
+  });
+
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+  const blocked = runs.filter((run) => run.reason === "locationMissing");
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0]?.outcome, "blocked");
+  assert.ok(notes.some((note) => note.includes("konumu ayarlı değil")));
+
+  // Aynı gün içindeki turlar günlüğü şişirmez.
+  setClock(new Date(target.getTime() + 60_000).toISOString());
+  await engine.tick();
+  assert.equal(runs.filter((run) => run.reason === "locationMissing").length, 1);
+});
+
+test("kutup gününde kural atlanır ve günlüğe yazılır", async (context) => {
+  const { engine, source, runs } = await harness(context, [sunRule(0)], {
+    location: tromso,
+    start: new Date(2026, 5, 21, 21, 30, 0).toISOString()
+  });
+
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+  const blocked = runs.filter((run) => run.reason === "sunUnavailable");
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0]?.trigger?.kind, "sun");
+
+  // Panelin "neden pasif" sorusu da aynı sebebi veriyor.
+  const [saved] = await engine["options"].store.get();
+  assert.ok(saved);
+  assert.equal(engine.inactiveReason(saved)?.code, "sunUnavailable");
+  assert.equal(engine.sunSummary().sunset, null);
+});
+
+test("güneş anı yerel saate çevrilir ve kaydırma uygulanır", () => {
+  const times = sunTimes(new Date(2026, 5, 21, 12, 0, 0), istanbul.latitude, istanbul.longitude);
+  const withoutOffset = automationSunTime(
+    { type: "sun", event: "sunset", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+    times
+  );
+  const withOffset = automationSunTime(
+    { type: "sun", event: "sunset", offsetMinutes: -60, days: [1, 2, 3, 4, 5, 6, 7] },
+    times
+  );
+  assert.ok(withoutOffset && withOffset);
+  const minutes = (value: string): number =>
+    Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
+  assert.equal(minutes(withoutOffset) - minutes(withOffset), 60);
+  // Hesap yoksa (kutup günü) saat de yok.
+  assert.equal(
+    automationSunTime(
+      { type: "sun", event: "sunrise", offsetMinutes: 0, days: [1] },
+      { sunrise: null, sunset: null }
+    ),
+    null
+  );
+});
+
+test("gece yarısını aşan saat aralığı doğru değerlendirilir", () => {
+  const range = { type: "timeRange", from: "22:00", to: "06:00" } as const;
+  const at = (hour: number, minute = 0, day = 3): Date => new Date(2026, 7, day, hour, minute);
+  const check = (date: Date): boolean =>
+    evaluateAutomationConditions([range], date, () => undefined).ok;
+
+  assert.equal(check(at(23)), true);
+  assert.equal(check(at(22, 0)), true);
+  assert.equal(check(at(0, 30)), true);
+  assert.equal(check(at(5, 59)), true);
+  assert.equal(check(at(6, 0)), false);
+  assert.equal(check(at(12)), false);
+  assert.equal(check(at(21, 59)), false);
+
+  // Normal (aynı gün içi) aralık da bozulmadı.
+  const day = { type: "timeRange", from: "08:00", to: "20:00" } as const;
+  assert.equal(evaluateAutomationConditions([day], at(12), () => undefined).ok, true);
+  assert.equal(evaluateAutomationConditions([day], at(21), () => undefined).ok, false);
+  assert.equal(evaluateAutomationConditions([day], at(7), () => undefined).ok, false);
+});
+
+test("gece yarısını aşan aralıkta gün ölçütü aralığın başladığı güne bakar", () => {
+  // 2026-08-07 Cuma. "Cuma gecesi" = cuma 22:00 → cumartesi 06:00.
+  const fridayNight: AutomationCondition = {
+    type: "timeRange",
+    from: "22:00",
+    to: "06:00",
+    days: [5]
+  };
+  const check = (date: Date): boolean =>
+    evaluateAutomationConditions([fridayNight], date, () => undefined).ok;
+
+  assert.equal(check(new Date(2026, 7, 7, 23, 0)), true);
+  assert.equal(check(new Date(2026, 7, 8, 2, 0)), true);
+  // Cumartesi gecesi (yani pazar sabahı) kapsam dışı.
+  assert.equal(check(new Date(2026, 7, 8, 23, 0)), false);
+  assert.equal(check(new Date(2026, 7, 9, 2, 0)), false);
+});
+
+test("bilinmeyen cihaz durumu koşulu false yapar ve sebebi taşır", () => {
+  const evaluation = evaluateAutomationConditions(
+    [{ type: "deviceState", deviceId: lampId, property: "state_l1", equals: "ON" }],
+    new Date(2026, 7, 3, 12, 0),
+    () => undefined
+  );
+  assert.equal(evaluation.ok, false);
+  assert.match(evaluation.results[0]?.reason ?? "", /bilinmiyor/);
+});
+
+const conditionRule = (): Record<string, unknown> => automation({
+  id: "kosullu-kural",
+  name: "Koşullu kural",
+  triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true }],
+  // "Lamba zaten açıksa dokunma."
+  conditions: [{ type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" }]
+});
+
+test("koşul sağlanmazsa kural çalışmaz ve sebebi günlüğe düşer", async (context) => {
+  const { engine, source, runs, notes, setState } = await harness(context, [conditionRule()]);
+
+  setState(lampId, "state_l1", "ON");
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: true }]);
+  assert.equal(source.calls.length, 0);
+  const blocked = runs.filter((run) => run.reason === "conditionFalse");
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0]?.outcome, "blocked");
+  assert.equal(blocked[0]?.trigger?.deviceId, sensorId);
+  assert.equal(blocked[0]?.conditions?.[0]?.ok, false);
+  assert.ok(notes.some((note) => note.includes("Koşullu kural")));
+
+  // Koşul sağlanınca aynı kural çalışır.
+  setState(lampId, "state_l1", "OFF");
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: false }]);
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: true }]);
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+});
+
+const thresholdRule = (): Record<string, unknown> => automation({
+  id: "sicaklik-esigi",
+  name: "Sıcaklık eşiği",
+  triggers: [{ type: "deviceState", deviceId: sensorId, property: "temperature", above: 26 }]
+});
+
+test("sayısal eşik yalnız kenarda bir kez tetikler", async (context) => {
+  const { engine, source, advance } = await harness(context, [thresholdRule()]);
+  const report = async (value: number): Promise<void> => {
+    await engine.handleDeviceEvents([{ deviceId: sensorId, property: "temperature", value }]);
+    // Aynı imzanın 2 sn'lik tekrar bastırması testi yanıltmasın.
+    await advance(3_000);
+  };
+
+  await report(25.5);
+  assert.equal(source.calls.length, 0, "İlk okuma taban alınmalı.");
+
+  await report(26.1);
+  assert.equal(source.calls.length, 1, "Eşik geçildiği anda bir kez.");
+
+  await report(26.2);
+  await report(26.3);
+  assert.equal(source.calls.length, 1, "Eşiğin üstünde kalmak yeniden tetiklemez.");
+
+  await report(25.0);
+  assert.equal(source.calls.length, 1, "Eşiğin altına inmek eylemi çalıştırmaz.");
+
+  await report(26.4);
+  assert.equal(source.calls.length, 2, "Yeniden geçiş yeniden tetikler.");
+});
+
+test("sayısal olmayan değer tetiklemez ve günlüğe düşer", async (context) => {
+  const { engine, source, runs } = await harness(context, [thresholdRule()]);
+
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "temperature", value: "sıcak" }]);
+  assert.equal(source.calls.length, 0);
+  const blocked = runs.filter((run) => run.reason === "nonNumericValue");
+  assert.equal(blocked.length, 1);
+  assert.match(blocked[0]?.detail ?? "", /sayı değil/);
+});
+
+test("alt ve üst eşik birlikte aralığa girişi tetikler", async (context) => {
+  const { engine, source, advance } = await harness(context, [automation({
+    id: "nem-araligi",
+    name: "Nem aralığı",
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "humidity", above: 40, below: 60 }]
+  })]);
+  const report = async (value: number): Promise<void> => {
+    await engine.handleDeviceEvents([{ deviceId: sensorId, property: "humidity", value }]);
+    await advance(3_000);
+  };
+
+  await report(30);
+  await report(50);
+  assert.equal(source.calls.length, 1);
+  await report(55);
+  assert.equal(source.calls.length, 1);
+  await report(70);
+  await report(50);
+  assert.equal(source.calls.length, 2);
+});
+
+const delayRule = (): Record<string, unknown> => automation({
+  id: "gecikmeli-kural",
+  name: "Gecikmeli kural",
+  actions: [
+    { type: "device", deviceId: lampId, property: "state_l1", value: "ON" },
+    { type: "delay", seconds: 10 },
+    { type: "device", deviceId: lampId, property: "state_l2", value: "ON" }
+  ]
+});
+
+test("bekleme eylemleri sıraya sokar ve zaman aşımına takılmaz", async (context) => {
+  const { engine, source, timers, advance } = await harness(context, [delayRule()], {
+    // Zaman aşımı beklemeyi kapsasaydı 10 sn'lik bekleme hata üretirdi.
+    actionTimeoutMs: 1_000
+  });
+
+  await engine.tick();
+  await waitFor(() => source.calls.length === 1);
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+
+  // Bekleme sayacı kurulana kadar saati ilerletme; yoksa sayaç yeni saate göre kurulur.
+  await waitFor(() => timers.size === 1);
+  await advance(10_000);
+  await engine.settle();
+  assert.deepEqual(source.calls, [
+    { id: lampId, command: { state_l1: "ON" } },
+    { id: lampId, command: { state_l2: "ON" } }
+  ]);
+});
+
+test("bekleme içeren kural turu kilitlemez; diğer kurallar beklemez", async (context) => {
+  const { engine, source, notes } = await harness(context, [
+    delayRule(),
+    automation({ id: "hizli-kural", name: "Hızlı kural" })
+  ]);
+
+  await engine.tick();
+  // Tur döndüğünde ikinci kural çoktan çalışmış olmalı — bekleme onu geciktirmiyor.
+  await waitFor(() => source.calls.some((call) => call.command.state_l1 === "ON"));
+  await waitFor(() => source.calls.length === 2);
+  assert.ok(notes.some((note) => note.includes("arka planda yürüyor")));
+});
+
+test("motor durunca bekleyen eylem düşer ama iz bırakır", async (context) => {
+  const { engine, source, runs, logs } = await harness(context, [delayRule()]);
+
+  await engine.tick();
+  await waitFor(() => source.calls.length === 1);
+  engine.stop();
+  await engine.settle();
+
+  assert.equal(source.calls.length, 1);
+  const stopped = runs.filter((run) => run.reason === "stopped");
+  assert.equal(stopped.length, 1);
+  assert.equal(stopped[0]?.outcome, "failed");
+  assert.ok(logs.some((line) => line.includes("yarıda kesildi")));
+});
+
+test("grup ve sahne eylemleri kaynağa iletilir", async (context) => {
+  const { engine, source, runs } = await harness(context, [automation({
+    id: "grup-kurali",
+    name: "Grup kuralı",
+    actions: [
+      { type: "group", groupId: "group-7", property: "state", value: "ON" },
+      { type: "scene", groupId: "group-7", sceneId: 4 }
+    ]
+  })]);
+
+  await engine.tick();
+  assert.deepEqual(source.groupCalls, [{ id: "group-7", command: { state: "ON" } }]);
+  assert.deepEqual(source.sceneCalls, [{ id: "group-7", sceneId: 4, action: "recall" }]);
+  const ok = runs.find((run) => run.outcome === "ok");
+  assert.deepEqual(ok?.actions?.map((action) => action.type), ["group", "scene"]);
+});
+
+test("çalışma günlüğü başarıyı, tetikleyeni ve hatayı taşır", async (context) => {
+  const { engine, source, runs, advance } = await harness(context, [automation()]);
+
+  await engine.tick();
+  const ok = runs.at(-1);
+  assert.equal(ok?.outcome, "ok");
+  assert.equal(ok?.trigger?.kind, "time");
+  assert.deepEqual(ok?.actions, [{ type: "device", target: `${lampId}/state_l1`, ok: true }]);
+
+  // Aynı imzanın 2 sn'lik tekrar bastırması elle çalıştırmayı yutmasın.
+  await advance(3_000);
+  source.failNext = true;
+  await engine.run("aksam-salon");
+  const failed = runs.at(-1);
+  assert.equal(failed?.outcome, "failed");
+  assert.equal(failed?.trigger?.kind, "manual");
+  assert.equal(failed?.actions?.[0]?.ok, false);
 });

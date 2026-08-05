@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import YAML from "yaml";
+import { isValidLatitude, isValidLongitude } from "./sun.js";
 
 interface FileConfig {
   mode?: string;
@@ -25,6 +26,10 @@ interface FileConfig {
   };
   alerts?: {
     lowBatteryThreshold?: number;
+  };
+  location?: {
+    latitude?: number;
+    longitude?: number;
   };
   selfHealing?: {
     enabled?: boolean;
@@ -123,6 +128,15 @@ export interface AppConfig {
     lowBatteryThreshold: number;
   };
   /**
+   * Evin koordinatları — yalnızca gün doğumu/batımı tetikleyicisi için. Ürün çok evli olduğu
+   * için varsayılan yoktur; verilmezse güneş kuralları çalışmaz ve sebebi günlüğe yazılır.
+   * Kullanıcı panelden girerse değer `location.json`'a yazılır ve bunun önüne geçer.
+   */
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  /**
    * Otomatik onarım. Faz 1: cihaz kendini ilan edince raporlama ayarları yeniden yazılır.
    * Faz 2 (`probeOffline`): çevrimdışı görünen şebeke beslemeli yönlendiriciler tek ucuz
    * okumayla yoklanır; yanıt verirse erişilebilirlik geri alınır.
@@ -213,6 +227,18 @@ export async function loadConfig(): Promise<AppConfig> {
       port
     }
   };
+  const latitude = process.env.VILLA_BRIDGE_LATITUDE !== undefined
+    ? Number(process.env.VILLA_BRIDGE_LATITUDE)
+    : file.location?.latitude;
+  const longitude = process.env.VILLA_BRIDGE_LONGITUDE !== undefined
+    ? Number(process.env.VILLA_BRIDGE_LONGITUDE)
+    : file.location?.longitude;
+  if (latitude !== undefined || longitude !== undefined) {
+    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+      throw new Error("Konum için enlem (-90..90) ve boylam (-180..180) birlikte verilmelidir.");
+    }
+    result.location = { latitude, longitude };
+  }
   if (
     !Number.isInteger(result.alerts.lowBatteryThreshold)
     || result.alerts.lowBatteryThreshold < 5

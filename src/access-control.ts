@@ -31,6 +31,13 @@ const residentRoutes = new Set([
   "GET /api/home-groups",
   "PUT /api/home-groups",
   "GET /api/automations",
+  // Çalışma günlüğü, ev sakininin zaten gördüğü kural ve cihaz verisinden fazlasını açmaz;
+  // "neden çalışmadı" sorusunu soran da odur. Yazma yolu yok, salt okunur.
+  "GET /api/automation-runs",
+  "GET /api/automations/:id/runs",
+  // Konum okuması güneş kuralının saatini göstermek için gerekir; **yazma** listelenmez,
+  // dolayısıyla yönetici ister (evin koordinatı kurulum ayarıdır).
+  "GET /api/settings/location",
   "GET /api/device-image/:model",
   "GET /api/devices/:id/note",
   "PUT /api/devices/:id/note",

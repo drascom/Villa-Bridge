@@ -2,10 +2,12 @@ import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promis
 import { dirname } from "node:path";
 import { atomicTemporaryPath } from "./atomic-file.js";
 import {
+  automationDeviceIds,
   removeDeviceFromAutomations,
   validateAutomations,
   type Automation,
-  type AutomationDeviceLookup
+  type AutomationDeviceLookup,
+  type AutomationGroupLookup
 } from "./automations.js";
 import {
   validateDeviceImagePreferences,
@@ -103,6 +105,8 @@ export interface HomeBackupOptions {
   knownDeviceIds?: () => string[];
   /** Kilit/siren eylem yasağı için cihaz çözümleyici. */
   automationLookup?: AutomationDeviceLookup;
+  /** Grup eylemlerinin üyelerini çözer; grup içi kilit/siren yasağı buna bakar. */
+  automationGroupLookup?: AutomationGroupLookup;
 }
 
 const deviceIdPattern = /^0x[0-9a-f]{16}$/;
@@ -275,17 +279,17 @@ export class HomeBackupService {
 
     const incomingAutomations = validateAutomations(
       raw.automations ?? [],
-      this.options.automationLookup
+      this.options.automationLookup,
+      this.options.automationGroupLookup
     );
     let automations = incomingAutomations;
     if (known !== null) {
       const missing = new Set<string>();
       for (const automation of incomingAutomations) {
-        for (const trigger of automation.triggers) {
-          if (trigger.type !== "time" && !alive(trigger.deviceId)) missing.add(trigger.deviceId);
-        }
-        for (const action of automation.actions) {
-          if (!alive(action.deviceId)) missing.add(action.deviceId);
+        // Tetikleyici, koşul ve cihaz eylemlerinin tamamı; zaman/güneş ve grup eylemleri
+        // cihaz kimliği taşımaz.
+        for (const deviceId of automationDeviceIds(automation)) {
+          if (!alive(deviceId)) missing.add(deviceId);
         }
       }
       for (const deviceId of missing) automations = removeDeviceFromAutomations(automations, deviceId);
@@ -325,7 +329,8 @@ export class HomeBackupService {
     const merged: HomeBackupSections = {
       automations: validateAutomations(
         mergeById(current.automations, automations, mode),
-        this.options.automationLookup
+        this.options.automationLookup,
+        this.options.automationGroupLookup
       ),
       aliases: mergeRecords(current.aliases, aliases, mode),
       homeGroups: validateHomeGroups(mergeById(current.homeGroups, homeGroups, mode)),

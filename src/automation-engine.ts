@@ -1,11 +1,26 @@
-import type {
-  Automation,
-  AutomationAction,
-  AutomationAutoOffEntry,
-  AutomationAutoOffStore,
-  AutomationDeviceStateTrigger,
-  AutomationsStore
+import {
+  isAutomationDeviceAction,
+  isAutomationScheduleTrigger,
+  type Automation,
+  type AutomationAction,
+  type AutomationAutoOffEntry,
+  type AutomationAutoOffStore,
+  type AutomationCondition,
+  type AutomationDeviceAction,
+  type AutomationDeviceStateTrigger,
+  type AutomationSunTrigger,
+  type AutomationTimeTrigger,
+  type AutomationsStore
 } from "./automations.js";
+import type {
+  AutomationRunActionResult,
+  AutomationRunConditionResult,
+  AutomationRunLog,
+  AutomationRunRecord,
+  AutomationRunTriggerInfo
+} from "./automation-runs.js";
+import type { HomeLocation } from "./location.js";
+import { localNoon, sunTimes, type SunTimes } from "./sun.js";
 import type { JsonObject, JsonScalar } from "./types.js";
 
 /** Tur aralığı: dakika kilidi sayesinde aynı dakikada yalnızca bir kez çalışır. */
@@ -27,11 +42,23 @@ export const automationActionTimeoutMs = 10_000;
  */
 export const automationAutoOffRestartGraceMs = 60_000;
 
-/** `skipped`: kural eşleşti ama `when` yüzünden çalışacak eylem kalmadı — hata değildir. */
-export type AutomationRunResult = "ok" | "failed" | "busy" | "missing" | "skipped";
+/**
+ * `skipped`: kural eşleşti ama `when` yüzünden çalışacak eylem kalmadı — hata değildir.
+ * `blocked`: koşullar sağlanmadı; kural bilerek çalışmadı, sebebi çalışma günlüğünde.
+ */
+export type AutomationRunResult = "ok" | "failed" | "busy" | "missing" | "skipped" | "blocked";
 
 export interface AutomationEngineSource {
   setDevice(id: string, command: JsonObject): Promise<void>;
+  /** Grup eylemi için; kaynak desteklemiyorsa eylem hata olarak günlüğe düşer. */
+  setGroup?(id: string, command: JsonObject): Promise<void>;
+  /** Sahne eylemi için; aynı şekilde isteğe bağlıdır. */
+  groupScene?(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void>;
 }
 
 /** Testler gerçek `setTimeout` beklemesin diye zamanlayıcı da enjekte edilebilir. */
@@ -61,6 +88,12 @@ export interface AutomationEngineOptions {
   autoOffStore?: AutomationAutoOffStore;
   timers?: AutomationTimers;
   logger?: { error(message: string): void; info?(message: string): void };
+  /** Evin konumu — güneş tetikleyicisi için. Yoksa `sun` kuralları çalışmaz ve günlüğe düşer. */
+  location?: () => HomeLocation | null;
+  /** Koşulların okuduğu anlık cihaz durumu; verilmezse `deviceState` koşulu hep `false` olur. */
+  deviceState?: (deviceId: string, property: string) => JsonScalar | undefined;
+  /** Çalışma günlüğü — "neden çalıştı / neden çalışmadı". */
+  runLog?: Pick<AutomationRunLog, "append">;
 }
 
 const pad = (value: number): string => String(value).padStart(2, "0");
@@ -70,14 +103,122 @@ export const localMinuteStamp = (date: Date): string =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
   + ` ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
+/** Yerel gün damgası — "YYYY-MM-DD". */
+export const localDayStamp = (date: Date): string =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+/** Yerel saat damgası — "HH:MM". */
+export const localTimeStamp = (date: Date): string =>
+  `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
 /** 1 = Pazartesi … 7 = Pazar. */
 export const isoWeekday = (date: Date): number => date.getDay() === 0 ? 7 : date.getDay();
 
-export const automationDueAt = (automation: Automation, date: Date): boolean => {
-  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+const previousWeekday = (weekday: number): number => weekday === 1 ? 7 : weekday - 1;
+
+/**
+ * Güneş tetikleyicisinin yerel `HH:MM` karşılığı. Hesaplanan an mevcut saat yoluna böyle girer;
+ * ayrı bir zamanlayıcı açılmaz ve `firedMinutes` dakika kilidi DST çift-ateşlemesini engeller.
+ *
+ * Kaydırma günü aşarsa (ör. gün doğumundan 4 saat önce, kutup dışı kışta) elde edilen `HH:MM`
+ * yine o günün gün ölçütüyle karşılaştırılır — sınırdaki bu durum bilinçli olarak basit tutuldu.
+ */
+export const automationSunTime = (
+  trigger: AutomationSunTrigger,
+  times: SunTimes | null
+): string | null => {
+  const base = trigger.event === "sunrise" ? times?.sunrise : times?.sunset;
+  if (!base) return null;
+  return localTimeStamp(new Date(base.getTime() + trigger.offsetMinutes * 60_000));
+};
+
+/** Zamanı gelen zaman/güneş tetikleyicisi — yoksa `null`. */
+export const automationDueTrigger = (
+  automation: Automation,
+  date: Date,
+  times: SunTimes | null = null
+): AutomationTimeTrigger | AutomationSunTrigger | null => {
+  const time = localTimeStamp(date);
   const weekday = isoWeekday(date);
-  return automation.triggers.some((trigger) =>
-    trigger.type === "time" && trigger.at === time && trigger.days.includes(weekday));
+  for (const trigger of automation.triggers) {
+    if (trigger.type === "time") {
+      if (trigger.at === time && trigger.days.includes(weekday)) return trigger;
+      continue;
+    }
+    if (trigger.type !== "sun") continue;
+    if (!trigger.days.includes(weekday)) continue;
+    if (automationSunTime(trigger, times) === time) return trigger;
+  }
+  return null;
+};
+
+export const automationDueAt = (
+  automation: Automation,
+  date: Date,
+  times: SunTimes | null = null
+): boolean => automationDueTrigger(automation, date, times) !== null;
+
+/**
+ * §5.3 — koşullar **VE** ile değerlendirilir. Sağlanmayan koşulun sebebi geri döner; çağıran
+ * bunu çalışma günlüğüne yazar (sessiz atlama yok).
+ */
+export const evaluateAutomationConditions = (
+  conditions: AutomationCondition[],
+  date: Date,
+  readState: (deviceId: string, property: string) => JsonScalar | undefined
+): { ok: boolean; results: AutomationRunConditionResult[] } => {
+  const results: AutomationRunConditionResult[] = [];
+  for (const condition of conditions) {
+    if (condition.type === "timeRange") {
+      const time = localTimeStamp(date);
+      // Gece yarısını aşan aralık: 22:00→06:00 iki parçadan oluşur.
+      const wraps = condition.from > condition.to;
+      const inRange = wraps
+        ? time >= condition.from || time < condition.to
+        : time >= condition.from && time < condition.to;
+      if (!inRange) {
+        results.push({
+          type: "timeRange",
+          ok: false,
+          reason: `Saat ${time}, ${condition.from}-${condition.to} aralığının dışında.`
+        });
+        continue;
+      }
+      if (condition.days) {
+        // Aralık geceyi aşıyorsa ve şu an sabah tarafındaysak, gün ölçütü dünü gösterir.
+        const weekday = wraps && time < condition.to
+          ? previousWeekday(isoWeekday(date))
+          : isoWeekday(date);
+        if (!condition.days.includes(weekday)) {
+          results.push({ type: "timeRange", ok: false, reason: "Aralığın günü tutmuyor." });
+          continue;
+        }
+      }
+      results.push({ type: "timeRange", ok: true });
+      continue;
+    }
+    const value = readState(condition.deviceId, condition.property);
+    if (value === undefined) {
+      // Cihaz bilinmiyorsa ya da durum hiç bildirilmediyse koşul `false` sayılır.
+      results.push({
+        type: "deviceState",
+        ok: false,
+        reason: `${condition.deviceId} cihazının "${condition.property}" durumu bilinmiyor.`
+      });
+      continue;
+    }
+    const ok = condition.equals !== undefined
+      ? value === condition.equals
+      : value !== condition.not;
+    results.push({
+      type: "deviceState",
+      ok,
+      reason: ok
+        ? undefined
+        : `${condition.deviceId} "${condition.property}" değeri ${JSON.stringify(value)}.`
+    });
+  }
+  return { ok: results.every((result) => result.ok), results };
 };
 
 /**
@@ -91,24 +232,91 @@ export interface AutomationDeviceEvent {
   value: JsonScalar;
 }
 
-/** Bir olay bu otomasyonu tetikliyor mu? `deviceState` kenar kontrolü çağırana aittir. */
+/** Eşik karşılaştırması yalnız sayı üzerinde yapılır; "26.5" gibi metinler de kabul edilir. */
+const numericValue = (value: JsonScalar | undefined): number | null => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const thresholdSatisfied = (trigger: AutomationDeviceStateTrigger, value: number): boolean => {
+  if (trigger.above !== undefined && !(value > trigger.above)) return false;
+  if (trigger.below !== undefined && !(value < trigger.below)) return false;
+  return true;
+};
+
+/**
+ * Eşleşmedi ise **neden** eşleşmediği: sayısal olmayan değer ya da karşılaştırılacak önceki
+ * değerin olmaması sessizce yutulmaz, çalışma günlüğüne düşer.
+ */
+export type AutomationEventMatch =
+  | { matched: true }
+  | { matched: false; reason?: "nonNumericValue" | "noPreviousValue"; detail?: string };
+
+const noMatch: AutomationEventMatch = { matched: false };
+
+/**
+ * Bir olay bu otomasyonu tetikliyor mu?
+ * - `equals`/eşitliksiz durum tetikleyicisinde kenar kontrolü çağırana aittir (değer değişimi).
+ * - Sayısal eşikte kenar **burada** aranır: değer eşiğin öbür tarafından bu tarafa geçmiş olmalı.
+ *   26,1 → 26,2 → 26,3 akışında yalnız ilk geçiş tetikler.
+ */
+export const automationEventMatch = (
+  automation: Automation,
+  event: AutomationDeviceEvent,
+  previous?: JsonScalar
+): AutomationEventMatch => {
+  let fallback: AutomationEventMatch = noMatch;
+  for (const trigger of automation.triggers) {
+    if (trigger.type === "deviceAction") {
+      if (
+        event.property === "action"
+        && trigger.deviceId === event.deviceId
+        && trigger.action === event.value
+      ) return { matched: true };
+      continue;
+    }
+    if (trigger.type !== "deviceState") continue;
+    if (trigger.deviceId !== event.deviceId || trigger.property !== event.property) continue;
+    if (trigger.above === undefined && trigger.below === undefined) {
+      if (trigger.equals === undefined || trigger.equals === event.value) return { matched: true };
+      continue;
+    }
+    const current = numericValue(event.value);
+    if (current === null) {
+      fallback = {
+        matched: false,
+        reason: "nonNumericValue",
+        detail: `"${trigger.property}" değeri sayı değil: ${JSON.stringify(event.value)}`
+      };
+      continue;
+    }
+    if (!thresholdSatisfied(trigger, current)) continue;
+    const before = numericValue(previous);
+    if (before === null) {
+      // Karşılaştıracak önceki değer yok (ilk okuma ya da yeniden başlatma): bu okuma taban
+      // sayılır. Aksi halde her yeniden başlatmada eşik üstündeki tüm sensörler ateşlerdi.
+      fallback = {
+        matched: false,
+        reason: "noPreviousValue",
+        detail: `"${trigger.property}" için önceki değer yok; bu okuma taban alındı.`
+      };
+      continue;
+    }
+    if (thresholdSatisfied(trigger, before)) continue;
+    return { matched: true };
+  }
+  return fallback;
+};
+
 export const automationMatchesEvent = (
   automation: Automation,
-  event: AutomationDeviceEvent
-): boolean => automation.triggers.some((trigger) => {
-  if (trigger.type === "deviceAction") {
-    return event.property === "action"
-      && trigger.deviceId === event.deviceId
-      && trigger.action === event.value;
-  }
-  if (trigger.type === "deviceState") {
-    // `equals` yoksa özelliğin her değişimi tetikler; kenar kontrolü çağırana aittir.
-    return trigger.deviceId === event.deviceId
-      && trigger.property === event.property
-      && (trigger.equals === undefined || trigger.equals === event.value);
-  }
-  return false;
-});
+  event: AutomationDeviceEvent,
+  previous?: JsonScalar
+): boolean => automationEventMatch(automation, event, previous).matched;
 
 /**
  * §5.4 — `when` taşımayan eylem her zaman çalışır (geriye uyumluluk). `when` taşıyan eylem
@@ -125,7 +333,20 @@ export const automationActionApplies = (
 
 /** Aynı eylem kümesinin tekrarını tanımak için kararlı imza. */
 export const automationActionSignature = (actions: AutomationAction[]): string =>
-  JSON.stringify(actions.map((action) => [action.deviceId, action.property, action.value]));
+  JSON.stringify(actions.map((action) => {
+    if (action.type === "device") return [action.deviceId, action.property, action.value];
+    if (action.type === "group") return ["group", action.groupId, action.property, action.value];
+    if (action.type === "scene") return ["scene", action.groupId, action.sceneId];
+    return ["delay", action.seconds];
+  }));
+
+/** Günlükte insanın tanıyacağı hedef. */
+const actionTarget = (action: AutomationAction): string => {
+  if (action.type === "device") return `${action.deviceId}/${action.property}`;
+  if (action.type === "group") return `${action.groupId}/${action.property}`;
+  if (action.type === "scene") return `${action.groupId}#${action.sceneId}`;
+  return `${action.seconds} sn`;
+};
 
 /** Çalışan iş bitince çalıştırılmak üzere bekletilen (birleştirilen) son istek. */
 interface PendingRun {
@@ -133,6 +354,8 @@ interface PendingRun {
   signature: string;
   /** Tetikleyen olay — "hareket bitince kapat" izlemesi buradan kurulur. */
   event?: AutomationDeviceEvent;
+  /** Çalışma günlüğüne yazılacak tetikleyici bilgisi. */
+  trigger?: AutomationRunTriggerInfo;
 }
 
 /** Bekleyen bir "sonra kapat"; zamanlayıcı tutamacı kalıcı değildir. */
@@ -157,6 +380,20 @@ export class AutomationEngine {
   private readonly autoOff = new Map<string, PendingAutoOff>();
   /** Durum dosyası yazımları sıraya girer; son yazan kazansın diye zincirlenir. */
   private autoOffWrite: Promise<void> = Promise.resolve();
+  /** Bekleyen `delay` sayaçları — motor durunca serbest bırakılır, kalıcı değildir. */
+  private readonly delays = new Set<{ handle: unknown; resolve: () => void }>();
+  /** `delay` taşıyan kurallar ortak döngüyü kilitlemesin diye arka planda yürür. */
+  private readonly background = new Set<Promise<void>>();
+  private stopped = false;
+  /** Yerel gün başına güneş hesabı; her turda yeniden hesaplanmaz. */
+  private sunCache: {
+    day: string;
+    latitude: number;
+    longitude: number;
+    times: SunTimes | null;
+  } | null = null;
+  /** Güneş sorununun günlüğe günde bir kez düşmesi için: otomasyon → yerel gün. */
+  private readonly sunNotices = new Map<string, string>();
   private readonly timers: AutomationTimers;
   private readonly now: () => Date;
   private readonly logger: { error(message: string): void; info?(message: string): void };
@@ -173,7 +410,96 @@ export class AutomationEngine {
     else console.info(message);
   }
 
+  /** Çalışma günlüğü kaydı; günlük yoksa sessizce atlanır (motorun akışını bloke etmez). */
+  private record(record: Omit<AutomationRunRecord, "at">): void {
+    this.options.runLog?.append({ at: this.now().toISOString(), ...record });
+  }
+
+  /**
+   * Güneş hesabı yerel gün + konum başına bir kez yapılır. Konum yoksa ya da güneş o gün ufku
+   * kesmiyorsa (kutup günü) sebep döner; çağıran bunu günlüğe yazar.
+   */
+  private resolveSun(date: Date): {
+    times: SunTimes | null;
+    reason: "locationMissing" | "sunUnavailable" | null;
+  } {
+    const location = this.options.location?.() ?? null;
+    if (!location) return { times: null, reason: "locationMissing" };
+    const day = localDayStamp(date);
+    const cached = this.sunCache;
+    if (
+      !cached
+      || cached.day !== day
+      || cached.latitude !== location.latitude
+      || cached.longitude !== location.longitude
+    ) {
+      const times = sunTimes(localNoon(date), location.latitude, location.longitude);
+      this.sunCache = {
+        day,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        times: times.sunrise && times.sunset ? times : null
+      };
+    }
+    const times = this.sunCache?.times ?? null;
+    return { times, reason: times ? null : "sunUnavailable" };
+  }
+
+  /** Panelin "bu kural neden pasif" sorusuna yanıt; UI sonraki turda okuyacak. */
+  inactiveReason(automation: Automation): { code: string; message: string } | null {
+    if (!automation.triggers.some((trigger) => trigger.type === "sun")) return null;
+    const { reason } = this.resolveSun(this.now());
+    if (reason === "locationMissing") {
+      return {
+        code: "locationMissing",
+        message: "Evin konumu ayarlı değil; güneş tetikleyicisi çalışmıyor."
+      };
+    }
+    if (reason === "sunUnavailable") {
+      return {
+        code: "sunUnavailable",
+        message: "Güneş bugün bu enlemde ufku kesmiyor; güneş tetikleyicisi bugün atlanıyor."
+      };
+    }
+    return null;
+  }
+
+  /** Bugünün güneş saatleri — panelin kuralı "05:41'de" diye gösterebilmesi için. */
+  sunSummary(): { sunrise: string | null; sunset: string | null; reason: string | null } {
+    const date = this.now();
+    const { times, reason } = this.resolveSun(date);
+    return {
+      sunrise: times?.sunrise ? localTimeStamp(times.sunrise) : null,
+      sunset: times?.sunset ? localTimeStamp(times.sunset) : null,
+      reason
+    };
+  }
+
+  /** Güneş kuralı çalışamadıysa günde bir kez günlüğe düşer; her turda kayıt üretmez. */
+  private noteSunProblem(
+    automation: Automation,
+    date: Date,
+    reason: "locationMissing" | "sunUnavailable"
+  ): void {
+    const day = localDayStamp(date);
+    if (this.sunNotices.get(automation.id) === day) return;
+    this.sunNotices.set(automation.id, day);
+    const detail = reason === "locationMissing"
+      ? "Evin konumu ayarlı değil; güneş tetikleyicisi hesaplanamıyor."
+      : "Güneş bugün bu enlemde ufku kesmiyor; kural bugün atlandı.";
+    this.note(`Otomasyon "${automation.name}" atlandı: ${detail}`);
+    this.record({
+      automationId: automation.id,
+      automationName: automation.name,
+      outcome: "blocked",
+      reason,
+      detail,
+      trigger: { kind: "sun" }
+    });
+  }
+
   start(): void {
+    this.stopped = false;
     if (this.timer) return;
     this.timer = setInterval(() => {
       void this.tick();
@@ -182,11 +508,23 @@ export class AutomationEngine {
   }
 
   stop(): void {
+    this.stopped = true;
     // Bekleyen kapatmalar durum dosyasında duruyor; süreç dönünce oradan devam eder.
     for (const pending of this.autoOff.values()) this.clearAutoOffTimer(pending);
+    // Bekleyen `delay`'ler kalıcı değildir: serbest bırakılır, kalan eylemler çalışmaz.
+    for (const delay of [...this.delays]) {
+      this.timers.clear(delay.handle);
+      this.delays.delete(delay);
+      delay.resolve();
+    }
     if (!this.timer) return;
     clearInterval(this.timer);
     this.timer = null;
+  }
+
+  /** Arka planda yürüyen (`delay` taşıyan) kuralların bitmesini bekler — kapanış ve testler için. */
+  async settle(): Promise<void> {
+    while (this.background.size > 0) await Promise.all([...this.background]);
   }
 
   /** Bir tur: zamanı gelen otomasyonları sırayla çalıştırır. Geçmiş dakikalar telafi edilmez. */
@@ -200,12 +538,17 @@ export class AutomationEngine {
     }
     const date = this.now();
     const stamp = localMinuteStamp(date);
+    const sun = this.resolveSun(date);
     for (const automation of automations) {
       if (!automation.enabled) continue;
       if (this.firedMinutes.get(automation.id) === stamp) continue;
-      if (!automationDueAt(automation, date)) continue;
+      if (sun.reason && automation.triggers.some((trigger) => trigger.type === "sun")) {
+        this.noteSunProblem(automation, date, sun.reason);
+      }
+      const trigger = automationDueTrigger(automation, date, sun.times);
+      if (!trigger) continue;
       this.firedMinutes.set(automation.id, stamp);
-      await this.execute(automation);
+      await this.dispatch(automation, undefined, { kind: trigger.type === "sun" ? "sun" : "time" });
     }
   }
 
@@ -216,7 +559,13 @@ export class AutomationEngine {
    * otomasyon başına 2 saniyelik aralıktır (§8.2).
    */
   async handleDeviceEvents(events: AutomationDeviceEvent[]): Promise<void> {
-    const edges = events.filter((event) => this.isEdge(event));
+    // Önceki değer `isEdge` onu ezmeden yakalanır; sayısal eşik kenarı buna dayanıyor.
+    const edges: Array<{ event: AutomationDeviceEvent; previous?: JsonScalar }> = [];
+    for (const event of events) {
+      const previous = this.lastStateValues.get(`${event.deviceId}|${event.property}`);
+      if (!this.isEdge(event)) continue;
+      edges.push({ event, previous });
+    }
     if (edges.length === 0) return;
     let automations: Automation[];
     try {
@@ -225,15 +574,64 @@ export class AutomationEngine {
       this.logger.error(`Otomasyonlar okunamadı: ${String(error)}`);
       return;
     }
-    for (const event of edges) {
+    for (const { event, previous } of edges) {
       // Bekleyen kapatmalar önce bakar: elle müdahale iptal eder, yeni hareket sayacı sıfırlar.
       this.observeAutoOff(event);
       for (const automation of automations) {
         if (!automation.enabled) continue;
-        if (!automationMatchesEvent(automation, event)) continue;
-        await this.execute(automation, event);
+        const match = automationEventMatch(automation, event, previous);
+        if (!match.matched) {
+          // Sayısal olmayan değer ve "önceki değer yok" sessizce yutulmaz.
+          if (match.reason) {
+            this.note(`Otomasyon "${automation.name}" tetiklenmedi: ${match.detail ?? match.reason}`);
+            this.record({
+              automationId: automation.id,
+              automationName: automation.name,
+              outcome: "blocked",
+              reason: match.reason,
+              detail: match.detail,
+              trigger: {
+                kind: "device",
+                deviceId: event.deviceId,
+                property: event.property,
+                value: event.value
+              }
+            });
+          }
+          continue;
+        }
+        await this.dispatch(automation, event, {
+          kind: "device",
+          deviceId: event.deviceId,
+          property: event.property,
+          value: event.value
+        });
       }
     }
+  }
+
+  /**
+   * `delay` taşıyan kural ortak döngüyü kilitlemez: kendi sırası (`running` + `pending`
+   * birleştirme) korunarak arka planda yürür, tur ve olay akışı beklemeden devam eder.
+   * `delay`siz kurallarda davranış aynen eskisi gibidir — sırayla, bekleyerek.
+   */
+  private async dispatch(
+    automation: Automation,
+    event: AutomationDeviceEvent | undefined,
+    trigger: AutomationRunTriggerInfo
+  ): Promise<AutomationRunResult> {
+    if (!automation.actions.some((action) => action.type === "delay")) {
+      return this.execute(automation, event, trigger);
+    }
+    this.note(`Otomasyon "${automation.name}" arka planda yürüyor: bekleme içeriyor.`);
+    const task = this.execute(automation, event, trigger)
+      .then(() => undefined)
+      .catch((error) => {
+        this.logger.error(`Otomasyon "${automation.name}" arka planda başarısız: ${String(error)}`);
+      });
+    this.background.add(task);
+    void task.then(() => this.background.delete(task));
+    return "ok";
   }
 
   /** §9 — bekleyen kapatmanın kanonik anahtarı: otomasyon + IEEE adresi + kanal. */
@@ -288,7 +686,7 @@ export class AutomationEngine {
   /** Eylem çalıştıktan sonra kapatma sözünü kurar; aynı otomasyon+kanalda sayaç sıfırlanır. */
   private armAutoOff(
     automation: Automation,
-    action: AutomationAction,
+    action: AutomationDeviceAction,
     event?: AutomationDeviceEvent
   ): void {
     const key = this.autoOffKey(automation.id, action.deviceId, action.property);
@@ -458,40 +856,90 @@ export class AutomationEngine {
     }
     const automation = automations.find((entry) => entry.id === normalizedId);
     if (!automation) return "missing";
-    return this.execute(automation);
+    return this.dispatch(automation, undefined, { kind: "manual" });
   }
 
   private async execute(
     automation: Automation,
-    event?: AutomationDeviceEvent
+    event?: AutomationDeviceEvent,
+    trigger: AutomationRunTriggerInfo = { kind: "manual" }
   ): Promise<AutomationRunResult> {
     const actions = automation.actions.filter((action) => automationActionApplies(action, event));
     // Hiçbir eylem eşleşmediyse çalıştırma sayılmaz: ne kilit alınır ne de `lastRunOk` bozulur.
     if (actions.length === 0) {
       this.note(`Otomasyon "${automation.name}" atlandı: koşullara uyan eylem yok.`);
+      this.record({
+        automationId: automation.id,
+        automationName: automation.name,
+        outcome: "skipped",
+        reason: "noMatchingAction",
+        detail: "Tetikleyen değere uyan eylem yok.",
+        trigger
+      });
       return "skipped";
+    }
+    // §5.3 — koşullar VE ile; sağlanmazsa kural çalışmaz ve sebebi günlüğe düşer.
+    if (automation.conditions.length > 0) {
+      const evaluation = evaluateAutomationConditions(
+        automation.conditions,
+        this.now(),
+        (deviceId, property) => this.options.deviceState?.(deviceId, property)
+      );
+      if (!evaluation.ok) {
+        const failed = evaluation.results.find((result) => !result.ok);
+        const detail = failed?.reason ?? "Koşul sağlanmadı.";
+        this.note(`Otomasyon "${automation.name}" atlandı: ${detail}`);
+        this.record({
+          automationId: automation.id,
+          automationName: automation.name,
+          outcome: "blocked",
+          reason: "conditionFalse",
+          detail,
+          trigger,
+          conditions: evaluation.results
+        });
+        return "blocked";
+      }
     }
     const signature = automationActionSignature(actions);
     // Kilit doluyken düşürmek yerine birleştir: çalışan iş bitince bu istek çalışır.
     if (this.running.has(automation.id)) {
-      this.pending.set(automation.id, { actions, signature, event });
+      this.pending.set(automation.id, { actions, signature, event, trigger });
       this.note(`Otomasyon "${automation.name}" meşgul: son istek sıraya alındı (birleştirildi).`);
+      this.record({
+        automationId: automation.id,
+        automationName: automation.name,
+        outcome: "busy",
+        reason: "busy",
+        detail: "Kural çalışıyordu; son istek sıraya alındı.",
+        trigger
+      });
       return "busy";
     }
-    if (this.suppressedAsRepeat(automation, signature)) return "busy";
-    return this.runQueue(automation, { actions, signature, event });
+    if (this.suppressedAsRepeat(automation, signature, trigger)) return "busy";
+    return this.runQueue(automation, { actions, signature, event, trigger });
   }
 
   /** Asgari aralık yalnızca aynı eylem kümesinin tekrarını bastırır — ters yön niyettir. */
-  private suppressedAsRepeat(automation: Automation, signature: string): boolean {
+  private suppressedAsRepeat(
+    automation: Automation,
+    signature: string,
+    trigger?: AutomationRunTriggerInfo
+  ): boolean {
     const previousStart = this.lastStartedAt.get(automation.id);
     if (previousStart === undefined) return false;
     if (this.lastSignatures.get(automation.id) !== signature) return false;
     if (this.now().getTime() - previousStart >= automationMinimumRunGapMs) return false;
-    this.note(
-      `Otomasyon "${automation.name}" bastırıldı: aynı eylem `
-      + `${automationMinimumRunGapMs} ms içinde tekrarlandı.`
-    );
+    const detail = `Aynı eylem ${automationMinimumRunGapMs} ms içinde tekrarlandı.`;
+    this.note(`Otomasyon "${automation.name}" bastırıldı: ${detail}`);
+    this.record({
+      automationId: automation.id,
+      automationName: automation.name,
+      outcome: "busy",
+      reason: "repeatSuppressed",
+      detail,
+      trigger
+    });
     return true;
   }
 
@@ -505,7 +953,9 @@ export class AutomationEngine {
         result = await this.runOnce(automation, current);
         const next = this.pending.get(automation.id);
         this.pending.delete(automation.id);
-        current = next && !this.suppressedAsRepeat(automation, next.signature) ? next : undefined;
+        current = next && !this.suppressedAsRepeat(automation, next.signature, next.trigger)
+          ? next
+          : undefined;
       }
     } finally {
       this.running.delete(automation.id);
@@ -517,32 +967,103 @@ export class AutomationEngine {
   private async runOnce(automation: Automation, run: PendingRun): Promise<AutomationRunResult> {
     this.lastStartedAt.set(automation.id, this.now().getTime());
     this.lastSignatures.set(automation.id, run.signature);
+    const results: AutomationRunActionResult[] = [];
     let ok = true;
-    try {
-      for (const action of run.actions) {
-        await this.setDevice(action.deviceId, { [action.property]: action.value });
-        // Kapatma sözü ancak komut gerçekten gittiyse kurulur (§9).
-        this.armAutoOff(automation, action, run.event);
+    let reason: string | undefined;
+    let detail: string | undefined;
+    for (const action of run.actions) {
+      if (this.stopped) {
+        // Bekleyen `delay` kalıcı değildir: süreç durunca kalan eylemler çalışmaz — ama iz kalır.
+        ok = false;
+        reason = "stopped";
+        detail = "Motor durdu; kalan eylemler çalışmadı (bekleme kalıcı değildir).";
+        results.push({ type: action.type, target: actionTarget(action), ok: false, error: detail });
+        this.logger.error(`Otomasyon "${automation.name}" yarıda kesildi: ${detail}`);
+        break;
       }
-    } catch (error) {
-      ok = false;
-      this.logger.error(`Otomasyon "${automation.name}" çalıştırılamadı: ${String(error)}`);
+      try {
+        await this.applyAction(automation, action, run.event);
+        results.push({ type: action.type, target: actionTarget(action), ok: true });
+      } catch (error) {
+        ok = false;
+        reason = "actionFailed";
+        detail = String(error);
+        results.push({
+          type: action.type,
+          target: actionTarget(action),
+          ok: false,
+          error: detail
+        });
+        this.logger.error(`Otomasyon "${automation.name}" çalıştırılamadı: ${detail}`);
+        break;
+      }
     }
     try {
       await this.options.store.markRun(automation.id, ok, this.now());
     } catch (error) {
       this.logger.error(`Otomasyon son çalışma bilgisi yazılamadı: ${String(error)}`);
     }
+    this.record({
+      automationId: automation.id,
+      automationName: automation.name,
+      outcome: ok ? "ok" : "failed",
+      reason,
+      detail,
+      trigger: run.trigger,
+      actions: results
+    });
     return ok ? "ok" : "failed";
+  }
+
+  /** Tek eylemin uygulanması; tür ayrımı burada, sıralama `runOnce`'ta. */
+  private async applyAction(
+    automation: Automation,
+    action: AutomationAction,
+    event?: AutomationDeviceEvent
+  ): Promise<void> {
+    if (action.type === "delay") {
+      // Zaman aşımı tek cihaz çağrısı içindir; bekleme onun kapsamına girmez.
+      await this.wait(action.seconds * 1000);
+      return;
+    }
+    if (action.type === "group") {
+      const setGroup = this.options.source.setGroup?.bind(this.options.source);
+      if (!setGroup) throw new Error("Bu kaynak grup komutunu desteklemiyor.");
+      await this.withTimeout(setGroup(action.groupId, { [action.property]: action.value }));
+      return;
+    }
+    if (action.type === "scene") {
+      const groupScene = this.options.source.groupScene?.bind(this.options.source);
+      if (!groupScene) throw new Error("Bu kaynak sahne komutunu desteklemiyor.");
+      await this.withTimeout(groupScene(action.groupId, action.sceneId, "recall"));
+      return;
+    }
+    await this.setDevice(action.deviceId, { [action.property]: action.value });
+    // Kapatma sözü ancak komut gerçekten gittiyse kurulur (§9).
+    this.armAutoOff(automation, action, event);
+  }
+
+  /**
+   * `delay` beklemesi — enjekte edilen zamanlayıcıyı kullanır, testler gerçek saati beklemez.
+   * Motor durdurulursa bekleme serbest bırakılır ve `runOnce` kalan eylemleri çalıştırmaz.
+   */
+  private wait(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const entry: { handle: unknown; resolve: () => void } = { handle: null, resolve };
+      entry.handle = this.timers.set(() => {
+        this.delays.delete(entry);
+        resolve();
+      }, Math.max(ms, 0));
+      this.delays.add(entry);
+    });
   }
 
   /**
    * Yavaş ya da çevrimdışı bir cihaz kuralın tamamını kilitlemesin diye eylem başına zaman aşımı.
    * Komut iptal edilemez; yalnızca beklemeyi bırakırız.
    */
-  private async setDevice(deviceId: string, command: JsonObject): Promise<void> {
+  private async withTimeout(call: Promise<void>): Promise<void> {
     const timeoutMs = this.options.actionTimeoutMs ?? automationActionTimeoutMs;
-    const call = this.options.source.setDevice(deviceId, command);
     if (timeoutMs <= 0) return call;
     let timer: NodeJS.Timeout | undefined;
     try {
@@ -559,5 +1080,9 @@ export class AutomationEngine {
     } finally {
       if (timer) clearTimeout(timer);
     }
+  }
+
+  private async setDevice(deviceId: string, command: JsonObject): Promise<void> {
+    await this.withTimeout(this.options.source.setDevice(deviceId, command));
   }
 }

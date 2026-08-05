@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { registerAccessControl } from "./access-control.js";
 import { loadAliases, saveAliases } from "./aliases.js";
 import { AutomationEngine } from "./automation-engine.js";
+import { AutomationRunLog } from "./automation-runs.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
@@ -23,6 +24,7 @@ import {
 import { HomeGroupsStore, homeGroupDeviceControlId, validateHomeGroups } from "./home-groups.js";
 import { HomeBackupService, type HomeBackupMode } from "./home-backup.js";
 import { InstallationStateStore } from "./installation-state.js";
+import { LocationStore, type HomeLocation } from "./location.js";
 import {
   applyCoordinatorOwnership,
   createVillaBridgeDiscoveryRecord,
@@ -87,10 +89,28 @@ store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
 const homeGroupsStore = new HomeGroupsStore(resolve(dirname(configPath), "home-groups.json"));
+const automationGroupLookup = (groupId: string): { memberIds: string[] } | undefined =>
+  store.getGroups().find((group) => group.id === groupId);
 const automationsStore = new AutomationsStore(
   resolve(dirname(configPath), "automations.json"),
-  (deviceId) => store.getDevice(deviceId)
+  (deviceId) => store.getDevice(deviceId),
+  () => store.topologyRevision,
+  automationGroupLookup
 );
+// Konum yalnız güneş tetikleyicisi için; panelden girilen değer yapılandırmanın önüne geçer.
+const locationStore = new LocationStore(resolve(dirname(configPath), "location.json"));
+let homeLocation: HomeLocation | null = null;
+let homeLocationSource: "file" | "config" | null = null;
+try {
+  homeLocation = await locationStore.get();
+  homeLocationSource = homeLocation ? "file" : null;
+} catch (error) {
+  console.error(`Konum dosyası okunamadı: ${String(error)}`);
+}
+if (!homeLocation && config.location) {
+  homeLocation = config.location;
+  homeLocationSource = "config";
+}
 const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
 const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
@@ -109,7 +129,8 @@ const homeBackupService = new HomeBackupService({
   },
   aliases,
   knownDeviceIds: () => store.getDevices().map((device) => device.id),
-  automationLookup: (deviceId) => store.getDevice(deviceId)
+  automationLookup: (deviceId) => store.getDevice(deviceId),
+  automationGroupLookup: (groupId) => automationGroupLookup(groupId)
 });
 const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
@@ -191,13 +212,33 @@ if (config.mode === "direct") {
 } else {
   source = new MqttShadowSource(config.mqtt, store);
 }
+// Çalışma günlüğü JSONL: olay başına ekleme, tam JSON yeniden yazma yok (HANDOFF 2026-08-04 §6).
+const automationRunLog = new AutomationRunLog(
+  resolve(dirname(configPath), "automation-runs.jsonl"),
+  {
+    // Kalıcılık hatası sessiz kalmasın (HANDOFF §7).
+    onError: (message) => {
+      console.error(message);
+      recentErrors.record({ operation: "automation-runs", statusCode: 500, message });
+    }
+  }
+);
 const automationEngine = new AutomationEngine({
   store: automationsStore,
   source,
   // Bekleyen "sonra kapat" kayıtları yeniden başlatmayı atlatır (§9).
   autoOffStore: new AutomationAutoOffStore(
     resolve(dirname(configPath), "automation-auto-off.json")
-  )
+  ),
+  location: () => homeLocation,
+  deviceState: (deviceId, property) => {
+    const value = store.getDevice(deviceId)?.state[property];
+    return typeof value === "string" || typeof value === "boolean"
+      || (typeof value === "number" && Number.isFinite(value))
+      ? value
+      : undefined;
+  },
+  runLog: automationRunLog
 });
 const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
@@ -742,11 +783,79 @@ app.put<{ Body?: { groups?: unknown } }>("/api/home-groups", async (request, rep
 
 app.get("/api/automations", async (_request, reply) => {
   try {
-    return { ok: true, automations: await automationsStore.get() };
+    const automations = await automationsStore.get();
+    return {
+      ok: true,
+      // Kuralın neden pasif olduğu yanıtta görünür: konum yok / kutup günü (UI sonraki turda okur).
+      automations: automations.map((automation) => ({
+        ...automation,
+        inactiveReason: automationEngine.inactiveReason(automation)
+      })),
+      sun: automationEngine.sunSummary(),
+      location: homeLocation
+    };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
+
+/** Çalışma günlüğü — "neden çalıştı / neden çalışmadı"; en yeniden eskiye. */
+app.get<{ Querystring: { limit?: string } }>("/api/automation-runs", async (request, reply) => {
+  try {
+    const limit = Number(request.query.limit ?? 100);
+    return {
+      ok: true,
+      runs: await automationRunLog.read({ limit: Number.isFinite(limit) ? limit : 100 })
+    };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.get<{ Params: { id: string }; Querystring: { limit?: string } }>(
+  "/api/automations/:id/runs",
+  async (request, reply) => {
+    try {
+      const limit = Number(request.query.limit ?? 50);
+      return {
+        ok: true,
+        runs: await automationRunLog.read({
+          limit: Number.isFinite(limit) ? limit : 50,
+          automationId: request.params.id
+        })
+      };
+    } catch (error) {
+      return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
+
+/** Evin konumu — okuma ev sakinine açık, yazma yönetici işi (yetki tablosunda bilinçli). */
+app.get("/api/settings/location", async () => ({
+  ok: true,
+  location: homeLocation,
+  source: homeLocationSource,
+  sun: automationEngine.sunSummary()
+}));
+
+app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown } }>(
+  "/api/settings/location",
+  async (request, reply) => {
+    try {
+      const body = request.body ?? {};
+      const raw = body.location ?? { latitude: body.latitude, longitude: body.longitude };
+      const location = await locationStore.save(raw);
+      homeLocation = location;
+      homeLocationSource = "file";
+      return { ok: true, location, source: homeLocationSource, sun: automationEngine.sunSummary() };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
 
 app.put<{ Body?: { automations?: unknown } }>("/api/automations", async (request, reply) => {
   try {
@@ -767,6 +876,10 @@ app.post<{ Params: { id: string } }>("/api/automations/:id/run", async (request,
   }
   // Elle çalıştırmada tetikleyen olay yoktur; `when` taşıyan eylemler atlanır — hata değildir.
   if (result === "skipped") return { ok: true, skipped: true };
+  // Koşullar sağlanmadı: hata değil, bilinçli atlama. Sebep çalışma günlüğünde.
+  if (result === "blocked") {
+    return { ok: true, blocked: true, error: "Kuralın koşulları şu anda sağlanmıyor." };
+  }
   return { ok: true };
 });
 
@@ -1152,6 +1265,9 @@ const shutdown = async (): Promise<void> => {
   clearInterval(imageWarmTimer);
   clearTimeout(imageWarmStartTimer);
   automationEngine.stop();
+  // Bekleyen `delay`'ler durdu; son günlük satırları yine de diske insin.
+  await automationEngine.settle();
+  await automationRunLog.flush();
   peerWatcher?.stop();
   await discoveryResponder?.close();
   await source.stop();

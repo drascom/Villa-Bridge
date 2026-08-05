@@ -1,0 +1,59 @@
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
+import { isValidLatitude, isValidLongitude } from "./sun.js";
+
+/**
+ * Evin konumu — yalnızca güneş tetikleyicisi için. Ürün çok evli, sabit koordinat gömülmez;
+ * değer ya yapılandırmadan (`config/default.yaml` + `VILLA_BRIDGE_LATITUDE/LONGITUDE`) gelir
+ * ya da kullanıcı panelden girer ve yapılandırmanın yanındaki `location.json`'a yazılır.
+ */
+export interface HomeLocation {
+  latitude: number;
+  longitude: number;
+}
+
+/** Kullanıcı girdisini sayıya çevirir; ikisi birden verilmek zorunda. */
+export const validateLocation = (value: unknown): HomeLocation => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Konum geçersiz.");
+  }
+  const candidate = value as Record<string, unknown>;
+  for (const key of Object.keys(candidate)) {
+    if (key !== "latitude" && key !== "longitude") {
+      throw new Error("Konumda bilinmeyen alan var.");
+    }
+  }
+  const latitude = typeof candidate.latitude === "string"
+    ? Number(candidate.latitude.trim())
+    : candidate.latitude;
+  const longitude = typeof candidate.longitude === "string"
+    ? Number(candidate.longitude.trim())
+    : candidate.longitude;
+  if (!isValidLatitude(latitude)) throw new Error("Enlem -90 ile 90 arasında olmalıdır.");
+  if (!isValidLongitude(longitude)) throw new Error("Boylam -180 ile 180 arasında olmalıdır.");
+  // Altı ondalık ≈ 11 cm; daha fazlası gürültü.
+  return {
+    latitude: Number(latitude.toFixed(6)),
+    longitude: Number(longitude.toFixed(6))
+  };
+};
+
+/** Konum dosyası — `aliases.ts` deseniyle atomik yazılır. */
+export class LocationStore {
+  constructor(private readonly path: string) {}
+
+  async get(): Promise<HomeLocation | null> {
+    try {
+      return validateLocation(JSON.parse(await readFile(this.path, "utf8")));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+  }
+
+  async save(value: unknown): Promise<HomeLocation> {
+    const location = validateLocation(value);
+    await writeJsonAtomic(this.path, location, { mode: 0o600 });
+    return location;
+  }
+}
