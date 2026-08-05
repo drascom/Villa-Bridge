@@ -204,6 +204,50 @@ export function isInterestingEventProperty(property: string): boolean {
   return false;
 }
 
+/**
+ * Takma ad ve rol haritaları dışarıda tutulur ve dışarıda değiştirilir (API uçları, yedek geri
+ * yükleme). Cihaz görünümü önbelleği bayat kalmasın diye harita örneğinin `set`/`delete`/`clear`
+ * çağrıları sarmalanır: her mutasyon dinleyicileri uyarır. Aynı harita birden çok kez gözlenebilir;
+ * dinleyiciler tek bir kümede birikir, harita yalnızca bir kez sarmalanır.
+ */
+const observedMapListeners = Symbol.for("villa-bridge.observed-map-listeners");
+
+type ObservedMap = Map<string, unknown> & { [observedMapListeners]?: Set<() => void> };
+
+function observeMapMutations(map: Map<string, unknown>, onChange: () => void): void {
+  const observed = map as ObservedMap;
+  const existing = observed[observedMapListeners];
+  if (existing) {
+    existing.add(onChange);
+    return;
+  }
+  const listeners = new Set<() => void>([onChange]);
+  Object.defineProperty(observed, observedMapListeners, {
+    value: listeners,
+    enumerable: false,
+    configurable: true
+  });
+  for (const method of ["set", "delete", "clear"] as const) {
+    const original = observed[method] as unknown as (...args: unknown[]) => unknown;
+    Object.defineProperty(observed, method, {
+      value: function patched(this: ObservedMap, ...args: unknown[]): unknown {
+        const result = original.apply(this, args);
+        for (const listener of listeners) listener();
+        return result;
+      },
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+}
+
+interface DeviceSnapshot {
+  revision: number;
+  list: DeviceView[];
+  byId: Map<string, DeviceView>;
+}
+
 export class DeviceStore {
   private readonly aliases: Map<string, string>;
   private readonly states = new Map<string, StateEntry>();
@@ -220,6 +264,18 @@ export class DeviceStore {
   private mode: "shadow" | "direct" = "shadow";
   private lowBatteryThreshold = 15;
   private readonly events: DeviceEventView[];
+  /**
+   * Cihaz görünümünü etkileyen her mutasyonda artar. Memo bu sayaca bağlıdır: sayaç aynıysa
+   * altta hiçbir şey değişmemiştir ve liste yeniden kurulmaz (200 cihaz × 64 kural darboğazı).
+   */
+  private revision = 0;
+  private snapshot: DeviceSnapshot | null = null;
+  /**
+   * Yalnızca cihaz listesinin kendisi (exposes/kumanda topolojisi) değişince artar. Durum
+   * mesajları bunu kıpırdatmaz; otomasyon doğrulaması gibi topolojiye bakan önbellekler
+   * için doğru anahtar budur.
+   */
+  private topology = 0;
 
   constructor(
     aliases: Map<string, string>,
@@ -234,10 +290,24 @@ export class DeviceStore {
   ) {
     this.aliases = aliases;
     this.events = initialEvents.slice(0, 200);
+    const invalidate = (): void => this.invalidate();
+    observeMapMutations(aliases, invalidate);
+    observeMapMutations(roles, invalidate);
+  }
+
+  /** Cihaz görünümü önbelleğini düşürür; bir sonraki okuma listeyi yeniden kurar. */
+  invalidate(): void {
+    this.revision += 1;
+  }
+
+  /** Cihaz topolojisi sürümü — yalnızca cihaz listesi değişince artar. */
+  get topologyRevision(): number {
+    return this.topology;
   }
 
   setImagePreferences(preferences: DeviceImagePreferences): void {
     this.imagePreferences = preferences;
+    this.invalidate();
   }
 
   setLowBatteryThreshold(threshold: number): void {
@@ -247,6 +317,8 @@ export class DeviceStore {
     const previousThreshold = this.lowBatteryThreshold;
     this.lowBatteryThreshold = threshold;
     if (previousThreshold === threshold) return;
+    // Eşik uyarıları cihaz görünümünde taşınır.
+    this.invalidate();
     const at = new Date().toISOString();
     const events: DeviceEventView[] = [];
     for (const [sourceName, state] of this.states) {
@@ -274,6 +346,8 @@ export class DeviceStore {
     const parsed = this.parse(payload);
     if (topic === "bridge/devices" && Array.isArray(parsed)) {
       this.devices = parsed.filter(isObject) as BridgeDevice[];
+      this.topology += 1;
+      this.invalidate();
       return;
     }
     if (topic === "bridge/groups" && Array.isArray(parsed)) {
@@ -292,6 +366,7 @@ export class DeviceStore {
       } else {
         this.pairingStatus = "error";
         this.pairingMessage = typeof parsed.error === "string" ? parsed.error : "Eşleştirme açılamadı.";
+        this.invalidate();
       }
       return;
     }
@@ -317,6 +392,7 @@ export class DeviceStore {
             }]);
           }
         }
+        if (this.availability.get(name) !== state) this.invalidate();
         this.availability.set(name, state);
       }
       return;
@@ -351,6 +427,7 @@ export class DeviceStore {
       }
       this.recordEvents(events);
       this.states.set(topic, { value: parsed, updatedAt: at });
+      this.invalidate();
       this.completeReconnectedPairingFromState(topic);
     }
   }
@@ -374,6 +451,8 @@ export class DeviceStore {
     const added = events.slice();
     this.events.unshift(...events.reverse());
     if (this.events.length > 200) this.events.length = 200;
+    // Son basılan düğme cihaz görünümünde taşınır.
+    this.invalidate();
     this.onEventsChanged?.(this.events.slice(), added);
   }
 
@@ -387,7 +466,33 @@ export class DeviceStore {
   }
 
   getDevices(): DeviceView[] {
+    return this.deviceSnapshot().list.slice();
+  }
+
+  getDevice(id: string): DeviceView | undefined {
+    return this.deviceSnapshot().byId.get(id.toLowerCase());
+  }
+
+  /**
+   * Memo: sürüm sayacı değişmedikçe liste ve IEEE→cihaz haritası yeniden kurulmaz. İkisi de
+   * aynı yapımdan doğar, bu yüzden `getDevice` her zaman listedeki nesnenin ta kendisini verir.
+   */
+  private deviceSnapshot(): DeviceSnapshot {
+    // Eşleştirme süresi zamanla dolar; sayacı artırabileceği için memo kontrolünden önce çalışır.
     this.expirePairingIfNeeded();
+    const cached = this.snapshot;
+    if (cached && cached.revision === this.revision) return cached;
+    const list = this.buildDeviceViews();
+    const snapshot: DeviceSnapshot = {
+      revision: this.revision,
+      list,
+      byId: new Map(list.map((device) => [device.id, device]))
+    };
+    this.snapshot = snapshot;
+    return snapshot;
+  }
+
+  private buildDeviceViews(): DeviceView[] {
     const pairingActive = this.pairingStatus === "open" || this.pairingStatus === "pending";
     // Olaylar en yeniden eskiye sıralı: her cihaz için ilk `action` kaydı son basılan düğmedir.
     const lastActions = new Map<string, DeviceEventView>();
@@ -511,11 +616,6 @@ export class DeviceStore {
       .sort((a, b) => a.name.localeCompare(b.name, "en"));
   }
 
-  getDevice(id: string): DeviceView | undefined {
-    const normalized = id.toLowerCase();
-    return this.getDevices().find((device) => device.id === normalized);
-  }
-
   getGroups(): GroupView[] {
     return this.groups
       .map((group) => {
@@ -548,7 +648,7 @@ export class DeviceStore {
       sourceOnline: this.bridgeOnline,
       mqttConnected: this.mqttConnected,
       sourceBridgeOnline: this.bridgeOnline,
-      deviceCount: this.getDevices().length,
+      deviceCount: this.deviceSnapshot().list.length,
       groupCount: this.getGroups().length,
       stateCount: this.states.size,
       lastMessageAt: this.lastMessageAt?.toISOString() ?? null
@@ -560,6 +660,7 @@ export class DeviceStore {
     this.pairingUntil = new Date(Date.now() + seconds * 1_000);
     this.pairingMessage = "Koordinatörden onay bekleniyor.";
     this.pairingDevice = null;
+    this.invalidate();
   }
 
   pairingRequestFailed(message: string): void {
@@ -567,6 +668,7 @@ export class DeviceStore {
     this.pairingUntil = null;
     this.pairingMessage = message;
     this.pairingDevice = null;
+    this.invalidate();
   }
 
   getPairing(): JsonObject {
@@ -596,6 +698,7 @@ export class DeviceStore {
     this.pairingStatus = seconds > 0 ? "open" : "closed";
     this.pairingUntil = seconds > 0 ? new Date(Date.now() + seconds * 1_000) : null;
     this.pairingMessage = seconds > 0 ? "Yeni Zigbee cihazları eklenebilir." : null;
+    this.invalidate();
   }
 
   private expirePairingIfNeeded(): void {
@@ -603,6 +706,7 @@ export class DeviceStore {
     this.pairingUntil = null;
     this.pairingStatus = "closed";
     this.pairingMessage = null;
+    this.invalidate();
   }
 
   private completeReconnectedPairingFromState(sourceName: string): void {
@@ -623,6 +727,7 @@ export class DeviceStore {
       interviewCompleted: true,
       supported: typeof device.supported === "boolean" ? device.supported : null
     };
+    this.invalidate();
   }
 
   private ingestPairingEvent(event: JsonObject): void {
@@ -640,6 +745,7 @@ export class DeviceStore {
         supported: null,
         reconnected: false
       };
+      this.invalidate();
       return;
     }
     if (event.type === "device_announce") {
@@ -656,6 +762,7 @@ export class DeviceStore {
         supported: typeof knownDevice.supported === "boolean" ? knownDevice.supported : null,
         reconnected: true
       };
+      this.invalidate();
       return;
     }
     if (
@@ -668,6 +775,7 @@ export class DeviceStore {
         interviewCompleted: true,
         supported: typeof event.data.supported === "boolean" ? event.data.supported : null
       };
+      this.invalidate();
     }
   }
 }
