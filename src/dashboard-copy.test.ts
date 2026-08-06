@@ -976,13 +976,15 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /screensaverTitle:"Screen saver"/);
   assert.match(dashboard, /#home #editDashboard\.editing-active\{color:#fff!important;background:#16a765!important;box-shadow:0 0 0 3px rgba\(43,214,137,.32\),0 8px 22px rgba\(10,112,68,.34\)!important\}/);
   assert.match(dashboard, /editDashboard\.classList\.toggle\("editing-active",state\.dashboardEditing\)/);
-  assert.match(dashboard, /body\[data-active-view="home"\]\{overflow:hidden\}/);
+  // Yatay kipte sayfa dikey kayar: gövde/main artık kesilmiyor, hızlı erişim şeridi altta sabit duruyor.
+  assert.doesNotMatch(dashboard, /body\[data-active-view="home"\]\{overflow:hidden\}/);
+  assert.doesNotMatch(dashboard, /body\[data-active-view="home"\] main\{height:100vh/);
   assert.match(dashboard, /id="widgetRail" class="widget-rail"/);
-  assert.match(dashboard, /#home \.widget-board\{height:auto;min-height:0;flex:1;display:grid;grid-template-columns:var\(--hub-column\) minmax\(0,1fr\);grid-template-rows:minmax\(0,1fr\) auto;gap:10px;overflow:hidden\}/);
+  assert.match(dashboard, /#home \.widget-board\{min-height:0;display:grid;grid-template-columns:var\(--hub-column\) minmax\(0,1fr\);grid-template-rows:auto;gap:10px\}/);
   assert.doesNotMatch(dashboard, /#home \[data-widget="status"\]/);
-  assert.match(dashboard, /#home \[data-widget="quick"\]\{grid-column:1\/-1;grid-row:2;height:136px;min-width:0;overflow:hidden\}/);
+  assert.match(dashboard, /#home \[data-widget="quick"\]\{position:fixed;z-index:9;left:var\(--strip-inset\);right:var\(--strip-inset\);bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\);grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden\}/);
   assert.match(dashboard, /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card\{height:56px\}/);
-  assert.match(dashboard, /#home \.widget-rail\{grid-column:2;grid-row:1;min-height:0;display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
+  assert.match(dashboard, /#home \.widget-rail\{grid-column:2;grid-row:1;min-height:300px;height:calc\(100vh - 340px\);display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
   assert.match(dashboard, /grid-auto-columns:var\(--rail-column\)/);
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2\}/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
@@ -1041,7 +1043,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const hasAfter=scroller\.scrollWidth-scroller\.clientWidth-scroller\.scrollLeft>8/);
   assert.match(dashboard, /function scrollWidgetRail\(direction\)\{scrollDashboardRow\(\$\("#widgetRail"\),direction,220,\.72\)\}/);
   assert.match(dashboard, /function scrollQuickControls\(direction\)\{scrollDashboardRow\(\$\("#quickDevices"\),direction,120,\.55\)\}/);
-  assert.match(dashboard, /#home \.widget-scroll-hint\{top:calc\(50% - 67px\);width:38px;height:48px;border-radius:15px\}/);
+  assert.match(dashboard, /#home \.widget-scroll-hint\{top:calc\(50% - 24px\);width:38px;height:48px;border-radius:15px\}/);
   assert.match(dashboard, /#home \.quick-scroll-hint\{top:calc\(50% - 20px\);width:30px;height:40px;border-radius:13px\}/);
   assert.doesNotMatch(dashboard, /scroll-hint-pulse/);
   assert.match(dashboard, /const button=card\.querySelector\("\[data-command-value\],\[data-quick-show\]"\)/);
@@ -1270,12 +1272,15 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact\{font-size:14px\}#home \.quick-battery\{font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row\{display:grid;grid-template-columns:minmax\(0,1fr\) auto;align-items:baseline;gap:2px 10px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row strong\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}#home \[data-widget="activity"\] \.widget-list-row time\{color:var\(--muted\);font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row span\{grid-column:1\/-1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px\}\}/);
   // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
   const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
-  const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"]{overflow:hidden}");
+  const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"] main{padding-bottom:");
   assert.ok(landscapeBlock > 0 && shortBlock > landscapeBlock);
-  // Grup (a): tam ekran yerleşim, rail sığdırma ve sıkışık boşluklar yükseklik koşuluna bağlı kalır.
-  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\]\{overflow:hidden\}body\[data-active-view="home"\] main\{height:100vh;overflow:hidden\}#home\.active\{height:100%/);
+  // Grup (a): iki sütunlu yerleşim, rail sığdırma ve sıkışık boşluklar yükseklik koşuluna bağlı kalır.
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\] main\{padding-bottom:calc\(106px \+ env\(safe-area-inset-bottom\)\)\}#home\.active\{min-height:0\}/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
   assert.match(dashboard, /#home \.hub-time\{font-size:54px\}#home \.hub-date\{margin-top:5px;font-size:15px\}/);
+  // Yatayda hub kısaltılır: en fazla 2 şehir, 2 günlük tahmin ve ipucu satırları gizli.
+  assert.match(dashboard, /#home \.hub-city:nth-child\(n\+3\),#home \.hub-day:nth-child\(n\+3\)\{display:none\}/);
+  assert.match(dashboard, /#home \.hub-hint\{display:none\}/);
   assert.match(dashboard, /#home \.group-summary\{margin-top:7px\}#home \.home-summary\{gap:14px;margin-top:12px\}#home \.widget-value\{margin-top:14px\}/);
   // Yükseklik koşullu blok artık tipografi kurallarını içermemeli.
   const shortBlockBody = dashboard.slice(shortBlock, dashboard.indexOf("\n", shortBlock));
@@ -3536,13 +3541,13 @@ test("hub yerel şehir adını kullanıcının kaydından okur", async () => {
 test("ana ekran hub'ı fotoğraf zemininden bağımsız okunur", async () => {
   const dashboard = await readDashboardBundle();
 
-  // Sabit perde: iki temada ayrı değer, zemin rengine bağlı değil.
-  assert.match(dashboard, /--hub-scrim-strong:rgba\(250,252,251,\.66\);--hub-scrim-soft:rgba\(250,252,251,\.4\)/);
-  assert.match(dashboard, /--hub-scrim-strong:rgba\(6,14,11,\.74\);--hub-scrim-soft:rgba\(6,14,11,\.5\)/);
-  // Kart değil, sönen degrade: kenarlık yok, tıklamayı yemiyor, metnin arkasında duruyor.
-  const scrim = /body\[data-active-view="home"\] #home \.home-hub::before\{content:"";position:absolute;z-index:-1;[^}]*background:linear-gradient\(100deg,var\(--hub-scrim-strong\) 0%,var\(--hub-scrim-soft\) 58%,transparent 100%\);pointer-events:none\}/;
-  assert.match(dashboard, scrim);
-  assert.doesNotMatch(dashboard, /\.home-hub::before\{[^}]*border:/);
+  // Okunabilirliği dolgu üstlenir: cihaz kartlarıyla aynı token, kenarlık yok, color-mix yok.
+  assert.match(dashboard, /\.home-hub\{[^}]*padding:16px 18px;border:0;border-radius:20px;background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
+  assert.doesNotMatch(dashboard, /\.home-hub\{[^}]*border:1px/);
+  // Perde kaldırıldı: dolgunun üstüne ikinci katman binmiyor.
+  assert.doesNotMatch(dashboard, /\.home-hub::before/);
+  assert.doesNotMatch(dashboard, /--hub-scrim-/);
+  assert.doesNotMatch(dashboard, /\.home-hub\{[^}]*color-mix\(/);
   // Alt satırlar karanlık temada ayrıca yükseltilir; ipucu metni sönük kalmaz.
   assert.match(dashboard, /--hub-muted:#cddcd4/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.hub-hint\{opacity:1\}/);
