@@ -2,6 +2,8 @@
   "code": "tr",
   "name": "Türkçe",
   "translations": {
+    "menu": "Menü",
+    "openMenu": "Menüyü aç",
     "navHome": "Ev",
     "navDevices": "Cihazlar",
     "navAutomations": "Otomasyon",
@@ -401,6 +403,8 @@
     "tourEditLead": "Düzenle’ye dokunun, ardından widget’ları sol ve sağ oklarla sıralayın. Yerleşim tamamlanınca düzenlemeyi bitirin.",
     "tourWidgetsTitle": "Widget’larınız burada",
     "tourWidgetsLead": "Üst kontroller yerinde kalırken widget’lar kendi alanlarında yatay olarak kaydırılır.",
+    "tourMenuTitle": "Geri kalan her şey menüde",
+    "tourMenuLead": "Bu düğme menüyü açar: Ev, Cihazlar, Otomasyon, Bağlantılar, Ayarlar ve tema, dil, çıkış.",
     "tourDevicesTitle": "Tüm ayrıntılar Cihazlar’da",
     "tourDevicesLead": "İsim değiştirmek, resim seçmek, kontrolleri incelemek veya cihaz kaldırmak için Cihazlar’ı açın.",
     "deviceHintTitle": "Cihazı buradan ekleyin",

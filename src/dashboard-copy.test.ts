@@ -73,7 +73,9 @@ test("dashboard sabit ve hafif manzara arka planı üzerinde iki katmanlı sayda
   assert.match(dashboard, /body\[data-active-view="home"\]\{background-color:#c5ccc7;background-image:[^}]*url\("\/assets\/dashboard-landscape\.jpg"\)[^}]*background-attachment:fixed/);
   assert.match(dashboard, /--home-glass:rgba\(247,250,248,.22\)/);
   assert.match(dashboard, /--home-control:rgba\(251,252,252,.82\)/);
-  assert.match(dashboard, /body\[data-active-view="home"\] aside\{color:#f4f8f5;background:rgba\(23,65,54,.9\)/);
+  // Gezinme şeridi kalktı: fotoğrafın üstünde yalnız menü düğmesi koyu cam olarak durur.
+  assert.doesNotMatch(dashboard, /<aside>/);
+  assert.match(dashboard, /body\[data-active-view="home"\] \.app-menu-button\{color:#fff;background:rgba\(23,65,54,.76\)/);
   // Kartlar %82 saydam dolguyu kullanır; seçici tek `body` — çift yazım hiç eşleşmediği için kartlar beyaza düşüyordu.
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.widget-card\{border-color:var\(--home-border\);background:var\(--home-control\)/);
   assert.doesNotMatch(dashboard, /body\[data-active-view="home"\] body\[data-active-view="home"\]/);
@@ -262,7 +264,8 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /\.device-grid\.devices-list-view>\.empty\{width:100%\}/);
   assert.match(dashboard, /\.device-card\.command-failed,\.group-control-tile\.command-failed\{border-color:var\(--danger\)/);
   assert.match(dashboard, /:root\[data-theme="dark"\] \.device-card\.command-failed,:root\[data-theme="dark"\] \.group-control-tile\.command-failed\{border-color:#c86058/);
-  assert.match(dashboard, /@media\(max-width:900px\)\{\.toast\{bottom:calc\(96px \+ env\(safe-area-inset-bottom\)\)\}\}/);
+  // Alt gezinme şeridi kalktığı için toast artık ekranın dibine oturur.
+  assert.match(dashboard, /@media\(max-width:900px\)\{\.toast\{bottom:calc\(24px \+ env\(safe-area-inset-bottom\)\)\}\}/);
   assert.doesNotMatch(dashboard, /class="device-card-layout"/);
   assert.match(dashboard, /class="image-edit-overlay"[^>]*data-change-image=/);
   assert.match(dashboard, /class="device-detail-photo" data-device-photo hidden/);
@@ -458,7 +461,10 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /target:"#quickDevices"/);
   assert.match(dashboard, /target:"#addWidget"/);
   assert.match(dashboard, /target:"#editDashboard"/);
-  assert.match(dashboard, /target:'.nav-button\[data-view="devices"\]'/);
+  // Turun son adımı yeni menü düğmesini gösterir; gezinme şeridi artık yok.
+  assert.match(dashboard, /target:'#home \[data-app-menu\]',fallback:"#home \.home-actions",title:"tourMenuTitle",text:"tourMenuLead"/);
+  assert.match(dashboard, /tourMenuTitle:"Everything else is in the menu"/);
+  assert.match(dashboard, /tourMenuTitle:"Geri kalan her şey menüde"/);
   assert.match(dashboard, /box-shadow:0 0 0 9999px rgba\(10,23,17,.68\)/);
   assert.match(dashboard, /\.onboarding-actions button\[hidden\],\.coach-actions button\[hidden\]\{display:none\}/);
   assert.match(dashboard, /\.onboarding-actions\.final\{justify-content:flex-end\}/);
@@ -619,22 +625,23 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /runtimeStopConfirm:"Stop Zigbee, MQTT and Matter/);
   assert.match(dashboard, /runtimeStopConfirm:"Bu tablette Zigbee, MQTT ve Matter/);
   assert.match(dashboard, /orientation:landscape/);
-  assert.match(dashboard, /aside\{position:fixed;z-index:10;top:0;bottom:auto/);
-  assert.match(dashboard, /grid-template-columns:repeat\(5,minmax\(104px,1fr\)\) auto/);
+  // Yatay kipte üstteki 68 px'lik gezinme şeridi kaldırıldı: `main` yukarıdan 82 -> 14 px'e indi.
+  assert.doesNotMatch(dashboard, /aside\{position:fixed/);
+  assert.doesNotMatch(dashboard, /\.nav-utilities/);
+  assert.doesNotMatch(dashboard, /id="landscapeTheme"/);
+  assert.doesNotMatch(dashboard, /id="landscapeLanguage"/);
+  assert.match(dashboard, /\.topbar\{display:none\}main\{max-width:none;padding:14px 20px 20px\}/);
   assert.match(
     dashboard,
-    /@media\(orientation:landscape\) and \(max-width:900px\) and \(max-height:700px\)\{aside\{[^}]*\}nav\{grid-template-columns:repeat\(5,1fr\) auto\}/,
+    /@media\(orientation:landscape\) and \(max-width:900px\) and \(max-height:700px\)\{\.topbar\{display:none\}main\{padding-top:14px;padding-bottom:20px\}/,
   );
-  assert.match(dashboard, /\.nav-utilities\{display:flex/);
-  assert.match(dashboard, /\.topbar\{display:none\}main\{max-width:none;padding:82px 20px 20px\}/);
-  assert.match(dashboard, /id="landscapeTheme"/);
-  assert.match(dashboard, /id="landscapeLanguage"/);
   assert.match(dashboard, /id="mobileTheme" class="mobile-utility"[^>]*data-theme-toggle/);
   assert.match(dashboard, /id="mobileLanguage" class="mobile-utility"[^>]*data-language-cycle/);
   assert.match(dashboard, /\$\$\("\[data-theme-toggle\]"\)\.forEach\(button=>button\.onclick=\(\)=>setThemeMode/);
   assert.match(dashboard, /\$\$\("\[data-language-cycle\]"\)\.forEach\(button=>button\.onclick=cycleLanguage\)/);
   assert.match(dashboard, /\.mobile-utility\{[^}]*border:0[^}]*background:transparent\}/);
-  assert.match(dashboard, /@media\(orientation:portrait\)\{\.topbar\{justify-content:flex-end\}\.theme-switch,\.language-switch\{display:none\}\.mobile-topbar-actions\{display:flex/);
+  // Kural `.topbar` altına kapsandı: aynı bileşenler menü penceresinde dikey kipte de görünür kalır.
+  assert.match(dashboard, /@media\(orientation:portrait\)\{\.topbar\{justify-content:flex-end\}\.topbar \.theme-switch,\.topbar \.language-switch\{display:none\}\.mobile-topbar-actions\{display:flex/);
   assert.match(dashboard, /document\.body\.dataset\.activeView=viewName/);
   assert.match(dashboard, /body\.android-app dialog::backdrop\{backdrop-filter:none\}/);
   assert.match(dashboard, /signature!==state\.overviewSignature/);
@@ -676,8 +683,9 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /--card-shadow:0 2px 8px rgba\(35,45,41,.055\)/);
   assert.match(dashboard, /id="systemAlertBar" class="system-alert-bar" role="alert" hidden/);
   assert.match(dashboard, /\.system-alert-bar\[hidden\]\{display:none\}/);
-  assert.match(dashboard, /\.system-alert-bar\{position:fixed;z-index:9;top:68px;[^}]*min-height:56px;[^}]*font-size:20px\}/);
-  assert.match(dashboard, /body\.has-system-alert main\{padding-top:138px\}/);
+  // Şerit kalktı: uyarı çubuğu ekranın tepesine oturur, `main` de ona göre 70 px kalır.
+  assert.match(dashboard, /\.system-alert-bar\{position:fixed;z-index:9;top:0;[^}]*min-height:56px;[^}]*font-size:20px\}/);
+  assert.match(dashboard, /body\.has-system-alert main\{padding-top:70px\}/);
   assert.match(dashboard, /\.device-card\{[^}]*border-radius:16px[^}]*box-shadow:var\(--card-shadow\)/);
   assert.match(dashboard, /\.widget-card\{[^}]*border-radius:16px[^}]*background:var\(--surface\)/);
   assert.match(dashboard, /addWidget:"＋ Add"/);
@@ -732,8 +740,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.home-title-line\{width:100%;display:flex;align-items:baseline;gap:18px\}/);
   assert.match(dashboard, /\.home-metrics\{display:flex;align-items:center/);
   assert.match(dashboard, /h1\.eyebrow\{margin:0;font-family:inherit;line-height:1\.45\}/);
-  assert.match(dashboard, /@media\(max-width:900px\)\{\.shell\{grid-template-columns:minmax\(0,1fr\)\}aside\{left:0;right:0;width:auto\}/);
-  assert.match(dashboard, /main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:18px\}/);
+  assert.match(dashboard, /\.shell\{min-height:100vh\}/);
+  assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:18px\}/);
   assert.match(dashboard, /#home \.group-control-grid\{grid-template-columns:1fr\}/);
   assert.match(dashboard, /@media\(orientation:portrait\) and \(max-width:560px\)\{main\{padding:12px 14px 96px\}/);
   assert.match(dashboard, /#home \.home-actions\{display:flex;justify-content:flex-end;gap:4px\}/);
@@ -988,7 +996,11 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.doesNotMatch(dashboard, /#home \[data-widget="status"\]/);
   assert.match(dashboard, /#home \[data-widget="quick"\]\{position:fixed;z-index:9;left:var\(--strip-inset\);right:var\(--strip-inset\);bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\);grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden\}/);
   assert.match(dashboard, /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card\{height:56px\}/);
-  assert.match(dashboard, /#home \.widget-rail\{grid-column:2;grid-row:1;height:clamp\(150px,calc\(100vh - 340px\),560px\);display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
+  // Hub arka katmanda: rail tüm panoyu kaplar, hub sütunu kadar dolgusu var ve üstünden kayar.
+  assert.match(dashboard, /#home \.widget-rail\{position:relative;z-index:1;grid-column:1\/-1;grid-row:1;padding-left:calc\(var\(--hub-column\) \+ 10px\);scroll-padding-left:calc\(var\(--hub-column\) \+ 10px\);pointer-events:none;height:clamp\(150px,calc\(100vh - 340px\),560px\);display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
+  // Rail'in kendisi tıklamayı yutmaz; yalnız kartlar yakalar, böylece açıktaki hub tıklanabilir kalır.
+  assert.match(dashboard, /#home \.widget-rail>\*\{pointer-events:auto\}/);
+  assert.match(dashboard, /#home \.widget-scroll-hint\.scroll-hint-left\{left:6px\}/);
   assert.match(dashboard, /grid-auto-columns:var\(--rail-column\)/);
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2\}/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
@@ -1125,7 +1137,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /function touchDashboardEditing\(\)\{[\s\S]*?if\(!state\.dashboardEditing\)return/);
   assert.match(dashboard, /if\(state\.dashboardEditing\)setDashboardEditing\(false\)/);
   assert.match(dashboard, /function setDashboardEditing\(enabled\)\{\s*state\.dashboardEditing=Boolean\(enabled\);\s*applyWidgetLayout\(\);\s*touchDashboardEditing\(\);\s*\}/);
-  assert.match(dashboard, /function activateView\(viewName\)\{\s*if\(viewName!=="home"&&state\.dashboardEditing\)setDashboardEditing\(false\)/);
+  assert.match(dashboard, /function activateView\(viewName\)\{\s*closeAppMenu\(\);\s*if\(viewName!=="home"&&state\.dashboardEditing\)setDashboardEditing\(false\)/);
   assert.match(dashboard, /\$\("#widgetBoard"\)\.addEventListener\("pointerdown",touchDashboardEditing,\{passive:true\}\)/);
   assert.match(dashboard, /saveWidgetLayout\(\);\s*applyWidgetLayout\(\)/);
   assert.doesNotMatch(dashboard, /data-widget-drag-handle/);
@@ -1284,7 +1296,7 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\] main\{padding-bottom:calc\(106px \+ env\(safe-area-inset-bottom\)\)\}#home\.active\{min-height:0\}/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
   // Ölçüler dar yatayda da viewport'tan türer: cihaz listesi değil formül karar verir.
-  assert.match(dashboard, /#home \.home-hub\{--hub-time-size:clamp\(30px,6\.6vh,52px\);--hub-gap:clamp\(5px,1vh,10px\);--hub-pad-y:clamp\(4px,\.9vh,10px\);grid-column:1;grid-row:1;min-height:0;margin-top:0;max-height:calc\(100vh - 268px\);overflow:auto;scrollbar-width:none\}/);
+  assert.match(dashboard, /#home \.home-hub\{--hub-time-size:clamp\(30px,6\.6vh,52px\);--hub-gap:clamp\(5px,1vh,10px\);--hub-pad-y:clamp\(4px,\.9vh,10px\);grid-column:1;grid-row:1;z-index:0;min-height:0;margin-top:0;max-height:calc\(100vh - 268px\);overflow:auto;scrollbar-width:none\}/);
   assert.match(dashboard, /#home \.hub-date\{margin-top:clamp\(3px,\.7vh,6px\);font-size:clamp\(12px,1\.8vh,15px\)\}/);
   // Şehir ve günlük tahmin satırları tümüyle kalktı; kırpma kuralına gerek kalmadı.
   assert.doesNotMatch(dashboard, /hub-city|hub-days|class="hub-day"/);
@@ -1447,16 +1459,14 @@ test("dar sütunda hareket satırları dikey yığılır ve kapasite yeni satır
 test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
   const dashboard = await readDashboardBundle();
 
-  // Nav'da beşinci düğme: Home / Cihazlar / Otomasyon / Bağlantılar / Ayarlar.
+  // Menü penceresindeki beşinci düğme: Home / Cihazlar / Otomasyon / Bağlantılar / Ayarlar.
   const automationNav = dashboard.indexOf('data-view="automations"');
   const devicesNav = dashboard.indexOf('data-view="devices"');
   const connectionsNav = dashboard.indexOf('data-view="connections"');
   assert.ok(devicesNav >= 0 && devicesNav < automationNav && automationNav < connectionsNav);
-  assert.match(dashboard, /<button class="nav-button" data-view="automations" data-admin-only>/);
+  assert.match(dashboard, /<button class="nav-button" type="button" data-view="automations" data-admin-only>/);
   assert.match(dashboard, /navAutomations:"Automations"/);
   assert.match(dashboard, /navAutomations:"Otomasyon"/);
-  assert.match(dashboard, /nav\{margin:0;display:grid;grid-template-columns:repeat\(5,1fr\)\}/);
-  assert.match(dashboard, /grid-template-columns:repeat\(5,minmax\(104px,1fr\)\) auto/);
 
   // Sayfa ve iki yollu giriş; yol seçimi artık sayfada değil, sihirbaz modalinin ilk adımında.
   assert.match(dashboard, /<section id="automations" class="view" data-admin-only>/);
@@ -3626,4 +3636,65 @@ test("boş çalışma günlüğü kartın 'son çalışma' bilgisiyle çelişmez
   assert.match(dashboard, /t\(automation\.lastRunAt\?"automationRunsOlderThanLog":"automationRunsEmpty"\)/);
   assert.match(dashboard, /automationRunsOlderThanLog:"Bu kural bu sürümden önce çalışmış; günlük yeni tutulmaya başlandı\."/);
   assert.match(dashboard, /automationRunsOlderThanLog:"This rule ran before this version; the log has only just started\."/);
+});
+
+test("üst gezinme şeridi kalkar, yerine her ekranda duran tek menü düğmesi gelir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Şerit tümüyle kalktı: ne kenar çubuğu, ne yatay kipteki 68 px'lik sabit bant.
+  assert.doesNotMatch(dashboard, /<aside>/);
+  assert.doesNotMatch(dashboard, /<\/aside>/);
+  assert.doesNotMatch(dashboard, /class="nav-utility/);
+  assert.doesNotMatch(dashboard, /landscapeLanguageCode/);
+
+  // Menü düğmesi HER görünümün başlık satırında: yoksa kullanıcı ana ekrana dönemez.
+  const menuButton =
+    /<button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu">/g;
+  assert.equal(dashboard.match(menuButton)?.length, 5);
+  for (const view of ["home", "devices", "automations", "connections", "settings"]) {
+    const section = dashboard.slice(dashboard.indexOf(`<section id="${view}" class="view`));
+    const head = section.slice(0, section.indexOf("</header>"));
+    assert.ok(head.includes("data-app-menu"), `${view} başlığında menü düğmesi yok`);
+  }
+
+  // Hamburger seçildi: dişli bu panelde zaten "Ayarlar" görünümünü anlatıyor.
+  assert.match(dashboard, /class="app-menu-button"[^>]*>\s*<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"\/>/);
+
+  // Panelin mevcut diyalog dili: <dialog> + .modal.
+  assert.match(dashboard, /<dialog id="appMenuDialog" class="app-menu-dialog" aria-labelledby="appMenuTitle">/);
+  assert.match(dashboard, /<div class="modal app-menu-modal">/);
+  assert.match(dashboard, /menu:"Menu"/);
+  assert.match(dashboard, /menu:"Menü"/);
+  assert.match(dashboard, /openMenu:"Open menu"/);
+  assert.match(dashboard, /openMenu:"Menüyü aç"/);
+
+  // Şeritteki her şey menüye taşındı: beş görünüm + tema + dil + çıkış + bağlantı durumu.
+  for (const view of ["home", "devices", "automations", "connections", "settings"]) {
+    assert.match(dashboard, new RegExp(`class="nav-button[^"]*" type="button" data-view="${view}"`));
+  }
+  const menuDialog = dashboard.slice(
+    dashboard.indexOf('<dialog id="appMenuDialog"'),
+    dashboard.indexOf('<dialog id="nameDialog"'),
+  );
+  assert.match(menuDialog, /data-theme-mode="light"[\s\S]*data-theme-mode="dark"[\s\S]*data-theme-mode="system"/);
+  assert.match(menuDialog, /class="language-switch" role="group" data-i18n-aria="language"/);
+  assert.match(menuDialog, /data-auth-logout/);
+  assert.match(menuDialog, /id="sideDot"[\s\S]*id="sideStatus"/);
+  // Aktif görünüm menüde belli olsun.
+  assert.match(dashboard, /\.app-menu-nav \.nav-button\.active\{color:var\(--on-forest\);background:var\(--forest\)\}/);
+  assert.match(dashboard, /\$\$\("\.nav-button"\)\.forEach\(item=>item\.classList\.toggle\("active",item\.dataset\.view===viewName\)\)/);
+
+  // Erişilebilirlik: aria-expanded eşitlenir, Escape'i <dialog> kapatır, odak düğmeye döner.
+  assert.match(dashboard, /\$\$\("\[data-app-menu\]"\)\.forEach\(item=>item\.setAttribute\("aria-expanded","true"\)\);/);
+  assert.match(dashboard, /\$\$\("\[data-app-menu\]"\)\.forEach\(item=>item\.setAttribute\("aria-expanded","false"\)\);/);
+  assert.match(dashboard, /if\(opener&&opener\.isConnected&&opener\.offsetParent!==null\)opener\.focus\(\)/);
+  assert.match(dashboard, /\.app-menu-nav \.nav-button\{min-height:clamp\(48px,7vh,58px\)/);
+  assert.match(dashboard, /\.app-menu-button\{width:46px;height:46px;min-width:46px/);
+  assert.match(dashboard, /\.app-menu-button:focus-visible\{outline:3px solid var\(--forest\);outline-offset:2px\}/);
+
+  // Dil paketleri artık tek değil, her `.language-switch` kutusuna yazılır.
+  assert.match(dashboard, /\$\$\("\.language-switch"\)\.forEach\(group=>\{group\.innerHTML=languageButtons\}\)/);
+  assert.match(dashboard, /\$\$\("\.theme-switch"\)\.forEach\(group=>group\.setAttribute\("aria-label",t\("appearance"\)\)\)/);
+
+  assert.doesNotMatch(dashboard, /color-mix\(/);
 });

@@ -2,6 +2,8 @@
   "code": "en",
   "name": "English",
   "translations": {
+    "menu": "Menu",
+    "openMenu": "Open menu",
     "navHome": "Home",
     "navDevices": "Devices",
     "navAutomations": "Automations",
@@ -401,6 +403,8 @@
     "tourEditLead": "Use Edit, then the left and right arrows to arrange widgets. Finish editing when the layout feels right.",
     "tourWidgetsTitle": "Your widgets live here",
     "tourWidgetsLead": "Widgets scroll sideways in their own area while the top controls stay in place.",
+    "tourMenuTitle": "Everything else is in the menu",
+    "tourMenuLead": "This button opens the menu: Home, Devices, Automations, Connections, Settings, plus theme, language and sign out.",
     "tourDevicesTitle": "All details stay in Devices",
     "tourDevicesLead": "Open Devices to rename equipment, choose pictures, inspect controls or remove a device.",
     "deviceHintTitle": "Add a device from here",
