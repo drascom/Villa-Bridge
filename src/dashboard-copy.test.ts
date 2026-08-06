@@ -73,9 +73,10 @@ test("dashboard sabit ve hafif manzara arka planı üzerinde iki katmanlı sayda
   assert.match(dashboard, /body\[data-active-view="home"\]\{background-color:#c5ccc7;background-image:[^}]*url\("\/assets\/dashboard-landscape\.jpg"\)[^}]*background-attachment:fixed/);
   assert.match(dashboard, /--home-glass:rgba\(247,250,248,.22\)/);
   assert.match(dashboard, /--home-control:rgba\(251,252,252,.82\)/);
-  // Gezinme şeridi kalktı: fotoğrafın üstünde yalnız menü düğmesi koyu cam olarak durur.
+  // Gezinme şeridi kalktı: fotoğrafın üstünde kalan menü düğmesi alttaki hızlı erişim
+  // düğmeleriyle aynı cam dolguyu, kenarı ve gölgeyi kullanır.
   assert.doesNotMatch(dashboard, /<aside>/);
-  assert.match(dashboard, /body\[data-active-view="home"\] \.app-menu-button\{color:#fff;background:rgba\(23,65,54,.76\)/);
+  assert.match(dashboard, /body\[data-active-view="home"\] \.app-menu-button\{color:var\(--forest\);border-color:var\(--home-border\);background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
   // Kartlar %82 saydam dolguyu kullanır; seçici tek `body` — çift yazım hiç eşleşmediği için kartlar beyaza düşüyordu.
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.widget-card\{border-color:var\(--home-border\);background:var\(--home-control\)/);
   assert.doesNotMatch(dashboard, /body\[data-active-view="home"\] body\[data-active-view="home"\]/);
@@ -741,15 +742,23 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.home-metrics\{display:flex;align-items:center/);
   assert.match(dashboard, /h1\.eyebrow\{margin:0;font-family:inherit;line-height:1\.45\}/);
   assert.match(dashboard, /\.shell\{min-height:100vh\}/);
-  assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:18px\}/);
+  assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:12px\}/);
   assert.match(dashboard, /#home \.group-control-grid\{grid-template-columns:1fr\}/);
   assert.match(dashboard, /@media\(orientation:portrait\) and \(max-width:560px\)\{main\{padding:12px 14px 96px\}/);
-  assert.match(dashboard, /#home \.home-actions\{display:flex;justify-content:flex-end;gap:4px\}/);
+  assert.match(dashboard, /#home \.home-actions\{display:flex;justify-content:flex-end;gap:10px\}/);
   assert.match(dashboard, /#home \.home-actions button,body\[data-active-view="home"\] #home \.home-actions button,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
+  // Dikeyde de aynı dokunma hedefi: yuvarlak ama en az 60px.
+  assert.match(dashboard, /#home \.home-actions button,body\[data-active-view="home"\] #home \.home-actions button\{width:var\(--head-action-h\);height:var\(--head-action-h\);min-width:var\(--head-action-h\)\}/);
   assert.match(dashboard, /id="addWidget" class="secondary"><svg class="home-action-glyph"/);
   assert.match(dashboard, /id="editDashboardLabel" class="home-action-label"/);
-  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{#devices \.toolbar\{padding:6px 0;margin-bottom:8px\}#home \.home-actions\{gap:6px\}#home \.home-actions button,#refreshButton\{[^}]*width:46px[^}]*background:var\(--forest-soft\)/);
-  assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{[^}]*background:rgba\(23,65,54,.76\)/);
+  // Üç başlık düğmesi parmak hedefi: en az 60px yükseklik, ekranla orantılı genişlik ve
+  // aralarında görünür boşluk. `#refreshButton` araç çubuğunda kaldığı için 46px kalır.
+  assert.match(dashboard, /--head-action-h:clamp\(60px,9\.4vh,64px\);--head-action-w:clamp\(72px,8\.6vw,96px\);--head-action-gap:clamp\(12px,1\.6vw,20px\)/);
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{#devices \.toolbar\{padding:6px 0;margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\);margin-top:-4px\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
+  assert.match(dashboard, /#refreshButton\{width:46px;height:46px;min-width:46px\}#home \.home-actions button\{width:var\(--head-action-w\);height:var\(--head-action-h\);min-width:var\(--head-action-w\);border-radius:999px\}/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{color:var\(--forest\);border-color:var\(--home-border\);background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
+  // Kazanılan dikey alan geri verilmez: başlık satırının alt boşluğu 10px'ten 4px'e indi.
+  assert.match(dashboard, /#home \.page-head\{align-items:center;margin-bottom:4px\}/);
   assert.match(dashboard, /\.hub-time\{display:block;color:var\(--ink\);font:750 var\(--hub-time-size\)\/1 system-ui,sans-serif/);
   assert.match(dashboard, /\.hub-w-temp\{display:block;color:var\(--ink\);font:750 clamp\(24px,4\.8vh,38px\)\/1 system-ui,sans-serif/);
   assert.match(dashboard, /\[data-widget="activity"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
@@ -3691,7 +3700,8 @@ test("üst gezinme şeridi kalkar, yerine her ekranda duran tek menü düğmesi 
   assert.match(dashboard, /\$\$\("\[data-app-menu\]"\)\.forEach\(item=>item\.setAttribute\("aria-expanded","false"\)\);/);
   assert.match(dashboard, /if\(opener&&opener\.isConnected&&opener\.offsetParent!==null\)opener\.focus\(\)/);
   assert.match(dashboard, /\.app-menu-nav \.nav-button\{aspect-ratio:1\/1;min-height:clamp\(84px,15vh,132px\)/);
-  assert.match(dashboard, /\.app-menu-button\{width:46px;height:46px;min-width:46px/);
+  // Menü düğmesi her ekranda aynı ölçüde: hap biçimli, en az 60px yüksek dokunma hedefi.
+  assert.match(dashboard, /\.app-menu-button\{width:var\(--head-action-w\);height:var\(--head-action-h\);min-width:var\(--head-action-w\);[^}]*border-radius:999px/);
   assert.match(dashboard, /\.app-menu-button:focus-visible\{outline:3px solid var\(--forest\);outline-offset:2px\}/);
 
   // Dil paketleri artık tek değil, her `.language-switch` kutusuna yazılır.
