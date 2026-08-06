@@ -742,7 +742,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.home-metrics\{display:flex;align-items:center/);
   assert.match(dashboard, /h1\.eyebrow\{margin:0;font-family:inherit;line-height:1\.45\}/);
   assert.match(dashboard, /\.shell\{min-height:100vh\}/);
-  assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:12px\}/);
+  // Dar ekranda başlık altı boşluğu yatayda oransal (`--home-head-gap`), dikeyde eski 12px'te kalır.
+  assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:var\(--home-head-gap,12px\)\}/);
   assert.match(dashboard, /#home \.group-control-grid\{--group-tile-span:1;grid-template-columns:1fr\}/);
   assert.match(dashboard, /@media\(orientation:portrait\) and \(max-width:560px\)\{main\{padding:12px 14px 96px\}/);
   assert.match(dashboard, /#home \.home-actions\{display:flex;justify-content:flex-end;gap:10px\}/);
@@ -757,8 +758,10 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{#devices \.toolbar\{padding:6px 0;margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\);margin-top:-4px\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
   assert.match(dashboard, /#refreshButton\{width:46px;height:46px;min-width:46px\}#home \.home-actions button\{width:var\(--head-action-w\);height:var\(--head-action-h\);min-width:var\(--head-action-w\);border-radius:999px\}/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{color:var\(--forest\);border-color:var\(--home-border\);background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
-  // Kazanılan dikey alan geri verilmez: başlık satırının alt boşluğu 10px'ten 4px'e indi.
-  assert.match(dashboard, /#home \.page-head\{align-items:center;margin-bottom:4px\}/);
+  // Başlık satırının alt boşluğu sabit px değil: `--home-head-gap` ile oransal verilir, burada
+  // yalnız hizalama kalır — düğmelerle kart panosu arasındaki nefes payı tek yerden yönetilir.
+  assert.match(dashboard, /#home \.page-head\{align-items:center\}/);
+  assert.doesNotMatch(dashboard, /#home \.page-head\{align-items:center;margin-bottom:4px\}/);
   assert.match(dashboard, /\.hub-time\{display:block;color:var\(--ink\);font:750 var\(--hub-time-size\)\/1 system-ui,sans-serif/);
   assert.match(dashboard, /\.hub-w-temp\{display:block;color:var\(--ink\);font:750 clamp\(24px,4\.8vh,38px\)\/1 system-ui,sans-serif/);
   assert.match(dashboard, /\[data-widget="activity"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
@@ -3806,7 +3809,10 @@ test("kartlar alttaki hızlı erişim şeridine kadar uzar", async () => {
     dashboard,
     /#home\.active\{min-height:0;display:flex;flex-direction:column;height:calc\(100dvh - var\(--home-top\) - 106px - env\(safe-area-inset-bottom\)\)\}/,
   );
-  assert.match(dashboard, /#home\{--hub-column:280px;--rail-column:calc\(\(100vw - 350px\)\/3\);--strip-inset:20px;--home-top:14px\}/);
+  // Başlık ile kart panosu arası nefes payı oransal (vh) ve tek değişkende; panonun boyu sütun
+  // akışında bu paydan kendiliğinden düşer, alt şeride ayrılan 106px'lik pay bozulmaz.
+  assert.match(dashboard, /#home\{--hub-column:280px;--rail-column:calc\(\(100vw - 350px\)\/3\);--strip-inset:20px;--home-top:14px;--home-head-gap:clamp\(12px,2\.8vh,26px\)\}/);
+  assert.match(dashboard, /#home \.page-head\{margin-bottom:var\(--home-head-gap\)\}/);
   assert.match(dashboard, /#home \.widget-board\{flex:1 1 auto;min-height:150px;max-height:660px;display:grid;/);
   assert.match(dashboard, /grid-template-rows:minmax\(0,1fr\);gap:10px\}/);
   assert.match(dashboard, /#home \.widget-rail\{[^}]*height:100%;display:grid/);
