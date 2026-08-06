@@ -743,7 +743,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /h1\.eyebrow\{margin:0;font-family:inherit;line-height:1\.45\}/);
   assert.match(dashboard, /\.shell\{min-height:100vh\}/);
   assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:12px\}/);
-  assert.match(dashboard, /#home \.group-control-grid\{grid-template-columns:1fr\}/);
+  assert.match(dashboard, /#home \.group-control-grid\{--group-tile-span:1;grid-template-columns:1fr\}/);
   assert.match(dashboard, /@media\(orientation:portrait\) and \(max-width:560px\)\{main\{padding:12px 14px 96px\}/);
   assert.match(dashboard, /#home \.home-actions\{display:flex;justify-content:flex-end;gap:10px\}/);
   assert.match(dashboard, /#home \.home-actions button,body\[data-active-view="home"\] #home \.home-actions button,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
@@ -1011,7 +1011,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-rail>\*\{pointer-events:auto\}/);
   assert.match(dashboard, /#home \.widget-scroll-hint\.scroll-hint-left\{left:6px\}/);
   assert.match(dashboard, /grid-auto-columns:var\(--rail-column\)/);
-  assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2\}/);
+  assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2;/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
   assert.match(dashboard, /const rail=\$\("#widgetRail"\)/);
   assert.match(dashboard, /rail\.insertBefore\(widget,\$\("#widgetEmpty"\)\)/);

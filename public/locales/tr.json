@@ -484,6 +484,8 @@
     "removeWidget": "Widget’ı kaldır",
     "moveWidgetLeft": "Widget’ı sola taşı",
     "moveWidgetRight": "Widget’ı sağa taşı",
+    "expandTile": "Butonu genişlet",
+    "collapseTile": "Butonu daralt",
     "showDetails": "Detayları Göster",
     "deviceLongPressLead": "Bu cihazla ne yapmak istediğinizi seçin.",
     "screensaverTitle": "Ekran koruyucu",

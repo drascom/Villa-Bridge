@@ -484,6 +484,8 @@
     "removeWidget": "Remove widget",
     "moveWidgetLeft": "Move widget left",
     "moveWidgetRight": "Move widget right",
+    "expandTile": "Widen button",
+    "collapseTile": "Narrow button",
     "showDetails": "Show Details",
     "deviceLongPressLead": "Choose what you want to do with this device.",
     "screensaverTitle": "Screen saver",
