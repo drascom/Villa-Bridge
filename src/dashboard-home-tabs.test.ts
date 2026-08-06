@@ -211,6 +211,49 @@ test("Genel görünümde widget ekleme, taşıma ve kaldırma yolları duruyor",
   assert.match(dashboard, /if\(state\.dashboardEditing\)for\(const widget of \$\$\("#widgetRail \[data-group-widget\]"\)\)/);
 });
 
+/* Hata: bir grup sekmesindeyken kart içindeki döşemeye dokununca alt şerit başa kayıyordu.
+   Kök neden ölçüldü: `innerHTML` yeniden yazımı konumu bozmuyor, ama düzen turundaki
+   `board.insertBefore(quick,rail)` şeridi taşıyan bölümü DOM'dan çıkarıp geri koyuyor ve
+   tarayıcı `scrollLeft`i sıfırlıyor. Düğüm zaten yerindeyse artık taşınmıyor. */
+test("düzen turu yerinde duran kartı taşımıyor", async () => {
+  const source = await readDashboard();
+  const run = new Function(
+    "moves",
+    `
+    const rail={};
+    const quick={parentElement:null,nextElementSibling:null};
+    const board={insertBefore(node,reference){moves.push("move");node.parentElement=board;node.nextElementSibling=reference}};
+    ${extractFunction(source, "placeNode")}
+    placeNode(board,quick,rail);
+    placeNode(board,quick,rail);
+    placeNode(board,quick,rail);
+  `
+  ) as (moves: string[]) => void;
+  const moves: string[] = [];
+  run(moves);
+  // İlk turda gerçekten taşınır, sonraki her turda dokunulmaz.
+  assert.deepEqual(moves, ["move"]);
+});
+
+test("kaydırma konumları düzen turu boyunca korunuyor", async () => {
+  const dashboard = await readDashboard();
+
+  assert.match(dashboard, /const scrollPositions=captureScrollPositions\(\);\s*reconcileWidgetLayout\(\);/);
+  assert.match(dashboard, /restoreScrollPositions\(scrollPositions\);\s*requestAnimationFrame\(updateWidgetScrollHint\)/);
+  assert.match(dashboard, /const scrollKeepers=\(\)=>\[\$\("#homeTabs"\),\$\("#widgetRail"\)\]\.filter\(Boolean\)/);
+  // Kartın kendi dikey kaydırması da grup kimliğiyle saklanır: ızgara her turda yeniden yazılıyor.
+  assert.match(dashboard, /const gridScrollKey=grid=>grid\.closest\("\[data-group-widget\]"\)\?\.dataset\.groupWidget\|\|\(grid\.closest\("#groupPanel"\)\?"panel":null\)/);
+  // Taşıma artık koşullu: `insertBefore` yerine `placeNode`.
+  const layout = extractFunction(dashboard, "applyWidgetLayout");
+  assert.doesNotMatch(layout, /insertBefore/);
+  assert.match(layout, /placeNode\(board,widget,rail\)/);
+  assert.match(layout, /placeNode\(rail,widget,\$\("#widgetEmpty"\)\)/);
+  // Odak ve görüş alanına kaydırma yalnız kullanıcı sekme değiştirdiğinde: her render'da değil.
+  assert.match(extractFunction(dashboard, "selectHomeTab"), /tab\.scrollIntoView\(\{[^}]*\}\);\s*tab\.focus\(\)/);
+  assert.doesNotMatch(extractFunction(dashboard, "renderHomeTabs"), /focus\(\)|scrollIntoView/);
+  assert.doesNotMatch(extractFunction(dashboard, "applyHomeTab"), /focus\(\)|scrollIntoView/);
+});
+
 test("sekme çubuğu metinleri iki dilde de var", async () => {
   const [english, turkish] = await Promise.all([readCatalog(englishLocaleUrl), readCatalog(turkishLocaleUrl)]);
 

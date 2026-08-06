@@ -569,6 +569,8 @@
     "groupNoControls": "Bu grupta kullanılabilir kumanda yok.",
     "groupNoAvailableControls": "Grup oluşturmadan önce kontrol edilebilir bir cihaz ekleyin.",
     "toggleGroupPower": "Tüm cihazları değiştir",
+    "groupPowerConfirmOn": "{name} grubundaki {count} cihazın hepsi açılacak. Devam edilsin mi?",
+    "groupPowerConfirmOff": "{name} grubundaki {count} cihazın hepsi kapatılacak. Devam edilsin mi?",
     "confirmReconnectedName": "Cihaz adını doğrulayın",
     "confirmReconnectedNameLead": "Kayıtlı cihaz yeniden bağlandı. Mevcut adını koruyun veya yeni bir ad girin.",
     "zigbeeTools": "Zigbee kurulum araçları",

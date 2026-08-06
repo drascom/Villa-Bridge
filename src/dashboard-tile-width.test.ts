@@ -87,6 +87,28 @@ test("geniş buton kart içinde akıyor, kart kendi içinde kayabiliyor", async 
   assert.match(dashboard, /\.group-control-grid\{--group-tile-span:2;[^}]*align-content:start/);
 });
 
+/* Genişlik kademesi asıl detay ekranında da gerekiyordu: grup sekmesindeki kart artık
+   düzenlenebilir bir yüzey — uzun basış orada da düzenleme kipini açıyor. */
+test("grup sekmesindeki kartta da genişlik simgesi var", async () => {
+  const dashboard = await readDashboard();
+
+  // Döşeme kabuğu tek yerde üretiliyor: Genel görünüm kartı da grup sekmesi paneli de aynı satırı kullanır.
+  const groupWidget = dashboard.slice(dashboard.indexOf("function groupWidgetHtml("), dashboard.indexOf("function renderGroupWidgets("));
+  assert.match(groupWidget, /const overview=options\.variant!=="panel"/);
+  assert.match(groupWidget, /\$\{tileWidthToggleHtml\(widthKey,wide\)\}\$\{favoriteStarHtml\(device,control,name\)\}/);
+  assert.match(groupWidget, /if\(!overview\)\{\s*return`<div class="group-widget-head">[^`]*\$\{body\}`/);
+  // Panel de düzenleme yüzeyi: uzun basış kipi açar, kart kenarlığı da kipi gösterir.
+  assert.match(dashboard, /const panel=\$\("#groupPanel"\);\s*if\(panel\)bindLongPress\(panel,\(\)=>\{\s*if\(!panel\.hidden&&!state\.dashboardEditing\)setDashboardEditing\(true\);/);
+  assert.match(dashboard, /\.widget-board\.editing \.dashboard-widget,\.widget-board\.editing \.group-panel\{outline:2px dashed var\(--forest\)/);
+  // Uzun basış döşemeyi tetiklemez: aynı yoksayma listesi iki yüzeyde de kullanılıyor.
+  assert.match(dashboard, /const longPressIgnore=target=>Boolean\(target\.closest\("button,input,select,textarea,a,\[data-group-device\],\[data-group-show-device\]"\)\)/);
+  // Yıldız ve genişlik simgesi çakışmaz, döşeme adını da örtmez: ad alanı ikisine göre daralır.
+  assert.match(dashboard, /\.tile-width-toggle\{position:absolute;z-index:6;right:6px;top:6px/);
+  assert.match(dashboard, /\.fav-star\{position:absolute;z-index:6;right:56px;top:6px/);
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot>\.group-control-tile\{padding-right:56px\}/);
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-fav>\.group-control-tile\{padding-right:106px\}/);
+});
+
 test("boyut simgesi metinleri iki dilde de var", async () => {
   const [english, turkish] = await Promise.all([readCatalog(englishLocaleUrl), readCatalog(turkishLocaleUrl)]);
 

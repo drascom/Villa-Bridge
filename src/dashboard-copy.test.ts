@@ -1004,9 +1004,11 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-scroll-hint\.scroll-hint-left\{left:6px\}/);
   assert.match(dashboard, /grid-auto-columns:var\(--rail-column\)/);
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2;/);
-  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
+  // "Ev hareketleri" bir kademe geniş: olay satırları sıkışmasın.
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
   assert.match(dashboard, /const rail=\$\("#widgetRail"\)/);
-  assert.match(dashboard, /rail\.insertBefore\(widget,\$\("#widgetEmpty"\)\)/);
+  // Yerinde duran kart taşınmaz: `insertBefore` kabı DOM'dan çıkarıp kaydırma konumunu sıfırlıyordu.
+  assert.match(dashboard, /placeNode\(rail,widget,\$\("#widgetEmpty"\)\)/);
   assert.match(dashboard, /\$\$\("#widgetRail \[data-widget\]"\)/);
   assert.match(dashboard, /\.group-widget\{grid-column:span 6;padding:22px/);
   assert.match(dashboard, /\.group-control-tile\{[^}]*min-height:100px[^}]*grid-template-columns:56px/);
@@ -1076,7 +1078,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /function runDashboardCommand\(button,deviceId,property,value\)\{\s*const messageKey=button\?\.dataset\.confirmCommand;\s*if\(messageKey\)\{confirmDashboardCommand\(deviceId,property,value,messageKey\);return\}/);
   assert.match(dashboard, /\$\$\("\[data-command-value\]"\)\.forEach\(button=>button\.onclick=\(\)=>runDashboardCommand\(button,button\.dataset\.device,button\.dataset\.property,JSON\.parse\(button\.dataset\.commandValue\)\)\)/);
   assert.match(dashboard, /\$\$\("\[data-group-device\]"\)\.forEach\(button=>button\.onclick=\(\)=>runDashboardCommand\(button,button\.dataset\.groupDevice/);
-  assert.match(dashboard, /\$\("#confirmDeviceAction"\)\.onclick=\(\)=>\{const pending=state\.pendingConfirm;\$\("#deviceActionDialog"\)\.close\(\);if\(pending\)command\(pending\.id,pending\.property,pending\.value\)\}/);
+  // Aynı onay diyaloğu toplu güç düğmesine de hizmet eder: grup kimliği varsa grup komutu çalışır.
+  assert.match(dashboard, /\$\("#confirmDeviceAction"\)\.onclick=\(\)=>\{const pending=state\.pendingConfirm;\$\("#deviceActionDialog"\)\.close\(\);if\(!pending\)return;if\(pending\.groupId\)commandDashboardGroup\(pending\.groupId\);else command\(pending\.id,pending\.property,pending\.value\)\}/);
   assert.match(dashboard, /confirmUnlockDevice:"Unlock \{name\}\? The door will open\."/);
   assert.match(dashboard, /confirmUnlockDevice:"\{name\} kilidi açılsın mı\? Kapı açılacak\."/);
   assert.match(dashboard, /const longPressDelay=560/);
@@ -1131,7 +1134,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /scrollIntoView\(\{behavior:reducedMotion\(\)\?"auto":"smooth",block:"nearest",inline:"center"\}\)/);
   assert.match(dashboard, /classList\.add\("widget-moved"\)/);
   assert.match(dashboard, /@keyframes widget-moved-pulse/);
-  assert.match(dashboard, /\.widget-board\.editing \.dashboard-widget\{outline:2px dashed var\(--forest\);outline-offset:4px\}/);
+  // Grup sekmesindeki kart da düzenleme yüzeyi: aynı kesikli kenarlığı alır.
+  assert.match(dashboard, /\.widget-board\.editing \.dashboard-widget,\.widget-board\.editing \.group-panel\{outline:2px dashed var\(--forest\);outline-offset:4px\}/);
   assert.match(dashboard, /const dashboardEditingIdleDelay=60000/);
   assert.match(dashboard, /function touchDashboardEditing\(\)\{[\s\S]*?if\(!state\.dashboardEditing\)return/);
   assert.match(dashboard, /if\(state\.dashboardEditing\)setDashboardEditing\(false\)/);
@@ -1296,7 +1300,7 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\] main\{padding-bottom:calc\(106px \+ env\(safe-area-inset-bottom\)\)\}/);
   // Ana ekran sütun akışı: pano kalan yüksekliği alır, kartlar şeride kadar uzar.
   assert.match(dashboard, /#home\.active\{min-height:0;display:flex;flex-direction:column;height:calc\(100dvh - var\(--home-top\) - 106px - env\(safe-area-inset-bottom\)\)\}/);
-  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
   // Ölçüler dar yatayda da viewport'tan türer: cihaz listesi değil formül karar verir.
   assert.match(dashboard, /#home \.home-hub\{--hub-time-size:clamp\(30px,6\.6vh,52px\);--hub-gap:clamp\(5px,1vh,10px\);--hub-pad-y:clamp\(4px,\.9vh,10px\);grid-column:1;grid-row:1;z-index:0;min-height:0;margin-top:0;max-height:100%;overflow:auto;scrollbar-width:none;transition:opacity \.18s ease\}/);
   assert.match(dashboard, /#home \.hub-date\{margin-top:clamp\(3px,\.7vh,6px\);font-size:clamp\(12px,1\.8vh,15px\)\}/);
@@ -1442,9 +1446,9 @@ test("yeni oluşturulan grup widget'ı görünüme alınır, düzenlenen grup al
 
 test("dar sütunda hareket satırları dikey yığılır ve kapasite yeni satır yüksekliğine uyar", async () => {
   const dashboard = await readDashboardBundle();
-  // Activity widget'ı artık tablette de diğer kartlarla aynı genişlikte.
-  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
-  assert.doesNotMatch(dashboard, /\[data-widget="activity"\]\{grid-column:span 2\}/);
+  // Activity widget'ı tablette bir kademe geniş: olay satırları sıkışmıyor, diğer kartlar tek sütun.
+  assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
+  assert.match(dashboard, /#home \.widget-rail \.widget-card\{grid-row:1;grid-column:span 1/);
   // Geniş ekran değeri span 5'te kaldı.
   assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}/);
   // Cihaz adı üstte, durum+zaman altta; yalnız activity listesi etkileniyor.
