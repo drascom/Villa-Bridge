@@ -117,7 +117,7 @@ test("Home Assistant kartı LAN IP ve EN/TR sabitleme rehberi sunar", async () =
   assert.match(server, /restartRequired: false/);
   assert.match(dashboard, /api\("\/api\/home-assistant\/discovery",\{method:"PUT",body:JSON\.stringify\(\{enabled\}\)\}\)/);
   const discoveryToggle = dashboard.match(
-    /async function toggleHomeAssistantDiscovery\(\)\{([\s\S]*?)\n  \}\n  async function loadFavorites/
+    /async function toggleHomeAssistantDiscovery\(\)\{([\s\S]*?)\n  \}\n  async function loadHomeGroups/
   )?.[1] ?? "";
   assert.doesNotMatch(discoveryToggle, /settings\/apply|waitForRestart|confirm\(/);
   assert.match(dashboard, /enableDiscovery:"Start service"/);
@@ -176,7 +176,7 @@ test("cihaz kaldırma Android WebView uyumlu ve açıkça yıkıcı bir diyalog 
   assert.match(dashboard, /JSON\.stringify\(\{confirmation,force\}\)/);
   assert.match(dashboard, /forceRemove:"Kaydı zorla sil"/);
   assert.match(dashboard, /forceRemove:"Force delete record"/);
-  assert.match(dashboard, /if\(Array\.isArray\(data\.favorites\)\)state\.favorites=data\.favorites/);
+  assert.match(dashboard, /if\(Array\.isArray\(data\.groups\)\)\{state\.groups=data\.groups;saveDashboardGroups\(\);applyWidgetLayout\(\)\}/);
   assert.match(dashboard, /showModal\(\)/);
   assert.doesNotMatch(dashboard, /prompt\(t\("confirmRemoval"/);
 });
@@ -446,7 +446,7 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /if\(localComplete&&!installationOnboardingComplete\)/);
   assert.match(dashboard, /await markOnboardingComplete\(\)/);
   assert.match(dashboard, /if\(!onboardingComplete\(\)\)openOnboarding\(\)/);
-  assert.match(dashboard, /const startup=\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadAutomations\(\),loadHomeLocation\(\),loadInstallationOnboarding\(\)\]/);
+  assert.match(dashboard, /const startup=\[refresh\(\),loadHomeGroups\(\),loadAutomations\(\),loadHomeLocation\(\),loadInstallationOnboarding\(\)\]/);
   assert.match(dashboard, /if\(state\.auth\.user\?\.role==="admin"\)startup\.push\(loadSettings\(\)\)/);
   assert.match(dashboard, /await Promise\.allSettled\(startup\)/);
   assert.match(dashboard, /data-onboarding-language="en"/);
@@ -902,9 +902,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /async function persistHomeGroups\(groups,successKey\)\{/);
   assert.match(dashboard, /await api\("\/api\/home-groups",\{method:"PUT",body:JSON\.stringify\(\{groups\}\)\}\)/);
   assert.match(dashboard, /catch\(error\)\{showToast\(t\("groupSaveFailed",\{error:error\.message\}\),true\)\}/);
-  assert.match(dashboard, /const reload=\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadAutomations\(\),loadHomeLocation\(\)\]/);
+  assert.match(dashboard, /const reload=\[refresh\(\),loadHomeGroups\(\),loadAutomations\(\),loadHomeLocation\(\)\]/);
   assert.match(dashboard, /await Promise\.allSettled\(startup\);\s*await migrateLocalGroups\(\)/);
-  assert.match(dashboard, /if\(Array\.isArray\(data\.favorites\)\)state\.favorites=data\.favorites;\s*if\(Array\.isArray\(data\.groups\)\)\{state\.groups=data\.groups;saveDashboardGroups\(\);applyWidgetLayout\(\)\}/);
   assert.match(dashboard, /function saveDashboardGroups\(\)\{\s*try\{localStorage\.setItem\("villa-dashboard-groups"/);
   assert.match(dashboard, /const roomSuggestionKeys=\["roomLivingRoom","roomKitchen","roomBedroom","roomBathroom","roomHallway","roomBalcony","roomKidsRoom","roomGarden","roomAllLights","roomAllSecurity"\]/);
   assert.match(dashboard, /function renderRoomSuggestions\(\)\{/);
@@ -956,7 +955,9 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const deviceRoomsHtml=device=>\{\s*if\(!state\.groups\.length\)return""/);
   assert.match(dashboard, /const member=deviceInRoom\(device,group\.id\)/);
   assert.match(dashboard, /data-toggle-room="\$\{esc\(group\.id\)\}" data-room-device="\$\{esc\(device\.id\)\}" aria-pressed="\$\{member\}"/);
-  assert.match(dashboard, /\$\{deviceRoomsHtml\(device\)\}\s*<details class="technical-details"/);
+  assert.match(dashboard, /\$\{deviceRoomsHtml\(device\)\}\s*\$\{deviceVisibilityHtml\(device\)\}\s*<details class="technical-details"/);
+  // Kontrolü olmayan cihazın döşemesi de Cihazlar sayfasından geri getirilebilir.
+  assert.match(dashboard, /const deviceVisibilityHtml=device=>\{\s*if\(device\.controls\.some\(isDashboardControl\)\)return""/);
   assert.match(dashboard, /async function toggleDeviceRoom\(deviceId,groupId\)\{/);
   assert.match(dashboard, /items:member\?item\.items\.filter\(entry=>entry\.deviceId!==deviceId\):\[\.\.\.item\.items,\{deviceId,controlId\}\]/);
   assert.match(dashboard, /const controlId=control\?control\.id:groupDeviceControlId/);
@@ -1258,20 +1259,20 @@ test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla göst
   ));
 });
 
-test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kullanılabilir", async () => {
+test("günlük cihaz tipleri göster/gizle, Quick Control ve dashboard gruplarında kullanılabilir", async () => {
   const dashboard = await readDashboardBundle();
 
   assert.match(dashboard, /dashboardControlKinds=new Set\(\["switch","fan","siren","cover","position","lock","climate"\]\)/);
   assert.match(dashboard, /const dashboardControlForDevice=/);
   assert.match(dashboard, /const dashboardControlAction=/);
   assert.match(dashboard, /const mainControl=dashboardControlForDevice\(device\)/);
-  // Favoriler artık Genel görünüm kartını süzüyor: aynı kayıt (cihaz UID + kontrol kimliği), yeni iş.
-  assert.match(dashboard, /const chosen=entries\.filter\(entry=>entry\.control&&isFavorite\(entry\.device\.id,entry\.control\.id\)\)/);
-  assert.match(dashboard, /const favoriteButton=\(device,control\)=>\{/);
-  assert.match(dashboard, /class="favorite-toggle \$\{active\?"active":""\}"/);
-  assert.match(dashboard, /\$\{isDashboardControl\(control\)\?favoriteButton\(device,control\):""\}/);
-  assert.doesNotMatch(dashboard, /favorite-main/);
-  assert.doesNotMatch(dashboard, /favoriteButton\(device,mainControl/);
+  // Görünürlük Genel görünüm kartını süzüyor: kayıt yalnız gizlenenleri tutar, varsayılan görünür.
+  assert.match(dashboard, /const visible=entries\.filter\(entry=>!isTileHidden\(entry\.device\.id,entry\.control\?entry\.control\.id:null\)\)/);
+  assert.match(dashboard, /const visibilityButton=\(device,control\)=>\{/);
+  assert.match(dashboard, /class="visibility-toggle\$\{hidden\?" is-hidden":""\}" type="button" role="switch" aria-checked="\$\{hidden\?"false":"true"\}"/);
+  assert.match(dashboard, /\$\{isDashboardControl\(control\)\?visibilityButton\(device,control\):""\}/);
+  // Yıldız/favori anlamı arayüzden tamamen kalktı: çift anlam kalmadı.
+  assert.doesNotMatch(dashboard, /favorite-main|favoriteButton|fav-star|isFavorite|loadFavorites/);
   assert.doesNotMatch(dashboard, /dashboardControlForDevice\(device\)\?\.id!==control\.id/);
   assert.match(dashboard, /const controls=device\.controls\.filter\(isDashboardControl\)/);
   assert.match(dashboard, /data-group-command-value=/);
@@ -2554,7 +2555,7 @@ test("Ayarlar'da yedek al ve geri yükle kartı onay adımı atlanmadan çalış
 
   // Başarıdan sonra ekran tazelenir.
   assert.match(dashboard, /api\("\/api\/backup\/restore",\{method:"POST",body:JSON\.stringify\(\{backup:pendingHomeBackup,mode:selectedHomeBackupMode\(\)\}\)\}/);
-  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadFavorites\(\),loadHomeGroups\(\),loadAutomations\(\)\]\);\s*render\(\)/);
+  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadHomeGroups\(\),loadAutomations\(\)\]\);\s*render\(\)/);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });

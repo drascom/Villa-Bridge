@@ -47,7 +47,7 @@ test("boyut simgesi gerçek buton ve cihazı tetiklemiyor", async () => {
     /\$\$\("\[data-tile-width-toggle\]"\)\.forEach\(button=>button\.onclick=event=>\{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*toggleTileWidth\(button\);/
   );
   // Simge döşemenin kardeşi: iç içe <button> geçersiz olurdu ve tıklama cihaza sızardı.
-  assert.match(dashboard, /<div class="group-control-slot\$\{wide\?" is-wide":""\}[^`]*>\$\{tile\}\$\{tileWidthToggleHtml\(widthKey,wide\)\}\$\{favoriteStarHtml\(device,control,name\)\}<\/div>/);
+  assert.match(dashboard, /<div class="group-control-slot has-eye\$\{wide\?" is-wide":""\}[^`]*>\$\{tile\}\$\{tileWidthToggleHtml\(widthKey,wide\)\}\$\{tileVisibilityHtml\(device,control,name\)\}<\/div>/);
   assert.match(dashboard, /aria-label="\$\{esc\(label\)\}"/);
   assert.match(dashboard, /const label=t\(wide\?"collapseTile":"expandTile"\)/);
 });
@@ -95,18 +95,18 @@ test("grup sekmesindeki kartta da genişlik simgesi var", async () => {
   // Döşeme kabuğu tek yerde üretiliyor: Genel görünüm kartı da grup sekmesi paneli de aynı satırı kullanır.
   const groupWidget = dashboard.slice(dashboard.indexOf("function groupWidgetHtml("), dashboard.indexOf("function renderGroupWidgets("));
   assert.match(groupWidget, /const overview=options\.variant!=="panel"/);
-  assert.match(groupWidget, /\$\{tileWidthToggleHtml\(widthKey,wide\)\}\$\{favoriteStarHtml\(device,control,name\)\}/);
+  assert.match(groupWidget, /\$\{tileWidthToggleHtml\(widthKey,wide\)\}\$\{tileVisibilityHtml\(device,control,name\)\}/);
   assert.match(groupWidget, /if\(!overview\)\{\s*return`<div class="group-widget-head">[^`]*\$\{body\}`/);
   // Panel de düzenleme yüzeyi: uzun basış kipi açar, kart kenarlığı da kipi gösterir.
   assert.match(dashboard, /const panel=\$\("#groupPanel"\);\s*if\(panel\)bindLongPress\(panel,\(\)=>\{\s*if\(!panel\.hidden&&!state\.dashboardEditing\)setDashboardEditing\(true\);/);
   assert.match(dashboard, /\.widget-board\.editing \.dashboard-widget,\.widget-board\.editing \.group-panel\{outline:2px dashed var\(--forest\)/);
   // Uzun basış döşemeyi tetiklemez: aynı yoksayma listesi iki yüzeyde de kullanılıyor.
   assert.match(dashboard, /const longPressIgnore=target=>Boolean\(target\.closest\("button,input,select,textarea,a,\[data-group-device\],\[data-group-show-device\]"\)\)/);
-  // Yıldız ve genişlik simgesi çakışmaz, döşeme adını da örtmez: ad alanı ikisine göre daralır.
+  // Göz ve genişlik simgesi çakışmaz, döşeme adını da örtmez: ad alanı ikisine göre daralır.
   assert.match(dashboard, /\.tile-width-toggle\{position:absolute;z-index:6;right:6px;top:6px/);
-  assert.match(dashboard, /\.fav-star\{position:absolute;z-index:6;right:56px;top:6px/);
+  assert.match(dashboard, /\.tile-eye\{position:absolute;z-index:6;right:56px;top:6px/);
   assert.match(dashboard, /\.widget-board\.editing \.group-control-slot>\.group-control-tile\{padding-right:56px\}/);
-  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-fav>\.group-control-tile\{padding-right:106px\}/);
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-eye>\.group-control-tile\{padding-right:106px\}/);
 });
 
 test("boyut simgesi metinleri iki dilde de var", async () => {

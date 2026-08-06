@@ -30,38 +30,90 @@ function extractFunction(source: string, name: string): string {
 
 type Entry = { device: { id: string }; control: { id: string } | null };
 
-async function pickOverviewEntries(entries: Entry[], favorites: string[]): Promise<{ entries: Entry[]; fallback: boolean }> {
+async function pickOverviewEntries(entries: Entry[], hidden: string[]): Promise<{ entries: Entry[]; hidden: number }> {
   const source = await readDashboard();
   const run = new Function(
     "entries",
-    "favorites",
+    "hidden",
     `
-    const isFavorite=(deviceId,controlId)=>favorites.includes(deviceId+"|"+controlId);
+    const isTileHidden=(deviceId,controlId)=>hidden.includes(deviceId+"::"+(controlId||"@device"));
     ${extractFunction(source, "overviewGroupEntries")}
     return overviewGroupEntries(entries);
   `
-  ) as (entries: Entry[], favorites: string[]) => { entries: Entry[]; fallback: boolean };
-  return run(entries, favorites);
+  ) as (entries: Entry[], hidden: string[]) => { entries: Entry[]; hidden: number };
+  return run(entries, hidden);
 }
 
 const device = (id: string, control: string | null): Entry => ({ device: { id }, control: control ? { id: control } : null });
 
-test("Genel görünüm kartı favorileri süzer, favori yoksa tüm kontrolleri gösterir", async () => {
+/* Varsayılan GÖRÜNÜR: yeni eklenen cihaz hiçbir şey yapılmadan odasının kartında çıkmalı.
+   Kayıt yalnız kullanıcının gizlediklerini tutar. */
+test("Genel görünüm kartı varsayılan olarak her cihazı gösterir, yalnız gizlenenleri süzer", async () => {
   const entries = [device("0x01", "main"), device("0x02", "main"), device("0x03", null)];
 
-  const filtered = await pickOverviewEntries(entries, ["0x02|main"]);
-  assert.deepEqual(filtered.entries.map((entry) => entry.device.id), ["0x02"]);
-  assert.equal(filtered.fallback, false);
+  const untouched = await pickOverviewEntries(entries, []);
+  assert.deepEqual(untouched.entries.map((entry) => entry.device.id), ["0x01", "0x02", "0x03"]);
+  assert.equal(untouched.hidden, 0);
 
-  // Hiç favori seçilmemişse kullanıcı henüz seçim yapmamıştır: boş kart yerine kontroller + ipucu.
-  const fallback = await pickOverviewEntries(entries, []);
-  assert.deepEqual(fallback.entries.map((entry) => entry.device.id), ["0x01", "0x02"]);
-  assert.equal(fallback.fallback, true);
+  const filtered = await pickOverviewEntries(entries, ["0x02::main"]);
+  assert.deepEqual(filtered.entries.map((entry) => entry.device.id), ["0x01", "0x03"]);
+  assert.equal(filtered.hidden, 1);
 
-  // Yalnız sensörü olan grupta kart boş kalmaz: kontrol edilebilir cihaz yoksa hepsi görünür.
-  const sensorsOnly = await pickOverviewEntries([device("0x09", null)], []);
-  assert.deepEqual(sensorsOnly.entries.map((entry) => entry.device.id), ["0x09"]);
-  assert.equal(sensorsOnly.fallback, true);
+  // Kontrolü olmayan cihaz (sensör) de gizlenebilir: anahtarı `@device`.
+  const sensorHidden = await pickOverviewEntries(entries, ["0x03::@device"]);
+  assert.deepEqual(sensorHidden.entries.map((entry) => entry.device.id), ["0x01", "0x02"]);
+  assert.equal(sensorHidden.hidden, 1);
+});
+
+test("gizleme kaydı ayrı bir anahtarda, boş başlar ve eski favori kaydına dokunmaz", async () => {
+  const dashboard = await readDashboard();
+
+  assert.match(dashboard, /const hiddenTilesStorageKey="villa-hidden-tiles"/);
+  assert.match(dashboard, /const tileVisibilityKey=\(deviceId,controlId\)=>`\$\{deviceId\}::\$\{controlId\|\|groupDeviceControlId\}`/);
+  // Kayıt bir liste: içinde olmayan her şey görünür.
+  assert.match(dashboard, /JSON\.parse\(localStorage\.getItem\(hiddenTilesStorageKey\)\|\|"\[\]"\)/);
+  assert.match(dashboard, /localStorage\.setItem\(hiddenTilesStorageKey,JSON\.stringify\(\[\.\.\.state\.hiddenTiles\]\)\)/);
+  // Eski favori uç noktası arayüzden çağrılmıyor; sunucudaki kayıt yerinde duruyor.
+  assert.doesNotMatch(dashboard, /\/api\/favorites/);
+});
+
+test("gizli cihaz sayısı kartın altında duyurulur ve Cihazlar görünümüne götürür", async () => {
+  const dashboard = await readDashboard();
+
+  assert.match(dashboard, /const hiddenNote=overview&&!state\.dashboardEditing&&picked\.hidden/);
+  assert.match(dashboard, /<button class="ov-hidden-note" type="button" data-hidden-room="\$\{esc\(group\.id\)\}">\$\{esc\(t\("hiddenDevicesNote",\{count:picked\.hidden\}\)\)\}<\/button>/);
+  assert.match(dashboard, /function openHiddenDevices\(groupId\)\{/);
+  assert.match(dashboard, /const room=groupId&&state\.groups\.some\(group=>group\.id===groupId\)\?groupId:null/);
+  assert.match(dashboard, /activateView\("devices"\);\s*setRoomFilter\(room\)/);
+  // Grup sekmesinde gizli cihazlar görünmeye devam eder, yalnız soluk gösterilir.
+  assert.match(dashboard, /const picked=overview\?overviewGroupEntries\(entries\):\{entries,hidden:0\}/);
+  assert.match(dashboard, /\.group-control-slot\.is-hidden-tile>\.group-control-tile\{opacity:\.62\}/);
+});
+
+test("odasız cihazlar için türetilmiş kart var, boşsa hiç çıkmaz", async () => {
+  const dashboard = await readDashboard();
+
+  assert.match(dashboard, /const noRoomGroupId="auto:noroom"/);
+  assert.match(dashboard, /const deviceHasRoom=device=>state\.groups\.some\(group=>group\.items\.some\(item=>item\.deviceId===device\.id\)\)/);
+  assert.match(dashboard, /return\{id:noRoomGroupId,name:t\("noRoomGroup"\),items,locked:true\}/);
+  assert.match(dashboard, /return\[lightsAutoGroup\(\),\.\.\.state\.groups,\.\.\.\(noRoom\.items\.length\?\[noRoom\]:\[\]\)\]/);
+  // Kart kullanıcıyı Cihazlar bölümüne yönlendirir: oda oradan seçilir.
+  assert.match(dashboard, /const roomNote=overview&&!state\.dashboardEditing&&group\.id===noRoomGroupId/);
+});
+
+test("eşleştirme akışının son adımı oda seçimi", async () => {
+  const dashboard = await readDashboard();
+
+  // Ad → görsel → rol → oda. Rol atlanınca da oda adımı gelir.
+  assert.match(dashboard, /if\(!deviceRoleAskable\(device\)\)\{if\(afterPairing\)askDeviceRoom\(id,true\);return\}/);
+  assert.match(dashboard, /if\(editing\?\.afterPairing\)askDeviceRoom\(editing\.id,true\);else render\(\)/);
+  assert.match(dashboard, /function askDeviceRoom\(id,afterPairing=false\)\{/);
+  // "Sonra" denirse cihaz odasız kalır ve eşleştirme biter.
+  assert.match(dashboard, /\$\("#deviceRoomDialog"\)\.onclose=\(\)=>\{const editing=state\.roomEditing;state\.roomEditing=null;if\(editing\?\.afterPairing\)finishPairingFlow\(editing\.id\);else render\(\)\}/);
+  // Oda ataması mevcut grup üyeliğini kullanır, yeni depo açılmaz.
+  assert.match(dashboard, /await toggleDeviceRoom\(editing\.id,groupId\)/);
+  assert.match(dashboard, /function createDeviceRoom\(event\)\{/);
+  assert.match(dashboard, /<dialog id="deviceRoomDialog">/);
 });
 
 test("cihazı olmayan grup Genel görünümde kart basmaz, sekmesi durur", async () => {
@@ -144,7 +196,7 @@ test("Işıklar grubu jenerik türetilir ve silinemez", async () => {
   // Sabit oda/isim listesi yok: sunucunun kategori çıkarımına dayanır.
   assert.match(dashboard, /state\.devices\.filter\(device=>device\.category==="light"\)/);
   assert.match(dashboard, /return\{id:lightsGroupId,name:t\("lightsGroup"\),items,locked:true\}/);
-  assert.match(dashboard, /const dashboardGroups=\(\)=>\[lightsAutoGroup\(\),\.\.\.state\.groups\]/);
+  assert.match(dashboard, /const noRoom=noRoomAutoGroup\(\);\s*return\[lightsAutoGroup\(\),\.\.\.state\.groups/);
   // Kilitli grupta düzenle düğmesi basılmaz, katalogda da düzenleme ikonu çıkmaz.
   assert.match(dashboard, /const editButton=group\.locked\?"":`<button type="button" data-edit-group=/);
   assert.match(dashboard, /groupId:group\.locked\?null:group\.id/);
@@ -158,21 +210,39 @@ test("iki seviyeli filtre yalnız düzenleme kipinde görünür ve cihazı tetik
   assert.match(dashboard, /\$\{empty\?" disabled aria-disabled=\\"true\\"":""\}/);
   assert.match(dashboard, /class="ov-switch-note">\$\{esc\(t\("showInOverviewEmpty"\)\)\}/);
   assert.match(dashboard, /state\.dashboardEditing\?overviewSwitchHtml\(group,entries\):""/);
-  // Cihaz seviyesi: yıldız döşemenin kardeşi, kanonik kimlikle (cihaz UID + kontrol kimliği).
-  assert.match(dashboard, /class="fav-star" type="button" role="switch" aria-checked="\$\{active\?"true":"false"\}" data-favorite-device="\$\{esc\(device\.id\)\}" data-favorite-control="\$\{esc\(control\.id\)\}"/);
-  assert.match(dashboard, /\.fav-star\{position:absolute;z-index:6;right:56px;top:6px;width:44px;height:44px;display:none/);
-  assert.match(dashboard, /\.widget-board\.editing \.fav-star\{display:grid\}/);
-  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-fav>\.group-control-tile\{padding-right:106px\}/);
-  // Yıldız ve anahtar cihaza sızmaz: olay hem durdurulur hem de döşemenin dışındadır.
+  // Cihaz seviyesi: göz döşemenin kardeşi, kanonik kimlikle (cihaz UID + kontrol kimliği).
+  assert.match(dashboard, /class="tile-eye" type="button" role="switch" aria-checked="\$\{hidden\?"false":"true"\}" data-visibility-device="\$\{esc\(device\.id\)\}" data-visibility-control="\$\{esc\(control\?control\.id:groupDeviceControlId\)\}"/);
+  assert.match(dashboard, /\.tile-eye\{position:absolute;z-index:6;right:56px;top:6px;width:44px;height:44px;display:none/);
+  assert.match(dashboard, /\.widget-board\.editing \.tile-eye\{display:grid\}/);
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-eye>\.group-control-tile\{padding-right:106px\}/);
+  // Göz ve anahtar cihaza sızmaz: olay hem durdurulur hem de döşemenin dışındadır.
   assert.match(
     dashboard,
-    /\$\$\("\.fav-star"\)\.forEach\(button=>button\.onclick=event=>\{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*toggleFavorite\(button\.dataset\.favoriteDevice,button\.dataset\.favoriteControl\);/
+    /\$\$\("\.tile-eye"\)\.forEach\(button=>button\.onclick=event=>\{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*toggleTileVisibility\(button\.dataset\.visibilityDevice,button\.dataset\.visibilityControl\);/
   );
   assert.match(
     dashboard,
     /\$\$\("\[data-overview-toggle\]"\)\.forEach\(button=>button\.onclick=event=>\{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*toggleGroupOverview\(button\.dataset\.overviewToggle\);/
   );
-  assert.match(dashboard, /\$\$\("\[data-favorite-device\]:not\(\.fav-star\)"\)\.forEach/);
+  assert.match(dashboard, /\$\$\("\[data-visibility-device\]:not\(\.tile-eye\)"\)\.forEach/);
+});
+
+/* Kullanıcı isteği: grup içinde bir cihaz açıkken kartın ZEMİNİ değişmesin. Döşemenin kendi
+   "açık" rengi kalır — kaldırılan yalnız kartın geneline yayılan sarımsı görünüm. */
+test("grup kartının zemini cihaz açıkken değişmez, döşemenin açık rengi kalır", async () => {
+  const dashboard = await readDashboard();
+
+  // Kart seviyesindeki "on" kuralı ve onu besleyen hesap tamamen kalktı: ölü CSS bırakılmadı.
+  assert.doesNotMatch(dashboard, /\.group-widget\.on\{/);
+  assert.doesNotMatch(dashboard, /groupAnyOn|anyOn/);
+  assert.doesNotMatch(dashboard, /panel\.classList\.toggle\("on"/);
+  assert.match(dashboard, /class="dashboard-widget widget-card group-widget\$\{groupInOverview\(group\)\?"":" is-off"\}"/);
+  // Kart her durumda aynı dolguyu kullanır: %82 saydam ev dolgusu.
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.widget-card\{border-color:var\(--home-border\);background:var\(--home-control\)/);
+  assert.match(dashboard, /\.group-widget\{grid-column:span 6;padding:22px\}/);
+  // Döşemenin kendi açık rengi yerinde.
+  assert.match(dashboard, /\.group-control-tile\.on\{border-color:#e1a33f;color:#70470e;background:#fff0c7\}/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.group-control-tile\.on\{border-color:rgba\(225,163,63,\.74\);background:rgba\(255,239,191,\.88\)\}/);
 });
 
 test("grup sekmesi tek kart, Genel görünüm rayı yerini alır ve şeridin üstünde biter", async () => {
@@ -183,7 +253,7 @@ test("grup sekmesi tek kart, Genel görünüm rayı yerini alır ve şeridin üs
   assert.match(dashboard, /panel\.innerHTML=groupWidgetHtml\(group,\{variant:"panel"\}\)/);
   assert.match(dashboard, /#widgetRail\[hidden\],#groupPanel\[hidden\]\{display:none\}/);
   // Sekme panelinde grubun TÜM cihazları var: süzme yalnız Genel görünüm kartında yapılır.
-  assert.match(dashboard, /const picked=overview\?overviewGroupEntries\(entries\):\{entries,fallback:false\}/);
+  assert.match(dashboard, /const picked=overview\?overviewGroupEntries\(entries\):\{entries,hidden:0\}/);
   // Yükseklik mekanizması ikisinde de aynı: pano kalan alanı alır, şeride 18px pay kalır
   // (106px pay eksi 76px şerit eksi 12px alt boşluk).
   assert.match(
@@ -267,7 +337,17 @@ test("sekme çubuğu metinleri iki dilde de var", async () => {
     "lightsGroup",
     "showInOverview",
     "showInOverviewEmpty",
-    "overviewFavoriteHint",
+    "hiddenDevicesNote",
+    "noRoomGroup",
+    "noRoomCardHint",
+    "showOnRoomCard",
+    "hideFromRoomCard",
+    "deviceRoomTitle",
+    "deviceRoomLead",
+    "deviceRoomNone",
+    "deviceRoomNewLabel",
+    "deviceRoomCreate",
+    "deviceRoomLater",
     "openGroupTab"
   ]) {
     assert.ok(english[key], `${key} İngilizce katalogda yok`);
@@ -278,7 +358,10 @@ test("sekme çubuğu metinleri iki dilde de var", async () => {
   assert.equal(english.lightsGroup, "Lights");
   assert.equal(turkish.lightsGroup, "Işıklar");
   // Yerini kaybeden hızlı erişim metinleri katalogdan da düştü.
-  for (const key of ["quickLead", "noQuickControls", "quickEmptyLead", "quickEmptyAction"]) {
+  assert.equal(english.noRoomGroup, "No room");
+  assert.equal(turkish.noRoomGroup, "Odasız");
+  // Favori dili tamamen kalktı: yerini göster/gizle aldı.
+  for (const key of ["quickLead", "noQuickControls", "quickEmptyLead", "quickEmptyAction", "showOnHome", "removeFromHome", "overviewFavoriteHint"]) {
     assert.equal(english[key], undefined, `${key} hâlâ İngilizce katalogda`);
     assert.equal(turkish[key], undefined, `${key} hâlâ Türkçe katalogda`);
   }
