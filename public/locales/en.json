@@ -99,6 +99,7 @@
     "locationNoResults": "No matching places found.",
     "locationSearchUnavailable": "Location search is unavailable.",
     "locationTimezoneUnavailable": "This place does not provide time zone information.",
+    "locationSelected": "Selected",
     "unknownLocation": "Unknown location",
     "weather": "Weather",
     "weatherUseLocation": "Use current location",

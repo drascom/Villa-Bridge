@@ -99,6 +99,7 @@
     "locationNoResults": "Eşleşen bir yer bulunamadı.",
     "locationSearchUnavailable": "Konum araması şu anda kullanılamıyor.",
     "locationTimezoneUnavailable": "Bu yer için saat dilimi bilgisi bulunmuyor.",
+    "locationSelected": "Seçili",
     "unknownLocation": "Bilinmeyen konum",
     "weather": "Hava durumu",
     "weatherUseLocation": "Mevcut konumu kullan",

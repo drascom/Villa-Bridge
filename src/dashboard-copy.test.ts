@@ -74,7 +74,9 @@ test("dashboard sabit ve hafif manzara arka planı üzerinde iki katmanlı sayda
   assert.match(dashboard, /--home-glass:rgba\(247,250,248,.22\)/);
   assert.match(dashboard, /--home-control:rgba\(251,252,252,.82\)/);
   assert.match(dashboard, /body\[data-active-view="home"\] aside\{color:#f4f8f5;background:rgba\(23,65,54,.9\)/);
-  assert.match(dashboard, /#home \.quick-control-widget,[^}]*#home \.widget-card\{[^}]*background:var\(--home-glass\)/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.widget-card\{[^}]*background:var\(--home-glass\)/);
+  // Şeridin kendi kartı yok: butonlar doğrudan fotoğrafın üstünde yüzer.
+  assert.match(dashboard, /#home \.quick-control-widget\{border-color:transparent;background:none;box-shadow:none\}/);
   assert.match(dashboard, /#home \.quick-card,[^}]*#home \.group-control-tile,[^}]*background:var\(--home-control\)/);
   assert.equal(background[0], 0xff);
   assert.equal(background[1], 0xd8);
@@ -738,8 +740,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /id="editDashboardLabel" class="home-action-label"/);
   assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{#devices \.toolbar\{padding:6px 0;margin-bottom:8px\}#home \.home-actions\{gap:6px\}#home \.home-actions button,#refreshButton\{[^}]*width:46px[^}]*background:var\(--forest-soft\)/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{[^}]*background:rgba\(23,65,54,.76\)/);
-  assert.match(dashboard, /\.hub-time\{display:block;color:var\(--ink\);font:750 66px\/1 system-ui,sans-serif/);
-  assert.match(dashboard, /\.hub-w-temp\{display:block;color:var\(--ink\);font:750 36px\/1 system-ui,sans-serif/);
+  assert.match(dashboard, /\.hub-time\{display:block;color:var\(--ink\);font:750 var\(--hub-time-size\)\/1 system-ui,sans-serif/);
+  assert.match(dashboard, /\.hub-w-temp\{display:block;color:var\(--ink\);font:750 clamp\(24px,4\.8vh,38px\)\/1 system-ui,sans-serif/);
   assert.match(dashboard, /\[data-widget="activity"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
   assert.doesNotMatch(dashboard, /id="homeAddDevice"/);
   assert.match(dashboard, /\$\("#editDashboardLabel"\)\.textContent=editDashboardText/);
@@ -984,7 +986,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.doesNotMatch(dashboard, /#home \[data-widget="status"\]/);
   assert.match(dashboard, /#home \[data-widget="quick"\]\{position:fixed;z-index:9;left:var\(--strip-inset\);right:var\(--strip-inset\);bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\);grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden\}/);
   assert.match(dashboard, /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card\{height:56px\}/);
-  assert.match(dashboard, /#home \.widget-rail\{grid-column:2;grid-row:1;min-height:300px;height:calc\(100vh - 340px\);display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
+  assert.match(dashboard, /#home \.widget-rail\{grid-column:2;grid-row:1;height:clamp\(150px,calc\(100vh - 340px\),560px\);display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
   assert.match(dashboard, /grid-auto-columns:var\(--rail-column\)/);
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2\}/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
@@ -1023,10 +1025,12 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /function scheduleWorldClockTick\(\)\{\s*setTimeout\(\(\)=>\{tickWorldClock\(\);scheduleWorldClockTick\(\)\},1000-new Date\(\)\.getMilliseconds\(\)\+20\)/);
   assert.match(dashboard, /const localTimeZone=\(\(\)=>\{try\{return Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone\|\|"UTC"\}catch\{return "UTC"\}\}\)\(\)/);
   assert.match(dashboard, /\{id:"default-local",label:"clockLocal",name:"Local time",country:"",timeZone:localTimeZone\}/);
-  assert.match(dashboard, /const secondary=worldClockZones\.filter\(zone=>zone\.timeZone!==localTimeZone\)/);
+  // Dünya saatleri yalnız #clockDialog'da: hub'da ikinci şehir satırı yok.
+  assert.doesNotMatch(dashboard, /id="hubCities"|class="hub-city"|\.hub-cities\{/);
+  assert.match(dashboard, /id="clockDialogRows" class="hub-rows"/);
   assert.match(dashboard, /time\.firstChild\.nodeValue=zoneTime\(now\)/);
   assert.match(dashboard, /<span id="hubTime" class="hub-time">--:--<span id="hubSeconds" class="hub-seconds"><\/span><\/span>/);
-  assert.match(dashboard, /#home \.hub-time\{font-size:54px\}/);
+  assert.match(dashboard, /\.home-hub\{--hub-time-size:clamp\(34px,7\.6vh,66px\)/);
   assert.doesNotMatch(dashboard, /clock-primary|clock-row|weather-facts|renderSelectedClockCities/);
   assert.match(dashboard, /#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}/);
   assert.match(dashboard, /#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}/);
@@ -1277,9 +1281,11 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   // Grup (a): iki sütunlu yerleşim, rail sığdırma ve sıkışık boşluklar yükseklik koşuluna bağlı kalır.
   assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\] main\{padding-bottom:calc\(106px \+ env\(safe-area-inset-bottom\)\)\}#home\.active\{min-height:0\}/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 1\}/);
-  assert.match(dashboard, /#home \.hub-time\{font-size:54px\}#home \.hub-date\{margin-top:5px;font-size:15px\}/);
-  // Yatayda hub kısaltılır: en fazla 2 şehir, 2 günlük tahmin ve ipucu satırları gizli.
-  assert.match(dashboard, /#home \.hub-city:nth-child\(n\+3\),#home \.hub-day:nth-child\(n\+3\)\{display:none\}/);
+  // Ölçüler dar yatayda da viewport'tan türer: cihaz listesi değil formül karar verir.
+  assert.match(dashboard, /#home \.home-hub\{--hub-time-size:clamp\(30px,6\.6vh,52px\);--hub-gap:clamp\(5px,1vh,10px\);--hub-pad-y:clamp\(4px,\.9vh,10px\);grid-column:1;grid-row:1;min-height:0;margin-top:0;max-height:calc\(100vh - 268px\);overflow:auto;scrollbar-width:none\}/);
+  assert.match(dashboard, /#home \.hub-date\{margin-top:clamp\(3px,\.7vh,6px\);font-size:clamp\(12px,1\.8vh,15px\)\}/);
+  // Şehir ve günlük tahmin satırları tümüyle kalktı; kırpma kuralına gerek kalmadı.
+  assert.doesNotMatch(dashboard, /hub-city|hub-days|class="hub-day"/);
   assert.match(dashboard, /#home \.hub-hint\{display:none\}/);
   assert.match(dashboard, /#home \.group-summary\{margin-top:7px\}#home \.home-summary\{gap:14px;margin-top:12px\}#home \.widget-value\{margin-top:14px\}/);
   // Yükseklik koşullu blok artık tipografi kurallarını içermemeli.
@@ -3541,9 +3547,13 @@ test("hub yerel şehir adını kullanıcının kaydından okur", async () => {
 test("ana ekran hub'ı fotoğraf zemininden bağımsız okunur", async () => {
   const dashboard = await readDashboardBundle();
 
-  // Okunabilirliği dolgu üstlenir: cihaz kartlarıyla aynı token, kenarlık yok, color-mix yok.
-  assert.match(dashboard, /\.home-hub\{[^}]*padding:16px 18px;border:0;border-radius:20px;background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
+  // Dolgu kalktı: zemin, gölge ve kenarlık yok — blok doğrudan fotoğrafın üstünde.
+  assert.match(dashboard, /\.home-hub\{[^}]*padding:0;border:0;border-radius:0;background:none;box-shadow:none;text-shadow:var\(--hub-text-shadow\)\}/);
   assert.doesNotMatch(dashboard, /\.home-hub\{[^}]*border:1px/);
+  assert.doesNotMatch(dashboard, /\.home-hub\{[^}]*background:var\(--home-control\)/);
+  // Okunabilirliği tema başına ayrı yazılan metin gölgesi taşır.
+  assert.match(dashboard, /--hub-text-shadow:0 1px 2px rgba\(255,255,255,\.92\)/);
+  assert.match(dashboard, /--hub-text-shadow:0 1px 2px rgba\(0,0,0,\.9\)/);
   // Perde kaldırıldı: dolgunun üstüne ikinci katman binmiyor.
   assert.doesNotMatch(dashboard, /\.home-hub::before/);
   assert.doesNotMatch(dashboard, /--hub-scrim-/);
@@ -3551,6 +3561,42 @@ test("ana ekran hub'ı fotoğraf zemininden bağımsız okunur", async () => {
   // Alt satırlar karanlık temada ayrıca yükseltilir; ipucu metni sönük kalmaz.
   assert.match(dashboard, /--hub-muted:#cddcd4/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.hub-hint\{opacity:1\}/);
+});
+
+test("hub yalnız yerel saati ve şu anki havayı yazar, tahminler pencerelerde kalır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Saat bölgesi: büyük saat + saniye + tarih + yerel bölge satırı. Şehir listesi yok.
+  assert.match(dashboard, /<span id="hubDate" class="hub-date"><\/span>\s*<span id="hubZoneName" class="hub-sub"><\/span>\s*<span class="hub-alarm">/);
+  assert.doesNotMatch(dashboard, /hubCities|hub-cities|hub-city/);
+  // Hava bölgesi yalnız "şu an"ı basar: hub-days düğümü hiç üretilmiyor.
+  assert.doesNotMatch(dashboard, /hub-days|class="hub-day"/);
+  assert.match(dashboard, /body\.innerHTML=`<span class="hub-now">[\s\S]*?<\/span><\/span>\$\{note\?`<span class="hub-note">/);
+  // Alarm satırı duruyor.
+  assert.match(dashboard, /<span class="hub-alarm"><span aria-hidden="true">⏰<\/span>/);
+  // Tam listeler pencerelerde: dünya saatleri #clockDialog'da, saatlik+günlük #weatherDialog'da.
+  assert.match(dashboard, /container\.innerHTML=worldClockZones\.length\?worldClockZones\.map\(city=>/);
+  assert.match(dashboard, /const days=weatherDailyEntries\(4\)\.map\(entry=>/);
+  assert.match(dashboard, /weatherHourlyEntries\(/);
+});
+
+test("hava konumu penceresinde tik yalnız seçili konumda çıkar ve pencere taşmaz", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Hata: eylem ikonu koşulsuz onay işaretiydi, her sonuç seçili görünüyordu.
+  assert.match(dashboard, /const chosenKey=kind==="weather"&&weatherState\.location\?locationKey\(weatherState\.location\):null/);
+  assert.match(dashboard, /const selected=chosenKey!==null&&key===chosenKey/);
+  assert.match(dashboard, /const glyph=kind==="clock"\?'<path d="M12 5v14M5 12h14"\/>':selected\?'<path d="m5 12 4 4L19 6"\/>':'<path d="M12 21s6\.5-5\.4 6\.5-10\.5/);
+  // Seçili öğe yalnız ikonla değil, metin ve renkle de belli olur.
+  assert.match(dashboard, /<div class="location-result\$\{selected\?" is-selected":""\}"\$\{selected\?' aria-current="true"':""\}/);
+  assert.match(dashboard, /\$\{selected\?`<em class="location-selected-tag">\$\{esc\(t\("locationSelected"\)\)\}<\/em>`:""\}/);
+  assert.match(dashboard, /\.location-result\.is-selected\{border-color:var\(--forest\);background:var\(--forest-soft\)\}/);
+  // Küçük tablette pencere tam ekran: yalnız sonuç listesi kayar, "Close" kesilmez.
+  assert.match(dashboard, /dialog#weatherLocationDialog\{height:100dvh;max-height:100dvh\}/);
+  assert.match(dashboard, /dialog#weatherLocationDialog>\.modal\{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-bottom:calc\(20px \+ env\(safe-area-inset-bottom\)\)\}/);
+  assert.match(dashboard, /dialog#weatherLocationDialog #weatherSearchResults\{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain\}/);
+  // Dokunma hedefleri kaba işaretçide 44 px'e çıkar.
+  assert.match(dashboard, /@media\(pointer:coarse\)\{\.location-result,\.selected-location\{min-height:56px\}\.location-result button,\.selected-location button\{width:44px;height:44px\}\}/);
 });
 
 test("boş çalışma günlüğü kartın 'son çalışma' bilgisiyle çelişmez", async () => {
