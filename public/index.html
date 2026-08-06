@@ -690,13 +690,23 @@
   /* Görünürlük: varsayılan GÖRÜNÜR. Kayıt yalnız GİZLENENLERİ tutar ve boş başlar — yeni eklenen
      bir cihaz hiçbir şey yapılmadan odasının kartında çıkar; kullanıcı istemediğini gizler.
      Kanonik anahtar cihaz kimliği (IEEE) + kontrol kimliği; dostane ad kullanılmaz. Eski favori
-     kaydı (`home-favorites.json`) ayrı yerinde durur, bu anahtar ona dokunmaz. */
+     kaydı (`home-favorites.json`) ayrı yerinde durur, bu anahtar ona dokunmaz.
+
+     Karar SUNUCUDA durur (`/api/home-visibility`): kullanıcı bazlı hesap yok, aynı lambayı her
+     tablette ayrı ayrı gizlemek anlamsız. Buradaki yerel anahtarlar iki iş görür: bir kerelik
+     göç kaynağı (eski `villa-hidden-tiles`) ve çevrimdışı açılışta son bilinen değer. Yerleşim
+     tercihleri (döşeme genişliği, kart sırası, seçili sekme) cihazda kalmaya devam eder. */
   const hiddenTilesStorageKey="villa-hidden-tiles";
+  const visibilityCacheKey="villa-home-visibility-cache";
   const tileVisibilityKey=(deviceId,controlId)=>`${deviceId}::${controlId||groupDeviceControlId}`;
-  const savedHiddenTiles=(()=>{try{
-    const value=JSON.parse(localStorage.getItem(hiddenTilesStorageKey)||"[]");
-    return new Set(Array.isArray(value)?value.filter(key=>typeof key==="string"&&key):[]);
-  }catch{return new Set()}})();
+  const savedVisibilityCache=(()=>{try{
+    const value=JSON.parse(localStorage.getItem(visibilityCacheKey)||"null");
+    if(!value||typeof value!=="object"||Array.isArray(value))return null;
+    const list=entry=>Array.isArray(entry)?entry.filter(item=>typeof item==="string"&&item):[];
+    return{hiddenDevices:list(value.hiddenDevices),hiddenGroups:list(value.hiddenGroups)};
+  }catch{return null}})();
+  const savedHiddenTiles=new Set(savedVisibilityCache?savedVisibilityCache.hiddenDevices:[]);
+  const savedHiddenGroups=new Set(savedVisibilityCache?savedVisibilityCache.hiddenGroups:[]);
   const dashboardWidgetTypes={
     quick:{title:"homeTabsWidget",lead:"homeTabsWidgetLead"},
     summary:{title:"summaryWidget",lead:"summaryWidgetLead"},
@@ -729,7 +739,7 @@
     return new Set(Array.isArray(value)?value.filter(id=>typeof id==="string"):[]);
   }catch{return new Set()}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailTechnicalOpen:false,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),pendingGroups:new Set(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailTechnicalOpen:false,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),pendingGroups:new Set(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   const weatherState={location:savedWeatherLocation,data:savedWeatherSnapshot?.data||null,error:null,loading:false,updatedAt:savedWeatherSnapshot?.updatedAt||0};
   const weatherStaleAfter=7200000;
@@ -1045,15 +1055,48 @@
   /* Gizlenenler listesi: kayıtta olmayan her şey görünür. Yıldız/favori değil — "oda kartında
      göster/gizle". Anahtar cihaz kimliği + kontrol kimliği; kontrolü olmayan cihaz `@device`. */
   const isTileHidden=(deviceId,controlId)=>state.hiddenTiles.has(tileVisibilityKey(deviceId,controlId));
-  function saveHiddenTiles(){
-    try{localStorage.setItem(hiddenTilesStorageKey,JSON.stringify([...state.hiddenTiles]))}catch{}
+  /* Sunucudaki şekil: `{hiddenDevices:[{deviceId,controlId}],hiddenGroups:[groupId]}`. Panelde
+     cihaz gizlemesi tek dizeli anahtarla (`<IEEE>::<controlId>`) taşınır; çeviri burada. */
+  function visibilityPayload(){
+    return{
+      hiddenDevices:[...state.hiddenTiles].map(key=>{
+        const index=key.lastIndexOf("::");
+        return index<0?null:{deviceId:key.slice(0,index),controlId:key.slice(index+2)};
+      }).filter(entry=>entry&&entry.deviceId&&entry.controlId),
+      hiddenGroups:[...state.hiddenGroups]
+    };
+  }
+  /* Yerel yansı yalnız çevrimdışı açılış içindir: karar sunucudadır, bu kayıt onu ezmez. */
+  function cacheVisibility(){
+    try{localStorage.setItem(visibilityCacheKey,JSON.stringify({
+      hiddenDevices:[...state.hiddenTiles],
+      hiddenGroups:[...state.hiddenGroups]
+    }))}catch{}
+  }
+  function applyVisibility(visibility){
+    const devices=Array.isArray(visibility?.hiddenDevices)?visibility.hiddenDevices:[];
+    const groups=Array.isArray(visibility?.hiddenGroups)?visibility.hiddenGroups:[];
+    state.hiddenTiles=new Set(devices
+      .filter(entry=>entry&&typeof entry.deviceId==="string"&&typeof entry.controlId==="string")
+      .map(entry=>tileVisibilityKey(entry.deviceId,entry.controlId)));
+    state.hiddenGroups=new Set(groups.filter(id=>typeof id==="string"&&id));
+    cacheVisibility();
+  }
+  /* Yazma hatası sessiz kalmaz: kullanıcı görünür uyarı alır, sunucu tarafında da
+     `RecentErrorLog`'a düşer. Panel son bilinen değerle çalışmaya devam eder. */
+  async function saveHomeVisibility(){
+    cacheVisibility();
+    try{
+      await api("/api/home-visibility",{method:"PUT",body:JSON.stringify({visibility:visibilityPayload()})});
+      return true;
+    }catch(error){showToast(t("visibilitySaveFailed",{error:error.message}),true);return false}
   }
   function toggleTileVisibility(deviceId,controlId){
     if(!deviceId)return;
     const key=tileVisibilityKey(deviceId,controlId);
     if(state.hiddenTiles.has(key))state.hiddenTiles.delete(key);
     else state.hiddenTiles.add(key);
-    saveHiddenTiles();
+    void saveHomeVisibility();
     render();
   }
   const visibilityIcon=hidden=>hidden
@@ -1738,7 +1781,11 @@
   /* Ekranda duran her kart sıralamaya dahil olmalı. Sunucudan senkronla gelen ya da düzen kaydı
      çıkmadan önce oluşmuş gruplar listede yoktu: kart görünüyor ama ok düğmeleri ölüydü ve listedeki
      ilk grup "en sol" sanılıyordu. Burada eksikler sessizce eklenir, silinen grupların kimlikleri
-     düşer. */
+     düşer.
+
+     Görünürlük artık bu listede DEĞİL: Genel görünümden kapatılan oda kartı da sırasını korur,
+     yoksa geri açıldığında yeri kayardı. `removedWidgets` yalnız bilgi kartları içindir; içinde
+     kalan eski `group:` girdileri göçte ve burada temizlenir. */
   function reconcileWidgetLayout(){
     const ids=dashboardGroups().map(group=>groupWidgetId(group.id));
     const known=new Set(ids);
@@ -1747,12 +1794,16 @@
     const kept=state.widgets.filter(id=>!stale(id));
     if(kept.length!==state.widgets.length){state.widgets=kept;changed=true}
     ids.forEach((id,index)=>{
-      if(state.widgets.includes(id)||state.removedWidgets.has(id))return;
+      if(state.widgets.includes(id))return;
       state.widgets.splice(groupWidgetSlot(ids,index),0,id);
       changed=true;
     });
     let dropped=false;
-    for(const id of[...state.removedWidgets])if(stale(id)){state.removedWidgets.delete(id);dropped=true}
+    for(const id of[...state.removedWidgets]){
+      if(!id.startsWith(groupWidgetPrefix))continue;
+      state.removedWidgets.delete(id);
+      dropped=true;
+    }
     if(dropped)saveRemovedWidgets();
     if(changed)saveWidgetLayout();
     return changed;
@@ -1791,7 +1842,12 @@
     const visible=entries.filter(entry=>!isTileHidden(entry.device.id,entry.control?entry.control.id:null));
     return{entries:visible,hidden:entries.length-visible.length};
   }
-  const groupInOverview=group=>state.widgets.includes(groupWidgetId(group.id));
+  /* Oda kartı Genel görünümde çıksın mı? Karar sunucudaki görünürlük kaydında durur — ev
+     genelinde tek doğru. Kart SIRASI (`villa-dashboard-widgets`) bundan ayrı ve cihaza özgü:
+     her oda kartı her zaman sıraya girer, yalnız basılıp basılmayacağı buradan belirlenir. */
+  const groupInOverview=group=>!state.hiddenGroups.has(group.id);
+  const groupWidgetHidden=widgetId=>widgetId.startsWith(groupWidgetPrefix)
+    &&state.hiddenGroups.has(widgetId.slice(groupWidgetPrefix.length));
   function groupControlEntries(group){
     return group.items.map(item=>{
       const device=state.devices.find(candidate=>candidate.id===item.deviceId);
@@ -1897,8 +1953,8 @@
     const label=`${visibilityLabel(hidden)}: ${name}`;
     return`<button class="tile-eye" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(control?control.id:groupDeviceControlId)}" aria-label="${esc(label)}" title="${esc(label)}">${visibilityIcon(hidden)}</button>`;
   }
-  /* Grup seviyesi filtre: kart Genel görünümde çıksın mı? Kayıt grup kimliğiyle widget düzeninde
-     durur (`group:<id>`), dostane ad değil. Cihazsız grupta anahtar pasif ve sebebi yazılı. */
+  /* Grup seviyesi filtre: kart Genel görünümde çıksın mı? Kayıt sunucuda `hiddenGroups` içinde
+     grup kimliğiyle durur, dostane ad değil. Cihazsız grupta anahtar pasif ve sebebi yazılı. */
   function overviewSwitchHtml(group,entries){
     const active=groupInOverview(group);
     const empty=entries.length===0;
@@ -2326,7 +2382,8 @@
   }
   function widgetCatalogItemHtml(entry){
       const {id,title,lead,groupId}=entry;
-      const active=state.widgets.includes(id);
+      // Oda kartı için "açık mı" sorusunun cevabı görünürlük kaydında; sıra listesinde değil.
+      const active=id.startsWith(groupWidgetPrefix)?!groupWidgetHidden(id):state.widgets.includes(id);
       const fixed=fixedDashboardWidgets.has(id);
       const action=fixed
         ?`<button class="quiet" type="button" disabled>${t("widgetAlwaysOn")}</button>`
@@ -2431,21 +2488,25 @@
       widget.hidden=false;
       placeNode(board,widget,rail);
     }
+    /* Sıra `state.widgets`ten, oda kartının görünürlüğü sunucudaki kayıttan gelir: kapatılmış
+       kart sırasını korur ama basılmaz. */
     for(const id of state.widgets.filter(id=>!fixedDashboardWidgets.has(id))){
       const widget=widgets[id];
       if(!widget)continue;
+      if(!state.dashboardEditing&&groupWidgetHidden(id))continue;
       widget.hidden=false;
       placeNode(rail,widget,$("#widgetEmpty"));
     }
-    /* Düzenleme kipinde Genel görünümden çıkarılmış grup kartları da soluk olarak görünür:
-       anahtarı kapatan kullanıcı onu geri açacak yeri bulabilmeli. */
+    /* Emniyet ağı: düzenleme kipinde, düzen kaydında hiç yeri olmayan bir grup kartı da
+       görünür kalsın — anahtarı kapatan kullanıcı onu geri açacak yeri bulabilmeli. */
     if(state.dashboardEditing)for(const widget of $$("#widgetRail [data-group-widget]")){
       if(state.widgets.includes(widget.dataset.widget))continue;
       widget.hidden=false;
       placeNode(rail,widget,$("#widgetEmpty"));
     }
     board.classList.toggle("editing",state.dashboardEditing);
-    $("#widgetEmpty").hidden=state.widgets.some(id=>!fixedDashboardWidgets.has(id));
+    // "Pano boş" satırı ekranda gerçekten kart olup olmamasına bakar; sıradaki kayda değil.
+    $("#widgetEmpty").hidden=railWidgets().length>0;
     applyHomeTab();
     const editDashboard=$("#editDashboard");
     const editDashboardText=t(state.dashboardEditing?"finishEditing":"editDashboard");
@@ -2498,7 +2559,10 @@
   }
   function addDashboardWidget(id){
     const known=Object.hasOwn(dashboardWidgetTypes,id)||dashboardGroups().some(group=>groupWidgetId(group.id)===id);
-    if(!known||state.widgets.includes(id))return;
+    if(!known)return;
+    // Oda kartı sırada zaten var: "ekle" onu görünürlük kaydından çıkarmak demek.
+    if(id.startsWith(groupWidgetPrefix))return setGroupOverview(id.slice(groupWidgetPrefix.length),true);
+    if(state.widgets.includes(id))return;
     state.widgets.push(id);
     state.removedWidgets.delete(id);
     saveRemovedWidgets();
@@ -2506,15 +2570,28 @@
     applyWidgetLayout();
     render();
   }
-  /* Grup seviyesi filtre: kart Genel görünümde dursun mu? Kayıt grup kimliğiyle widget düzeninde
-     tutulur, ayrı bir liste yok; grup silinince `reconcileWidgetLayout` kaydı düşürür. */
+  /* Grup seviyesi filtre: kart Genel görünümde dursun mu? Kayıt SUNUCUDA (`hiddenGroups`), grup
+     kimliğiyle — kart sırasından bağımsız. Oda silinince sunucu kaydı kendisi düşürür. */
+  function setGroupOverview(groupId,visible){
+    if(!groupId)return;
+    if(state.hiddenGroups.has(groupId)===!visible){applyWidgetLayout();return}
+    if(visible)state.hiddenGroups.delete(groupId);
+    else state.hiddenGroups.add(groupId);
+    void saveHomeVisibility();
+    applyWidgetLayout();
+    render();
+  }
   function toggleGroupOverview(groupId){
-    const id=groupWidgetId(groupId);
-    if(state.widgets.includes(id))removeDashboardWidget(id);
-    else addDashboardWidget(id);
+    setGroupOverview(groupId,state.hiddenGroups.has(groupId));
     touchDashboardEditing();
   }
   function removeDashboardWidget(id){
+    // Oda kartında "kaldır" bir görünürlük kararıdır (ev geneli), sıra kararı değil.
+    if(id.startsWith(groupWidgetPrefix)){
+      setGroupOverview(id.slice(groupWidgetPrefix.length),false);
+      touchDashboardEditing();
+      return;
+    }
     state.widgets=state.widgets.filter(widget=>widget!==id);
     state.removedWidgets.add(id);
     saveRemovedWidgets();
@@ -2816,8 +2893,6 @@
       createdId=id;
       groups=[...state.groups,{id,name,items}];
       state.widgets.push(groupWidgetId(id));
-      state.removedWidgets.delete(groupWidgetId(id));
-      saveRemovedWidgets();
       saveWidgetLayout();
     }
     closeAddDialog();
@@ -2865,9 +2940,9 @@
     $("#groupDeleteDialog").close();
     if(!pending)return;
     state.widgets=state.widgets.filter(widget=>widget!==groupWidgetId(pending.id));
-    state.removedWidgets.delete(groupWidgetId(pending.id));
-    saveRemovedWidgets();
     saveWidgetLayout();
+    // Görünürlük kaydı da düşer; sunucu tarafı da aynı temizliği oda listesi yazılırken yapar.
+    if(state.hiddenGroups.delete(pending.id))cacheVisibility();
     await persistHomeGroups(state.groups.filter(group=>group.id!==pending.id),"groupDeleted");
   }
   function closeAddDialog(){
@@ -3883,6 +3958,54 @@
       render();
     }catch(error){showToast(error.message,true)}
   }
+  /* Göç bir kez ve sessiz: bugüne kadar cihazda tutulan seçimler sunucuya taşınır, sonra yerel
+     kayıt silinir. Grup görünürlüğü eski düzende kart sırasının içindeydi
+     (`villa-dashboard-removed-widgets` içindeki `group:` girdileri); o da buraya alınır. */
+  function legacyVisibility(){
+    const read=(key,fallback)=>{try{
+      const value=JSON.parse(localStorage.getItem(key)||fallback);
+      return Array.isArray(value)?value.filter(item=>typeof item==="string"&&item):[];
+    }catch{return[]}};
+    return{
+      hiddenDevices:read(hiddenTilesStorageKey,"[]"),
+      hiddenGroups:read(removedWidgetsKey,"[]")
+        .filter(id=>id.startsWith(groupWidgetPrefix))
+        .map(id=>id.slice(groupWidgetPrefix.length))
+    };
+  }
+  function clearLegacyVisibility(){
+    try{localStorage.removeItem(hiddenTilesStorageKey)}catch{}
+    let dropped=false;
+    for(const id of[...state.removedWidgets]){
+      if(!id.startsWith(groupWidgetPrefix))continue;
+      state.removedWidgets.delete(id);
+      dropped=true;
+    }
+    if(dropped)saveRemovedWidgets();
+  }
+  async function loadHomeVisibility(){
+    let visibility;
+    try{
+      visibility=(await api("/api/home-visibility")).visibility;
+    }catch(error){
+      // Çevrimdışı: panel son bilinen değerle çalışmaya devam eder, kayıt sıfırlanmaz.
+      showToast(t("visibilityLoadFailed",{error:error.message}),true);
+      return;
+    }
+    const legacy=legacyVisibility();
+    const serverEmpty=!(visibility?.hiddenDevices||[]).length&&!(visibility?.hiddenGroups||[]).length;
+    if(serverEmpty&&(legacy.hiddenDevices.length||legacy.hiddenGroups.length)){
+      state.hiddenTiles=new Set(legacy.hiddenDevices);
+      state.hiddenGroups=new Set(legacy.hiddenGroups);
+      // Yazma başarısızsa yerel kayıt yerinde kalır: seçimler bir sonraki açılışta yeniden denenir.
+      if(await saveHomeVisibility())clearLegacyVisibility();
+    }else{
+      applyVisibility(visibility);
+      clearLegacyVisibility();
+    }
+    applyWidgetLayout();
+    render();
+  }
   function migratableLocalGroups(){
     if(!state.devices.length)return savedGroups;
     return savedGroups.map(group=>({id:group.id,name:group.name,items:group.items.filter(item=>{
@@ -4074,8 +4197,6 @@
     const id=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
     $("#deviceRoomName").value="";
     state.widgets.push(groupWidgetId(id));
-    state.removedWidgets.delete(groupWidgetId(id));
-    saveRemovedWidgets();
     saveWidgetLayout();
     await persistHomeGroups([...state.groups,{id,name:name.slice(0,32),items:[{deviceId:device.id,controlId:control?control.id:groupDeviceControlId}]}],"groupCreated");
     if($("#deviceRoomDialog").open)$("#deviceRoomDialog").close();
@@ -4469,7 +4590,7 @@
       pendingHomeBackup=null;
       $("#homeBackupDialog").close();
       showToast(t("homeBackupRestored"));
-      await Promise.allSettled([refresh(),loadHomeGroups(),loadAutomations()]);
+      await Promise.allSettled([refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations()]);
       render();
     }catch(error){
       button.disabled=false;
@@ -5268,8 +5389,10 @@
       triggerNumeric:numeric,
       thresholdDir:numeric&&trigger.below!==undefined&&trigger.below!==null&&(trigger.above===undefined||trigger.above===null)?"below":"above",
       thresholdValue:numeric?Number(trigger.above??trigger.below??0):0,
-      // Koşullar (§5.3) yalnız VE ile bağlanır; boş liste "her zaman çalışsın" demektir.
+      // Koşullar (§5.3): boş liste "her zaman çalışsın" demektir.
       conditions:(existing?.conditions||[]).map(condition=>({...condition})),
+      // §2.4 — kural başına tek anahtar: hepsi mi, herhangi biri mi. Alan yoksa "hepsi".
+      conditionMode:existing?.conditionMode==="any"?"any":"all",
       draftCondition:null,
       draftConditionIndex:null,
       condQuery:"",
@@ -5415,8 +5538,17 @@
     const seen=new Set();
     return rows.filter(row=>{const key=`${row.property}=${String(row.equals)}`;return seen.has(key)?false:(seen.add(key),true)});
   };
+  // Sayısal özellikler koşulda da satır olur; seçilince değer listesi yerine karşılaştırma gelir.
+  const automationConditionNumericRows=device=>automationNumericProperties(device).map(property=>({
+    token:`num:${property}`,property,numeric:true,
+    label:t("automationCondThresholdRow",{reading:automationPropertyLabel(device,property)})
+  }));
+  const automationConditionAllRows=device=>[
+    ...automationConditionRows(device),
+    ...automationConditionNumericRows(device)
+  ];
   const automationConditionDevices=()=>state.devices
-    .filter(device=>automationConditionRows(device).length>0)
+    .filter(device=>automationConditionAllRows(device).length>0)
     .sort(automationByName);
   const automationConditionEventLabel=condition=>{
     const device=state.devices.find(item=>item.id===condition.deviceId)||null;
@@ -5434,6 +5566,19 @@
       return condition.from>condition.to?`${base} <span class="automation-line-meta">${esc(t("automationCondOvernight"))}</span>`:base;
     }
     const device=automationStrong(automationTriggerDeviceName({deviceId:condition.deviceId}));
+    // Sayısal eşik: i18n kuralı gereği parça birleştirilmez, her biçimin tam şablonu vardır.
+    if(condition.above!==undefined||condition.below!==undefined){
+      const sensor=state.devices.find(item=>item.id===condition.deviceId)||null;
+      const unit=automationPropertyUnit(sensor,condition.property);
+      const reading=esc(automationPropertyLabel(sensor,condition.property));
+      const amount=value=>automationStrong(`${value}${unit}`);
+      if(condition.above!==undefined&&condition.below!==undefined)
+        return t("automationCondBetweenLine",{device,reading,from:amount(condition.above),to:amount(condition.below)});
+      const above=condition.above!==undefined;
+      return t(above?"automationCondAboveLine":"automationCondBelowLine",{
+        device,reading,value:amount(above?condition.above:condition.below)
+      });
+    }
     const event=esc(automationConditionEventLabel(condition));
     return t(condition.not!==undefined?"automationCondStateNotLine":"automationCondStateLine",{device,event});
   };
@@ -5444,11 +5589,23 @@
       toHour:Number(condition.to.slice(0,2)),toMinute:Number(condition.to.slice(3,5)),
       days:[...(condition.days||automationWeekDays)],index:index??null
     };
-    if(condition?.type==="deviceState")return{
-      type:"deviceState",deviceId:condition.deviceId,property:condition.property,
-      value:condition.equals!==undefined?condition.equals:condition.not,
-      negate:condition.not!==undefined,index:index??null
-    };
+    if(condition?.type==="deviceState"){
+      const above=condition.above!==undefined&&condition.above!==null;
+      const below=condition.below!==undefined&&condition.below!==null;
+      if(above||below)return{
+        type:"deviceState",deviceId:condition.deviceId,property:condition.property,numeric:true,
+        thresholdDir:above&&below?"between":below?"below":"above",
+        above:Number(above?condition.above:condition.below),
+        below:Number(below?condition.below:condition.above),
+        value:null,negate:false,index:index??null
+      };
+      return{
+        type:"deviceState",deviceId:condition.deviceId,property:condition.property,numeric:false,
+        thresholdDir:"above",above:0,below:0,
+        value:condition.equals!==undefined?condition.equals:condition.not,
+        negate:condition.not!==undefined,index:index??null
+      };
+    }
     return null;
   };
   const automationConditionFromDraft=draft=>{
@@ -5462,7 +5619,20 @@
       if(!automationEveryDay(draft.days))condition.days=[...draft.days].sort((left,right)=>left-right);
       return condition;
     }
-    if(!draft.deviceId||!draft.property||draft.value===undefined||draft.value===null)return null;
+    if(!draft.deviceId||!draft.property)return null;
+    if(draft.numeric){
+      const above=Number(draft.above),below=Number(draft.below);
+      const wantsAbove=draft.thresholdDir!=="below",wantsBelow=draft.thresholdDir!=="above";
+      if(wantsAbove&&!Number.isFinite(above))return null;
+      if(wantsBelow&&!Number.isFinite(below))return null;
+      // Ters aralık hiçbir zaman sağlanmaz; sunucu da reddeder.
+      if(wantsAbove&&wantsBelow&&!(above<below))return null;
+      const condition={type:"deviceState",deviceId:draft.deviceId,property:draft.property};
+      if(wantsAbove)condition.above=above;
+      if(wantsBelow)condition.below=below;
+      return condition;
+    }
+    if(draft.value===undefined||draft.value===null)return null;
     const condition={type:"deviceState",deviceId:draft.deviceId,property:draft.property};
     if(draft.negate)condition.not=draft.value;else condition.equals=draft.value;
     return condition;
@@ -5471,19 +5641,39 @@
     {glyph:"🕐",title:t("automationCondTime"),sub:t("automationCondTimeSub"),hook:'data-automation-cond-kind="timeRange"'},
     {glyph:"💡",title:t("automationCondState"),sub:t("automationCondStateSub"),hook:'data-automation-cond-kind="deviceState"'}
   ]);
+  // §2.4 — kural başına tek anahtar. Tek koşulda anlamsız olduğu için hiç çizilmez.
+  function automationCondModeHtml(wizard){
+    const active=wizard.conditionMode==="any"?"any":"all";
+    const choice=(value,key)=>automationChoiceHtml(value==="any"?"toggle":"on",key,active===value,`data-automation-cond-mode="${value}"`);
+    return`<div class="automation-parts"><div class="automation-part"><div class="automation-choices">${choice("all","automationCondModeAll")}${choice("any","automationCondModeAny")}</div></div></div>`;
+  }
   function automationConditionTimeHtml(wizard){
     const draft=wizard.draftCondition;
     return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(t("automationCondFrom"))}</p>${automationClockHtml(draft.fromHour,draft.fromMinute,"data-automation-cond-time","automationCondFrom")}</div><div class="automation-part"><p class="automation-part-name">${esc(t("automationCondTo"))}</p>${automationClockHtml(draft.toHour,draft.toMinute,"data-automation-cond-time-to","automationCondTo")}</div></div>${automationDaysHtml(draft.days,"data-automation-cond-day")}<p class="automation-hint">${esc(t("automationCondOvernightHint"))}</p>`;
   }
+  // Sayısal koşul: değer listesi yerine karşılaştırma satırı. Tetikleyicideki eşik arayüzünün
+  // aynısı, üstüne yalnız koşula özgü "arasında" ucu eklenir.
+  function automationCondThresholdHtml(draft,device){
+    const unit=automationPropertyUnit(device,draft.property);
+    const size=automationThresholdStepFor(device,draft.property);
+    const choice=(value,key)=>automationChoiceHtml(value==="below"?"off":"on",key,draft.thresholdDir===value,`data-automation-cond-threshold-dir="${value}"`);
+    const step=(edge,amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-cond-threshold-step="${edge}:${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
+    const dial=(edge,labelKey)=>`<div class="automation-time" role="group" aria-label="${esc(t(labelKey))}"><div class="automation-time-unit">${step(edge,size,"automationThresholdUp","+")}<span class="automation-time-value">${esc(String(draft[edge]))}</span>${step(edge,-size,"automationThresholdDown","−")}</div><span class="automation-time-unit-label">${esc(unit||t(labelKey))}</span></div>`;
+    const dials=draft.thresholdDir==="between"
+      ?`${dial("above","automationCondThresholdFrom")}${dial("below","automationCondThresholdTo")}`
+      :dial(draft.thresholdDir==="below"?"below":"above","automationThresholdValueLabel");
+    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(automationPropertyLabel(device,draft.property))}</p><div class="automation-choices">${choice("above","automationCondAbove")}${choice("below","automationCondBelow")}${choice("between","automationCondBetween")}</div></div></div>${dials}<p class="automation-hint">${esc(t("automationCondThresholdHint"))}</p>`;
+  }
   function automationConditionStateHtml(wizard){
     const draft=wizard.draftCondition;
     const device=state.devices.find(item=>item.id===draft.deviceId)||null;
-    const rows=automationConditionRows(device);
+    const rows=automationConditionAllRows(device);
     if(!rows.length)return`<p class="automation-empty-line">${esc(t("automationCondNoState"))}</p>`;
+    if(draft.numeric)return automationCondThresholdHtml(draft,device);
     const negate=(value,key)=>automationChoiceHtml(value?"off":"on",key,Boolean(draft.negate)===value,`data-automation-cond-negate="${value?1:0}"`);
     const list=automationOptionsHtml(rows.map(row=>({
       title:row.label,
-      on:draft.property===row.property&&draft.value===row.equals,
+      on:!row.numeric&&draft.property===row.property&&draft.value===row.equals,
       hook:`data-automation-cond-state="${esc(row.token)}"`
     })));
     return`<div class="automation-parts"><div class="automation-part"><div class="automation-choices">${negate(false,"automationCondIs")}${negate(true,"automationCondIsNot")}</div></div></div>${list}`;
@@ -5929,6 +6119,10 @@
   }
   // KOŞUL bölümü isteğe bağlıdır: hiç koşul yoksa tek satır "her zaman çalışsın" durur.
   function automationCondNodes(wizard,nodes){
+    // İki ya da daha çok koşul varsa "hepsi mi, herhangi biri mi" sorusu listenin başında durur.
+    if(wizard.conditions.length>1){
+      nodes.push({state:"branch",label:t("automationCondModeTitle"),body:automationCondModeHtml(wizard)});
+    }
     wizard.conditions.forEach((condition,index)=>{
       nodes.push({
         state:"done",fresh:wizard.fresh===`cond-${index}`,
@@ -6097,6 +6291,9 @@
     $$("[data-automation-cond-device]").forEach(button=>button.onclick=()=>chooseAutomationCondDevice(button.dataset.automationCondDevice));
     $$("[data-automation-cond-state]").forEach(button=>button.onclick=()=>chooseAutomationCondState(button.dataset.automationCondState));
     $$("[data-automation-cond-negate]").forEach(button=>button.onclick=()=>chooseAutomationCondNegate(button.dataset.automationCondNegate));
+    $$("[data-automation-cond-mode]").forEach(button=>button.onclick=()=>chooseAutomationCondMode(button.dataset.automationCondMode));
+    $$("[data-automation-cond-threshold-dir]").forEach(button=>button.onclick=()=>chooseAutomationCondThresholdDir(button.dataset.automationCondThresholdDir));
+    $$("[data-automation-cond-threshold-step]").forEach(button=>button.onclick=()=>stepAutomationCondThreshold(button.dataset.automationCondThresholdStep));
     $$("[data-automation-cond-time]").forEach(button=>button.onclick=()=>stepAutomationCondTime(button.dataset.automationCondTime,"from"));
     $$("[data-automation-cond-time-to]").forEach(button=>button.onclick=()=>stepAutomationCondTime(button.dataset.automationCondTimeTo,"to"));
     $$("[data-automation-cond-day]").forEach(button=>button.onclick=()=>toggleAutomationCondDay(button.dataset.automationCondDay));
@@ -6603,7 +6800,7 @@
         return;
       }
       if(kind!=="deviceState")return;
-      wizard.draftCondition={type:"deviceState",deviceId:null,property:null,value:null,negate:false,index:wizard.draftConditionIndex};
+      wizard.draftCondition={type:"deviceState",deviceId:null,property:null,value:null,negate:false,numeric:false,thresholdDir:"above",above:0,below:0,index:wizard.draftConditionIndex};
       wizard.condQuery="";
       wizard.condTab="all";
       wizard.stage="condDevice";
@@ -6616,6 +6813,7 @@
       wizard.draftCondition.deviceId=deviceId;
       wizard.draftCondition.property=null;
       wizard.draftCondition.value=null;
+      wizard.draftCondition.numeric=false;
       wizard.condQuery="";
       wizard.stage="condState";
     });
@@ -6625,8 +6823,23 @@
     const draft=wizard?.draftCondition;
     if(!draft)return;
     const device=state.devices.find(item=>item.id===draft.deviceId)||null;
-    const row=automationConditionRows(device).find(item=>item.token===token);
+    const row=automationConditionAllRows(device).find(item=>item.token===token);
     if(!row)return;
+    if(row.numeric){
+      // Sayısal özellikte hazır değer yoktur: karşılaştırma satırı bugünkü okumanın yakınından başlar.
+      const current=Number(device?.state?.[row.property]);
+      const seed=Number.isFinite(current)?Math.round(current):0;
+      draft.numeric=true;
+      draft.property=row.property;
+      draft.value=null;
+      draft.negate=false;
+      draft.thresholdDir="above";
+      draft.above=seed;
+      draft.below=seed;
+      automationRedraw();
+      return;
+    }
+    draft.numeric=false;
     draft.property=row.property;
     draft.value=row.equals;
     commitAutomationCondition();
@@ -6635,6 +6848,35 @@
     const wizard=state.automationWizard;
     if(!wizard?.draftCondition)return;
     wizard.draftCondition.negate=value==="1";
+    automationRedraw();
+  }
+  // §2.4 — anahtar kuralın kendisine ait; taslak koşula değil.
+  function chooseAutomationCondMode(mode){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    wizard.conditionMode=mode==="any"?"any":"all";
+    automationRedraw();
+  }
+  function chooseAutomationCondThresholdDir(direction){
+    const wizard=state.automationWizard;
+    const draft=wizard?.draftCondition;
+    if(!draft||!["above","below","between"].includes(direction))return;
+    draft.thresholdDir=direction;
+    // "Arasında"da iki uç birbirine eşit kalırsa ölçüt hiç sağlanmaz; üst uç bir adım açılır.
+    if(direction==="between"&&!(Number(draft.above)<Number(draft.below))){
+      const device=state.devices.find(item=>item.id===draft.deviceId)||null;
+      draft.below=Math.round((Number(draft.above)+automationThresholdStepFor(device,draft.property))*1000)/1000;
+    }
+    automationRedraw();
+  }
+  function stepAutomationCondThreshold(token){
+    const wizard=state.automationWizard;
+    const draft=wizard?.draftCondition;
+    if(!draft)return;
+    const [edge,rawAmount]=String(token).split(":");
+    const amount=Number(rawAmount);
+    if(!Number.isFinite(amount)||(edge!=="above"&&edge!=="below"))return;
+    draft[edge]=Math.round((Number(draft[edge])+amount)*1000)/1000;
     automationRedraw();
   }
   function stepAutomationCondTime(token,which){
@@ -6849,6 +7091,11 @@
     const wizard=state.automationWizard;
     cancelAutomationAdvance();
     if(!wizard||wizard.stage==="path"||wizard.stage==="kind"){$("#automationDialog").close();return}
+    // Sayısal koşulda geri, cihazı değil özelliği geri alır: liste yeniden görünür.
+    if(wizard.stage==="condState"&&wizard.draftCondition?.numeric){
+      automationAdvance(()=>{wizard.draftCondition.numeric=false;wizard.draftCondition.property=null});
+      return;
+    }
     const back=automationBackStage(wizard);
     if(!back){$("#automationDialog").close();return}
     automationAdvance(()=>{wizard.stage=back});
@@ -6913,6 +7160,8 @@
       lastRunAt:null,
       lastRunOk:null
     };
+    // Varsayılan "hepsi" alanı hiç yazılmaz; tek koşullu kuralda anahtar zaten görünmez.
+    if(wizard.conditions.length>1&&wizard.conditionMode==="any")entry.conditionMode="any";
     try{
       const data=await api("/api/automations");
       const automations=Array.isArray(data.automations)?data.automations:[];
@@ -7507,7 +7756,7 @@
   $("#matterDialog").addEventListener("close",stopMatterWatch);
   async function startAuthenticatedApplication(){
     if(applicationStarted){
-      const reload=[refresh(),loadHomeGroups(),loadAutomations(),loadHomeLocation()];
+      const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation()];
       if(state.auth.user?.role==="admin")reload.push(loadSettings());
       await Promise.allSettled(reload);
       await migrateLocalGroups();
@@ -7515,7 +7764,7 @@
     }
     applicationStarted=true;
     setupPullToRefresh();setupQuickMouseScrolling();configureAndroidActions();bindScreensaver();bindWidgetControls();applyWidgetLayout();
-    const startup=[refresh(),loadHomeGroups(),loadAutomations(),loadHomeLocation(),loadInstallationOnboarding()];
+    const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadInstallationOnboarding()];
     if(state.auth.user?.role==="admin")startup.push(loadSettings());
     await Promise.allSettled(startup);
     await migrateLocalGroups();

@@ -158,14 +158,21 @@ export const automationDueAt = (
   times: SunTimes | null = null
 ): boolean => automationDueTrigger(automation, date, times) !== null;
 
+/** §4 — koşul değerlendirmesinin isteğe bağlı ayarları; sonraki adımlar bu nesneyi büyütür. */
+export interface AutomationConditionOptions {
+  /** §2.4 — `all` (varsayılan) hepsini, `any` en az birini arar. */
+  mode?: "all" | "any";
+}
+
 /**
- * §5.3 — koşullar **VE** ile değerlendirilir. Sağlanmayan koşulun sebebi geri döner; çağıran
- * bunu çalışma günlüğüne yazar (sessiz atlama yok).
+ * §5.3 — koşullar varsayılan olarak **VE** ile değerlendirilir; `any` modunda en az biri yeter.
+ * Sağlanmayan koşulun sebebi geri döner; çağıran bunu çalışma günlüğüne yazar (sessiz atlama yok).
  */
 export const evaluateAutomationConditions = (
   conditions: AutomationCondition[],
   date: Date,
-  readState: (deviceId: string, property: string) => JsonScalar | undefined
+  readState: (deviceId: string, property: string) => JsonScalar | undefined,
+  options: AutomationConditionOptions = {}
 ): { ok: boolean; results: AutomationRunConditionResult[] } => {
   const results: AutomationRunConditionResult[] = [];
   for (const condition of conditions) {
@@ -207,6 +214,33 @@ export const evaluateAutomationConditions = (
       });
       continue;
     }
+    if (condition.above !== undefined || condition.below !== undefined) {
+      // Koşulda semantik kenar değil, o anki değerdir: "şu an eşiğin üstünde/altında mı".
+      const current = numericValue(value);
+      if (current === null) {
+        results.push({
+          type: "deviceState",
+          ok: false,
+          reason: `${condition.deviceId} "${condition.property}" değeri sayısal değil: ${JSON.stringify(value)}.`
+        });
+        continue;
+      }
+      const inside = (condition.above === undefined || current > condition.above)
+        && (condition.below === undefined || current < condition.below);
+      const limit = condition.above !== undefined && condition.below !== undefined
+        ? `${condition.above}-${condition.below} aralığında değil`
+        : condition.above !== undefined
+          ? `${condition.above} üstünde değil`
+          : `${condition.below} altında değil`;
+      results.push({
+        type: "deviceState",
+        ok: inside,
+        reason: inside
+          ? undefined
+          : `${condition.deviceId} "${condition.property}" değeri ${current}, ${limit}.`
+      });
+      continue;
+    }
     const ok = condition.equals !== undefined
       ? value === condition.equals
       : value !== condition.not;
@@ -218,7 +252,15 @@ export const evaluateAutomationConditions = (
         : `${condition.deviceId} "${condition.property}" değeri ${JSON.stringify(value)}.`
     });
   }
-  return { ok: results.every((result) => result.ok), results };
+  // `any` modunda da **tüm** koşullar değerlendirilip döner: günlükte hangisinin tuttuğu görünsün.
+  // Koşul listesi boşsa kural koşulsuzdur; iki modda da geçer (`some` boş listede false döner).
+  if (results.length === 0) return { ok: true, results };
+  return {
+    ok: options.mode === "any"
+      ? results.some((result) => result.ok)
+      : results.every((result) => result.ok),
+    results
+  };
 };
 
 /**
@@ -878,16 +920,21 @@ export class AutomationEngine {
       });
       return "skipped";
     }
-    // §5.3 — koşullar VE ile; sağlanmazsa kural çalışmaz ve sebebi günlüğe düşer.
+    // §5.3 — koşullar kuralın bağlama biçimiyle; sağlanmazsa kural çalışmaz ve sebebi günlüğe düşer.
     if (automation.conditions.length > 0) {
+      const anyMode = automation.conditionMode === "any";
       const evaluation = evaluateAutomationConditions(
         automation.conditions,
         this.now(),
-        (deviceId, property) => this.options.deviceState?.(deviceId, property)
+        (deviceId, property) => this.options.deviceState?.(deviceId, property),
+        { mode: automation.conditionMode }
       );
       if (!evaluation.ok) {
         const failed = evaluation.results.find((result) => !result.ok);
-        const detail = failed?.reason ?? "Koşul sağlanmadı.";
+        // `any` modunda tek bir koşulun sebebini yazmak yanıltır: hiçbiri tutmadı demek gerekir.
+        const detail = anyMode
+          ? `Koşulların hiçbiri sağlanmadı. ${failed?.reason ?? ""}`.trim()
+          : failed?.reason ?? "Koşul sağlanmadı.";
         this.note(`Otomasyon "${automation.name}" atlandı: ${detail}`);
         this.record({
           automationId: automation.id,

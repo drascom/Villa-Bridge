@@ -623,6 +623,85 @@ test("koşullar kabul edilir; bilinmeyen tür ve bozuk alan reddedilir", () => {
   })]), /koşulları geçersiz/);
 });
 
+test("koşulda sayısal eşik kabul edilir; üçlü dışlama ve ters aralık reddedilir", () => {
+  const result = validateAutomations([automation({
+    conditions: [
+      { type: "deviceState", deviceId: sensorId, property: "temperature", above: 25 },
+      { type: "deviceState", deviceId: sensorId, property: "humidity", below: "40" },
+      { type: "deviceState", deviceId: sensorId, property: "co2", above: 400, below: 1000 }
+    ]
+  })]);
+  assert.deepEqual(result[0]?.conditions, [
+    { type: "deviceState", deviceId: sensorId, property: "temperature", above: 25 },
+    { type: "deviceState", deviceId: sensorId, property: "humidity", below: 40 },
+    { type: "deviceState", deviceId: sensorId, property: "co2", above: 400, below: 1000 }
+  ]);
+
+  // Aralık ters ya da sıfır genişlikte olamaz.
+  assert.throws(() => validateAutomations([automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "temperature", above: 30, below: 20 }]
+  })]), /üst eşik/);
+  assert.throws(() => validateAutomations([automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "temperature", above: 25, below: 25 }]
+  })]), /üst eşik/);
+  // Eşitlik ve eşik aynı koşulda iki ayrı ölçüt olurdu.
+  assert.throws(() => validateAutomations([automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "temperature", equals: 25, above: 20 }]
+  })]), /tam biri/);
+  assert.throws(() => validateAutomations([automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "temperature", not: 25, below: 20 }]
+  })]), /tam biri/);
+  assert.throws(() => validateAutomations([automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "temperature", above: "sıcak" }]
+  })]), /eşiği geçersiz/);
+  assert.throws(() => validateAutomations([automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "temperature", below: null, above: null }]
+  })]), /tam biri/);
+
+  // Geriye uyumluluk: eski biçimli koşullar aynen doğrulanır.
+  const legacy = validateAutomations([automation({
+    conditions: [
+      { type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" },
+      { type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true },
+      { type: "timeRange", from: "22:00", to: "06:00" }
+    ]
+  })]);
+  assert.deepEqual(legacy[0]?.conditions, [
+    { type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" },
+    { type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true },
+    { type: "timeRange", from: "22:00", to: "06:00" }
+  ]);
+});
+
+test("koşul bağlama biçimi yalnız `any` olduğunda saklanır", () => {
+  const conditions = [
+    { type: "timeRange", from: "22:00", to: "06:00" },
+    { type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" }
+  ];
+  const any = validateAutomations([automation({ conditions, conditionMode: "any" })]);
+  assert.equal(any[0]?.conditionMode, "any");
+
+  // Varsayılan diske gömülmez: alan yoksa da `"all"` verilse de sonuç aynı — hiç yazılmaz.
+  const explicit = validateAutomations([automation({ conditions, conditionMode: "all" })]);
+  assert.equal(explicit[0]?.conditionMode, undefined);
+  assert.equal("conditionMode" in (explicit[0] ?? {}), false);
+  const absent = validateAutomations([automation({ conditions })]);
+  assert.equal("conditionMode" in (absent[0] ?? {}), false);
+  const nulled = validateAutomations([automation({ conditions, conditionMode: null })]);
+  assert.equal("conditionMode" in (nulled[0] ?? {}), false);
+
+  // Geriye uyumluluk: alansız eski kural aynen doğrulanır, koşulları değişmez.
+  assert.deepEqual(absent[0]?.conditions, [
+    { type: "timeRange", from: "22:00", to: "06:00" },
+    { type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" }
+  ]);
+
+  assert.throws(() => validateAutomations([automation({ conditions, conditionMode: "or" })]),
+    /koşul bağlama biçimi/);
+  assert.throws(() => validateAutomations([automation({ conditions, conditionMode: 1 })]),
+    /koşul bağlama biçimi/);
+});
+
 test("bekleme, grup ve sahne eylemleri kaydedilir", () => {
   const result = validateAutomations([automation({
     actions: [

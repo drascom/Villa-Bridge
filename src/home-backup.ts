@@ -20,13 +20,21 @@ import {
   validateHomeGroups,
   type HomeGroup
 } from "./home-groups.js";
+import {
+  emptyHomeVisibility,
+  validateHomeVisibility,
+  type HomeVisibility
+} from "./home-visibility.js";
 
 /**
  * Ev yapılandırması yedeği — aynı evde güncelleme öncesi alınır, gerekirse geri yüklenir.
  *
  * Yedek indirilebilir bir dosyadır: içine ASLA sır girmez. Parola özetleri (`auth.json`),
  * Zigbee ağ anahtarı, MQTT/HA kimlik bilgileri, Matter sertifikaları ve kuruluma özel
- * durum dosyaları kapsam dışıdır. Kapsam yalnızca aşağıdaki altı bölümdür.
+ * durum dosyaları kapsam dışıdır. Kapsam yalnızca aşağıdaki yedi bölümdür.
+ *
+ * Sürüm bilerek 1'de kalır: yeni bölüm eksikse boş sayılır, böylece eski yedekler açılmaya
+ * devam eder.
  */
 export const homeBackupVersion = 1;
 
@@ -35,6 +43,7 @@ export const homeBackupSectionNames = [
   "aliases",
   "homeGroups",
   "favorites",
+  "homeVisibility",
   "deviceNotes",
   "deviceImages"
 ] as const;
@@ -52,6 +61,8 @@ export interface HomeBackupSections {
   homeGroups: HomeGroup[];
   /** Ana ekran favorileri. */
   favorites: HomeFavorite[];
+  /** Gizlenen cihaz kontrolleri ve odalar — kullanıcının kurduğu bir tercih, sır içermez. */
+  homeVisibility: HomeVisibility;
   /** Cihaz notları. */
   deviceNotes: DeviceNotes;
   /** Cihaz görsel tercihleri. */
@@ -93,6 +104,7 @@ export interface HomeBackupPaths {
   aliases?: string;
   homeGroups: string;
   favorites: string;
+  homeVisibility: string;
   deviceNotes: string;
   deviceImages: string;
 }
@@ -203,6 +215,31 @@ const mergeById = <T extends { id: string }>(
 
 const favoriteKey = (favorite: HomeFavorite): string => `${favorite.deviceId}|${favorite.controlId}`;
 
+/** Özet sayımı için: gizlenen cihaz ve oda kayıtları tek anahtar uzayında toplanır. */
+const visibilityKeys = (visibility: HomeVisibility): string[] => [
+  ...visibility.hiddenDevices.map((entry) => `device:${entry.deviceId}|${entry.controlId}`),
+  ...visibility.hiddenGroups.map((groupId) => `group:${groupId}`)
+];
+
+const mergeVisibility = (
+  current: HomeVisibility,
+  incoming: HomeVisibility,
+  mode: HomeBackupMode
+): HomeVisibility => {
+  if (mode === "replace") return incoming;
+  const incomingDeviceKeys = new Set(incoming.hiddenDevices.map(favoriteKey));
+  return {
+    hiddenDevices: [
+      ...current.hiddenDevices.filter((entry) => !incomingDeviceKeys.has(favoriteKey(entry))),
+      ...incoming.hiddenDevices
+    ],
+    hiddenGroups: [
+      ...current.hiddenGroups,
+      ...incoming.hiddenGroups.filter((groupId) => !current.hiddenGroups.includes(groupId))
+    ]
+  };
+};
+
 const readJsonFile = async (path: string): Promise<unknown> => {
   try {
     return JSON.parse(await readFile(path, "utf8")) as unknown;
@@ -230,10 +267,18 @@ export class HomeBackupService {
 
   private async currentSections(): Promise<HomeBackupSections> {
     const paths = this.options.paths;
-    const [automations, homeGroups, favorites, deviceNotes, deviceImages] = await Promise.all([
+    const [
+      automations,
+      homeGroups,
+      favorites,
+      homeVisibility,
+      deviceNotes,
+      deviceImages
+    ] = await Promise.all([
       readJsonFile(paths.automations),
       readJsonFile(paths.homeGroups),
       readJsonFile(paths.favorites),
+      readJsonFile(paths.homeVisibility),
       readJsonFile(paths.deviceNotes),
       readJsonFile(paths.deviceImages)
     ]);
@@ -245,6 +290,7 @@ export class HomeBackupService {
       aliases: validateBackupAliases(aliases),
       homeGroups: validateHomeGroups(homeGroups ?? []),
       favorites: validateHomeFavorites(favorites ?? []),
+      homeVisibility: validateHomeVisibility(homeVisibility ?? emptyHomeVisibility()),
       deviceNotes: validateBackupDeviceNotes(deviceNotes ?? {}),
       deviceImages: validateBackupDeviceImages(deviceImages ?? { devices: {}, models: {} })
     };
@@ -312,6 +358,12 @@ export class HomeBackupService {
     }
     const incomingFavorites = validateHomeFavorites(raw.favorites ?? []);
     const favorites = incomingFavorites.filter((favorite) => alive(favorite.deviceId));
+    // Oda kimlikleri cihaz değil; yalnız gizlenen cihaz kayıtları ölü UID için düşer.
+    const incomingVisibility = validateHomeVisibility(raw.homeVisibility ?? emptyHomeVisibility());
+    const homeVisibility: HomeVisibility = {
+      hiddenDevices: incomingVisibility.hiddenDevices.filter((entry) => alive(entry.deviceId)),
+      hiddenGroups: incomingVisibility.hiddenGroups
+    };
     const incomingNotes = validateBackupDeviceNotes(raw.deviceNotes ?? {});
     const deviceNotes = Object.fromEntries(
       Object.entries(incomingNotes).filter(([id]) => alive(id))
@@ -341,6 +393,9 @@ export class HomeBackupService {
             !favorites.some((incoming) => favoriteKey(incoming) === favoriteKey(favorite))),
           ...favorites
         ]),
+      homeVisibility: validateHomeVisibility(
+        mergeVisibility(current.homeVisibility, homeVisibility, mode)
+      ),
       deviceNotes: mergeRecords(current.deviceNotes, deviceNotes, mode),
       deviceImages: {
         devices: mergeRecords(current.deviceImages.devices, deviceImages.devices, mode),
@@ -387,6 +442,12 @@ export class HomeBackupService {
           current.favorites.map(favoriteKey),
           favorites.map(favoriteKey),
           incomingFavorites.length - favorites.length
+        ),
+        sectionSummary(
+          "homeVisibility",
+          visibilityKeys(current.homeVisibility),
+          visibilityKeys(homeVisibility),
+          incomingVisibility.hiddenDevices.length - homeVisibility.hiddenDevices.length
         ),
         sectionSummary(
           "deviceNotes",
@@ -439,6 +500,7 @@ export class HomeBackupService {
       { path: paths.automations, content: serialize(sections.automations) },
       { path: paths.homeGroups, content: serialize(sections.homeGroups) },
       { path: paths.favorites, content: serialize(sections.favorites) },
+      { path: paths.homeVisibility, content: serialize(sections.homeVisibility) },
       { path: paths.deviceNotes, content: serialize(sections.deviceNotes) },
       { path: paths.deviceImages, content: serialize(sections.deviceImages) },
       ...(paths.aliases ? [{ path: paths.aliases, content: serialize(sortedAliases) }] : [])

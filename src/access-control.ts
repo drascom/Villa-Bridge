@@ -30,6 +30,12 @@ const residentRoutes = new Set([
   "PUT /api/favorites",
   "GET /api/home-groups",
   "PUT /api/home-groups",
+  // Görünürlük ("bu lambayı oda kartında gösterme", "bu oda Genel görünümde çıkmasın") günlük
+  // bir tercihtir, kurulum ayarı değil: paneli kullanan ev sakini kendi ekranını düzenleyebilmeli.
+  // Yazma da resident, çünkü aksi hâlde her düzeltme için yönetici çağırmak gerekirdi. Açtığı
+  // veri ev sakininin zaten gördüğü cihaz ve oda listesinden fazlası değil.
+  "GET /api/home-visibility",
+  "PUT /api/home-visibility",
   "GET /api/automations",
   // Çalışma günlüğü, ev sakininin zaten gördüğü kural ve cihaz verisinden fazlasını açmaz;
   // "neden çalışmadı" sorusunu soran da odur. Yazma yolu yok, salt okunur.

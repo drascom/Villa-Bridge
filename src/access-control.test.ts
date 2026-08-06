@@ -40,6 +40,8 @@ const setupApp = async (context: { after: (callback: () => Promise<void>) => voi
   app.get("/api/zigbee/backup", async () => ({ ok: true }));
   app.post("/api/zigbee/restore", async () => ({ ok: true }));
   app.put("/api/favorites", async () => ({ ok: true }));
+  app.get("/api/home-visibility", async () => ({ ok: true }));
+  app.put("/api/home-visibility", async () => ({ ok: true }));
   app.get("/api/backup", async () => ({ ok: true }));
   app.post("/api/backup/preview", async () => ({ ok: true }));
   app.post("/api/backup/restore", async () => ({ ok: true }));
@@ -107,6 +109,23 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
     url: "/api/groups/1/command",
     headers: { cookie, "x-villa-csrf": csrfToken }
   })).statusCode, 200);
+  // Göster/gizle günlük bir tercih: ev sakini okuyabildiği gibi yazabilir de.
+  assert.equal((await app.inject({
+    method: "GET",
+    url: "/api/home-visibility",
+    headers: { cookie }
+  })).statusCode, 200);
+  assert.equal((await app.inject({
+    method: "PUT",
+    url: "/api/home-visibility",
+    headers: { cookie, "x-villa-csrf": csrfToken }
+  })).statusCode, 200);
+  // CSRF başlığı olmadan yazma yine reddedilir.
+  assert.equal((await app.inject({
+    method: "PUT",
+    url: "/api/home-visibility",
+    headers: { cookie }
+  })).statusCode, 403);
   const settings = await app.inject({ method: "GET", url: "/api/settings", headers: { cookie } });
   assert.equal(settings.statusCode, 403);
   assert.equal(settings.json().code, "ADMIN_REQUIRED");

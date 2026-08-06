@@ -116,7 +116,10 @@ test("onarım mevcut sırayı bozmuyor ve ikinci turda yazmıyor", async () => {
   assert.equal(harness.saves().layout, 1);
 });
 
-test("kullanıcının kaldırdığı grup kartı geri gelmiyor", async () => {
+/* Görünürlük artık sunucudaki `hiddenGroups` kaydında; düzen kaydı yalnız sırayı taşır. Genel
+   görünümden kapatılan oda kartı bu yüzden sıradaki yerini korur — geri açılınca yeri kaymaz.
+   Düzen kaydında kalmış eski `group:` girdileri de burada temizlenir. */
+test("kapatılmış grup kartı sıradaki yerini koruyor, eski kaldırma kaydı temizleniyor", async () => {
   const harness = await layoutHarness({
     widgets: ["quick", "group:living"],
     removedWidgets: new Set(["group:garden"]),
@@ -126,8 +129,10 @@ test("kullanıcının kaldırdığı grup kartı geri gelmiyor", async () => {
     ]
   });
 
+  assert.equal(harness.reconcile(), true);
+  assert.deepEqual(harness.state.widgets, ["quick", "group:garden", "group:living"]);
+  assert.deepEqual([...harness.state.removedWidgets], []);
   assert.equal(harness.reconcile(), false);
-  assert.deepEqual(harness.state.widgets, ["quick", "group:living"]);
 });
 
 test("silinen grubun kimliği düzen kaydından ve kaldırılanlardan düşüyor", async () => {

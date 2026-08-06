@@ -91,7 +91,13 @@ export interface AutomationTimeRangeCondition {
   days?: number[];
 }
 
-/** "Lamba zaten açıksa dokunma" — değer `DeviceStore`'dan okunur. */
+/**
+ * "Lamba zaten açıksa dokunma" — değer `DeviceStore`'dan okunur.
+ *
+ * `above`/`below` sayısal eşiktir ve tetikleyicinin tersine **kenara değil, o anki değere** bakar:
+ * "şu an eşiğin üstünde mi". İkisi birden verilirse "aralıkta" demektir ve `above < below` olmalıdır.
+ * `equals`, `not` ve eşik grubundan **tam biri** verilir.
+ */
 export interface AutomationDeviceStateCondition {
   type: "deviceState";
   /** IEEE adresi — kanonik bağ. */
@@ -99,8 +105,12 @@ export interface AutomationDeviceStateCondition {
   property: string;
   /** Değer buna eşitse koşul sağlanır. */
   equals?: JsonScalar;
-  /** Değer buna eşit **değilse** koşul sağlanır. İkisinden tam biri verilir. */
+  /** Değer buna eşit **değilse** koşul sağlanır. Ölçütlerden tam biri verilir. */
   not?: JsonScalar;
+  /** Değer şu an bunun üstündeyse koşul sağlanır. */
+  above?: number;
+  /** Değer şu an bunun altındaysa koşul sağlanır. */
+  below?: number;
 }
 
 export type AutomationCondition =
@@ -196,6 +206,11 @@ export interface Automation {
   enabled: boolean;
   triggers: AutomationTrigger[];
   conditions: AutomationCondition[];
+  /**
+   * §2.4 — koşulların nasıl bağlanacağı **kural başına** tek anahtardır (koşul başına değil).
+   * Alan yoksa `"all"` sayılır; varsayılan diske yazılmaz ki eski dosyalar aynen kalsın.
+   */
+  conditionMode?: "all" | "any";
   actions: AutomationAction[];
   lastRunAt: string | null;
   lastRunOk: boolean | null;
@@ -251,6 +266,17 @@ const triggerDeviceId = (value: unknown): string => {
   return deviceId;
 };
 
+/**
+ * Sayısal eşik ayrıştırması — tetikleyici ve koşul aynı kuralı paylaşır: alan yoksa `undefined`,
+ * `"25"` gibi dize de kabul, sonuç sonlu bir sayı olmalıdır.
+ */
+const thresholdNumber = (value: unknown, message: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  const numeric = typeof value === "string" ? Number(value.trim()) : value;
+  if (typeof numeric !== "number" || !Number.isFinite(numeric)) throw new Error(message);
+  return numeric;
+};
+
 /** 1 = Pazartesi … 7 = Pazar; yinelenenler ayıklanır, sıralanır. */
 const validateDays = (value: unknown, label: string): number[] => {
   if (!Array.isArray(value) || value.length === 0) throw new Error(label);
@@ -297,16 +323,8 @@ const validateTriggers = (value: unknown): AutomationTrigger[] => {
         }
         trigger.equals = candidate.equals;
       }
-      const threshold = (raw: unknown, label: string): number | undefined => {
-        if (raw === undefined || raw === null) return undefined;
-        const numeric = typeof raw === "string" ? Number(raw.trim()) : raw;
-        if (typeof numeric !== "number" || !Number.isFinite(numeric)) {
-          throw new Error(`Otomasyon tetikleyicisi ${label} eşiği geçersiz.`);
-        }
-        return numeric;
-      };
-      const above = threshold(candidate.above, "üst");
-      const below = threshold(candidate.below, "alt");
+      const above = thresholdNumber(candidate.above, "Otomasyon tetikleyicisi üst eşiği geçersiz.");
+      const below = thresholdNumber(candidate.below, "Otomasyon tetikleyicisi alt eşiği geçersiz.");
       if (above !== undefined) trigger.above = above;
       if (below !== undefined) trigger.below = below;
       // Eşitlik ile eşik aynı tetikleyicide iki ayrı kenar tanımı olurdu; biri seçilmeli.
@@ -354,7 +372,17 @@ const validateTriggers = (value: unknown): AutomationTrigger[] => {
   });
 };
 
-/** §5.3 — koşullar VE ile değerlendirilir; bilinmeyen tür reddedilir. */
+/**
+ * §2.4 — koşulların bağlanma biçimi. Yokluk ve `"all"` aynı şeydir ve **hiç yazılmaz**:
+ * varsayılanı diske gömmek eski dosyalarla sahte bir fark üretirdi.
+ */
+const validateConditionMode = (value: unknown): "any" | undefined => {
+  if (value === undefined || value === null || value === "all") return undefined;
+  if (value === "any") return "any";
+  throw new Error("Otomasyon koşul bağlama biçimi geçersiz.");
+};
+
+/** §5.3 — koşullar varsayılan olarak VE ile değerlendirilir; bilinmeyen tür reddedilir. */
 const validateConditions = (value: unknown): AutomationCondition[] => {
   if (!Array.isArray(value) || value.length > maxAutomationConditions) {
     throw new Error("Otomasyon koşulları geçersiz.");
@@ -391,8 +419,24 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
     }
     const hasEquals = candidate.equals !== undefined && candidate.equals !== null;
     const hasNot = candidate.not !== undefined && candidate.not !== null;
-    if (hasEquals === hasNot) {
-      throw new Error("Otomasyon koşulunda `equals` ya da `not` alanlarından tam biri olmalıdır.");
+    const above = thresholdNumber(candidate.above, "Otomasyon koşulu üst eşiği geçersiz.");
+    const below = thresholdNumber(candidate.below, "Otomasyon koşulu alt eşiği geçersiz.");
+    const hasThreshold = above !== undefined || below !== undefined;
+    // Üç ölçüt de aynı kanalı okur; ikisi birlikte "hangisi geçerli" sorusunu doğurur.
+    if ([hasEquals, hasNot, hasThreshold].filter(Boolean).length !== 1) {
+      throw new Error(
+        "Otomasyon koşulunda `equals`, `not` ya da sayısal eşik alanlarından tam biri olmalıdır."
+      );
+    }
+    if (hasThreshold) {
+      // İkisi birden verilmişse ölçüt "aralıkta"dır; ters aralık hiçbir zaman sağlanmaz.
+      if (above !== undefined && below !== undefined && above >= below) {
+        throw new Error("Otomasyon koşulunda üst eşik alt eşikten küçük olmalıdır.");
+      }
+      const condition: AutomationDeviceStateCondition = { type: "deviceState", deviceId, property };
+      if (above !== undefined) condition.above = above;
+      if (below !== undefined) condition.below = below;
+      return condition;
     }
     const raw = hasEquals ? candidate.equals : candidate.not;
     if (!isJsonScalar(raw)) throw new Error("Otomasyon koşulu değeri geçersiz.");
@@ -620,6 +664,7 @@ export const validateAutomations = (
     if (!name || name.length > maxAutomationNameLength) throw new Error("Otomasyon adı geçersiz.");
     // Eski dosyalarda alan hep var ve boş; yokluğunu da kabul ederiz (geriye dönük uyumluluk).
     const conditions = validateConditions(candidate.conditions ?? []);
+    const conditionMode = validateConditionMode(candidate.conditionMode);
     const lastRunAt = candidate.lastRunAt;
     if (lastRunAt !== undefined && lastRunAt !== null) {
       if (typeof lastRunAt !== "string" || Number.isNaN(Date.parse(lastRunAt))) {
@@ -674,7 +719,7 @@ export const validateAutomations = (
         );
       }
     }
-    result.push({
+    const automation: Automation = {
       id,
       name,
       enabled: candidate.enabled !== false,
@@ -683,7 +728,10 @@ export const validateAutomations = (
       actions,
       lastRunAt: typeof lastRunAt === "string" ? lastRunAt : null,
       lastRunOk: typeof lastRunOk === "boolean" ? lastRunOk : null
-    });
+    };
+    // Yalnız "any" korunur; varsayılan alan hiç görünmez (yukarıdaki gerekçe).
+    if (conditionMode) automation.conditionMode = conditionMode;
+    result.push(automation);
   }
   return result;
 };

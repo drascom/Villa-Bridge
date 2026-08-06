@@ -446,7 +446,7 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /if\(localComplete&&!installationOnboardingComplete\)/);
   assert.match(dashboard, /await markOnboardingComplete\(\)/);
   assert.match(dashboard, /if\(!onboardingComplete\(\)\)openOnboarding\(\)/);
-  assert.match(dashboard, /const startup=\[refresh\(\),loadHomeGroups\(\),loadAutomations\(\),loadHomeLocation\(\),loadInstallationOnboarding\(\)\]/);
+  assert.match(dashboard, /const startup=\[refresh\(\),loadHomeGroups\(\),loadHomeVisibility\(\),loadAutomations\(\),loadHomeLocation\(\),loadInstallationOnboarding\(\)\]/);
   assert.match(dashboard, /if\(state\.auth\.user\?\.role==="admin"\)startup\.push\(loadSettings\(\)\)/);
   assert.match(dashboard, /await Promise\.allSettled\(startup\)/);
   assert.match(dashboard, /data-onboarding-language="en"/);
@@ -902,7 +902,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /async function persistHomeGroups\(groups,successKey\)\{/);
   assert.match(dashboard, /await api\("\/api\/home-groups",\{method:"PUT",body:JSON\.stringify\(\{groups\}\)\}\)/);
   assert.match(dashboard, /catch\(error\)\{showToast\(t\("groupSaveFailed",\{error:error\.message\}\),true\)\}/);
-  assert.match(dashboard, /const reload=\[refresh\(\),loadHomeGroups\(\),loadAutomations\(\),loadHomeLocation\(\)\]/);
+  assert.match(dashboard, /const reload=\[refresh\(\),loadHomeGroups\(\),loadHomeVisibility\(\),loadAutomations\(\),loadHomeLocation\(\)\]/);
   assert.match(dashboard, /await Promise\.allSettled\(startup\);\s*await migrateLocalGroups\(\)/);
   assert.match(dashboard, /function saveDashboardGroups\(\)\{\s*try\{localStorage\.setItem\("villa-dashboard-groups"/);
   assert.match(dashboard, /const roomSuggestionKeys=\["roomLivingRoom","roomKitchen","roomBedroom","roomBathroom","roomHallway","roomBalcony","roomKidsRoom","roomGarden","roomAllLights","roomAllSecurity"\]/);
@@ -2555,7 +2555,7 @@ test("Ayarlar'da yedek al ve geri yükle kartı onay adımı atlanmadan çalış
 
   // Başarıdan sonra ekran tazelenir.
   assert.match(dashboard, /api\("\/api\/backup\/restore",\{method:"POST",body:JSON\.stringify\(\{backup:pendingHomeBackup,mode:selectedHomeBackupMode\(\)\}\)\}/);
-  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadHomeGroups\(\),loadAutomations\(\)\]\);\s*render\(\)/);
+  assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadHomeGroups\(\),loadHomeVisibility\(\),loadAutomations\(\)\]\);\s*render\(\)/);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
 });
@@ -2760,6 +2760,7 @@ const automationExports = [
   "automationStageAdvanceable", "chooseAutomationSunEvent", "setAutomationSunOffset", "openAutomationSunCustom",
   "chooseAutomationThresholdDir", "stepAutomationThreshold", "addAutomationCondition", "chooseAutomationCondKind",
   "chooseAutomationCondDevice", "chooseAutomationCondState", "chooseAutomationCondNegate",
+  "chooseAutomationCondThresholdDir", "stepAutomationCondThreshold", "chooseAutomationCondMode",
   "stepAutomationCondTime", "editAutomationCondition", "removeAutomationCondition", "commitAutomationCondition",
   "chooseAutomationActionKind", "setAutomationDelay", "commitAutomationDelay", "chooseAutomationGroup",
   "chooseAutomationGroupValue", "chooseAutomationSceneGroup", "chooseAutomationScene",
@@ -3470,6 +3471,136 @@ test("koşul bölümü saat aralığı ve cihaz durumu koşulu ekler", async () 
   // Kaldırma yalnız o koşulu düşürür.
   api.removeAutomationCondition(0, null);
   assert.equal((harness.wizard().conditions as unknown[]).length, 1);
+});
+
+// İkiden az koşulda "hepsi / herhangi biri" sorusu anlamsızdır; hiç çizilmez.
+test("koşul sayısı ikiye çıkınca hepsi/herhangi biri anahtarı görünür ve kaydedilir", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+
+  // Tek koşulda anahtar yok.
+  api.goToAutomationStage("cond");
+  api.chooseAutomationCondKind("timeRange");
+  api.commitAutomationCondition();
+  assert.equal((harness.wizard().conditions as unknown[]).length, 1);
+  assert.doesNotMatch(harness.body(), /data-automation-cond-mode=/);
+
+  // İkinci koşulla birlikte iki uçlu anahtar çizilir; varsayılan "hepsi".
+  api.addAutomationCondition();
+  api.chooseAutomationCondKind("deviceState");
+  api.chooseAutomationCondDevice("0x0011");
+  api.chooseAutomationCondState("state=ON");
+  assert.match(harness.body(), /data-automation-cond-mode="all"/);
+  assert.match(harness.body(), /data-automation-cond-mode="any"/);
+  assert.match(harness.body(), /automationCondModeAll/);
+  assert.match(harness.body(), /automationCondModeAny/);
+  assert.equal(harness.wizard().conditionMode, "all");
+
+  // Her kaydetme listeye yeni bir kural ekler; ölçülen hep sonuncusudur.
+  const lastSaved = (): Record<string, unknown> => harness.saved()[harness.saved().length - 1] ?? {};
+
+  // Varsayılan seçiliyken alan hiç yazılmaz.
+  await api.saveAutomationWizard();
+  assert.equal("conditionMode" in lastSaved(), false);
+
+  api.chooseAutomationCondMode("any");
+  assert.equal(harness.wizard().conditionMode, "any");
+  await api.saveAutomationWizard();
+  assert.equal(lastSaved().conditionMode, "any");
+
+  // Koşul tek kalınca anahtar da yazılan alan da kaybolur.
+  api.removeAutomationCondition(0, null);
+  assert.doesNotMatch(harness.body(), /data-automation-cond-mode=/);
+  await api.saveAutomationWizard();
+  assert.equal("conditionMode" in lastSaved(), false);
+});
+
+// Kayıtlı `any` kuralı düzenlemeye açılıp dokunulmadan kaydedilirse aynen geri yazılır.
+test("kayıtlı herhangi-biri kuralı sihirbaza okunur ve aynen geri yazılır", async () => {
+  const rule = storedRule({
+    conditionMode: "any",
+    triggers: [{ type: "deviceState", deviceId: "0xa4c1389eef9ade7e", property: "presence", equals: true }],
+    conditions: [
+      { type: "timeRange", from: "22:00", to: "06:00" },
+      { type: "deviceState", deviceId: "0x0088", property: "temperature", below: 18 }
+    ],
+    actions: [{ type: "device", deviceId: "0xa4c138b950918de3", property: "state", value: "ON", controlId: "main" }]
+  });
+  const { saved } = await automationRoundTrip(rule);
+  assert.equal(saved.conditionMode, "any");
+  assert.deepEqual(saved.conditions, rule.conditions);
+});
+
+// Sayısal özellikte koşul değer listesi yerine karşılaştırma satırı gösterir.
+test("sayısal koşul üstünde/altında/arasında ölçütü yazar", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+
+  api.goToAutomationStage("cond");
+  api.chooseAutomationCondKind("deviceState");
+  // Sıcaklık sensörü yalnız sayısal satırı olduğu hâlde koşul listesinde durur.
+  assert.match(harness.body(), /data-automation-cond-device="0x0044"/);
+  api.chooseAutomationCondDevice("0x0044");
+  assert.match(harness.body(), /data-automation-cond-state="num:temperature"/);
+  // Boolean özellikte eşik arayüzü hiç görünmez.
+  assert.doesNotMatch(harness.body(), /data-automation-cond-threshold-dir=/);
+
+  api.chooseAutomationCondState("num:temperature");
+  assert.equal(harness.wizard().stage, "condState");
+  assert.match(harness.body(), /data-automation-cond-threshold-dir="above"/);
+  assert.match(harness.body(), /data-automation-cond-threshold-dir="below"/);
+  assert.match(harness.body(), /data-automation-cond-threshold-dir="between"/);
+  assert.match(harness.body(), /data-automation-cond-threshold-step="above:1"/);
+  // Eşik bugünkü okumadan (21,4) başlar.
+  const draft = () => harness.wizard().draftCondition as Record<string, unknown>;
+  assert.equal(draft().above, 21);
+  api.stepAutomationCondThreshold("above:4");
+  api.commitAutomationCondition();
+  const conditions = harness.wizard().conditions as Array<Record<string, unknown>>;
+  assert.deepEqual(conditions[0], { type: "deviceState", deviceId: "0x0044", property: "temperature", above: 25 });
+  assert.match(String(api.automationConditionLine(conditions[0])), /automationCondAboveLine/);
+
+  // "Altındaysa" yalnız `below` yazar.
+  api.editAutomationCondition(0);
+  api.chooseAutomationCondThresholdDir("below");
+  api.stepAutomationCondThreshold("below:-3");
+  api.commitAutomationCondition();
+  const below = (harness.wizard().conditions as Array<Record<string, unknown>>)[0];
+  assert.deepEqual(below, { type: "deviceState", deviceId: "0x0044", property: "temperature", below: 22 });
+  assert.match(String(api.automationConditionLine(below)), /automationCondBelowLine/);
+
+  // "Arasında" iki ucu birden yazar; eşit uçlarda üst sınır kendiliğinden bir adım açılır.
+  api.editAutomationCondition(0);
+  api.chooseAutomationCondThresholdDir("between");
+  assert.equal(draft().above, 22);
+  assert.equal(draft().below, 23);
+  api.stepAutomationCondThreshold("below:3");
+  api.commitAutomationCondition();
+  const between = (harness.wizard().conditions as Array<Record<string, unknown>>)[0];
+  assert.deepEqual(between, { type: "deviceState", deviceId: "0x0044", property: "temperature", above: 22, below: 26 });
+  assert.match(String(api.automationConditionLine(between)), /automationCondBetweenLine/);
+
+  // Ters aralık kaydedilemez: ileri düğmesi pasif kalır ve sebebi yazar.
+  api.editAutomationCondition(0);
+  api.stepAutomationCondThreshold("below:-10");
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), false);
+  assert.equal(api.automationBlockedReason(harness.wizard()), "automationNeedCondValue");
 });
 
 // Çalışma geçmişi satırı: renk tek başına yeterli değil, işaret de var.

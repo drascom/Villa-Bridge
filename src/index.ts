@@ -22,6 +22,7 @@ import {
   validateHomeFavorites
 } from "./home-favorites.js";
 import { HomeGroupsStore, homeGroupDeviceControlId, validateHomeGroups } from "./home-groups.js";
+import { HomeVisibilityStore, validateHomeVisibility } from "./home-visibility.js";
 import { HomeBackupService, type HomeBackupMode } from "./home-backup.js";
 import { InstallationStateStore } from "./installation-state.js";
 import { LocationStore, type HomeLocation } from "./location.js";
@@ -89,6 +90,10 @@ store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
 const homeGroupsStore = new HomeGroupsStore(resolve(dirname(configPath), "home-groups.json"));
+// Görünürlük ev genelinde tek doğru: tablette gizlenen cihaz sunucudaki panelde de gizli.
+const homeVisibilityStore = new HomeVisibilityStore(
+  resolve(dirname(configPath), "home-visibility.json")
+);
 const automationGroupLookup = (groupId: string): { memberIds: string[] } | undefined =>
   store.getGroups().find((group) => group.id === groupId);
 const automationsStore = new AutomationsStore(
@@ -124,6 +129,7 @@ const homeBackupService = new HomeBackupService({
     aliases: config.aliasesFile,
     homeGroups: resolve(dirname(configPath), "home-groups.json"),
     favorites: resolve(dirname(configPath), "home-favorites.json"),
+    homeVisibility: resolve(dirname(configPath), "home-visibility.json"),
     deviceNotes: resolve(dirname(configPath), "device-notes.json"),
     deviceImages: resolve(dirname(configPath), "device-images.json")
   },
@@ -775,9 +781,44 @@ app.put<{ Body?: { groups?: unknown } }>("/api/home-groups", async (request, rep
         }
       }
     }
-    return { ok: true, groups: await homeGroupsStore.save(groups) };
+    const saved = await homeGroupsStore.save(groups);
+    // Oda silmek bu uç noktadan geçer (liste komple yazılır): kalmayan odanın gizleme kaydı düşer.
+    await homeVisibilityStore.pruneGroups(saved.map((group) => group.id)).catch((error) => {
+      console.error(`Görünürlük kaydından silinen oda düşürülemedi: ${String(error)}`);
+    });
+    return { ok: true, groups: saved };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/**
+ * Görünürlük tercihleri — cihaz/oda gösterme kararı ev genelinde tektir, tarayıcıya bağlı
+ * değildir. Yerleşim tercihleri (döşeme genişliği, kart sırası, seçili sekme) burada durmaz.
+ */
+app.get("/api/home-visibility", async (_request, reply) => {
+  try {
+    return { ok: true, visibility: await homeVisibilityStore.get() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{ Body?: { visibility?: unknown } }>("/api/home-visibility", async (request, reply) => {
+  let visibility;
+  try {
+    // Kayıt canlı cihaz listesine karşı doğrulanmaz: açılışta liste henüz boşken gelen bir
+    // yazma tüm tercihleri reddederdi. Ölü kayıtları cihaz silme ve oda kaydı temizler.
+    visibility = validateHomeVisibility(request.body?.visibility);
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+  try {
+    return { ok: true, visibility: await homeVisibilityStore.save(visibility) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    recentErrors.record({ operation: "home-visibility", statusCode: 503, message });
+    return reply.code(503).send({ ok: false, error: `Görünürlük tercihleri kaydedilemedi: ${message}` });
   }
 });
 
@@ -1088,6 +1129,10 @@ app.delete<{
     store.setImagePreferences(imagePreferences);
     const favorites = await favoritesStore.removeDevice(id);
     const groups = await homeGroupsStore.removeDevice(id);
+    const visibility = await homeVisibilityStore.removeDevice(id).catch((error) => {
+      console.error(`Görünürlük kaydından cihaz düşürülemedi: ${String(error)}`);
+      return null;
+    });
     await automationsStore.removeDevice(id).catch((error) => {
       console.error(`Otomasyonlardan cihaz düşürülemedi: ${String(error)}`);
     });
@@ -1095,7 +1140,7 @@ app.delete<{
     await removeDeviceRole(deviceRolesPath, deviceRoles, id).catch((error) => {
       console.error(`Cihaz rolü silinemedi: ${String(error)}`);
     });
-    return { ok: true, force, favorites, groups };
+    return { ok: true, force, favorites, groups, visibility };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }

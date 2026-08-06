@@ -28,6 +28,82 @@ function extractFunction(source: string, name: string): string {
   throw new Error(`${name} gövdesi kapanmıyor`);
 }
 
+interface VisibilityRun {
+  hiddenTiles: string[];
+  hiddenGroups: string[];
+  storage: Record<string, string>;
+  writes: unknown[];
+  toasts: string[];
+}
+
+/* Görünürlük yükleme/göç akışı, gönderilen kodun kendisiyle çalıştırılıyor: sahte `api`,
+   sahte `localStorage` ve sahte panel çizimiyle. */
+async function runVisibilityLoad(options: {
+  storage: Record<string, string>;
+  response?: unknown;
+  loadFails?: boolean;
+  saveFails?: boolean;
+}): Promise<VisibilityRun> {
+  const source = await readDashboard();
+  const result: VisibilityRun = {
+    hiddenTiles: [],
+    hiddenGroups: [],
+    storage: { ...options.storage },
+    writes: [],
+    toasts: []
+  };
+  const factory = new Function(
+    "options",
+    "result",
+    `
+    const groupDeviceControlId="@device";
+    const groupWidgetPrefix="group:";
+    const hiddenTilesStorageKey="villa-hidden-tiles";
+    const removedWidgetsKey="villa-dashboard-removed-widgets";
+    const visibilityCacheKey="villa-home-visibility-cache";
+    const tileVisibilityKey=(deviceId,controlId)=>\`\${deviceId}::\${controlId||groupDeviceControlId}\`;
+    const localStorage={
+      getItem:key=>Object.hasOwn(result.storage,key)?result.storage[key]:null,
+      setItem:(key,value)=>{result.storage[key]=value},
+      removeItem:key=>{delete result.storage[key]}
+    };
+    const state={hiddenTiles:new Set(),hiddenGroups:new Set(),removedWidgets:new Set(
+      JSON.parse(result.storage[removedWidgetsKey]||"[]")
+    )};
+    const t=(key,values)=>key+":"+JSON.stringify(values||{});
+    const showToast=message=>{result.toasts.push(message)};
+    const applyWidgetLayout=()=>{};
+    const render=()=>{};
+    const saveRemovedWidgets=()=>{
+      result.storage[removedWidgetsKey]=JSON.stringify([...state.removedWidgets]);
+    };
+    const api=async(url,init)=>{
+      if(!init){
+        if(options.loadFails)throw new Error("offline");
+        return{visibility:options.response};
+      }
+      result.writes.push(JSON.parse(init.body).visibility);
+      if(options.saveFails)throw new Error("disk dolu");
+      return{ok:true};
+    };
+    ${extractFunction(source, "visibilityPayload")}
+    ${extractFunction(source, "cacheVisibility")}
+    ${extractFunction(source, "applyVisibility")}
+    async ${extractFunction(source, "saveHomeVisibility")}
+    ${extractFunction(source, "legacyVisibility")}
+    ${extractFunction(source, "clearLegacyVisibility")}
+    async ${extractFunction(source, "loadHomeVisibility")}
+    return async()=>{
+      await loadHomeVisibility();
+      result.hiddenTiles=[...state.hiddenTiles];
+      result.hiddenGroups=[...state.hiddenGroups];
+    };
+  `
+  ) as (options: unknown, result: VisibilityRun) => () => Promise<void>;
+  await factory(options, result)();
+  return result;
+}
+
 type Entry = { device: { id: string }; control: { id: string } | null };
 
 async function pickOverviewEntries(entries: Entry[], hidden: string[]): Promise<{ entries: Entry[]; hidden: number }> {
@@ -65,16 +141,108 @@ test("Genel görünüm kartı varsayılan olarak her cihazı gösterir, yalnız 
   assert.equal(sensorHidden.hidden, 1);
 });
 
-test("gizleme kaydı ayrı bir anahtarda, boş başlar ve eski favori kaydına dokunmaz", async () => {
+test("görünürlük kararı sunucuda durur, yerel kayıt yalnız göç ve çevrimdışı yansıdır", async () => {
+  const dashboard = await readDashboard();
+
+  assert.match(dashboard, /const tileVisibilityKey=\(deviceId,controlId\)=>`\$\{deviceId\}::\$\{controlId\|\|groupDeviceControlId\}`/);
+  // Kayıt yalnız gizlenenleri tutar: listede olmayan her şey görünür.
+  assert.match(dashboard, /await api\("\/api\/home-visibility",\{method:"PUT",body:JSON\.stringify\(\{visibility:visibilityPayload\(\)\}\)\}\)/);
+  assert.match(dashboard, /visibility=\(await api\("\/api\/home-visibility"\)\)\.visibility/);
+  assert.match(dashboard, /hiddenGroups:\[\.\.\.state\.hiddenGroups\]/);
+  // Döşeme genişliği ve kart sırası cihazda kalır: yerleşim tercihi, ev kararı değil.
+  assert.match(dashboard, /const tileWidthStorageKey="villa-tile-widths"/);
+  assert.match(dashboard, /localStorage\.setItem\("villa-dashboard-widgets",JSON\.stringify\(state\.widgets\)\)/);
+  // Eski favori uç noktası arayüzden çağrılmıyor; sunucudaki kayıt yerinde duruyor.
+  assert.doesNotMatch(dashboard, /\/api\/favorites/);
+});
+
+test("eski yerel görünürlük kaydı bir kez sunucuya taşınır, sonra silinir", async () => {
   const dashboard = await readDashboard();
 
   assert.match(dashboard, /const hiddenTilesStorageKey="villa-hidden-tiles"/);
-  assert.match(dashboard, /const tileVisibilityKey=\(deviceId,controlId\)=>`\$\{deviceId\}::\$\{controlId\|\|groupDeviceControlId\}`/);
-  // Kayıt bir liste: içinde olmayan her şey görünür.
-  assert.match(dashboard, /JSON\.parse\(localStorage\.getItem\(hiddenTilesStorageKey\)\|\|"\[\]"\)/);
-  assert.match(dashboard, /localStorage\.setItem\(hiddenTilesStorageKey,JSON\.stringify\(\[\.\.\.state\.hiddenTiles\]\)\)/);
-  // Eski favori uç noktası arayüzden çağrılmıyor; sunucudaki kayıt yerinde duruyor.
-  assert.doesNotMatch(dashboard, /\/api\/favorites/);
+  // Grup görünürlüğü eskiden kart sırasının içindeydi; göç onu `group:` önekinden toplar.
+  assert.match(dashboard, /read\(removedWidgetsKey,"\[\]"\)\s*\.filter\(id=>id\.startsWith\(groupWidgetPrefix\)\)\s*\.map\(id=>id\.slice\(groupWidgetPrefix\.length\)\)/);
+  assert.match(dashboard, /const serverEmpty=!\(visibility\?\.hiddenDevices\|\|\[\]\)\.length&&!\(visibility\?\.hiddenGroups\|\|\[\]\)\.length/);
+  // Yazma başarısızsa yerel kayıt silinmez: seçim kaybolmaz, bir sonraki açılışta yeniden denenir.
+  assert.match(dashboard, /if\(await saveHomeVisibility\(\)\)clearLegacyVisibility\(\)/);
+  assert.match(dashboard, /localStorage\.removeItem\(hiddenTilesStorageKey\)/);
+  // Çevrimdışı: son bilinen değerle çalışmaya devam eder, kayıt sıfırlanmaz.
+  assert.match(dashboard, /showToast\(t\("visibilityLoadFailed",\{error:error\.message\}\),true\);\s*return;/);
+  assert.match(dashboard, /const visibilityCacheKey="villa-home-visibility-cache"/);
+});
+
+test("bugün cihazda yapılmış seçimler göçte kaybolmuyor", async () => {
+  const run = await runVisibilityLoad({
+    storage: {
+      "villa-hidden-tiles": JSON.stringify(["0xa4c138ea872c2c8e::l1", "0x20a716fffe6835f1::@device"]),
+      // Grup görünürlüğü eskiden kart sırasının içindeydi; `group:` girdileri göçe dahil.
+      "villa-dashboard-removed-widgets": JSON.stringify(["group:salon", "summary"])
+    },
+    response: { hiddenDevices: [], hiddenGroups: [] }
+  });
+
+  assert.deepEqual(run.writes, [{
+    hiddenDevices: [
+      { deviceId: "0xa4c138ea872c2c8e", controlId: "l1" },
+      { deviceId: "0x20a716fffe6835f1", controlId: "@device" }
+    ],
+    hiddenGroups: ["salon"]
+  }]);
+  assert.deepEqual(run.hiddenGroups, ["salon"]);
+  // Göç bitti: eski anahtar silinir, sıra kaydındaki `group:` girdisi düşer, bilgi kartı kalır.
+  assert.equal(Object.hasOwn(run.storage, "villa-hidden-tiles"), false);
+  assert.deepEqual(JSON.parse(run.storage["villa-dashboard-removed-widgets"] as string), ["summary"]);
+});
+
+test("göç yazması başarısızsa yerel kayıt silinmiyor", async () => {
+  const run = await runVisibilityLoad({
+    storage: { "villa-hidden-tiles": JSON.stringify(["0xa4c138ea872c2c8e::l1"]) },
+    response: { hiddenDevices: [], hiddenGroups: [] },
+    saveFails: true
+  });
+
+  assert.equal(run.writes.length, 1);
+  assert.match(run.toasts.join(" "), /visibilitySaveFailed/);
+  assert.ok(Object.hasOwn(run.storage, "villa-hidden-tiles"));
+});
+
+test("sunucuda kayıt varsa o kazanır, yerel kalıntı temizlenir", async () => {
+  const run = await runVisibilityLoad({
+    storage: {
+      "villa-hidden-tiles": JSON.stringify(["0xa4c138ea872c2c8e::l1"]),
+      "villa-dashboard-removed-widgets": JSON.stringify(["group:salon"])
+    },
+    response: {
+      hiddenDevices: [{ deviceId: "0x20a716fffe6835f1", controlId: "main" }],
+      hiddenGroups: ["mutfak"]
+    }
+  });
+
+  assert.deepEqual(run.writes, []);
+  assert.deepEqual(run.hiddenTiles, ["0x20a716fffe6835f1::main"]);
+  assert.deepEqual(run.hiddenGroups, ["mutfak"]);
+  assert.equal(Object.hasOwn(run.storage, "villa-hidden-tiles"), false);
+  assert.deepEqual(JSON.parse(run.storage["villa-dashboard-removed-widgets"] as string), []);
+});
+
+test("çevrimdışıyken panel son bilinen değerle çalışmayı sürdürüyor", async () => {
+  const cache = JSON.stringify({
+    hiddenDevices: ["0xa4c138ea872c2c8e::l1"],
+    hiddenGroups: ["salon"]
+  });
+  const run = await runVisibilityLoad({
+    storage: {
+      "villa-hidden-tiles": JSON.stringify(["0xa4c138ea872c2c8e::l1"]),
+      "villa-home-visibility-cache": cache
+    },
+    loadFails: true
+  });
+
+  // Sunucuya yazılmaz, yerel kayıt sıfırlanmaz, kullanıcı görünür uyarı alır.
+  assert.deepEqual(run.writes, []);
+  assert.match(run.toasts.join(" "), /visibilityLoadFailed/);
+  assert.equal(run.storage["villa-home-visibility-cache"], cache);
+  assert.ok(Object.hasOwn(run.storage, "villa-hidden-tiles"));
 });
 
 test("gizli cihaz sayısı kartın altında duyurulur ve Cihazlar görünümüne götürür", async () => {
@@ -136,26 +304,69 @@ test("cihazı olmayan grup Genel görünümde kart basmaz, sekmesi durur", async
   assert.deepEqual(rendered, ["salon"]);
 });
 
-test("grup görünürlüğü grup kimliğiyle widget düzeninde saklanır", async () => {
+/* Görünürlük artık kart sırasından ayrı: anahtar `hiddenGroups`'a yazar ve sunucuya gider,
+   `state.widgets` (sıra) hiç değişmez. */
+test("grup görünürlüğü kart sırasına dokunmadan sunucuya yazılır", async () => {
   const source = await readDashboard();
   const calls: string[] = [];
+  const state = { widgets: ["summary", "group:salon"], hiddenGroups: new Set<string>() };
   const run = new Function(
     "calls",
-    "widgets",
+    "state",
     `
     const groupWidgetPrefix="group:";
-    const groupWidgetId=id=>\`\${groupWidgetPrefix}\${id}\`;
-    const state={widgets};
-    const addDashboardWidget=id=>calls.push("add:"+id);
-    const removeDashboardWidget=id=>calls.push("remove:"+id);
+    const applyWidgetLayout=()=>calls.push("layout");
+    const render=()=>calls.push("render");
+    const saveHomeVisibility=async()=>{calls.push("save");return true};
     const touchDashboardEditing=()=>calls.push("touch");
+    ${extractFunction(source, "setGroupOverview")}
     ${extractFunction(source, "toggleGroupOverview")}
     toggleGroupOverview("salon");
     toggleGroupOverview("auto:lights");
+    toggleGroupOverview("salon");
   `
-  ) as (calls: string[], widgets: string[]) => void;
-  run(calls, ["summary", "group:salon"]);
-  assert.deepEqual(calls, ["remove:group:salon", "touch", "add:group:auto:lights", "touch"]);
+  ) as (calls: string[], state: { widgets: string[]; hiddenGroups: Set<string> }) => void;
+  run(calls, state);
+
+  assert.deepEqual([...state.hiddenGroups], ["auto:lights"]);
+  assert.deepEqual(state.widgets, ["summary", "group:salon"]);
+  assert.equal(calls.filter((call) => call === "save").length, 3);
+});
+
+test("oda kartında kaldır düğmesi sırayı değil görünürlüğü değiştirir", async () => {
+  const source = await readDashboard();
+  interface RemoveState {
+    widgets: string[];
+    removedWidgets: Set<string>;
+    hiddenGroups: Set<string>;
+  }
+  const state: RemoveState = {
+    widgets: ["summary", "group:salon"],
+    removedWidgets: new Set<string>(),
+    hiddenGroups: new Set<string>()
+  };
+  const run = new Function(
+    "state",
+    `
+    const groupWidgetPrefix="group:";
+    const applyWidgetLayout=()=>{};
+    const render=()=>{};
+    const saveHomeVisibility=async()=>true;
+    const saveRemovedWidgets=()=>{};
+    const saveWidgetLayout=()=>{};
+    const touchDashboardEditing=()=>{};
+    ${extractFunction(source, "setGroupOverview")}
+    ${extractFunction(source, "removeDashboardWidget")}
+    removeDashboardWidget("group:salon");
+    removeDashboardWidget("summary");
+  `
+  ) as (state: RemoveState) => void;
+  run(state);
+
+  // Oda kartı sırasını korur (geri açılınca yeri kaymasın), bilgi kartı listeden düşer.
+  assert.deepEqual(state.widgets, ["group:salon"]);
+  assert.deepEqual([...state.hiddenGroups], ["salon"]);
+  assert.deepEqual([...state.removedWidgets], ["summary"]);
 });
 
 test("alt şerit sekme çubuğu: Genel görünüm ilk ve kilitli, yeni grup düğmesi tablist dışında", async () => {

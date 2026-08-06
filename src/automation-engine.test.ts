@@ -976,6 +976,78 @@ test("gece yarısını aşan aralıkta gün ölçütü aralığın başladığı
   assert.equal(check(new Date(2026, 7, 9, 2, 0)), false);
 });
 
+test("sayısal eşik koşulu o anki değere bakar; tam sınır dışarıda kalır", () => {
+  const at = new Date(2026, 7, 3, 12, 0);
+  const check = (condition: AutomationCondition, value: JsonScalar): boolean =>
+    evaluateAutomationConditions([condition], at, () => value).ok;
+  const above: AutomationCondition = {
+    type: "deviceState", deviceId: sensorId, property: "temperature", above: 25
+  };
+  const below: AutomationCondition = {
+    type: "deviceState", deviceId: sensorId, property: "temperature", below: 25
+  };
+  const between: AutomationCondition = {
+    type: "deviceState", deviceId: sensorId, property: "temperature", above: 20, below: 25
+  };
+
+  assert.equal(check(above, 25.1), true);
+  assert.equal(check(above, 25), false);
+  assert.equal(check(above, 24.9), false);
+  assert.equal(check(below, 24.9), true);
+  assert.equal(check(below, 25), false);
+  assert.equal(check(below, 25.1), false);
+  assert.equal(check(between, 22), true);
+  assert.equal(check(between, 20), false);
+  assert.equal(check(between, 25), false);
+  assert.equal(check(between, 26), false);
+  // Dize okuma da sayıya çevrilir — MQTT bazı cihazlarda metin gönderir.
+  assert.equal(check(above, "26.5"), true);
+
+  // Sayıya çevrilemeyen değerde koşul false ve sebebi ayrı.
+  const broken = evaluateAutomationConditions([above], at, () => "sıcak");
+  assert.equal(broken.ok, false);
+  assert.match(broken.results[0]?.reason ?? "", /sayısal değil/);
+  // Eşik dışında kalan değerin sebebi sınırı da yazar.
+  const outside = evaluateAutomationConditions([between], at, () => 30);
+  assert.equal(outside.ok, false);
+  assert.match(outside.results[0]?.reason ?? "", /20-25 aralığında değil/);
+});
+
+test("`any` modu tek koşulun tutmasıyla geçer; sonuçlar hepsini taşır", () => {
+  const at = new Date(2026, 7, 3, 12, 0);
+  // Biri tutan, biri tutmayan iki koşul: fark yalnız moddan gelir.
+  const conditions: AutomationCondition[] = [
+    { type: "timeRange", from: "08:00", to: "20:00" },
+    { type: "deviceState", deviceId: lampId, property: "state_l1", equals: "ON" }
+  ];
+  const read = (): JsonScalar => "OFF";
+
+  const all = evaluateAutomationConditions(conditions, at, read);
+  assert.equal(all.ok, false);
+  const any = evaluateAutomationConditions(conditions, at, read, { mode: "any" });
+  assert.equal(any.ok, true);
+  // Günlükte "hangisi tuttu" görünmeli: `any` modunda da tüm koşullar döner.
+  assert.equal(any.results.length, 2);
+  assert.deepEqual(any.results.map((result) => result.ok), [true, false]);
+  assert.match(any.results[1]?.reason ?? "", /state_l1/);
+
+  // Hiçbiri tutmuyorsa `any` de geçmez.
+  const none = evaluateAutomationConditions(
+    [conditions[1] as AutomationCondition, conditions[1] as AutomationCondition],
+    at,
+    read,
+    { mode: "any" }
+  );
+  assert.equal(none.ok, false);
+
+  // Koşulsuz kural iki modda da geçer.
+  assert.equal(evaluateAutomationConditions([], at, read).ok, true);
+  assert.equal(evaluateAutomationConditions([], at, read, { mode: "any" }).ok, true);
+  // Belirtilmeyen mod "all" ile aynıdır.
+  assert.equal(evaluateAutomationConditions(conditions, at, read, {}).ok, false);
+  assert.equal(evaluateAutomationConditions(conditions, at, read, { mode: "all" }).ok, false);
+});
+
 test("bilinmeyen cihaz durumu koşulu false yapar ve sebebi taşır", () => {
   const evaluation = evaluateAutomationConditions(
     [{ type: "deviceState", deviceId: lampId, property: "state_l1", equals: "ON" }],
@@ -1009,6 +1081,36 @@ test("koşul sağlanmazsa kural çalışmaz ve sebebi günlüğe düşer", async
 
   // Koşul sağlanınca aynı kural çalışır.
   setState(lampId, "state_l1", "OFF");
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: false }]);
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: true }]);
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+});
+
+test("`any` modundaki kural tek koşul tutunca çalışır, hiçbiri tutmayınca sebebini yazar", async (context) => {
+  const anyRule = automation({
+    id: "herhangi-biri",
+    name: "Herhangi biri",
+    conditionMode: "any",
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true }],
+    conditions: [
+      { type: "deviceState", deviceId: lampId, property: "state_l1", equals: "ON" },
+      { type: "deviceState", deviceId: sensorId, property: "illuminance", below: 50 }
+    ]
+  });
+  const { engine, source, runs, setState } = await harness(context, [anyRule]);
+
+  // İkisi de tutmuyor: kural bloklanır ve sebep "hiçbiri" der.
+  setState(lampId, "state_l1", "OFF");
+  setState(sensorId, "illuminance", 300);
+  await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: true }]);
+  assert.equal(source.calls.length, 0);
+  const blocked = runs.filter((run) => run.reason === "conditionFalse");
+  assert.equal(blocked.length, 1);
+  assert.match(blocked[0]?.detail ?? "", /hiçbiri sağlanmadı/);
+  assert.equal(blocked[0]?.conditions?.length, 2);
+
+  // Yalnız ikinci koşul tutuyor: `all` olsaydı geçmezdi, `any` geçirir.
+  setState(sensorId, "illuminance", 10);
   await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: false }]);
   await engine.handleDeviceEvents([{ deviceId: sensorId, property: "occupancy", value: true }]);
   assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);

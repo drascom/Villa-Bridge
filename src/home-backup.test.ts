@@ -54,6 +54,7 @@ const setup = async (
     aliases: join(directory, "aliases.json"),
     homeGroups: join(directory, "home-groups.json"),
     favorites: join(directory, "home-favorites.json"),
+    homeVisibility: join(directory, "home-visibility.json"),
     deviceNotes: join(directory, "device-notes.json"),
     deviceImages: join(directory, "device-images.json")
   };
@@ -81,6 +82,10 @@ const seed = async (harness: Harness): Promise<void> => {
     { id: "salon", name: "Salon", items: [{ deviceId: deviceOne, controlId: "@device" }] }
   ]));
   await writeFile(harness.paths.favorites, JSON.stringify([{ deviceId: deviceOne, controlId: "main" }]));
+  await writeFile(harness.paths.homeVisibility, JSON.stringify({
+    hiddenDevices: [{ deviceId: deviceOne, controlId: "l2" }],
+    hiddenGroups: ["salon"]
+  }));
   await writeFile(harness.paths.deviceNotes, JSON.stringify({ [deviceOne]: "Sol duvar anahtarı" }));
   await writeFile(harness.paths.deviceImages, JSON.stringify({
     devices: { [deviceOne]: "WHD02" },
@@ -151,6 +156,55 @@ test("dışa aktarılan yedek hiçbir sır içermez", async (context) => {
   assert.equal(backup.deviceCount, 2);
   assert.equal(backup.sections.aliases[deviceOne], "Salon lambası");
   assert.equal(backup.sections.aliases[`${deviceOne}:button:1`], "Üst düğme");
+  // Göster/gizle kullanıcının kurduğu bir tercih: geri yüklemede kaybolmamalı, sır da içermez.
+  assert.deepEqual(backup.sections.homeVisibility, {
+    hiddenDevices: [{ deviceId: deviceOne, controlId: "l2" }],
+    hiddenGroups: ["salon"]
+  });
+});
+
+test("görünürlük bölümü replace'te değişir, merge'te birleşir, ölü cihaz düşer", async (context) => {
+  const replaceHarness = await setup(context);
+  await seed(replaceHarness);
+  const incoming = (): HomeBackup => ({
+    version: homeBackupVersion,
+    createdAt: "2026-07-01T10:00:00.000Z",
+    deviceCount: 2,
+    sections: {
+      automations: [],
+      aliases: {},
+      homeGroups: [],
+      favorites: [],
+      homeVisibility: {
+        hiddenDevices: [
+          { deviceId: deviceTwo, controlId: "main" },
+          // Artık tanınmayan cihaz: geri yüklemede düşer ve özette bildirilir.
+          { deviceId: "0x0000000000000009", controlId: "main" }
+        ],
+        hiddenGroups: ["mutfak"]
+      },
+      deviceNotes: {},
+      deviceImages: { devices: {}, models: {} }
+    }
+  });
+
+  const replaceSummary = await replaceHarness.service.restore(incoming(), "replace");
+  assert.equal(sectionOf(replaceSummary, "homeVisibility").skippedMissingDevices, 1);
+  assert.deepEqual(await replaceHarness.read(replaceHarness.paths.homeVisibility), {
+    hiddenDevices: [{ deviceId: deviceTwo, controlId: "main" }],
+    hiddenGroups: ["mutfak"]
+  });
+
+  const mergeHarness = await setup(context);
+  await seed(mergeHarness);
+  await mergeHarness.service.restore(incoming(), "merge");
+  assert.deepEqual(await mergeHarness.read(mergeHarness.paths.homeVisibility), {
+    hiddenDevices: [
+      { deviceId: deviceOne, controlId: "l2" },
+      { deviceId: deviceTwo, controlId: "main" }
+    ],
+    hiddenGroups: ["salon", "mutfak"]
+  });
 });
 
 test("önizleme hiçbir dosyayı değiştirmez", async (context) => {
@@ -199,6 +253,10 @@ test("replace bölümü tamamen değiştirir, merge fazlalığı silmez", async 
       aliases: { [deviceTwo]: "Mutfak lambası" },
       homeGroups: [{ id: "mutfak", name: "Mutfak", items: [] }],
       favorites: [{ deviceId: deviceTwo, controlId: "main" }],
+      homeVisibility: {
+        hiddenDevices: [{ deviceId: deviceTwo, controlId: "main" }],
+        hiddenGroups: ["mutfak"]
+      },
       deviceNotes: { [deviceTwo]: "Tezgah altı" },
       deviceImages: { devices: { [deviceTwo]: "TS0002" }, models: {} }
     }
