@@ -155,7 +155,7 @@ test("aç/kapat komutları sonuçlanana kadar kontrolü kilitler ve spinner gös
   assert.match(dashboard, /class="command-spinner"/);
   assert.match(dashboard, /\.switch\.pending::after/);
   assert.match(dashboard, /\.light-power\.pending::after/);
-  assert.match(dashboard, /\(device\.availability==="offline"&&Boolean\(action\)\)\|\|pending\?" disabled":""/);
+  assert.match(dashboard, /\(device\.availability==="offline"&&Boolean\(controlAction\)\)\|\|pending\?" disabled":""/);
 });
 
 test("cihaz kaldırma Android WebView uyumlu ve açıkça yıkıcı bir diyalog kullanır", async () => {
@@ -383,7 +383,7 @@ test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async 
   assert.match(dashboard, /const preparing=device\.preparing===true/);
   assert.match(dashboard, /<dialog id="deviceDetailDialog" class="device-detail-dialog"/);
   assert.match(dashboard, /preparing\?' inert aria-busy="true"'/);
-  assert.match(dashboard, /preparing\|\|\(device\.availability==="offline"&&Boolean\(action\)\)\|\|pending/);
+  assert.match(dashboard, /preparing\|\|\(device\.availability==="offline"&&Boolean\(controlAction\)\)\|\|pending/);
   assert.match(dashboard, /pairingReconnectComplete:"Known device reconnected successfully\."/);
   assert.match(dashboard, /pairingReconnectComplete:"Kayıtlı cihaz yeniden bağlandı\."/);
   assert.match(dashboard, /state\.editing=\{id,channel:null,afterPairing:true,reconnected\}/);
@@ -459,7 +459,7 @@ test("ilk kurulum sihirbazı ve ilk kullanım rehberleri amatör kullanıcıyı 
   assert.match(dashboard, /emptyDevicesTitle:"İlk cihazınızı ekleyin"/);
   assert.match(dashboard, /data-empty-add-device/);
   assert.match(dashboard, /const dashboardTourSteps=\(\)=>\[/);
-  assert.match(dashboard, /target:"#quickDevices"/);
+  assert.match(dashboard, /target:"#homeTabs"/);
   assert.match(dashboard, /target:"#addWidget"/);
   assert.match(dashboard, /target:"#editDashboard"/);
   // Turun son adımı yeni menü düğmesini gösterir; gezinme şeridi artık yok.
@@ -696,14 +696,14 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.doesNotMatch(dashboard, /Add widget|Widget ekle|Edit dashboard|Dashboard’u düzenle/);
   assert.doesNotMatch(dashboard, /data-widget="status"/);
   assert.match(dashboard, /data-widget="quick"/);
-  assert.match(dashboard, /class="dashboard-widget widget-wide quick-control-widget" data-widget="quick"[\s\S]*?id="quickDevices"/);
-  assert.doesNotMatch(dashboard, /data-widget="quick"[\s\S]*?<h2[\s\S]*?id="quickDevices"/);
+  assert.match(dashboard, /class="dashboard-widget widget-wide quick-control-widget" data-widget="quick"[\s\S]*?id="homeTabs"[^>]*role="tablist"/);
+  assert.doesNotMatch(dashboard, /data-widget="quick"[\s\S]*?<h2[\s\S]*?id="homeTabs"/);
   assert.match(dashboard, /data-widget="availability"/);
   assert.doesNotMatch(dashboard, /data-widget="recent"/);
   assert.doesNotMatch(dashboard, /id="recentDevices"|recentWidgetLead|noRecentDevices/);
   // Saat ve hava artık widget değil: `#widgetBoard`un ilk statik çocuğu olan hub bloğunda duruyorlar.
   assert.match(dashboard, /<div id="widgetBoard" class="widget-board">\s*<section id="homeHub" class="home-hub"/);
-  assert.match(dashboard, /<section id="homeHub" class="home-hub"[\s\S]*?<div id="widgetRail" class="widget-rail">/);
+  assert.match(dashboard, /<section id="homeHub" class="home-hub"[\s\S]*?<div id="widgetRail" class="widget-rail"/);
   assert.doesNotMatch(dashboard, /data-widget="clock"|data-widget="weather"/);
   assert.match(dashboard, /const defaultDashboardWidgets=\["quick","summary","availability","activity"\]/);
   assert.match(dashboard, /known\.some\(id=>!fixedDashboardWidgets\.has\(id\)\)\?known:\[\.\.\.defaultDashboardWidgets\]/);
@@ -817,7 +817,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /bar\.hidden=!message/);
   assert.match(dashboard, /document\.body\.classList\.toggle\("has-system-alert",Boolean\(message\)\)/);
   assert.match(dashboard, /const fixedDashboardWidgets=new Set\(\["quick"\]\)/);
-  assert.match(dashboard, /data-quick-controls=/);
+  assert.match(dashboard, /data-home-tab=/);
   assert.match(dashboard, /\.layout-glyph\{position:relative;width:14px;height:14px/);
   assert.match(dashboard, /\.layout-glyph\.grid::before\{left:2px;top:2px/);
   assert.match(dashboard, /\.layout-glyph\.list::before\{left:0;top:1px/);
@@ -844,16 +844,13 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /startedOutside=event\.target===dialog&&outside\(event\)/);
   assert.match(dashboard, /bindBackdropClose\("#widgetDialog","\.add-modal",closeAddDialog\)/);
   assert.doesNotMatch(dashboard, /bindBackdropClose\("#(nameDialog|noteDialog|deviceOptionsDialog|removeDialog|imageDialog|clockDialog|weatherLocationDialog|runtimeStopDialog|onboardingDialog|pairingDialog)"/);
-  assert.match(dashboard, /class="device-card quick-card \$\{visualState\}\$\{failed\?" command-failed":""\}"/);
-  assert.match(dashboard, /const shown=pending\?!action\.active:action\?\.active===true/);
+  assert.match(dashboard, /class="quick-card home-tab\$\{selected\?" selected":""\}" type="button" role="tab"/);
   assert.match(dashboard, /const shown=pending\?!controlAction\.active:controlAction\?\.active===true/);
   assert.match(dashboard, /class="group-control-tile \$\{visualState\}\$\{pending\?" pending":""\}\$\{failed\?" command-failed":""\}"/);
   assert.match(dashboard, /\.device-card\.command-failed,\.group-control-tile\.command-failed\{border-color:var\(--danger\)/);
   assert.match(dashboard, /catch\(error\)\{for\(const \{device\} of entries\)flagCommandError\(device\.id\);showToast\(error\.message,true\)\}/);
   assert.doesNotMatch(dashboard, /class="quick-state /);
-  assert.match(dashboard, /const batteryThreshold=state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
-  assert.match(dashboard, /class="quick-battery\$\{battery<=batteryThreshold\?" low":""\}"/);
-  assert.match(dashboard, /class="battery-glyph"/);
+  assert.match(dashboard, /const lowBatteryThreshold=\(\)=>state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
   assert.match(dashboard, /class="device-name-row"><div class="device-name">\$\{esc\(device\.name\)\}<\/div><\/div>/);
   assert.match(dashboard, /const cardToggle=deviceCardToggle\(device,preparing\)/);
@@ -863,20 +860,13 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.quick-control-widget\{[^}]*padding:12px 10px 4px[^}]*border-radius:16px[^}]*background:var\(--surface\)[^}]*box-shadow:var\(--card-shadow\)/);
   assert.match(dashboard, /\.quick-control-widget \.quick-card\{min-height:56px;padding:5px 12px\}/);
   assert.match(dashboard, /class="quick-device-icon"/);
-  assert.match(dashboard, /\.quick-toggle\{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:26px minmax\(0,1fr\) auto/);
-  assert.match(dashboard, /<button class="quick-toggle \$\{shown\?"on":""\}\$\{pending\?" pending":""\}" \$\{actionAttributes\}[\s\S]*?<span class="quick-device-icon" aria-hidden="true">\$\{deviceTypeIcon\(device,control\)\}<\/span><span class="device-name">\$\{esc\(displayName\)\}<\/span>\$\{preparing\|\|pending\?'<span class="command-spinner" aria-hidden="true"><\/span>':batteryPill\}<\/button>/);
   assert.match(dashboard, /\.quick-grid\.grid-view\{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto/);
   assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start\}/);
   assert.match(dashboard, /\.quick-grid \.device-name\{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:15px\}/);
-  assert.match(dashboard, /\.quick-battery\{[^}]*font-size:11px;font-weight:750\}/);
   assert.match(dashboard, /\.quick-grid\.grid-view \.quick-card\{width:max-content;min-width:144px;flex-basis:auto\}/);
   assert.doesNotMatch(dashboard, /\.quick-grid \.device-name\{[^}]*text-overflow:ellipsis/);
-  assert.doesNotMatch(dashboard, /quick\.length>=Math\.max\(8,state\.favorites\.length\)/);
-  assert.match(dashboard, /if\(!quick\.length\)for\(const id of orderedIds\)\{/);
-  assert.match(dashboard, /if\(quick\.length>=8\)break/);
-  assert.match(dashboard, /quick\.map\(item=>quickDeviceHtml\(item\.device,item\.control\)\)\.join\(""\):quickEmptyHtml\(\)/);
-  assert.match(dashboard, /const quickEmptyHtml=\(\)=>`<div class="empty quick-empty">[\s\S]*?data-quick-empty-action>\$\{t\("quickEmptyAction"\)\}<\/button><\/div>`/);
-  assert.match(dashboard, /\$\$\("\[data-quick-empty-action\]"\)\.forEach\(button=>button\.onclick=\(\)=>activateView\("devices"\)\)/);
+  // Şerit artık cihaz kısayolu basmıyor: eski hızlı erişim işleyişi tamamen kalktı.
+  assert.doesNotMatch(dashboard, /quickDeviceHtml|quickEmptyHtml|data-quick-controls|data-quick-empty-action/);
   assert.doesNotMatch(dashboard, /createGroupShortcut/);
   assert.doesNotMatch(dashboard, /tourGroupTitle|tourGroupLead/);
   assert.match(dashboard, /<div class="home-actions"><button id="addWidget"[\s\S]*?<button id="editDashboard"[\s\S]*?<\/div><\/header>/);
@@ -974,9 +964,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\$\$\("\[data-toggle-room\]"\)\.forEach\(button=>button\.onclick=\(\)=>toggleDeviceRoom\(button\.dataset\.roomDevice,button\.dataset\.toggleRoom\)\)/);
   assert.match(dashboard, /\.room-membership\.active\{border-color:var\(--forest\);color:var\(--on-forest\);background:var\(--forest\)\}/);
   assert.doesNotMatch(dashboard, /data-toggle-room[^>]*data-admin-only/);
-  assert.match(dashboard, /\.quick-empty\{display:flex/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \[data-widget="activity"\] \.widget-list-row\{background:transparent;box-shadow:none\}/);
-  assert.match(dashboard, /#quickDevices\{cursor:grab\}#quickDevices\.mouse-dragging,#quickDevices\.mouse-dragging \*\{cursor:grabbing!important\}/);
+  assert.match(dashboard, /#homeTabs\{cursor:grab\}#homeTabs\.mouse-dragging,#homeTabs\.mouse-dragging \*\{cursor:grabbing!important\}/);
   assert.match(dashboard, /function setupQuickMouseScrolling\(\)\{/);
   assert.match(dashboard, /if\(event\.pointerType!=="mouse"\|\|event\.button!==0\)return/);
   assert.match(dashboard, /if\(!dragged&&Math\.abs\(distance\)>6\)\{/);
@@ -1007,7 +996,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-board\{flex:1 1 auto;min-height:150px;max-height:660px;display:grid;grid-template-columns:var\(--hub-column\) minmax\(0,1fr\);grid-template-rows:minmax\(0,1fr\);gap:10px\}/);
   assert.doesNotMatch(dashboard, /#home \[data-widget="status"\]/);
   assert.match(dashboard, /#home \[data-widget="quick"\]\{position:fixed;z-index:9;left:var\(--strip-inset\);right:var\(--strip-inset\);bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\);grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden\}/);
-  assert.match(dashboard, /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card\{height:56px\}/);
+  assert.match(dashboard, /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card,#home \.strip-row>\.quick-card-add\{height:56px\}/);
   // Hub arka katmanda: rail tüm panoyu kaplar, hub sütunu kadar dolgusu var ve üstünden kayar.
   assert.match(dashboard, /#home \.widget-rail\{position:relative;z-index:1;grid-column:1\/-1;grid-row:1;padding-left:calc\(var\(--hub-column\) \+ 10px\);scroll-padding-left:calc\(var\(--hub-column\) \+ 10px\);pointer-events:none;height:100%;display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
   // Rail'in kendisi tıklamayı yutmaz; yalnız kartlar yakalar, böylece açıktaki hub tıklanabilir kalır.
@@ -1072,14 +1061,12 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const hasBefore=scroller\.scrollLeft>8/);
   assert.match(dashboard, /const hasAfter=scroller\.scrollWidth-scroller\.clientWidth-scroller\.scrollLeft>8/);
   assert.match(dashboard, /function scrollWidgetRail\(direction\)\{scrollDashboardRow\(\$\("#widgetRail"\),direction,220,\.72\)\}/);
-  assert.match(dashboard, /function scrollQuickControls\(direction\)\{scrollDashboardRow\(\$\("#quickDevices"\),direction,120,\.55\)\}/);
+  assert.match(dashboard, /function scrollHomeTabs\(direction\)\{scrollDashboardRow\(\$\("#homeTabs"\),direction,120,\.55\)\}/);
   assert.match(dashboard, /#home \.widget-scroll-hint\{top:calc\(50% - 24px\);width:38px;height:48px;border-radius:15px\}/);
   assert.match(dashboard, /#home \.quick-scroll-hint\{top:calc\(50% - 20px\);width:30px;height:40px;border-radius:13px\}/);
   assert.doesNotMatch(dashboard, /scroll-hint-pulse/);
-  assert.match(dashboard, /const button=card\.querySelector\("\[data-command-value\],\[data-quick-show\]"\)/);
-  assert.match(dashboard, /if\(!button\|\|button\.disabled\)return/);
-  assert.match(dashboard, /const button=card\.querySelector\("\[data-command-value\],\[data-quick-show\]"\);[\s\S]*?button\.click\(\)/);
-  assert.match(dashboard, /if\(!event\.target\.closest\("button,input"\)\)toggle\(\)/);
+  // Sekmenin kendisi buton: eski "karta dokun, içindeki butonu tıkla" sarmalayıcısı kalktı.
+  assert.doesNotMatch(dashboard, /if\(!event\.target\.closest\("button,input"\)\)toggle\(\)/);
   assert.doesNotMatch(dashboard, /if\(!event\.target\.closest\("button,input"\)\)openLightControls/);
   assert.match(dashboard, /id="deviceActionDialog"/);
   assert.match(dashboard, /data-i18n="showDetails">Show Details/);
@@ -1093,7 +1080,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /confirmUnlockDevice:"Unlock \{name\}\? The door will open\."/);
   assert.match(dashboard, /confirmUnlockDevice:"\{name\} kilidi açılsın mı\? Kapı açılacak\."/);
   assert.match(dashboard, /const longPressDelay=560/);
-  assert.match(dashboard, /bindLongPress\(card,\(\)=>openDeviceDetail\(card\.dataset\.quickControls\)\)/);
+  assert.match(dashboard, /bindLongPress\(card,\(\)=>openDeviceDetail\(card\.dataset\.groupDevice\)\)/);
   assert.match(dashboard, /bindLongPress\(card,\(\)=>openDeviceDetail\(card\.dataset\.groupDevice\)\)/);
   assert.match(dashboard, /bindLongPress\(card,\(\)=>openDeviceDetail\(card\.dataset\.groupShowDevice\)\)/);
   assert.doesNotMatch(dashboard, /openDeviceActions/);
@@ -1274,7 +1261,8 @@ test("günlük cihaz tipleri favori, Quick Control ve dashboard gruplarında kul
   assert.match(dashboard, /const dashboardControlForDevice=/);
   assert.match(dashboard, /const dashboardControlAction=/);
   assert.match(dashboard, /const mainControl=dashboardControlForDevice\(device\)/);
-  assert.match(dashboard, /device\?\.controls\.find\(item=>item\.id===favorite\.controlId&&isDashboardControl\(item\)\)/);
+  // Favoriler artık Genel görünüm kartını süzüyor: aynı kayıt (cihaz UID + kontrol kimliği), yeni iş.
+  assert.match(dashboard, /const chosen=entries\.filter\(entry=>entry\.control&&isFavorite\(entry\.device\.id,entry\.control\.id\)\)/);
   assert.match(dashboard, /const favoriteButton=\(device,control\)=>\{/);
   assert.match(dashboard, /class="favorite-toggle \$\{active\?"active":""\}"/);
   assert.match(dashboard, /\$\{isDashboardControl\(control\)\?favoriteButton\(device,control\):""\}/);
@@ -1393,7 +1381,7 @@ test("widget kataloğu bilgi kutuları ve kullanıcı grupları olarak ayrılır
   assert.match(dashboard, /<div class="widget-catalog-section" role="group" aria-labelledby="\$\{headingId\}"><h3 id="\$\{headingId\}" class="widget-catalog-heading">\$\{esc\(t\(labelKey\)\)\}<\/h3>/);
   assert.match(dashboard, /widgetCatalogSectionHtml\("widgetCatalogInfoHeading","widgetCatalogInfoBoxes",infoBoxes\)\+widgetCatalogSectionHtml\("widgetCatalogGroupsHeading","widgetCatalogYourGroups",groupBoxes\)/);
   assert.match(dashboard, /const infoBoxes=Object\.entries\(dashboardWidgetTypes\)/);
-  assert.match(dashboard, /const groupBoxes=state\.groups\.map\(group=>/);
+  assert.match(dashboard, /const groupBoxes=dashboardGroups\(\)\.map\(group=>/);
   // Ekle/Kaldır, "Her zaman açık" ve grup düzenle ikonu aynı öğe şablonunda kaldı.
   assert.match(dashboard, /function widgetCatalogItemHtml\(entry\)\{/);
   assert.match(dashboard, /\$\{t\("widgetAlwaysOn"\)\}<\/button>/);

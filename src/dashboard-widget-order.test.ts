@@ -35,6 +35,8 @@ async function layoutHarness(state: LayoutState): Promise<Harness> {
     `
     const groupWidgetPrefix="group:";
     const groupWidgetId=id=>\`\${groupWidgetPrefix}\${id}\`;
+    // Panoda gruplar listesi türetilmiş "Işıklar" grubuyla birleşir; sıralama onarımı o listeyi okur.
+    const dashboardGroups=()=>state.groups;
     let layoutSaves=0,removedSaves=0;
     function saveWidgetLayout(){layoutSaves+=1}
     function saveRemovedWidgets(){removedSaves+=1}

@@ -33,7 +33,9 @@ test("boyut simgesi yalnız düzenleme kipinde görünür", async () => {
   assert.match(dashboard, /\.widget-board\.editing \.tile-width-toggle\{display:grid\}/);
   assert.match(dashboard, /\.tile-width-toggle:focus-visible\{outline:3px solid var\(--forest-soft\)/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.tile-width-toggle:focus-visible/);
-  assert.match(dashboard, /\.widget-board\.editing \.quick-card,\.widget-board\.editing \.group-control-tile\{pointer-events:none\}/);
+  // Alt şerit artık sekme çubuğu: düzenleme kipinde de dokunulabilir kalmalı, yalnız döşemeler donar.
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-tile\{pointer-events:none\}/);
+  assert.doesNotMatch(dashboard, /\.widget-board\.editing \.quick-card\{pointer-events:none\}/);
 });
 
 test("boyut simgesi gerçek buton ve cihazı tetiklemiyor", async () => {
@@ -45,7 +47,7 @@ test("boyut simgesi gerçek buton ve cihazı tetiklemiyor", async () => {
     /\$\$\("\[data-tile-width-toggle\]"\)\.forEach\(button=>button\.onclick=event=>\{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*toggleTileWidth\(button\);/
   );
   // Simge döşemenin kardeşi: iç içe <button> geçersiz olurdu ve tıklama cihaza sızardı.
-  assert.match(dashboard, /<div class="group-control-slot\$\{wide\?" is-wide":""\}[^`]*>\$\{tile\}\$\{tileWidthToggleHtml\(widthKey,wide\)\}<\/div>/);
+  assert.match(dashboard, /<div class="group-control-slot\$\{wide\?" is-wide":""\}[^`]*>\$\{tile\}\$\{tileWidthToggleHtml\(widthKey,wide\)\}\$\{favoriteStarHtml\(device,control,name\)\}<\/div>/);
   assert.match(dashboard, /aria-label="\$\{esc\(label\)\}"/);
   assert.match(dashboard, /const label=t\(wide\?"collapseTile":"expandTile"\)/);
 });
@@ -81,7 +83,7 @@ test("geniş buton kart içinde akıyor, kart kendi içinde kayabiliyor", async 
   const dashboard = await readDashboard();
 
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2;display:grid;grid-template-rows:auto minmax\(0,1fr\)\}/);
-  assert.match(dashboard, /#home \.widget-rail \.group-control-grid\{min-height:0;overflow-y:auto/);
+  assert.match(dashboard, /#home \.widget-rail \.group-control-grid,#home \.group-panel \.group-control-grid\{min-height:0;overflow-y:auto/);
   assert.match(dashboard, /\.group-control-grid\{--group-tile-span:2;[^}]*align-content:start/);
 });
 
