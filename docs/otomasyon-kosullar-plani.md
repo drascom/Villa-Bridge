@@ -226,6 +226,13 @@ testler aynen geçmeli, üstüne nesne biçimi testleri eklenir.*
 "yeniden başlatmadan beri" sebebi → `condState` altındaki süre satırı.
 *Tek yeni altyapı burada; en sona bırakıldı ki önceki adımlar onu beklemesin.*
 
+**Saha testinden gelen iki arayüz şartı (§9.2):** "sonra kapat" ile "şu kadar süredir" ekranda
+**açıkça ayrılacak**, ve koşul adımındaki cihaz listesi neyi neden listelediğini belli edecek.
+
+### Adım 5 — Gün doğumu ve gün batımı tek kuralda
+Saha testinin ortaya çıkardığı eksik (§9.1). Veri modeli **değişmez**; motor `sun` tetikleyicisine
+eşleşme değeri verir, sihirbaz anahtar akışındaki eşleme formunu güneş için de açar.
+
 ## 7. Test yükü
 
 - `src/automations.test.ts` — her yeni alan için kabul + ret; **eski biçimli kuralların hâlâ
@@ -238,7 +245,71 @@ testler aynen geçmeli, üstüne nesne biçimi testleri eklenir.*
 - `src/dashboard-copy.test.ts` — markup ve CSS metnini birebir doğruluyor; **her arayüz adımında
   bu assertion'ları güncellemek işin parçası.**
 
-## 8. Bilinçli olarak kapsam dışı
+## 9. Saha testi bulguları — 2026-08-06
+
+Adım 1–2 canlıya çıkmadan önce kullanıcı panelde dört kural kurdu. Üçü sorunsuz
+(`Corridor Detector → Corridor light` iki ayrı sensörle: `presence` tetikleyici + `occupancy`
+koşulu, tek denemede kuruldu). Kalan iki bulgu aşağıda.
+
+### 9.1 Güneş tek kuralda iki yöne gitmiyor → Adım 5
+
+Kullanıcı "gün doğumunda şunu, gün batımında şunu yap" demek istiyor; bugün **iki ayrı kural**
+kurmak zorunda (`Test Light sunrise`, tek `sun` tetikleyicisi + `TOGGLE`).
+
+**Çözüm — yeni alan gerekmiyor.** Duvar anahtarı için yazılmış `when: { equals }` (§5.4,
+`docs/otomasyon-plani.md`) aynen kullanılır. Tek gereken: motor bir `sun` tetikleyicisi
+ateşlendiğinde **eşleşme değeri olarak olay adını** (`"sunrise"` / `"sunset"`) versin.
+
+```jsonc
+"triggers": [
+  { "type": "sun", "event": "sunset",  "offsetMinutes": 0, "days": [1,2,3,4,5,6,7] },
+  { "type": "sun", "event": "sunrise", "offsetMinutes": 0, "days": [1,2,3,4,5,6,7] }
+],
+"actions": [
+  { "type": "device", …, "value": "ON",  "when": { "equals": "sunset"  } },
+  { "type": "device", …, "value": "OFF", "when": { "equals": "sunrise" } }
+]
+```
+
+- Bugünkü kural — *"zaman tetikleyicisinde eşleşecek olay değeri yoktur, `when` taşıyan eylemler
+  atlanır"* — yalnızca `time` için sürer; `sun` için eşleşme değeri artık vardır.
+- `time` tetikleyicisi bilinçli olarak dışarıda: iki farklı saat için eşleme formu kurmak
+  "her satır bir kural" sadeliğini bozar, kullanıcı da bunu istemedi.
+- Sihirbaz: güneş seçilince **iki olayı birden** sunar ve eşleme formunu açar.
+  Varsayılan **batınca Aç / doğunca Kapat** (ışık için doğal eşleme).
+- `TOGGLE` değeri bu formda anlamsızlaşır (iki olay da aynı şeyi yapar); eşleme formunda
+  Aç/Kapat çifti öne çıkar.
+
+### 9.2 İki farklı "süre" birbirine karışıyor → Adım 4'ün arayüz şartı
+
+Kullanıcı "sensör X süredir Y durumundaysa" aradı, bulamadı (henüz yok), yerine `autoOff` ile
+kurulmuş `Toilet PIR Detector → Toilet Fan` kuralına baktı ve ikisini aynı şey sandı.
+
+Ekranda **ayrılması gereken iki kavram**:
+
+| Kavram | Cümlesi | Nerede |
+|---|---|---|
+| `autoOff` (mevcut) | *"…yap, **sonra** şu kadar süre içinde geri al"* | Eylem adımı, eylemin sonucu |
+| `forSeconds` (Adım 4) | *"…**şu kadar süredir** böyleyse çalış"* | Koşul adımı, çalışma ölçütü |
+
+İkisi ayrı adımda duruyor ama aynı kelimeyi ("süre", "dakika") kullandıkları için karışıyor.
+Arayüz kararı: her ikisinin de etiketi **zaman yönünü** taşısın — "sonra" ve "…dir/…dır" —
+ve süre seçicilerinin görsel dili birbirinden ayrışsın.
+
+### 9.3 Koşul adımında cihaz seçimi belirsiz
+
+Kullanıcı koşul eklerken tetikleyicideki cihazı yeniden aramak zorunda kaldı ve listedeki
+cihazların **neden orada olduğu** belli değildi.
+
+Yapılacak (Adım 4 turuyla birlikte):
+- Listenin başında **tetikleyicide kullanılan cihaz** kısayolu ("Aynı cihazın durumu").
+- Cihaz satırında hangi özelliğin koşula gireceği önden görünsün (bugün cihaza girmeden belli değil).
+- Boş liste hâli sessiz kalmasın: koşula uygun özelliği olmayan cihaz neden listelenmiyor, tek
+  satırla söylensin.
+
+---
+
+## 10. Bilinçli olarak kapsam dışı
 
 | Fikir | Neden |
 |---|---|
