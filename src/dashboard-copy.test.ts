@@ -74,7 +74,9 @@ test("dashboard sabit ve hafif manzara arka planı üzerinde iki katmanlı sayda
   assert.match(dashboard, /--home-glass:rgba\(247,250,248,.22\)/);
   assert.match(dashboard, /--home-control:rgba\(251,252,252,.82\)/);
   assert.match(dashboard, /body\[data-active-view="home"\] aside\{color:#f4f8f5;background:rgba\(23,65,54,.9\)/);
-  assert.match(dashboard, /body\[data-active-view="home"\] #home \.widget-card\{[^}]*background:var\(--home-glass\)/);
+  // Kartlar %82 saydam dolguyu kullanır; seçici tek `body` — çift yazım hiç eşleşmediği için kartlar beyaza düşüyordu.
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.widget-card\{border-color:var\(--home-border\);background:var\(--home-control\)/);
+  assert.doesNotMatch(dashboard, /body\[data-active-view="home"\] body\[data-active-view="home"\]/);
   // Şeridin kendi kartı yok: butonlar doğrudan fotoğrafın üstünde yüzer.
   assert.match(dashboard, /#home \.quick-control-widget\{border-color:transparent;background:none;box-shadow:none\}/);
   assert.match(dashboard, /#home \.quick-card,[^}]*#home \.group-control-tile,[^}]*background:var\(--home-control\)/);
@@ -3591,10 +3593,28 @@ test("hava konumu penceresinde tik yalnız seçili konumda çıkar ve pencere ta
   assert.match(dashboard, /<div class="location-result\$\{selected\?" is-selected":""\}"\$\{selected\?' aria-current="true"':""\}/);
   assert.match(dashboard, /\$\{selected\?`<em class="location-selected-tag">\$\{esc\(t\("locationSelected"\)\)\}<\/em>`:""\}/);
   assert.match(dashboard, /\.location-result\.is-selected\{border-color:var\(--forest\);background:var\(--forest-soft\)\}/);
-  // Küçük tablette pencere tam ekran: yalnız sonuç listesi kayar, "Close" kesilmez.
-  assert.match(dashboard, /dialog#weatherLocationDialog\{height:100dvh;max-height:100dvh\}/);
-  assert.match(dashboard, /dialog#weatherLocationDialog>\.modal\{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-bottom:calc\(20px \+ env\(safe-area-inset-bottom\)\)\}/);
-  assert.match(dashboard, /dialog#weatherLocationDialog #weatherSearchResults\{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain\}/);
+  // Küçük tablette saat, hava ve konum pencereleri tam ekran: yalnız gövde kayar, alt eylemler kesilmez.
+  assert.match(dashboard, /dialog#clockDialog,dialog#weatherDialog,dialog#weatherLocationDialog\{height:100dvh;max-height:100dvh\}/);
+  assert.match(
+    dashboard,
+    /dialog#clockDialog>\.modal,dialog#weatherDialog>\.modal,dialog#weatherLocationDialog>\.modal\{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:clamp\(14px,3vh,26px\);padding-bottom:calc\(20px \+ env\(safe-area-inset-bottom\)\)\}/
+  );
+  assert.match(
+    dashboard,
+    /dialog#clockDialog \.hub-columns,dialog#weatherDialog #weatherDialogBody,dialog#weatherLocationDialog #weatherSearchResults\{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain\}/
+  );
+  assert.match(
+    dashboard,
+    /dialog#clockDialog \.modal-actions,dialog#weatherDialog \.modal-actions,dialog#weatherLocationDialog \.modal-actions\{flex:none;margin-top:14px\}/
+  );
+  // Konum listesi ve arama alanı pencerenin yarısı kadar; ölçü orantılı, sabit px değil.
+  assert.match(
+    dashboard,
+    /dialog#weatherLocationDialog \.location-current,dialog#weatherLocationDialog \.location-search-field,dialog#weatherLocationDialog \.location-search-status,dialog#weatherLocationDialog #weatherSearchResults\{width:min\(100%,max\(52vw,320px\)\);margin-left:auto;margin-right:auto\}/
+  );
+  // Rozet satırın içinde kalır: ızgara satırı yalnız min-height kadar ölçülüp satırlar üst üste biniyordu.
+  assert.match(dashboard, /\.location-results,\.selected-locations\{display:flex;flex-direction:column;gap:8px\}/);
+  assert.match(dashboard, /\.location-result,\.selected-location\{flex:none;display:grid/);
   // Dokunma hedefleri kaba işaretçide 44 px'e çıkar.
   assert.match(dashboard, /@media\(pointer:coarse\)\{\.location-result,\.selected-location\{min-height:56px\}\.location-result button,\.selected-location button\{width:44px;height:44px\}\}/);
 });
