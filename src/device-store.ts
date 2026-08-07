@@ -11,7 +11,7 @@ import type {
 import { deviceButtons } from "./device-buttons.js";
 import { validateDeviceEvents } from "./device-events.js";
 import { detectDeviceCategory, resolveDeviceCategory, type DeviceRole } from "./device-category.js";
-import { deviceControls, type WritableFeature } from "./device-controls.js";
+import { colorHex, deviceControls, type WritableFeature } from "./device-controls.js";
 import { canonicalDeviceModel, deviceIdentity } from "./device-identity.js";
 import { resolveChannelRole } from "./device-roles.js";
 import type { DeviceImagePreferences } from "./device-images.js";
@@ -223,6 +223,43 @@ export function isInterestingEventProperty(property: string): boolean {
 }
 
 /**
+ * Otomasyon yoluna **girmeyen** meta/gürültü alanları. Burada ekleme değil **dışlama** listesi
+ * kullanılır: kural motoru cihazın bildirdiği her skaler değişimi görebilmeli (`brightness`,
+ * `color_temp`, `temperature`, `humidity`…), yalnız taşıma ve firmware gürültüsü dışarıda kalmalı.
+ *
+ * Bu liste olay **günlüğünü** (cihaz etkinlik listesi) etkilemez; o hâlâ `interestingEventProperty`
+ * dar kümesinden beslenir — parlaklık kaydırmaları "Ev hareketleri" listesini boğmasın diye.
+ */
+const noisyEventProperties = new Set([
+  "linkquality",
+  "last_seen",
+  "elapsed",
+  "update",
+  "update_available",
+  "update_state"
+]);
+
+/**
+ * Otomasyon motorunun gördüğü geniş akışın süzgeci. Dar küme bunun **alt kümesidir**: dar kümedeki
+ * hiçbir özellik burada elenmez, yani olay günlüğüne giren her şey motora da ulaşır.
+ */
+export function isAutomationEventProperty(property: string): boolean {
+  return !noisyEventProperties.has(property);
+}
+
+/**
+ * Olay değeri skaler olmalıdır. Tek istisna renktir: Zigbee2MQTT rengi nesne olarak bildirir
+ * (`{x,y}`), ama renk kanalı otomasyonda izlenebilsin diye ortak `#rrggbb` diline indirilir —
+ * hedefe yazarken aynı normalizasyon onu geri xy'ye çevirir.
+ */
+function eventScalar(property: string, value: unknown): JsonScalar | undefined {
+  const direct = scalar(value);
+  if (direct !== undefined) return direct;
+  if (!isObject(value)) return undefined;
+  return property === "color" || property.startsWith("color_") ? colorHex(value) : undefined;
+}
+
+/**
  * Takma ad ve rol haritaları dışarıda tutulur ve dışarıda değiştirilir (API uçları, yedek geri
  * yükleme). Cihaz görünümü önbelleği bayat kalmasın diye harita örneğinin `set`/`delete`/`clear`
  * çağrıları sarmalanır: her mutasyon dinleyicileri uyarır. Aynı harita birden çok kez gözlenebilir;
@@ -293,6 +330,8 @@ export class DeviceStore {
    */
   private revision = 0;
   private snapshot: DeviceSnapshot | null = null;
+  /** §6 — otomasyon motorunun geniş akış dinleyicisi; olay günlüğünden bağımsızdır. */
+  private automationListener: ((events: DeviceEventView[]) => void) | null = null;
   /**
    * Yalnızca cihaz listesinin kendisi (exposes/kumanda topolojisi) değişince artar. Durum
    * mesajları bunu kıpırdatmaz; otomasyon doğrulaması gibi topolojiye bakan önbellekler
@@ -316,6 +355,15 @@ export class DeviceStore {
     const invalidate = (): void => this.invalidate();
     observeMapMutations(aliases, invalidate);
     observeMapMutations(roles, invalidate);
+  }
+
+  /**
+   * §6 — otomasyon motorunun dinlediği **geniş** akış. Olay günlüğünün dar akışından ayrıdır:
+   * aynı değişimler bir kez hesaplanır, iki ayrı yola dağıtılır. Dinleyici verilmezse geniş akış
+   * hiç üretilmez (eski davranış).
+   */
+  setAutomationEventListener(listener: (events: DeviceEventView[]) => void): void {
+    this.automationListener = listener;
   }
 
   /** Cihaz görünümü önbelleğini düşürür; bir sonraki okuma listeyi yeniden kurar. */
@@ -353,6 +401,8 @@ export class DeviceStore {
       }
     }
     this.recordEvents(events);
+    // Köprünün kendi ürettiği olaylar iki yola da girer: eşik uyarısı hem listede hem kuralda.
+    this.emitAutomationEvents(events);
   }
 
   setMqttConnected(connected: boolean): void {
@@ -414,12 +464,14 @@ export class DeviceStore {
             event.sourceName === name && event.property === "availability"
           );
           if (lastAvailability?.value !== state) {
-            this.recordEvents([{
+            const events: DeviceEventView[] = [{
               sourceName: name,
               property: "availability",
               value: state,
               at: new Date().toISOString()
-            }]);
+            }];
+            this.recordEvents(events);
+            this.emitAutomationEvents(events);
           }
         }
         if (this.availability.get(name) !== state) this.invalidate();
@@ -430,16 +482,21 @@ export class DeviceStore {
     if (isObject(parsed)) {
       const previous = this.states.get(topic)?.value ?? {};
       const at = new Date();
+      // Değişimler bir kez hesaplanır, iki ayrı yola dağıtılır: dar küme olay günlüğüne (kullanıcının
+      // gördüğü "Ev hareketleri"), geniş küme yalnız otomasyon motoruna.
       const events: DeviceEventView[] = [];
-      for (const [property, value] of Object.entries(parsed)) {
-        if (!isInterestingEventProperty(property)) continue;
+      const automationEvents: DeviceEventView[] = [];
+      for (const [property, raw] of Object.entries(parsed)) {
+        const value = eventScalar(property, raw);
+        if (value === undefined) continue;
         // `action` anlık bir kenar olayıdır ve kalıcı duruma yazılmaz: aynı düğmeye arka arkaya
         // basılırsa iki ayrı olay üretilmeli. Diğer özellikler yalnızca değer değişince olay olur.
         const isAction = property === "action" || property.startsWith("action_");
-        if (!isAction && previous[property] === value) continue;
-        if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") continue;
+        if (!isAction && eventScalar(property, previous[property]) === value) continue;
         if (isAction && typeof value === "string" && value.trim() === "") continue;
-        events.push({ sourceName: topic, property, value, at: at.toISOString() });
+        const event: DeviceEventView = { sourceName: topic, property, value, at: at.toISOString() };
+        if (isInterestingEventProperty(property)) events.push(event);
+        if (isAutomationEventProperty(property)) automationEvents.push(event);
       }
       if (typeof parsed.battery === "number") {
         const low = parsed.battery <= this.lowBatteryThreshold;
@@ -447,15 +504,18 @@ export class DeviceStore {
           ? previous.battery <= this.lowBatteryThreshold
           : undefined;
         if (low !== previousLow && (low || previousLow !== undefined)) {
-          events.push({
+          const event: DeviceEventView = {
             sourceName: topic,
             property: "battery_threshold",
             value: low,
             at: at.toISOString()
-          });
+          };
+          events.push(event);
+          automationEvents.push(event);
         }
       }
       this.recordEvents(events);
+      this.emitAutomationEvents(automationEvents);
       this.trackChannelSince(topic, parsed, at);
       this.states.set(topic, { value: parsed, updatedAt: at });
       this.invalidate();
@@ -510,9 +570,21 @@ export class DeviceStore {
    * (ör. otomatik onarım). Şema aynıdır: `property` küçük harf ve alt çizgi olmalıdır.
    */
   recordExternalEvent(sourceName: string, property: string, value: JsonScalar): void {
-    this.recordEvents(validateDeviceEvents([
+    const events = validateDeviceEvents([
       { sourceName, property, value, at: new Date().toISOString() }
-    ]));
+    ]);
+    this.recordEvents(events);
+    this.emitAutomationEvents(events);
+  }
+
+  /**
+   * Geniş akışı motora verir. Olay günlüğüne dokunmaz: iki yol bilerek ayrıdır, biri gürültülenirse
+   * öbürü etkilenmez. Dinleyicinin hatası akışı kesmesin diye çağrı burada tutulmaz — çağıran
+   * (index.ts) kendi hata yakalayıcısını kurar.
+   */
+  private emitAutomationEvents(events: DeviceEventView[]): void {
+    if (events.length === 0 || !this.automationListener) return;
+    this.automationListener(events.slice());
   }
 
   private recordEvents(events: DeviceEventView[]): void {

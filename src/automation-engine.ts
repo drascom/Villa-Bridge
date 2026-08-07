@@ -14,7 +14,12 @@ import {
   type AutomationDeviceLookup,
   type AutomationsStore
 } from "./automations.js";
-import { normalizeControlValueOrRaw } from "./device-controls.js";
+import {
+  controlValueFromPercent,
+  controlValuePercent,
+  isHexColor,
+  normalizeControlValueOrRaw
+} from "./device-controls.js";
 import type {
   AutomationRunActionResult,
   AutomationRunConditionResult,
@@ -24,7 +29,7 @@ import type {
 } from "./automation-runs.js";
 import type { HomeLocation } from "./location.js";
 import { localNoon, sunTimes, type SunTimes } from "./sun.js";
-import type { JsonObject, JsonScalar } from "./types.js";
+import type { DeviceControlView, JsonObject, JsonScalar } from "./types.js";
 
 /** Tur aralığı: dakika kilidi sayesinde aynı dakikada yalnızca bir kez çalışır. */
 export const automationTickIntervalMs = 20_000;
@@ -44,6 +49,13 @@ export const automationActionTimeoutMs = 10_000;
  * bu sırada gelen yeni hareket sayacı yine sıfırlar.
  */
 export const automationAutoOffRestartGraceMs = 60_000;
+/**
+ * §5.5 — canlı takipte yazma kısıtı. Kullanıcı bir kısma anahtarını çevirirken onlarca ara değer
+ * gelir; hepsini hedefe yazmak ağı boğar. Otomasyon + kanal başına bu aralıkta en çok bir komut
+ * gider, aradakiler düşer — ama **son değer mutlaka yazılır** (panelin `queueLightWrite` deseninin
+ * sunucu karşılığı: hemen yaz, sonra bekleyen son değeri kuyrukta tut).
+ */
+export const automationFollowWriteIntervalMs = 200;
 
 /**
  * `skipped`: kural eşleşti ama `when` yüzünden çalışacak eylem kalmadı — hata değildir.
@@ -87,6 +99,8 @@ export interface AutomationEngineOptions {
   intervalMs?: number;
   /** Tek eylem için azami bekleme; 0 verilirse zaman aşımı uygulanmaz. */
   actionTimeoutMs?: number;
+  /** §5.5 — "izle" yazmaları arasındaki asgari aralık; 0 verilirse kısıt uygulanmaz. */
+  followWriteIntervalMs?: number;
   /** Bekleyen "sonra kapat" kayıtları; verilmezse yeniden başlatmada telafi edilmez. */
   autoOffStore?: AutomationAutoOffStore;
   timers?: AutomationTimers;
@@ -483,10 +497,23 @@ export const automationTriggerMatchValue = (
   trigger: AutomationRunTriggerInfo
 ): JsonScalar | undefined => trigger.kind === "sun" ? trigger.value : undefined;
 
-/** Aynı eylem kümesinin tekrarını tanımak için kararlı imza. */
-export const automationActionSignature = (actions: AutomationAction[]): string =>
+/**
+ * Aynı eylem kümesinin tekrarını tanımak için kararlı imza.
+ *
+ * §5.5 — "izle" kipinde kuralın `value` alanı sabittir ama cihaza giden değer tetikleyenle birlikte
+ * değişir. İmzaya tetikleyen değer katılmazsa §8.2 tekrar bastırması canlı takibi tümden öldürürdü;
+ * aynı değer tekrar gelirse imza da aynı kalır ve bastırma doğru çalışmaya devam eder.
+ */
+export const automationActionSignature = (
+  actions: AutomationAction[],
+  event?: AutomationDeviceEvent
+): string =>
   JSON.stringify(actions.map((action) => {
-    if (action.type === "device") return [action.deviceId, action.property, action.value];
+    if (action.type === "device") {
+      return action.follow
+        ? ["follow", action.deviceId, action.property, event?.value ?? null]
+        : [action.deviceId, action.property, action.value];
+    }
     if (action.type === "group") return ["group", action.groupId, action.property, action.value];
     if (action.type === "scene") return ["scene", action.groupId, action.sceneId];
     return ["delay", action.seconds];
@@ -510,6 +537,15 @@ interface PendingRun {
   trigger?: AutomationRunTriggerInfo;
 }
 
+/** §5.5 — otomasyon + kanal başına izleme yazma durumu; kuyrukta yalnız **son** değer bekler. */
+interface FollowWrite {
+  /** Son gerçekleşen yazmanın anı (ms). */
+  lastAt: number;
+  /** Aralık dolmadan gelen en son değer; yazılınca temizlenir. */
+  pending: { deviceId: string; property: string; value: JsonScalar; automationName: string } | null;
+  handle: unknown;
+}
+
 /** Bekleyen bir "sonra kapat"; zamanlayıcı tutamacı kalıcı değildir. */
 interface PendingAutoOff extends Omit<AutomationAutoOffEntry, "dueAt"> {
   /** Sayaç işliyorsa bitiş anı (ms); `idle` hareket beklerken null. */
@@ -528,6 +564,10 @@ export class AutomationEngine {
   private readonly pending = new Map<string, PendingRun>();
   /** `deviceId|property` → son görülen değer; `deviceState` kenar tetiklemesi için. */
   private readonly lastStateValues = new Map<string, JsonScalar>();
+  /** Kanal → kural dizini; kural listesi değişmedikçe yeniden kurulmaz. */
+  private indexCache: { source: Automation[]; index: Map<string, Automation[]> } | null = null;
+  /** §5.5 — `automationId|deviceId|property` → izleme yazma kısıtının durumu. */
+  private readonly followWrites = new Map<string, FollowWrite>();
   /** `automationId|deviceId|property` → bekleyen "sonra kapat"; otomasyon+kanal başına tekil. */
   private readonly autoOff = new Map<string, PendingAutoOff>();
   /**
@@ -681,6 +721,13 @@ export class AutomationEngine {
     this.stopped = true;
     // Bekleyen kapatmalar durum dosyasında duruyor; süreç dönünce oradan devam eder.
     for (const pending of this.autoOff.values()) this.clearAutoOffTimer(pending);
+    // Bekleyen izleme yazmaları kalıcı değildir: süreç dururken hedefe komut göndermeyiz.
+    for (const entry of this.followWrites.values()) {
+      if (entry.handle === null) continue;
+      this.timers.clear(entry.handle);
+      entry.handle = null;
+      entry.pending = null;
+    }
     // Bekleyen `delay`'ler kalıcı değildir: serbest bırakılır, kalan eylemler çalışmaz.
     for (const delay of [...this.delays]) {
       this.timers.clear(delay.handle);
@@ -787,14 +834,7 @@ export class AutomationEngine {
    * otomasyon başına 2 saniyelik aralıktır (§8.2).
    */
   async handleDeviceEvents(events: AutomationDeviceEvent[]): Promise<void> {
-    // Önceki değer `isEdge` onu ezmeden yakalanır; sayısal eşik kenarı buna dayanıyor.
-    const edges: Array<{ event: AutomationDeviceEvent; previous?: JsonScalar }> = [];
-    for (const event of events) {
-      const previous = this.lastStateValues.get(`${event.deviceId}|${event.property}`);
-      if (!this.isEdge(event)) continue;
-      edges.push({ event, previous });
-    }
-    if (edges.length === 0) return;
+    if (events.length === 0) return;
     let automations: Automation[];
     try {
       automations = await this.options.store.get();
@@ -802,11 +842,30 @@ export class AutomationEngine {
       this.logger.error(`Otomasyonlar okunamadı: ${String(error)}`);
       return;
     }
-    for (const { event, previous } of edges) {
+    // Akış artık cihazın bildirdiği her skaler değişimi taşıyor (parlaklık, sıcaklık, nem…).
+    // Kural taraması olay başına O(1) olsun diye kanal → kural dizini kurulur; hiçbir kuralın
+    // dinlemediği kanal buradan öteye geçmez ve `lastStateValues` defterini de şişirmez.
+    const index = this.triggerIndex(automations);
+    // Önceki değer `isEdge` onu ezmeden yakalanır; sayısal eşik kenarı buna dayanıyor.
+    const edges: Array<{
+      event: AutomationDeviceEvent;
+      previous?: JsonScalar;
+      candidates: Automation[];
+    }> = [];
+    for (const event of events) {
+      const key = `${event.deviceId}|${event.property}`;
+      const candidates = index.get(key);
+      // Bekleyen "sonra kapat" varsa ilgisiz olay da izlenir: hedefin dışarıdan değişmesi sözü bozar.
+      if (!candidates && this.autoOff.size === 0) continue;
+      const previous = this.lastStateValues.get(key);
+      if (!this.isEdge(event)) continue;
+      edges.push({ event, previous, candidates: candidates ?? [] });
+    }
+    if (edges.length === 0) return;
+    for (const { event, previous, candidates } of edges) {
       // Bekleyen kapatmalar önce bakar: elle müdahale iptal eder, yeni hareket sayacı sıfırlar.
       this.observeAutoOff(event);
-      for (const automation of automations) {
-        if (!automation.enabled) continue;
+      for (const automation of candidates) {
         const match = automationEventMatch(automation, event, previous);
         if (!match.matched) {
           // Sayısal olmayan değer ve "önceki değer yok" sessizce yutulmaz.
@@ -836,6 +895,45 @@ export class AutomationEngine {
         });
       }
     }
+  }
+
+  /**
+   * `deviceId|property` → o kanalı dinleyen etkin kurallar. Süreli tetikleyiciler (turda
+   * değerlendirilir) ve zaman/güneş tetikleyicileri dizine girmez; düğme tetikleyicisi `action`
+   * kanalına yazılır — `automationEventMatch` orada da tam olarak bu kanala bakıyor.
+   *
+   * Dizin kural listesi nesnesine göre önbelleklenir: `AutomationsStore` aynı doğrulanmış nesneleri
+   * döndürdüğü sürece yeniden kurulmaz, dosya değişince kendiliğinden tazelenir.
+   */
+  private triggerIndex(automations: Automation[]): Map<string, Automation[]> {
+    const cached = this.indexCache;
+    if (
+      cached
+      && cached.source.length === automations.length
+      && cached.source.every((item, position) => item === automations[position])
+    ) return cached.index;
+    const index = new Map<string, Automation[]>();
+    const add = (key: string, automation: Automation): void => {
+      const list = index.get(key);
+      if (list) {
+        if (!list.includes(automation)) list.push(automation);
+        return;
+      }
+      index.set(key, [automation]);
+    };
+    for (const automation of automations) {
+      if (!automation.enabled) continue;
+      for (const trigger of automation.triggers) {
+        if (trigger.type === "deviceAction") {
+          add(`${trigger.deviceId}|action`, automation);
+          continue;
+        }
+        if (trigger.type !== "deviceState" || trigger.forSeconds !== undefined) continue;
+        add(`${trigger.deviceId}|${trigger.property}`, automation);
+      }
+    }
+    this.indexCache = { source: automations.slice(), index };
+    return index;
   }
 
   /**
@@ -915,7 +1013,9 @@ export class AutomationEngine {
   private armAutoOff(
     automation: Automation,
     action: AutomationDeviceAction,
-    event?: AutomationDeviceEvent
+    event?: AutomationDeviceEvent,
+    /** Gerçekten yazılan değer; "izle" kipinde kuralın sabit değerinden farklıdır. */
+    appliedValue: JsonScalar = action.value
   ): void {
     const key = this.autoOffKey(automation.id, action.deviceId, action.property);
     const existing = this.autoOff.get(key);
@@ -941,7 +1041,7 @@ export class AutomationEngine {
       deviceId: action.deviceId,
       property: action.property,
       value: action.autoOff.value,
-      appliedValue: action.value,
+      appliedValue,
       mode: action.autoOff.mode,
       seconds: action.autoOff.seconds,
       dueAt: null,
@@ -1145,7 +1245,7 @@ export class AutomationEngine {
         return "blocked";
       }
     }
-    const signature = automationActionSignature(actions);
+    const signature = automationActionSignature(actions, event);
     // Kilit doluyken düşürmek yerine birleştir: çalışan iş bitince bu istek çalışır.
     if (this.running.has(automation.id)) {
       this.pending.set(automation.id, { actions, signature, event, trigger });
@@ -1282,11 +1382,111 @@ export class AutomationEngine {
       await this.withTimeout(groupScene(action.groupId, action.sceneId, "recall"));
       return;
     }
-    await this.setDevice(action.deviceId, {
-      [action.property]: this.commandValue(action.deviceId, action.property, action.value)
-    });
+    // §5.5 — "izle" kipinde değer tetikleyen olaydan çıkar; çözülemezse kuralın sabit değeri yazılır.
+    const followed = action.follow ? this.followValue(action, event) : null;
+    if (action.follow && followed === null) {
+      this.note(
+        `Otomasyon "${automation.name}" izlemesi çözülemedi; kuralın kendi değeri yazıldı.`
+      );
+    }
+    const value = followed ?? action.value;
+    if (action.follow) {
+      await this.writeFollow(automation, action, value);
+    } else {
+      await this.setDevice(action.deviceId, {
+        [action.property]: this.commandValue(action.deviceId, action.property, value)
+      });
+    }
     // Kapatma sözü ancak komut gerçekten gittiyse kurulur (§9).
-    this.armAutoOff(automation, action, event);
+    this.armAutoOff(automation, action, event, value);
+  }
+
+  /** Kuralın bir kanalı için kumanda tanımı; `controls` verilmemişse `undefined`. */
+  private control(deviceId: string, property: string): DeviceControlView | undefined {
+    return this.options.controls?.(deviceId)?.controls.find((item) => item.property === property);
+  }
+
+  /**
+   * §5.5 — "izle" kipinde cihaza yazılacak değer.
+   * - `ratio`: tetikleyen kanalın **kendi** `min`/`max`'ından yüzde çıkarılır, hedefin ölçeğine
+   *   çevrilir. İki cihazın aralığı farklı olduğu için ham değer kopyalanmaz.
+   * - `copy`: renk hex olarak kopyalanır; xy'ye çevirmeyi ortak normalizasyon yapar.
+   *
+   * Kumanda tanımı bulunamazsa ya da değer uygun değilse `null` döner ve çağıran kuralın sabit
+   * değerine düşer — eski kurallar ve kumanda arayıcısı olmayan kurulumlar bozulmaz.
+   */
+  private followValue(
+    action: AutomationDeviceAction,
+    event?: AutomationDeviceEvent
+  ): JsonScalar | null {
+    if (!action.follow || !event) return null;
+    if (action.follow.mode === "copy") {
+      return isHexColor(event.value) ? event.value : null;
+    }
+    const target = this.control(action.deviceId, action.property);
+    const source = this.control(event.deviceId, event.property);
+    if (!target || !source) return null;
+    const percent = controlValuePercent(source, event.value);
+    if (percent === null) return null;
+    return controlValueFromPercent(target, percent);
+  }
+
+  /**
+   * §5.5 — izleme yazmasının kısıtı. Aralık dolmuşsa komut hemen gider; dolmamışsa değer kuyruğa
+   * konur ve **son** gelen değer aralık sonunda yazılır. Böylece anahtar çevrilirken hedefe komut
+   * yağmaz ama kullanıcının bıraktığı değer mutlaka uygulanır.
+   */
+  private async writeFollow(
+    automation: Automation,
+    action: AutomationDeviceAction,
+    value: JsonScalar
+  ): Promise<void> {
+    const key = `${automation.id}|${action.deviceId}|${action.property}`;
+    const interval = this.options.followWriteIntervalMs ?? automationFollowWriteIntervalMs;
+    const entry = this.followWrites.get(key)
+      ?? { lastAt: Number.NEGATIVE_INFINITY, pending: null, handle: null };
+    this.followWrites.set(key, entry);
+    const now = this.now().getTime();
+    const waited = now - entry.lastAt;
+    if (interval > 0 && waited < interval) {
+      entry.pending = {
+        deviceId: action.deviceId,
+        property: action.property,
+        value,
+        automationName: automation.name
+      };
+      if (entry.handle === null) {
+        entry.handle = this.timers.set(() => {
+          void this.flushFollow(key);
+        }, interval - waited);
+      }
+      return;
+    }
+    entry.lastAt = now;
+    entry.pending = null;
+    await this.setDevice(action.deviceId, {
+      [action.property]: this.commandValue(action.deviceId, action.property, value)
+    });
+  }
+
+  /** Kuyrukta bekleyen son değeri yazar; hata kuralı kilitlemez, günlüğe düşer. */
+  private async flushFollow(key: string): Promise<void> {
+    const entry = this.followWrites.get(key);
+    if (!entry) return;
+    entry.handle = null;
+    const pending = entry.pending;
+    if (!pending) return;
+    entry.pending = null;
+    entry.lastAt = this.now().getTime();
+    try {
+      await this.setDevice(pending.deviceId, {
+        [pending.property]: this.commandValue(pending.deviceId, pending.property, pending.value)
+      });
+    } catch (error) {
+      this.logger.error(
+        `Otomasyon "${pending.automationName}" izleme yazması uygulanamadı: ${String(error)}`
+      );
+    }
   }
 
   /**

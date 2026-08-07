@@ -781,3 +781,78 @@ test("değişim defteri üst sınırı aşılınca en eski kayıt düşer", () =
   assert.equal(store.stateSince("0x3333333333333333", "first_channel"), null);
   assert.ok(store.stateSince("0x3333333333333333", "p4999") instanceof Date);
 });
+
+// ————— iki ayrı yol: dar akış cihaz etkinlik listesine, geniş akış otomasyon motoruna.
+const automationFeed = (store: DeviceStore): Array<{ property: string; value: unknown }> => {
+  const seen: Array<{ property: string; value: unknown }> = [];
+  store.setAutomationEventListener((events) => {
+    for (const event of events) seen.push({ property: event.property, value: event.value });
+  });
+  return seen;
+};
+
+test("otomasyon yolu sayısal değişimleri görür, etkinlik listesi görmez", () => {
+  const store = new DeviceStore(new Map());
+  const feed = automationFeed(store);
+  store.ingest("Balcony Lamp", Buffer.from('{"state":"ON","brightness":40,"color_temp":300}'));
+  store.ingest("Balcony Lamp", Buffer.from('{"state":"ON","brightness":180,"color_temp":300}'));
+  store.ingest("Balcony Lamp", Buffer.from('{"state":"ON","brightness":180,"color_temp":420}'));
+
+  // Motor her skaler değişimi görür: parlaklık ve ışık sıcaklığı da tetikleyici olabilir.
+  assert.deepEqual(feed, [
+    { property: "state", value: "ON" },
+    { property: "brightness", value: 40 },
+    { property: "color_temp", value: 300 },
+    { property: "brightness", value: 180 },
+    { property: "color_temp", value: 420 }
+  ]);
+  // Etkinlik listesi dokunulmadan kalır: parlaklık kaydırmaları "Ev hareketleri"ni boğmaz.
+  assert.deepEqual(
+    store.getEvents().map((event) => event.property),
+    ["state"]
+  );
+});
+
+test("meta ve gürültü alanları iki yolda da elenir", () => {
+  const store = new DeviceStore(new Map());
+  const feed = automationFeed(store);
+  store.ingest("Balcony Lamp", Buffer.from(JSON.stringify({
+    linkquality: 120, last_seen: "2026-08-07T10:00:00Z", elapsed: 12,
+    update_available: false, update: { state: "idle" }, temperature: 21.5
+  })));
+  store.ingest("Balcony Lamp", Buffer.from(JSON.stringify({
+    linkquality: 44, last_seen: "2026-08-07T10:05:00Z", elapsed: 9,
+    update_available: true, update: { state: "available" }, temperature: 22
+  })));
+  assert.deepEqual(feed, [{ property: "temperature", value: 21.5 }, { property: "temperature", value: 22 }]);
+  assert.deepEqual(store.getEvents(), []);
+});
+
+test("renk otomasyon yolunda hex olarak izlenir", () => {
+  const store = new DeviceStore(new Map());
+  const feed = automationFeed(store);
+  store.ingest("Garden Lamp", Buffer.from('{"color":{"x":0.7,"y":0.29}}'));
+  // Aynı renk yeniden bildirilirse olay üretilmez; renk değişimi hex kenarında tanınır.
+  store.ingest("Garden Lamp", Buffer.from('{"color":{"x":0.7,"y":0.29}}'));
+  store.ingest("Garden Lamp", Buffer.from('{"color":{"hex":"#3f9dff"}}'));
+  assert.deepEqual(feed.map((event) => event.property), ["color", "color"]);
+  assert.equal(feed[1].value, "#3f9dff");
+  assert.match(String(feed[0].value), /^#[0-9a-f]{6}$/);
+  assert.deepEqual(store.getEvents(), []);
+});
+
+test("köprünün kendi olayları iki yola da girer", () => {
+  const store = new DeviceStore(new Map());
+  const feed = automationFeed(store);
+  store.ingest("Hall Sensor/availability", Buffer.from('{"state":"offline"}'));
+  store.ingest("Hall Sensor", Buffer.from('{"battery":9,"occupancy":true}'));
+  store.recordExternalEvent("Hall Sensor", "self_heal", "restarted");
+  assert.deepEqual(
+    feed.map((event) => event.property),
+    ["availability", "battery", "occupancy", "battery_threshold", "self_heal"]
+  );
+  assert.deepEqual(
+    store.getEvents().map((event) => event.property).sort(),
+    ["availability", "battery_threshold", "occupancy", "self_heal"]
+  );
+});

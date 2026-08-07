@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { writeJsonAtomic } from "./atomic-file.js";
-import { isHexColor } from "./device-controls.js";
+import { isHexColor, numericControlKinds } from "./device-controls.js";
 import type { DeviceControlView, JsonScalar } from "./types.js";
 
 export interface AutomationTimeTrigger {
@@ -196,6 +196,20 @@ export interface AutomationAutoOff {
   value: JsonScalar;
 }
 
+/**
+ * "İzle" kipi — eylem sabit bir değer yerine **tetikleyen olayın değerini** kullanır.
+ * - `ratio`: sayısal kanallarda oranlı eşleme. Tetikleyen kanalın kendi `min`/`max`'ından yüzde
+ *   çıkarılır, hedefin `min`/`max`/`step`'ine çevrilir; iki cihazın ölçeği farklı olduğu için ham
+ *   değer asla kopyalanmaz.
+ * - `copy`: renk kanalında doğrudan kopya. Renkte yüzde anlamsızdır; değer normalizasyondan
+ *   geçerek (hex → xy) olduğu gibi yazılır.
+ *
+ * Alan yoksa eylem bugünkü davranışıyla, `value` alanındaki sabit değerle çalışır.
+ */
+export interface AutomationActionFollow {
+  mode: "ratio" | "copy";
+}
+
 export interface AutomationDeviceAction {
   type: "device";
   /** IEEE adresi — otomasyonun kalıcı bağı. */
@@ -204,11 +218,17 @@ export interface AutomationDeviceAction {
   property: string;
   /** DeviceControlView.id — yalnızca sunum için, opsiyonel. */
   controlId?: string;
+  /**
+   * Sabit değer. `follow` varsa bu değer **yedektir**: tetikleyenin değeri çözülemezse motor buna
+   * düşer, böylece kural sessizce ölmez.
+   */
   value: JsonScalar;
   /** Yoksa eylem her zaman çalışır — geriye tam uyumluluk. */
   when?: AutomationActionWhen;
   /** Yoksa geri alma yok — geriye tam uyumluluk. */
   autoOff?: AutomationAutoOff;
+  /** Yoksa sabit değer yazılır — geriye tam uyumluluk. */
+  follow?: AutomationActionFollow;
 }
 
 /**
@@ -694,14 +714,43 @@ const rejectForbiddenControl = (
   if (hit) throw new Error("Kilit ve siren bir otomasyon eylemi olamaz.");
 };
 
-/** Sayısal kumandalar: değeri kendi aralığının dışına çıkan eylem kaydedilmez. */
-const numericAutomationControlKinds = new Set([
-  "level",
-  "temperature",
-  "number",
-  "position",
-  "climate"
-]);
+/** §5.5 — "izle" yalnız iki alan tanır; fazlası reddedilir. */
+const validateActionFollow = (value: unknown): AutomationActionFollow => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Otomasyon eylemi izleme ayarı geçersiz.");
+  }
+  const candidate = value as Record<string, unknown>;
+  for (const key of Object.keys(candidate)) {
+    if (key !== "mode") throw new Error("Otomasyon eylemi izleme ayarında bilinmeyen alan var.");
+  }
+  if (candidate.mode !== "ratio" && candidate.mode !== "copy") {
+    throw new Error("Otomasyon eylemi izleme türü geçersiz.");
+  }
+  return { mode: candidate.mode };
+};
+
+/** İzlenen ve yazılan kanalın türü uyumlu mu? Kumanda arayıcısı yoksa denetim atlanır. */
+const followControlMatches = (
+  control: DeviceControlView | undefined,
+  mode: AutomationActionFollow["mode"]
+): boolean => {
+  if (!control) return true;
+  return mode === "copy" ? control.kind === "color" : numericControlKinds.has(control.kind);
+};
+
+const rejectIncompatibleFollow = (
+  deviceId: string,
+  property: string,
+  follow: AutomationActionFollow,
+  lookup?: AutomationDeviceLookup
+): void => {
+  const control = lookup?.(deviceId)?.controls.find((item) => item.property === property);
+  if (!control) return;
+  if (followControlMatches(control, follow.mode)) return;
+  throw new Error(follow.mode === "copy"
+    ? "Renk izlemesi yalnız renk kumandasına yazılabilir."
+    : "Oranlı izleme yalnız sayısal bir kumandaya yazılabilir.");
+};
 
 /**
  * Eylemin değeri kumandaya uyuyor mu? Kumanda arayıcısı yoksa (eski davranış) doğrulama atlanır.
@@ -720,7 +769,7 @@ const rejectInvalidActionValue = (
     if (!isHexColor(value)) throw new Error("Otomasyon eylemi renk değeri geçersiz.");
     return;
   }
-  if (!numericAutomationControlKinds.has(control.kind) || typeof value !== "number") return;
+  if (!numericControlKinds.has(control.kind) || typeof value !== "number") return;
   if (!Number.isFinite(value)) throw new Error("Otomasyon eylemi değeri geçersiz.");
   if (
     (control.min !== undefined && value < control.min)
@@ -822,6 +871,10 @@ const validateActions = (
     if (candidate.autoOff !== undefined && candidate.autoOff !== null) {
       action.autoOff = validateAutoOff(candidate.autoOff, action.value);
     }
+    if (candidate.follow !== undefined && candidate.follow !== null) {
+      action.follow = validateActionFollow(candidate.follow);
+      rejectIncompatibleFollow(deviceId, property, action.follow, lookup);
+    }
     rejectForbiddenControl(deviceId, property, lookup);
     rejectInvalidActionValue(deviceId, property, action.value, lookup);
     if (action.autoOff) rejectInvalidActionValue(deviceId, property, action.autoOff.value, lookup);
@@ -879,6 +932,36 @@ export const validateAutomations = (
         throw new Error(
           "Hareket bitince kapatma için durum bildiren bir tetikleyici gerekir."
         );
+      }
+    }
+    // §5.5 — "izle" kipi tetikleyenin **canlı** değerini kullanır. Bunu yalnız hedefsiz bir durum
+    // tetikleyicisi ("değeri her değiştiğinde") besler: `equals` tek bir değere geçişte, sayısal
+    // eşik ise yalnız eşiği geçerken bir kez ateşler — ikisinde de izlenen değer tek bir sayıda
+    // donar, yani izleme sabit değerden farksız olurdu. Süreli tetikleyici de aynı sebeple dışarıda.
+    const followActions = actions.filter((action): action is AutomationDeviceAction =>
+      isAutomationDeviceAction(action) && action.follow !== undefined);
+    if (followActions.length > 0) {
+      const sources = triggers.filter((trigger): trigger is AutomationDeviceStateTrigger =>
+        trigger.type === "deviceState"
+        && trigger.equals === undefined
+        && trigger.above === undefined
+        && trigger.below === undefined
+        && trigger.forSeconds === undefined);
+      if (sources.length === 0) {
+        throw new Error(
+          "İzleme için değeri her değiştiğinde bildiren bir cihaz durumu tetikleyicisi gerekir."
+        );
+      }
+      for (const action of followActions) {
+        const mode = action.follow!.mode;
+        const usable = sources.some((trigger) => followControlMatches(
+          lookup?.(trigger.deviceId)?.controls.find((item) => item.property === trigger.property),
+          mode
+        ));
+        if (usable) continue;
+        throw new Error(mode === "copy"
+          ? "Renk izlemesi için renk bildiren bir tetikleyici gerekir."
+          : "Oranlı izleme için sayısal değer bildiren bir tetikleyici gerekir.");
       }
     }
     // §8.2 — geri besleme döngüsü kaydetme anında reddedilir, çalışma zamanında değil.

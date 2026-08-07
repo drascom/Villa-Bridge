@@ -2137,7 +2137,7 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
 
   // Kanonik kayıt: düğme için action, sensör için property + equals.
   assert.match(dashboard, /\{type:"deviceAction",deviceId:wizard\.triggerDeviceId,action:wizard\.triggerAction\}/);
-  assert.match(dashboard, /\{type:"deviceState",deviceId:wizard\.triggerDeviceId,property:wizard\.triggerProperty,equals:wizard\.triggerEquals\}/);
+  assert.match(dashboard, /\{type:"deviceState",deviceId:wizard\.triggerDeviceId,property:wizard\.triggerProperty,\s*\.\.\.\(wizard\.triggerEquals===null\|\|wizard\.triggerEquals===undefined\?\{\}:\{equals:wizard\.triggerEquals\}\)\}/);
   assert.match(dashboard, /token:`action:\$\{entry\.action\}`,action:entry\.action,label:automationActionLabel\(entry\.action\)/);
 
   // Alt varlık kuralı: her düğme ayrı hedef; liste sunucunun `buttons` yapısından geliyor.
@@ -2208,7 +2208,7 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   // Tek basış hem açıp hem kapatabilsin: seçenek yalnız cihaz destekliyorsa listelenir.
   assert.match(dashboard, /const automationCanToggle=control=>control\?\.valueToggle!==undefined&&control\?\.valueToggle!==null/);
   assert.match(dashboard, /const toggle=automationCanToggle\(control\)\?choice\("toggle","automationTurnToggle"\):"";/);
-  assert.match(dashboard, /<div class="automation-choices">\$\{choice\("on","automationTurnOn"\)\}\$\{choice\("off","automationTurnOff"\)\}\$\{toggle\}\$\{valueChoices\}<\/div>/);
+  assert.match(dashboard, /<div class="automation-choices">\$\{choice\("on","automationTurnOn"\)\}\$\{choice\("off","automationTurnOff"\)\}\$\{toggle\}\$\{valueChoices\}\$\{followChoices\}<\/div>/);
   // Kaydedilen değer cihazın kendi bildirdiği değer; arayüzde uydurulmuyor.
   assert.match(dashboard, /if\(mode==="toggle"&&!automationCanToggle\(control\)\)return;/);
   assert.match(dashboard, /const value=mode==="toggle"\?control\.valueToggle:automationControlValue\(control,mode==="on"\);/);
@@ -3210,7 +3210,7 @@ const automationExports = [
   "automationRunRowHtml", "automationReasonText", "automationOutcomeText", "saveAutomationWizard",
   "nextAutomationStep",
   // Değer eylemleri: parlaklık / ışık sıcaklığı / renk.
-  "chooseAutomationValue", "stepAutomationValue", "setAutomationValueColor",
+  "chooseAutomationValue", "stepAutomationValue", "setAutomationValueColor", "chooseAutomationFollow",
   "automationValueControls", "automationValuePercent", "automationValueRaw", "automationValueText",
   "automationWizardSentence", "automationCardLine"
 ];
@@ -5619,7 +5619,7 @@ test("tetikleyici adımı süreyi koşuldakiyle aynı yerde ve aynı görünümd
   // Düğme yolunda da görünmez: orada tetikleyici `deviceAction` yazar, sunucu süreyi okumaz.
   assert.match(
     dashboard,
-    /const automationTrigForEligible=wizard=>Boolean\(wizard\)\s*&&!automationMappingMode\(wizard\)\s*&&wizard\.triggerKind!=="button"\s*&&automationDeviceKinds\.includes\(wizard\.triggerKind\);/
+    /const automationTrigForEligible=wizard=>Boolean\(wizard\)\s*&&!automationMappingMode\(wizard\)\s*&&wizard\.triggerKind!=="button"[\s\S]*?&&!automationFollowSource\(wizard\)\s*&&automationDeviceKinds\.includes\(wizard\.triggerKind\);/
   );
 
   // Etiketler zaman yönünü taşır ve "sonra kapansın" ile farkı ipucunda yazar.
@@ -6221,7 +6221,17 @@ async function automationValueHarness(messages: Record<string, string> = {}): Pr
         id: "0x0022", name: "Bahçe prizi", buttons: [], features: [], state: {},
         controls: [{ id: "main", property: "state", name: "Bahçe prizi", kind: "switch", valueOn: "ON", valueOff: "OFF" }]
       },
-      { id: "0x0033", name: "Koridor sensörü", buttons: [], features: ["occupancy"], state: { occupancy: false }, controls: [] }
+      { id: "0x0033", name: "Koridor sensörü", buttons: [], features: ["occupancy"], state: { occupancy: false }, controls: [] },
+      {
+        // Kısılabilir, renk değiştirebilen duvar anahtarı: kendi ölçeği 0–100, hedefinki 1–254.
+        // Canlı takibin tetikleyicisi budur.
+        id: "0x0044", name: "Bahçe anahtarı", buttons: [], features: [], state: { brightness: 40 },
+        controls: [
+          { id: "main", property: "state", name: "Bahçe anahtarı", kind: "switch", valueOn: "ON", valueOff: "OFF" },
+          { id: "main:brightness", property: "brightness", name: "Parlaklık", kind: "level", value: 40, min: 0, max: 100 },
+          { id: "main:color", property: "color", name: "Renk", kind: "color", value: "#ffffff" }
+        ]
+      }
     ],
     [],
     messages
@@ -6450,5 +6460,117 @@ test("değer eylemlerinin cümlesi tam şablon anahtarıdır ve tr/en paritesi t
   assert.equal(
     api.automationValueText({ kind: "temperature", min: 153, max: 500 }, 153),
     "%0 soğuk"
+  );
+});
+
+// ————— "tetikleyeni izle": sabit değerin yanındaki canlı takip seçeneği. Yalnız değeri her
+// değiştiğinde bildiren bir tetikleyici seçilmişken görünür.
+const openFollowAction = (harness: WizardHarness, token: string, targetId = "0x0011"): void => {
+  harness.api.openAutomationWizard(null);
+  harness.api.chooseAutomationPath("rule");
+  harness.api.chooseAutomationTrigger("sensor");
+  harness.api.chooseAutomationTriggerDevice("0x0044");
+  harness.api.chooseAutomationEvent(token);
+  harness.api.chooseAutomationTargetDevice(targetId);
+};
+
+test("izleme seçeneği yalnız uygun tetikleyicide ve aynı tür kanalda çıkar", async () => {
+  const harness = await automationValueHarness();
+
+  // Değer kanalı için "… değişince" satırı tetikleyici listesinde durur.
+  openFollowAction(harness, "brightness=null");
+  // Sabit değer yolu aynen kalır; izleme onun yanında bir seçenektir.
+  assert.match(harness.body(), /data-automation-value="0x0011\|main:brightness"/);
+  assert.match(harness.body(), /data-automation-follow="0x0011\|main:brightness"/);
+  // Aynı tür değil: parlaklık ışık sıcaklığını ya da rengi "aynı oranda" sürüklemez.
+  assert.doesNotMatch(harness.body(), /data-automation-follow="0x0011\|main:temperature"/);
+  assert.doesNotMatch(harness.body(), /data-automation-follow="0x0011\|main:color"/);
+
+  // Renk tetikleyicisinde yalnız renk hedefi izlenir.
+  const colored = await automationValueHarness();
+  openFollowAction(colored, "color=null");
+  assert.match(colored.body(), /data-automation-follow="0x0011\|main:color"/);
+  assert.doesNotMatch(colored.body(), /data-automation-follow="0x0011\|main:brightness"/);
+
+  // Hareket algılayan tetikleyicinin izlenecek bir değeri yok.
+  const motion = await automationValueHarness();
+  openValueAction(motion, "0x0011");
+  assert.doesNotMatch(motion.body(), /data-automation-follow=/);
+
+  // Eşik tetikleyicisi yalnız eşiği geçerken bir kez ateşler: izleme sunulmaz.
+  const threshold = await automationValueHarness();
+  openFollowAction(threshold, "num:brightness");
+  assert.doesNotMatch(threshold.body(), /data-automation-follow=/);
+
+  // §8.2 — tetikleyen kanalın kendisi hedef olarak hiç listelenmez.
+  const same = await automationValueHarness();
+  openFollowAction(same, "brightness=null", "0x0044");
+  assert.doesNotMatch(same.body(), /data-automation-(value|follow)="0x0044\|main:brightness"/);
+});
+
+test("izleme seçilince kural izleme kipiyle kaydedilir", async () => {
+  const harness = await automationValueHarness();
+  const { api } = harness;
+
+  openFollowAction(harness, "brightness=null");
+  api.chooseAutomationFollow("0x0011|main:brightness");
+  await api.saveAutomationWizard();
+  const saved = harness.saved()[0] as {
+    id: string; triggers: unknown[]; actions: Record<string, unknown>[];
+  };
+  // Tetikleyici hedefsizdir: değer her değiştiğinde çalışır.
+  assert.deepEqual(saved.triggers, [{ type: "deviceState", deviceId: "0x0044", property: "brightness" }]);
+  assert.deepEqual(saved.actions, [{
+    type: "device", deviceId: "0x0011", property: "brightness", controlId: "main:brightness",
+    // Sabit değer yedek olarak kalır; motor tetikleyeni çözemezse buna düşer.
+    value: 128, follow: { mode: "ratio" }
+  }]);
+
+  // Kayıt düzenlemeye açılınca kip korunur ve sayaç açılmaz: ayarlanacak bir değer yok.
+  api.openAutomationWizard(saved.id);
+  api.editAutomationTarget(0);
+  assert.equal(harness.wizard().draftValueTarget, null);
+  assert.match(harness.body(), /data-automation-follow="0x0011\|main:brightness"/);
+});
+
+test("izleme cümlesi tam şablon anahtarıdır ve tr/en paritesi tam", async () => {
+  const [englishSource, turkishSource] = await Promise.all([
+    readFile(englishLocaleUrl, "utf8"),
+    readFile(turkishLocaleUrl, "utf8")
+  ]);
+  const english = JSON.parse(englishSource).translations as Record<string, string>;
+  const turkish = JSON.parse(turkishSource).translations as Record<string, string>;
+  const keys = [
+    "automationChangeRow", "automationFollowRatio", "automationFollowColor", "automationFollowHint",
+    "automationPillFollowRatio", "automationPillFollowColor",
+    "automationWillFollowRatio", "automationWillFollowColor",
+    "automationFollowsRatio", "automationFollowsColor"
+  ];
+  for (const key of keys) {
+    assert.equal(typeof turkish[key], "string", `tr eksik: ${key}`);
+    assert.equal(typeof english[key], "string", `en eksik: ${key}`);
+  }
+
+  const harness = await automationValueHarness(turkish);
+  const { api } = harness;
+  openFollowAction(harness, "brightness=null");
+  // Seçenek ev dilinde konuşur; "izleme kipi" gibi teknik bir sözlük yok.
+  assert.match(harness.body(), />Aynı oranda</);
+  assert.match(harness.body(), /Bahçe anahtarı ne kadar değişirse bu da o kadar değişir\./);
+  api.chooseAutomationFollow("0x0011|main:brightness");
+  assert.equal(
+    api.automationTargetLine(harness.wizard(), (harness.wizard().targets as unknown[])[0]),
+    '<strong>Salon lambası</strong> <span class="automation-pill act-followRatio">Aynı oranda değişecek</span>'
+  );
+  assert.equal(
+    api.automationWizardSentence(harness.wizard()),
+    "Bahçe anahtarı Parlaklık değişince Salon lambası aynı oranda değişecek."
+  );
+  assert.equal(
+    api.automationCardLine(
+      { type: "deviceState", deviceId: "0x0044", property: "color" },
+      { type: "device", deviceId: "0x0011", property: "color", value: "#ffffff", follow: { mode: "copy" } }
+    ),
+    "Bahçe anahtarı Renk değişince → Salon lambası aynı renge döner"
   );
 });

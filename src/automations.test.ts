@@ -1072,3 +1072,156 @@ test("kumanda arayıcısı yoksa değer doğrulaması atlanır — geriye uyumlu
   // Arayıcı var ama cihazı tanımıyor (henüz keşfedilmemiş): yine engellenmez.
   assert.equal(validateAutomations([valueAutomation("brightness", 900)], lookup).length, 1);
 });
+
+// ————— §5.5 "izle" kipi: sabit değer yerine tetikleyenin canlı değeri.
+/** Tetikleyen kısılabilir anahtar: kendi ölçeği 0–100, ayrıca rengi var. */
+const dimmerId = "0x00124b0033ee44ff";
+const followLookup: AutomationDeviceLookup = (deviceId) => {
+  if (deviceId === lampId) {
+    return {
+      controls: [
+        control("state_l1", "switch"),
+        { id: "main:brightness", property: "brightness", name: "Parlaklık", kind: "level", value: null, min: 1, max: 254 },
+        { id: "main:color", property: "color", name: "Renk", kind: "color", value: null }
+      ]
+    };
+  }
+  if (deviceId === dimmerId) {
+    return {
+      controls: [
+        { id: "main:brightness", property: "brightness", name: "Parlaklık", kind: "level", value: null, min: 0, max: 100 },
+        { id: "main:color", property: "color", name: "Renk", kind: "color", value: null },
+        control("state", "switch")
+      ]
+    };
+  }
+  return undefined;
+};
+
+const followAutomation = (
+  trigger: Record<string, unknown>,
+  action: Record<string, unknown>
+): Record<string, unknown> => automation({
+  triggers: [trigger],
+  actions: [{ type: "device", deviceId: lampId, value: 128, ...action }]
+});
+
+const changeTrigger = { type: "deviceState", deviceId: dimmerId, property: "brightness" };
+const colorTrigger = { type: "deviceState", deviceId: dimmerId, property: "color" };
+
+test("izleme kipi değişim tetikleyicisiyle kabul edilir", () => {
+  const [rule] = validateAutomations(
+    [followAutomation(changeTrigger, { property: "brightness", follow: { mode: "ratio" } })],
+    followLookup
+  );
+  const action = rule.actions[0] as AutomationDeviceAction;
+  assert.deepEqual(action.follow, { mode: "ratio" });
+  // Sabit değer yedek olarak korunur: tetikleyenin değeri çözülemezse motor buna düşer.
+  assert.equal(action.value, 128);
+
+  // Renk kanalında kip kopyadır.
+  assert.deepEqual(
+    (validateAutomations(
+      [followAutomation(colorTrigger, { property: "color", value: "#ffffff", follow: { mode: "copy" } })],
+      followLookup
+    )[0].actions[0] as AutomationDeviceAction).follow,
+    { mode: "copy" }
+  );
+
+  // Kumanda arayıcısı yoksa (apps/runtime, eski kurulum) doğrulama atlanır ama alan korunur.
+  assert.deepEqual(
+    (validateAutomations(
+      [followAutomation(changeTrigger, { property: "brightness", follow: { mode: "ratio" } })]
+    )[0].actions[0] as AutomationDeviceAction).follow,
+    { mode: "ratio" }
+  );
+});
+
+test("izleme kipi uygun tetikleyici ya da hedef yoksa reddedilir", () => {
+  const follow = { property: "brightness", follow: { mode: "ratio" } };
+  // `equals` tek değere geçişte, eşik yalnız eşiği geçerken ateşler: izlenen değer donar.
+  assert.throws(
+    () => validateAutomations([followAutomation({ ...changeTrigger, equals: 50 }, follow)], followLookup),
+    /her değiştiğinde bildiren/
+  );
+  assert.throws(
+    () => validateAutomations([followAutomation({ ...changeTrigger, above: 50 }, follow)], followLookup),
+    /her değiştiğinde bildiren/
+  );
+  assert.throws(
+    () => validateAutomations(
+      [followAutomation({ ...changeTrigger, equals: 50, forSeconds: 60 }, follow)],
+      followLookup
+    ),
+    /her değiştiğinde bildiren/
+  );
+  // Düğme ve zaman tetikleyicisinin izlenecek bir değeri yoktur.
+  assert.throws(
+    () => validateAutomations(
+      [followAutomation({ type: "deviceAction", deviceId: switchId, action: "1_single" }, follow)],
+      followLookup
+    ),
+    /her değiştiğinde bildiren/
+  );
+
+  // Tür uyumu: renk tetikleyicisinden oran, sayısal tetikleyiciden renk çıkmaz.
+  assert.throws(
+    () => validateAutomations([followAutomation(colorTrigger, follow)], followLookup),
+    /sayısal değer bildiren bir tetikleyici/
+  );
+  assert.throws(
+    () => validateAutomations(
+      [followAutomation(changeTrigger, { property: "color", value: "#ffffff", follow: { mode: "copy" } })],
+      followLookup
+    ),
+    /renk bildiren bir tetikleyici/
+  );
+
+  // Hedef kumanda uyumsuzsa da reddedilir: aç/kapat kanalına oran yazılamaz.
+  assert.throws(
+    () => validateAutomations(
+      [followAutomation(changeTrigger, { property: "state_l1", value: "ON", follow: { mode: "ratio" } })],
+      followLookup
+    ),
+    /sayısal bir kumandaya yazılabilir/
+  );
+  assert.throws(
+    () => validateAutomations(
+      [followAutomation(changeTrigger, { property: "brightness", follow: { mode: "copy" } })],
+      followLookup
+    ),
+    /renk kumandasına yazılabilir/
+  );
+
+  // Şekil denetimi: bilinmeyen alan ve bilinmeyen kip sessizce kabul edilmez.
+  assert.throws(
+    () => validateAutomations(
+      [followAutomation(changeTrigger, { property: "brightness", follow: { mode: "ratio", scale: 2 } })],
+      followLookup
+    ),
+    /bilinmeyen alan/
+  );
+  assert.throws(
+    () => validateAutomations(
+      [followAutomation(changeTrigger, { property: "brightness", follow: { mode: "same" } })],
+      followLookup
+    ),
+    /izleme türü geçersiz/
+  );
+});
+
+test("izleme kipi döngü korumasından muaf değildir", () => {
+  assert.throws(
+    () => validateAutomations([automation({
+      triggers: [changeTrigger],
+      actions: [{ type: "device", deviceId: dimmerId, property: "brightness", value: 50, follow: { mode: "ratio" } }]
+    })], followLookup),
+    /döngü oluşur/
+  );
+});
+
+test("izleme alanı olmayan kural bugünkü şekliyle yazılır", () => {
+  // Geriye tam uyumluluk: alan yoksa hiç yazılmaz, canlıdaki kurallar bit bit aynı kalır.
+  const [rule] = validateAutomations([automation()], lookup);
+  assert.equal("follow" in (rule.actions[0] as AutomationDeviceAction), false);
+});

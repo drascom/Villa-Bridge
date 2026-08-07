@@ -1868,3 +1868,148 @@ test("sonra kapat değeri de aynı normalizasyondan geçer", async (context) => 
   // Kumandanın alt sınırı 1: kuralda yazan 0 cihaza kırpılmış gider.
   assert.deepEqual(source.calls[1], { id: lampId, command: { brightness: 1 } });
 });
+
+// ————— §5.5 canlı takip: tetikleyenin değeri oranla hedefe çevrilir, yazma kısıtlanır.
+/** Kısılabilir anahtar: kendi ölçeği 0–100. Hedef lamba 1–254 — ham değer kopyalanamaz. */
+const dimmerId = "0x00124b0033ee44ff";
+const dimmerControls: DeviceControlView[] = [
+  { id: "main:brightness", property: "brightness", name: "Parlaklık", kind: "level", value: null, min: 0, max: 100 },
+  { id: "main:color", property: "color", name: "Renk", kind: "color", value: null }
+];
+const followLookup = (deviceId: string): { controls: DeviceControlView[] } | undefined =>
+  deviceId === lampId ? { controls: lampControls }
+    : deviceId === dimmerId ? { controls: dimmerControls }
+      : undefined;
+
+const followRule = (overrides: Record<string, unknown> = {}): Record<string, unknown> => automation({
+  id: "parlaklik-takibi",
+  name: "Parlaklık takibi",
+  triggers: [{ type: "deviceState", deviceId: dimmerId, property: "brightness" }],
+  actions: [{
+    type: "device", deviceId: lampId, property: "brightness", value: 128, follow: { mode: "ratio" }
+  }],
+  ...overrides
+});
+
+const brightnessEvent = (value: number) => ([{ deviceId: dimmerId, property: "brightness", value }]);
+
+test("oranlı izleme tetikleyenin ölçeğini hedefin ölçeğine çevirir", async (context) => {
+  const { engine, source, advance } = await harness(context, [followRule()], { controls: followLookup });
+
+  // Sınırlar: tetikleyenin %0'ı hedefin alt ucu, %100'ü üst ucu. Ham değer asla kopyalanmaz.
+  await engine.handleDeviceEvents(brightnessEvent(0));
+  await advance(200);
+  await engine.handleDeviceEvents(brightnessEvent(100));
+  await advance(200);
+  await engine.handleDeviceEvents(brightnessEvent(50));
+  await advance(200);
+  assert.deepEqual(source.calls, [
+    { id: lampId, command: { brightness: 1 } },
+    { id: lampId, command: { brightness: 254 } },
+    { id: lampId, command: { brightness: 128 } }
+  ]);
+});
+
+test("renk izlemesi değeri kopyalar ve normalizasyondan geçirir", async (context) => {
+  const { engine, source } = await harness(
+    context,
+    [followRule({
+      id: "renk-takibi",
+      triggers: [{ type: "deviceState", deviceId: dimmerId, property: "color" }],
+      actions: [{
+        type: "device", deviceId: lampId, property: "color", value: "#ffffff", follow: { mode: "copy" }
+      }]
+    })],
+    { controls: followLookup }
+  );
+
+  await engine.handleDeviceEvents([{ deviceId: dimmerId, property: "color", value: "#ff0000" }]);
+  await settle();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { color: hexToXy("#ff0000") } }]);
+});
+
+test("izleme yazması kısıtlanır ama son değer mutlaka yazılır", async (context) => {
+  const { engine, source, advance } = await harness(context, [followRule()], { controls: followLookup });
+
+  // Kullanıcı anahtarı çeviriyor: aynı anda onlarca ara değer. Hedefe komut yağmamalı.
+  await engine.handleDeviceEvents(brightnessEvent(10));
+  for (const value of [20, 30, 40, 50, 60]) {
+    await engine.handleDeviceEvents(brightnessEvent(value));
+  }
+  await settle();
+  // İlk değer hemen gider, aradakiler düşer.
+  assert.deepEqual(source.calls, [{ id: lampId, command: { brightness: 26 } }]);
+
+  // Aralık dolunca kuyrukta bekleyen **son** değer yazılır — kullanıcının bıraktığı yer.
+  await advance(200);
+  assert.deepEqual(source.calls, [
+    { id: lampId, command: { brightness: 26 } },
+    { id: lampId, command: { brightness: 153 } }
+  ]);
+
+  // Kuyruk boşaldı: ikinci bir sayaç kendiliğinden yazma üretmez.
+  await advance(1_000);
+  assert.equal(source.calls.length, 2);
+});
+
+test("izlenen değer çözülemezse kuralın kendi değeri yazılır", async (context) => {
+  const { engine, source, notes } = await harness(
+    context,
+    [followRule()],
+    // Kumanda arayıcısı yok: oran hesaplanamaz, eylem sessizce düşmek yerine yedeğe iner.
+    {}
+  );
+
+  await engine.handleDeviceEvents(brightnessEvent(70));
+  await settle();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { brightness: 128 } }]);
+  assert.ok(notes.some((note) => note.includes("izlemesi çözülemedi")));
+});
+
+test("izleme kipi §8.2 tekrar bastırmasına takılmaz", async (context) => {
+  const { engine, source, advance } = await harness(context, [followRule()], { controls: followLookup });
+
+  // Kuralın `value` alanı sabit; imzaya tetikleyen değer katılmasa iki saniye boyunca hiçbir
+  // ara değer geçemez ve canlı takip ölürdü.
+  await engine.handleDeviceEvents(brightnessEvent(10));
+  await advance(200);
+  await engine.handleDeviceEvents(brightnessEvent(90));
+  await advance(200);
+  assert.equal(source.calls.length, 2);
+
+  // Aynı değerin tekrarı yine bastırılır: yazacak yeni bir şey yok.
+  await engine.handleDeviceEvents(brightnessEvent(90));
+  await advance(200);
+  assert.equal(source.calls.length, 2);
+});
+
+test("izleyen kural kendi yazdığı kanaldan tetiklenemez", async (context) => {
+  await assert.rejects(
+    () => harness(context, [followRule({
+      actions: [{
+        type: "device", deviceId: dimmerId, property: "brightness", value: 50, follow: { mode: "ratio" }
+      }]
+    })], { controls: followLookup }),
+    /döngü oluşur/
+  );
+});
+
+test("hiçbir kuralın dinlemediği kanallar kural taramasına girmez", async (context) => {
+  const { engine, source, runs, advance } = await harness(context, [followRule()], { controls: followLookup });
+
+  // Geniş akış artık sıcaklık, nem, pil gibi her şeyi taşıyor: ilgisiz kanal iz bırakmamalı.
+  const noise = Array.from({ length: 200 }, (_item, index) => ({
+    deviceId: sensorId,
+    property: index % 2 === 0 ? "temperature" : "humidity",
+    value: index
+  }));
+  await engine.handleDeviceEvents(noise);
+  await settle();
+  assert.deepEqual(source.calls, []);
+  assert.deepEqual(runs, []);
+
+  await engine.handleDeviceEvents(brightnessEvent(100));
+  await advance(200);
+  assert.deepEqual(source.calls, [{ id: lampId, command: { brightness: 254 } }]);
+  assert.equal(runs.length, 1);
+});

@@ -96,7 +96,11 @@ const hsToHex = (hue: number, saturation: number): string => {
   return rgbToHex((red + match) * 255, (green + match) * 255, (blue + match) * 255);
 };
 
-const colorHex = (value: unknown): string => {
+/**
+ * Rengin `#rrggbb` karşılığı. Zigbee2MQTT rengi nesne olarak bildirir (`{x,y}`, `{hue,saturation}`);
+ * panelin ve otomasyonun paylaştığı tek renk dili ise hex'tir, o yüzden dönüşüm dışarı da açıktır.
+ */
+export const colorHex = (value: unknown): string => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return "#ffffff";
   const color = value as Record<string, unknown>;
   if (typeof color.hex === "string" && /^#[0-9a-f]{6}$/i.test(color.hex)) return color.hex.toLowerCase();
@@ -192,6 +196,60 @@ export const normalizeControlValue = (
   return step && step > 0
     ? Number((Math.round((clamped - (control.min ?? 0)) / step) * step + (control.min ?? 0)).toFixed(6))
     : clamped;
+};
+
+/** Sayısal kumandalar — oranlı eşleme ve kaydetme doğrulaması aynı kümeyi paylaşır. */
+export const numericControlKinds: ReadonlySet<string> = new Set([
+  "level",
+  "temperature",
+  "number",
+  "position",
+  "climate"
+]);
+
+type RangeControl = Pick<DeviceControlView, "min" | "max">;
+
+/**
+ * Kumandanın kendi ölçeği. `min`/`max` bildirmeyen kumanda 0–100 sayılır (panelde de aynı kural);
+ * ölçek çökmüşse (max ≤ min) bir birimlik yapay aralık kurulur ki bölme sıfıra düşmesin.
+ */
+export const controlValueRange = (control: RangeControl): { min: number; max: number } => {
+  const min = typeof control.min === "number" && Number.isFinite(control.min) ? control.min : 0;
+  const max = typeof control.max === "number" && Number.isFinite(control.max) ? control.max : 100;
+  return max > min ? { min, max } : { min, max: min + 1 };
+};
+
+/**
+ * Ham değerin kendi aralığındaki yüzdesi (0–100). Sayıya çevrilemeyen değerde `null` döner.
+ * Panelin gösterdiği yüzdenin aynısıdır; tek fark burada tam sayıya yuvarlanmamasıdır — canlı
+ * takipte ara değerler kaybolmasın diye kesir korunur, yuvarlama hedefin `step`'inde yapılır.
+ */
+export const controlValuePercent = (control: RangeControl, value: unknown): number | null => {
+  const numeric = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== "" ? Number(value) : Number.NaN;
+  if (!Number.isFinite(numeric)) return null;
+  const { min, max } = controlValueRange(control);
+  const clamped = Math.min(max, Math.max(min, numeric));
+  return ((clamped - min) / (max - min)) * 100;
+};
+
+/**
+ * Yüzdenin hedef kumandadaki ham karşılığı. Kırpma ve `step` yuvarlaması ortak normalizasyondan
+ * geçer; adım bildirmeyen kumandada değer tam sayıya oturur (panelin `automationValueRaw`'ıyla
+ * aynı kural — iki cihazın ölçeği farklı olduğu için ham değer asla kopyalanmaz).
+ */
+export const controlValueFromPercent = (
+  control: Parameters<typeof normalizeControlValue>[0],
+  percent: number
+): number => {
+  const { min, max } = controlValueRange(control);
+  const clamped = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
+  const exact = min + (max - min) * clamped / 100;
+  const step = control.step;
+  const snapped = step && step > 0 ? exact : Math.round(exact);
+  const normalized = normalizeControlValue(control, snapped);
+  return typeof normalized === "number" ? normalized : snapped;
 };
 
 /**

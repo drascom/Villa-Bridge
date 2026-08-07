@@ -70,22 +70,26 @@ const store = new DeviceStore(
   aliases,
   imagePreferences,
   await deviceEventsStore.get(),
-  (events, added) => {
+  (events) => {
     void deviceEventsStore.save(events).catch((error) => {
       console.error(`Cihaz olay geçmişi kaydedilemedi: ${String(error)}`);
-    });
-    // §6 — olay tetikleyicileri mevcut olay akışına takılır, poll yok.
-    const deviceEvents = added.flatMap((event) => {
-      const deviceId = store.getDeviceIdBySourceName(event.sourceName);
-      return deviceId ? [{ deviceId, property: event.property, value: event.value }] : [];
-    });
-    if (deviceEvents.length === 0) return;
-    void automationEngine.handleDeviceEvents(deviceEvents).catch((error) => {
-      console.error(`Otomasyon olayı işlenemedi: ${String(error)}`);
     });
   },
   deviceRoles
 );
+// §6 — otomasyon tetikleyicileri olay akışına takılır, poll yok. Motorun yolu cihaz etkinlik
+// listesinden **ayrıdır**: orası dar kümeyle sınırlıdır, burası cihazın bildirdiği her skaler
+// değişimi görür (parlaklık, ışık sıcaklığı, sıcaklık…). Liste gürültülenmez.
+store.setAutomationEventListener((events) => {
+  const deviceEvents = events.flatMap((event) => {
+    const deviceId = store.getDeviceIdBySourceName(event.sourceName);
+    return deviceId ? [{ deviceId, property: event.property, value: event.value }] : [];
+  });
+  if (deviceEvents.length === 0) return;
+  void automationEngine.handleDeviceEvents(deviceEvents).catch((error) => {
+    console.error(`Otomasyon olayı işlenemedi: ${String(error)}`);
+  });
+});
 store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
