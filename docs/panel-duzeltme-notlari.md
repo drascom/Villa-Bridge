@@ -147,9 +147,15 @@ Menü düğmesi **yalnız ana ekranda** kalır; alt sayfalarda aynı ölçü ve 
 **"Genel görünüm"** düğmesi → `activateView("home")`. Simge alt şeritteki "Genel görünüm"
 sekmesiyle **aynı** olmalı (`deviceIconSvg("overview")`), iki farklı "eve dön" görseli olmasın.
 
-**Kabul edilen bedel:** Otomasyonlar / Bağlantılar / Ayarlar'a **sadece** menüden gidiliyor.
-Menü alt sayfalardan kalkınca "Ayarlar → Otomasyonlar" iki dokunuş olur. Kullanıcı bunu bilerek
-istedi ("sadece ana sayfaya dönebilsin"); tabletin ana kullanımı ana ekran.
+**Bedel çözüldü (kullanıcı kararı):** Otomasyonlar / Bağlantılar / Ayarlar'a bugün **sadece**
+menüden gidiliyor; menü alt sayfalardan kalkınca "Ayarlar → Otomasyonlar" iki dokunuş olurdu.
+Kullanıcının çözümü: **Otomasyon menüden çıkarılıp ana ekrana taşınır.** Menü zaten ana ekranda
+kalıyor, dolayısıyla sık kullanılan üç yer (Cihazlar, Otomasyon, Genel görünüm) doğrudan;
+Bağlantılar ve Ayarlar menüde kalır — ikisi de nadir kullanılıyor.
+
+Yeri `.home-actions` (bugün Ekle / Düzenle / Menü). **1024×640'ta dördüncü düğmenin sığması
+ölçülmeli** — sığmıyorsa etiketler kısalır, düğme sayısı değil. Simge ve biçim, aşağıdaki
+8. nottaki `.page-action-tile` diliyle aynı olmalı.
 
 Erişilebilirlik: alt sayfalarda `aria-haspopup`/`aria-expanded` **kaldırılmalı** (artık pencere
 açmıyor). Yeni metin: `backToOverview`.
@@ -178,7 +184,11 @@ handoff'un "masaüstünde yatay düzen" maddesi tam oraya dokunacak.
 
 ---
 
-## 8. "Yeni otomasyon" düğmesi "Cihaz ekle" ile aynı olsun — **küçük, 7 içinde**
+## 8. "Yeni otomasyon" düğmesi "Cihaz ekle" ile **aynı tipte** olsun — **küçük, 7 içinde**
+
+Kullanıcının açıklaması: *"tipleri aynı olsun dedim; her ikisi de ayrı sayfalarda ve farklı
+görevleri var, ben tema tutarlı olsun demek istedim."* Yani istenen **görsel dil birliği**,
+işlev ortaklığı değil — aşağıdaki çözüm tam olarak bunu yapıyor.
 
 **Nerede:** `#devicesAddDevice` `:531` (`class="primary add-device"`, biçim `:265`),
 `#newAutomation` `:539` (`class="primary"`).
