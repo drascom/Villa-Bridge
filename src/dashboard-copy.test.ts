@@ -973,6 +973,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /\.shell\{min-height:100vh\}/);
   // Dar ekranda başlık altı boşluğu yatayda oransal (`--home-head-gap`), dikeyde eski 12px'te kalır.
   assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:var\(--home-head-gap,12px\)\}/);
+  // Dar ekranda blok akış korunur: ortalama yalnız üç sütunlu ızgaranın kuralı, burada sola döner.
+  assert.match(dashboard, /#home \.page-head\{display:block;margin-bottom:var\(--home-head-gap,12px\)\}#home \.home-heading\{text-align:left\}/);
   assert.match(dashboard, /#home \.group-control-grid\{--group-tile-span:1;grid-template-columns:1fr\}/);
   assert.match(
     dashboard,
@@ -982,12 +984,17 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.home-actions button,body\[data-active-view="home"\] #home \.home-actions button,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
   // Dikeyde de aynı dokunma hedefi: yuvarlak ama en az 60px.
   assert.match(dashboard, /#home \.home-actions button,body\[data-active-view="home"\] #home \.home-actions button\{width:var\(--head-action-h\);height:var\(--head-action-h\);min-width:var\(--head-action-h\)\}/);
+  // Menü düğmesi eylem grubundan çıktı; dikey kipteki sade daire biçimini yitirmesin.
+  assert.match(
+    dashboard,
+    /body\[data-active-view="home"\] #home \.page-head>\.app-menu-button\{width:var\(--head-action-h\);height:var\(--head-action-h\);min-width:var\(--head-action-h\);border:0;border-radius:50%;color:var\(--ink\);background:transparent;box-shadow:none\}/,
+  );
   assert.match(dashboard, /id="addWidget" class="secondary"><svg class="home-action-glyph"/);
   assert.match(dashboard, /id="editDashboardLabel" class="home-action-label"/);
   // Üç başlık düğmesi parmak hedefi: en az 60px yükseklik, ekranla orantılı genişlik ve
   // aralarında görünür boşluk. `#refreshButton` araç çubuğunda kaldığı için 46px kalır.
   assert.match(dashboard, /--head-action-h:clamp\(60px,9\.4vh,64px\);--head-action-w:clamp\(72px,8\.6vw,96px\);--head-action-gap:clamp\(12px,1\.6vw,20px\)/);
-  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{#devices \.toolbar\{padding-block:clamp\(6px,1\.1vh,10px\) clamp\(9px,1\.7vh,14px\);margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\);margin-top:-4px\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{#devices \.toolbar\{padding-block:clamp\(6px,1\.1vh,10px\) clamp\(9px,1\.7vh,14px\);margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\)\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
   assert.match(dashboard, /#refreshButton\{width:46px;height:46px;min-width:46px\}#home \.home-actions button\{width:var\(--head-action-w\);height:var\(--head-action-h\);min-width:var\(--head-action-w\);border-radius:999px\}/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{color:var\(--forest\);border-color:var\(--home-border\);background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
   // Başlık satırının alt boşluğu sabit px değil: `--home-head-gap` ile oransal verilir, burada
@@ -1757,8 +1764,15 @@ test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
   assert.match(dashboard, /id="homeAutomations"[\s\S]{0,300}?<span class="home-action-label" data-i18n="navAutomations">/);
   assert.match(dashboard, /navAutomations:"Automations"/);
   assert.match(dashboard, /navAutomations:"Otomasyon"/);
-  // Ana ekranın dört eylemi tek satırda, kaynak sırasında: Ekle · Düzenle · Otomasyon · Menü.
-  assert.match(dashboard, /<div class="home-actions"><button id="addWidget"[\s\S]*?<button id="editDashboard"[\s\S]*?<button id="homeAutomations"[\s\S]*?<button class="app-menu-button"[\s\S]*?<\/div><\/header>/);
+  // Menü sol hücreye çıktı; sağ hücrede üç eylem kaynak sırasında: Ekle · Düzenle · Otomasyon.
+  assert.match(dashboard, /<div class="home-actions"><button id="addWidget"[\s\S]*?<button id="editDashboard"[\s\S]*?<button id="homeAutomations"[\s\S]*?<\/div><\/header>/);
+  // Menü düğmesi `.home-actions` içinde DEĞİL: sağ grup yalnız üç eylemden oluşur.
+  const homeActionsBlock = dashboard.slice(
+    dashboard.indexOf('<div class="home-actions">'),
+    dashboard.indexOf('<div class="home-actions">') + dashboard.slice(dashboard.indexOf('<div class="home-actions">')).indexOf("</div></header>"),
+  );
+  assert.ok(!homeActionsBlock.includes("app-menu-button"), "menü düğmesi hâlâ eylem grubunda");
+  assert.equal(homeActionsBlock.match(/<button /g)?.length, 3);
 
   // Sayfa ve iki yollu giriş; yol seçimi artık sayfada değil, sihirbaz modalinin ilk adımında.
   assert.match(dashboard, /<section id="automations" class="view" data-admin-only>/);
@@ -4931,6 +4945,17 @@ test("üst gezinme şeridi kalkar, yerine her ekranda duran tek menü düğmesi 
     return section.slice(0, section.indexOf("</header>"));
   };
   assert.ok(viewHead("home").includes("data-app-menu"), "ana ekran başlığında menü düğmesi yok");
+  // Sekme/odak sırası görsel sırayı izler: menü · bilgi · eylemler.
+  const homeHead = viewHead("home");
+  assert.ok(
+    homeHead.indexOf("data-app-menu") < homeHead.indexOf('class="home-heading"'),
+    "menü düğmesi başlığın ilk hücresinde değil",
+  );
+  assert.ok(
+    homeHead.indexOf('class="home-heading"') < homeHead.indexOf('class="home-actions"'),
+    "bilgi hücresi eylem grubundan sonra geliyor",
+  );
+  assert.match(dashboard, /<header class="page-head"><button class="app-menu-button" type="button" data-app-menu/);
   for (const view of ["devices", "automations", "connections", "settings"]) {
     const head = viewHead(view);
     assert.ok(head.includes('data-view-link="home"'), `${view} başlığında genel görünüm düğmesi yok`);
@@ -4999,8 +5024,14 @@ test("alt sayfalar ortak başlık omurgasını paylaşır: ana sayfa · ortada b
     /\.page-head\{display:grid;grid-template-columns:var\(--head-action-w\) minmax\(0,1fr\) var\(--head-action-w\);align-items:center;gap:var\(--head-action-gap\);margin-bottom:30px\}/,
   );
   assert.doesNotMatch(dashboard, /\n\s*\.page-head\{display:flex/);
-  // Ana ekran şablonun dışında: hub, metrik satırı ve `.home-actions` kendi düzeninde.
-  assert.match(dashboard, /#home \.page-head\{display:flex;justify-content:space-between;align-items:flex-start;gap:28px\}/);
+  // Ana ekran da aynı ızgarayı kullanır: sol hücre menü (aynı belirteç), orta hücre bilgi satırı,
+  // sağ hücre üç eylem olduğu için `auto`. Bilgi satırı esnek boşlukla değil ızgarayla ortalanır,
+  // böylece sağdaki düğmelerin genişliği değişince metin kaymaz.
+  assert.match(dashboard, /#home \.page-head\{grid-template-columns:var\(--head-action-w\) minmax\(0,1fr\) auto\}/);
+  assert.match(dashboard, /#home \.home-heading\{text-align:center\}#home \.home-title-line\{justify-content:center\}#home \.home-metrics\{justify-content:center\}/);
+  assert.doesNotMatch(dashboard, /#home \.page-head\{display:flex/);
+  // Sol hücre alt sayfalarla birebir aynı: `.page-head>.app-menu-button` dikeyde ortalanır.
+  assert.match(dashboard, /\.page-head>\.app-menu-button\{align-self:center\}/);
   // Başlık taşarsa üç nokta; sabit px yok, yükseklik viewport'tan türer.
   assert.match(dashboard, /\.page-head-title\{min-width:0;text-align:center\}/);
   assert.match(
