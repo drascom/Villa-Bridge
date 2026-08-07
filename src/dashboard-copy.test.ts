@@ -70,7 +70,9 @@ test("dashboard sabit ve hafif manzara arka planı üzerinde iki katmanlı sayda
     readFile(serverUrl, "utf8")
   ]);
 
-  assert.match(dashboard, /body\[data-active-view="home"\]\{background-color:#c5ccc7;background-image:[^}]*url\("\/assets\/dashboard-landscape\.jpg"\)[^}]*background-attachment:fixed/);
+  // Fotoğraf artık `body`de: her sayfa aynı zemini paylaşır, `data-active-view` kilidi kalktı.
+  assert.match(dashboard, /\n\s*body\{background-color:#c5ccc7;background-image:[^}]*url\("\/assets\/dashboard-landscape\.jpg"\)[^}]*background-attachment:fixed/);
+  assert.doesNotMatch(dashboard, /body\[data-active-view="home"\]\{background-color:/);
   assert.match(dashboard, /--home-glass:rgba\(247,250,248,.22\)/);
   assert.match(dashboard, /--home-control:rgba\(251,252,252,.82\)/);
   // Gezinme şeridi kalktı: fotoğrafın üstünde kalan menü düğmesi alttaki hızlı erişim
@@ -88,6 +90,72 @@ test("dashboard sabit ve hafif manzara arka planı üzerinde iki katmanlı sayda
   assert.ok(background.length < 180_000);
   assert.match(server, /app\.get\("\/assets\/dashboard-landscape\.jpg"/);
   assert.match(server, /Cache-Control", "public, max-age=31536000, immutable"/);
+});
+
+test("alt sayfalar aynı fotoğrafı daha güçlü bir katmanın altında taşır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Metin yoğun alt sayfalarda fotoğrafın üstündeki katman belirgin şekilde güçlenir.
+  assert.match(
+    dashboard,
+    /body:not\(\[data-active-view="home"\]\)\{background-image:linear-gradient\(rgba\(240,244,241,\.62\),rgba\(231,237,233,\.68\)\),url\("\/assets\/dashboard-landscape\.jpg"\)\}/
+  );
+  // Koyu temada en güçlü hali: ana ekranın .38/.50 karartması alt sayfalarda .78/.86 olur.
+  assert.match(
+    dashboard,
+    /:root\[data-theme="dark"\] body\{background-color:#17201c;background-image:linear-gradient\(rgba\(7,16,12,\.38\),rgba\(7,16,12,\.5\)\)/
+  );
+  assert.match(
+    dashboard,
+    /:root\[data-theme="dark"\] body:not\(\[data-active-view="home"\]\)\{background-image:linear-gradient\(rgba\(7,16,12,\.78\),rgba\(7,16,12,\.86\)\),url\("\/assets\/dashboard-landscape\.jpg"\)\}/
+  );
+  // Karartma alt sayfalarda gerçekten daha güçlü olmalı — sayıyı okuyup karşılaştırıyoruz.
+  const homeDark = dashboard.match(/:root\[data-theme="dark"\] body\{[^}]*rgba\(7,16,12,\.(\d+)\)\),url/);
+  const pageDark = dashboard.match(/:root\[data-theme="dark"\] body:not\(\[data-active-view="home"\]\)\{[^}]*rgba\(7,16,12,\.(\d+)\)\),url/);
+  assert.ok(homeDark && pageDark);
+  assert.ok(Number(`0.${pageDark[1]}`) > Number(`0.${homeDark[1]}`));
+});
+
+test("alt sayfa yüzeyleri ana ekranla aynı cam belirteçlerine bağlı, pencereler opak kalır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Kart/panel yüzeyleri tek cam belirtecini kullanır — ikinci bir saydamlık dili yok.
+  assert.match(
+    dashboard,
+    /body:not\(\[data-active-view="home"\]\) \.view :where\(\.setting-card,\.connection-card,\.ha-setup-details,\.ha-network-guide,\.settings-actions,\.automation-card,\.automation-empty,\.widget-empty,\.empty\)\{border-color:var\(--home-border\);background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/
+  );
+  // Kartın içindeki eylem şeridine ikinci bir cam yüzey binmez.
+  assert.match(
+    dashboard,
+    /body:not\(\[data-active-view="home"\]\) \.view \.connection-settings-card \.settings-actions\{border-width:1px 0 0;border-color:var\(--line\);background:none;box-shadow:none\}/
+  );
+  // Kendi kenar dilini koruyanlar yalnız dolgu alır.
+  assert.match(
+    dashboard,
+    /body:not\(\[data-active-view="home"\]\) \.view :where\(\.device-card,\.room-chip\)\{background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/
+  );
+  // Yapışkan araç çubuğu sayfanın en opak yüzeyi: altından kart geçmemeli.
+  assert.match(dashboard, /body:not\(\[data-active-view="home"\]\) \.view \.toolbar\{background:rgba\(251,252,252,\.94\)\}/);
+  assert.match(
+    dashboard,
+    /:root\[data-theme="dark"\] body:not\(\[data-active-view="home"\]\) \.view \.toolbar\{background:rgba\(22,31,27,\.94\)\}/
+  );
+  // Sayfa başlığı doğrudan fotoğrafın üstünde: tema başına ayrı hale.
+  assert.match(dashboard, /body:not\(\[data-active-view="home"\]\) \.page-head-title h1\{text-shadow:0 1px 2px rgba\(255,255,255,\.5\)\}/);
+  assert.match(
+    dashboard,
+    /:root\[data-theme="dark"\] body:not\(\[data-active-view="home"\]\) \.page-head-title h1\{text-shadow:0 1px 3px rgba\(0,0,0,\.62\)\}/
+  );
+  // `<dialog>` içeriği hariç: cam kuralları `.view` ile sınırlı ve bütün dialoglar `.view` dışında.
+  assert.doesNotMatch(dashboard, /body:not\(\[data-active-view="home"\]\)[^{]*dialog/);
+  const markup = await readFile(dashboardUrl, "utf8");
+  const firstDialog = markup.indexOf('<dialog id="');
+  const viewSections = [...markup.matchAll(/<section id="[a-z]+" class="view/g)];
+  assert.ok(firstDialog > 0);
+  assert.equal(viewSections.length, 5);
+  assert.ok(viewSections.every((section) => (section.index ?? -1) < firstDialog));
+  // Eski Android WebView: saydamlık düz `rgba()` ile, `color-mix()` yok.
+  assert.doesNotMatch(dashboard, /color-mix\(/);
 });
 
 test("Home Assistant kartı LAN IP ve EN/TR sabitleme rehberi sunar", async () => {
@@ -791,7 +859,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   // Üç başlık düğmesi parmak hedefi: en az 60px yükseklik, ekranla orantılı genişlik ve
   // aralarında görünür boşluk. `#refreshButton` araç çubuğunda kaldığı için 46px kalır.
   assert.match(dashboard, /--head-action-h:clamp\(60px,9\.4vh,64px\);--head-action-w:clamp\(72px,8\.6vw,96px\);--head-action-gap:clamp\(12px,1\.6vw,20px\)/);
-  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{#devices \.toolbar\{padding:6px 0;margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\);margin-top:-4px\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{#devices \.toolbar\{padding:6px 0;margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\);margin-top:-4px\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
   assert.match(dashboard, /#refreshButton\{width:46px;height:46px;min-width:46px\}#home \.home-actions button\{width:var\(--head-action-w\);height:var\(--head-action-h\);min-width:var\(--head-action-w\);border-radius:999px\}/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{color:var\(--forest\);border-color:var\(--home-border\);background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
   // Başlık satırının alt boşluğu sabit px değil: `--home-head-gap` ile oransal verilir, burada
@@ -1335,10 +1403,10 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact\{font-size:14px\}#home \.quick-battery\{font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row\{display:grid;grid-template-columns:minmax\(0,1fr\) auto;align-items:baseline;gap:2px 10px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row strong\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}#home \[data-widget="activity"\] \.widget-list-row time\{color:var\(--muted\);font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row span\{grid-column:1\/-1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px\}\}/);
   // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
   const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
-  const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px){body[data-active-view=\"home\"] main{padding-bottom:");
+  const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px),(orientation:landscape) and (min-width:1000px){body[data-active-view=\"home\"] main{padding-bottom:");
   assert.ok(landscapeBlock > 0 && shortBlock > landscapeBlock);
   // Grup (a): iki sütunlu yerleşim, rail sığdırma ve sıkışık boşluklar yükseklik koşuluna bağlı kalır.
-  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\)\{body\[data-active-view="home"\] main\{padding-bottom:calc\(106px \+ env\(safe-area-inset-bottom\)\)\}/);
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{body\[data-active-view="home"\] main\{padding-bottom:calc\(106px \+ env\(safe-area-inset-bottom\)\)\}/);
   // Ana ekran sütun akışı: pano kalan yüksekliği alır, kartlar şeride kadar uzar.
   assert.match(dashboard, /#home\.active\{min-height:0;display:flex;flex-direction:column;height:calc\(100dvh - var\(--home-top\) - 106px - env\(safe-area-inset-bottom\)\)\}/);
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
@@ -1356,6 +1424,35 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   assert.doesNotMatch(shortBlockBody, /#home \.summary-row strong\{/);
   assert.doesNotMatch(shortBlockBody, /#home \.widget-value strong\{/);
   assert.doesNotMatch(shortBlockBody, /#home \.widget-card:not\(\.group-widget\) h2\{/);
+});
+
+test("yatay kip masaüstünü de kapsar, telefon dikey kalır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Yatay kipin her bloğu aynı ikiliyi taşır: kısa ekran VEYA geniş ekran.
+  const gates = dashboard.match(/@media\(orientation:landscape\)[^{]*\(min-width:1000px\)[^{]*\{/g) ?? [];
+  assert.ok(gates.length >= 5, `yatay kip eşiği eksik: ${gates.length}`);
+  // Genişletilen bloklar: ana kabuk, ana ekran yerleşimi, şerit ölçüleri, hareket kısıtı, başlık eylemleri.
+  assert.match(
+    dashboard,
+    /@media\(orientation:landscape\) and \(min-width:901px\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{\.topbar\{display:none\}main\{max-width:none;padding:14px 20px 20px\}/
+  );
+  assert.match(
+    dashboard,
+    /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{#home \[data-widget="quick"\]\{height:76px\}/
+  );
+  // Uzun masaüstü ekranında kart tavanı ekranla orantılı — sabit px değil.
+  assert.match(
+    dashboard,
+    /@media\(orientation:landscape\) and \(min-width:1000px\) and \(min-height:901px\)\{#home \.widget-board\{max-height:min\(78vh,860px\)\}\}/
+  );
+  // Kısa ekranların (tablet 640, dizüstü 800) 660px tavanı yerinde kalır.
+  assert.match(dashboard, /#home \.widget-board\{flex:1 1 auto;min-height:150px;max-height:660px/);
+  // Telefon varsayımı koda yazılı: portre dikey kalır, çevirme yolu tek koşul.
+  assert.match(dashboard, /VARSAYIM[\s\S]{0,400}TELEFON DİKEY KALIR/);
+  assert.match(dashboard, /YATAY KİP EŞİĞİ/);
+  // Portre bloğu yatay kipe karışmaz: telefon dikey akışını `orientation:landscape` koruyor.
+  assert.doesNotMatch(dashboard, /@media\(orientation:portrait\)[^{]*\(min-width:1000px\)/);
 });
 
 test("ana ekran hareket listesi cihaz başına yalnız en son olayı gösterir", async () => {
@@ -4603,7 +4700,7 @@ test("rail kaydırılınca hub sönerek gizlenir ve tıklanamaz olur", async () 
   assert.match(dashboard, /#home \.home-hub\{[^}]*transition:opacity \.18s ease\}/);
   assert.match(
     dashboard,
-    /@media\(orientation:landscape\) and \(max-height:900px\) and \(prefers-reduced-motion:reduce\)\{#home \.home-hub\{transition:none\}\}/,
+    /@media\(orientation:landscape\) and \(max-height:900px\) and \(prefers-reduced-motion:reduce\),\(orientation:landscape\) and \(min-width:1000px\) and \(prefers-reduced-motion:reduce\)\{#home \.home-hub\{transition:none\}\}/,
   );
   // Yalnız yatay kip: dikey/masaüstü düzeninde hub bugünkü gibi kalır.
   assert.match(dashboard, /const landscape=window\.matchMedia\("\(orientation: landscape\) and \(max-height: 900px\)"\)\.matches/);
