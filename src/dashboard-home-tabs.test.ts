@@ -407,7 +407,11 @@ test("alt şerit sekme çubuğu: Genel görünüm ilk ve kilitli, yeni grup dü�
 
   assert.match(dashboard, /<div id="homeTabs" class="device-grid quick-grid grid-view" role="tablist"/);
   // "+ yeni grup" tablist'in kardeşi: erişilebilirlik için sekme listesinin içine girmemeli.
-  assert.match(dashboard, /<\/div>\s*<button id="createHomeGroup" class="quick-card quick-card-add" type="button"/);
+  // Şerit sırası: sol ok · sekme listesi · sağ ok · "+ yeni grup" — okların yeri kendine ait.
+  assert.match(
+    dashboard,
+    /<button id="quickScrollLeft"[^>]*><svg[^>]*>[\s\S]*?<\/button>\s*<div id="homeTabs"[\s\S]*?<\/div>\s*<button id="quickScrollRight"[^>]*><svg[^>]*>[\s\S]*?<\/button>\s*<button id="createHomeGroup" class="quick-card quick-card-add" type="button"/
+  );
   assert.match(dashboard, /const overviewTabId="overview"/);
   assert.match(dashboard, /id:overviewTabId,\s*name:t\("overviewTab"\),\s*icon:"overview",\s*locked:true/);
   // Roving tabindex + aria-selected: seçili sekme odak alır, diğerleri sıradan çıkar.

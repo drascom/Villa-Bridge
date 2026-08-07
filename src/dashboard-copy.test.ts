@@ -134,12 +134,15 @@ test("alt sayfa yüzeyleri ana ekranla aynı cam belirteçlerine bağlı, pencer
     dashboard,
     /body:not\(\[data-active-view="home"\]\) \.view :where\(\.device-card,\.room-chip\)\{background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/
   );
-  // Yapışkan araç çubuğu sayfanın en opak yüzeyi: altından kart geçmemeli.
-  assert.match(dashboard, /body:not\(\[data-active-view="home"\]\) \.view \.toolbar\{background:rgba\(251,252,252,\.94\)\}/);
+  // Yapışkan araç çubuğu sayfanın en opak yüzeyi: yarı saydamken altından kayan kartların hayaleti
+  // görünüyordu, artık her iki temada da bir ton koyu ve tam mat.
+  assert.match(dashboard, /body:not\(\[data-active-view="home"\]\) \.view \.toolbar\{background:#e2e8ea\}/);
+  assert.doesNotMatch(dashboard, /\.view \.toolbar\{background:rgba\(251,252,252,\.94\)\}/);
   assert.match(
     dashboard,
-    /:root\[data-theme="dark"\] body:not\(\[data-active-view="home"\]\) \.view \.toolbar\{background:rgba\(22,31,27,\.94\)\}/
+    /:root\[data-theme="dark"\] body:not\(\[data-active-view="home"\]\) \.view \.toolbar\{background:#0b100f\}/
   );
+  assert.doesNotMatch(dashboard, /\.view \.toolbar\{background:rgba\(22,31,27,\.94\)\}/);
   // Sayfa başlığı doğrudan fotoğrafın üstünde: tema başına ayrı hale.
   assert.match(dashboard, /body:not\(\[data-active-view="home"\]\) \.page-head-title h1\{text-shadow:0 1px 2px rgba\(255,255,255,\.5\)\}/);
   assert.match(
@@ -406,6 +409,16 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /return list\.filter\(fact=>fact!==primaryLabel\)\.slice\(0,5\)/);
   assert.match(dashboard, /<details class="technical-details" data-admin-only/);
   assert.match(dashboard, /#devices \.toolbar\{position:sticky;z-index:6;top:0/);
+  // Arama çubuğu kenardan kenara: `main`in yan dolgusunu negatif kenar boşluğuyla siler, aynı
+  // dolguyu içeride geri verir; böylece hiçbir sabit px'e bağlanmadan tam genişlik olur.
+  assert.match(
+    dashboard,
+    /#devices \.toolbar\{position:sticky;z-index:6;top:0;margin-inline:calc\(var\(--page-gutter\) \* -1\);margin-bottom:10px;padding-block:clamp\(10px,1\.6vh,16px\) clamp\(14px,2\.4vh,22px\);padding-inline:var\(--page-gutter\);background:var\(--paper\)\}/
+  );
+  assert.doesNotMatch(dashboard, /#devices \.toolbar\{position:sticky;z-index:6;top:0;padding:10px 0/);
+  // `main` yan dolgusu artık tek kaynaktan: her kırılım kendi `--page-gutter` değerini yazar.
+  assert.match(dashboard, /main\{--page-gutter:42px;width:100%;max-width:1240px;margin:0 auto;padding:24px var\(--page-gutter\) 80px\}/);
+  assert.match(dashboard, /@media\(max-width:900px\)\{main\{--page-gutter:18px;padding:14px var\(--page-gutter\) calc\(24px \+ env\(safe-area-inset-bottom\)\)\}/);
   assert.match(dashboard, /id="clearSearch" class="search-clear" type="button" hidden/);
   assert.match(dashboard, /clearSearch"\)\.onclick=\(\)=>\{\$\("#search"\)\.value="";syncSearchClear\(\);filterDevices\(\);bindCards\(\);\$\("#search"\)\.focus\(\)\}/);
   assert.match(dashboard, /clearSearch:"Clear search"/);
@@ -735,7 +748,7 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.doesNotMatch(dashboard, /\.nav-utilities/);
   assert.doesNotMatch(dashboard, /id="landscapeTheme"/);
   assert.doesNotMatch(dashboard, /id="landscapeLanguage"/);
-  assert.match(dashboard, /\.topbar\{display:none\}main\{max-width:none;padding:14px 20px 20px\}/);
+  assert.match(dashboard, /\.topbar\{display:none\}main\{--page-gutter:20px;max-width:none;padding:14px var\(--page-gutter\) 20px\}/);
   assert.match(
     dashboard,
     /@media\(orientation:landscape\) and \(max-width:900px\) and \(max-height:700px\)\{\.topbar\{display:none\}main\{padding-top:14px;padding-bottom:20px\}/,
@@ -849,7 +862,10 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   // Dar ekranda başlık altı boşluğu yatayda oransal (`--home-head-gap`), dikeyde eski 12px'te kalır.
   assert.match(dashboard, /@media\(max-width:900px\)\{main,\.view,\.page-head,\.home-heading,\.widget-board,\.widget-rail\{min-width:0\}#home \.page-head\{display:block;margin-bottom:var\(--home-head-gap,12px\)\}/);
   assert.match(dashboard, /#home \.group-control-grid\{--group-tile-span:1;grid-template-columns:1fr\}/);
-  assert.match(dashboard, /@media\(orientation:portrait\) and \(max-width:560px\)\{main\{padding:12px 14px 96px\}/);
+  assert.match(
+    dashboard,
+    /@media\(orientation:portrait\) and \(max-width:560px\)\{main\{--page-gutter:14px;padding:12px var\(--page-gutter\) 96px\}/
+  );
   assert.match(dashboard, /#home \.home-actions\{display:flex;justify-content:flex-end;gap:10px\}/);
   assert.match(dashboard, /#home \.home-actions button,body\[data-active-view="home"\] #home \.home-actions button,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
   // Dikeyde de aynı dokunma hedefi: yuvarlak ama en az 60px.
@@ -859,7 +875,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   // Üç başlık düğmesi parmak hedefi: en az 60px yükseklik, ekranla orantılı genişlik ve
   // aralarında görünür boşluk. `#refreshButton` araç çubuğunda kaldığı için 46px kalır.
   assert.match(dashboard, /--head-action-h:clamp\(60px,9\.4vh,64px\);--head-action-w:clamp\(72px,8\.6vw,96px\);--head-action-gap:clamp\(12px,1\.6vw,20px\)/);
-  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{#devices \.toolbar\{padding:6px 0;margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\);margin-top:-4px\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
+  assert.match(dashboard, /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{#devices \.toolbar\{padding-block:clamp\(6px,1\.1vh,10px\) clamp\(9px,1\.7vh,14px\);margin-bottom:8px\}#home \.home-actions\{gap:var\(--head-action-gap\);margin-top:-4px\}#home \.home-actions button,#refreshButton\{[^}]*background:var\(--forest-soft\)/);
   assert.match(dashboard, /#refreshButton\{width:46px;height:46px;min-width:46px\}#home \.home-actions button\{width:var\(--head-action-w\);height:var\(--head-action-h\);min-width:var\(--head-action-w\);border-radius:999px\}/);
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.home-actions button\{color:var\(--forest\);border-color:var\(--home-border\);background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/);
   // Başlık satırının alt boşluğu sabit px değil: `--home-head-gap` ile oransal verilir, burada
@@ -1101,7 +1117,10 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /#home \.widget-board\{flex:1 1 auto;min-height:150px;max-height:660px;display:grid;grid-template-columns:var\(--hub-column\) minmax\(0,1fr\);grid-template-rows:minmax\(0,1fr\);gap:10px\}/);
   assert.doesNotMatch(dashboard, /#home \[data-widget="status"\]/);
   assert.match(dashboard, /#home \[data-widget="quick"\]\{position:fixed;z-index:9;left:var\(--strip-inset\);right:var\(--strip-inset\);bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\);grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden\}/);
-  assert.match(dashboard, /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card,#home \.strip-row>\.quick-card-add\{height:56px\}/);
+  assert.match(
+    dashboard,
+    /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card,#home \.strip-row>\.quick-card-add,#home \.strip-row>\.quick-scroll-hint\{height:56px\}/
+  );
   // Hub arka katmanda: rail tüm panoyu kaplar, hub sütunu kadar dolgusu var ve üstünden kayar.
   assert.match(dashboard, /#home \.widget-rail\{position:relative;z-index:1;grid-column:1\/-1;grid-row:1;padding-left:calc\(var\(--hub-column\) \+ 10px\);scroll-padding-left:calc\(var\(--hub-column\) \+ 10px\);pointer-events:none;height:100%;display:grid;grid-template-columns:repeat\(3,var\(--rail-column\)\)/);
   // Rail'in kendisi tıklamayı yutmaz; yalnız kartlar yakalar, böylece açıktaki hub tıklanabilir kalır.
@@ -1173,8 +1192,24 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const hasAfter=scroller\.scrollWidth-scroller\.clientWidth-scroller\.scrollLeft>8/);
   assert.match(dashboard, /function scrollWidgetRail\(direction\)\{scrollDashboardRow\(\$\("#widgetRail"\),direction,220,\.72\)\}/);
   assert.match(dashboard, /function scrollHomeTabs\(direction\)\{scrollDashboardRow\(\$\("#homeTabs"\),direction,120,\.55\)\}/);
-  assert.match(dashboard, /#home \.widget-scroll-hint\{top:calc\(50% - 24px\);width:38px;height:48px;border-radius:15px\}/);
-  assert.match(dashboard, /#home \.quick-scroll-hint\{top:calc\(50% - 20px\);width:30px;height:40px;border-radius:13px\}/);
+  assert.match(dashboard, /#home \.widget-scroll-hint\{position:absolute;top:calc\(50% - 24px\);width:38px;height:48px;border-radius:15px\}/);
+  // Şerit okları artık şeridin düzeninin parçası: mutlak konum yok, genişlikleri kendilerine ayrılmış.
+  assert.match(
+    dashboard,
+    /#home \.strip-row>\.quick-scroll-hint\{position:static;flex:0 0 auto;width:clamp\(40px,4\.2vw,52px\);min-width:40px;border-radius:999px\}/
+  );
+  assert.doesNotMatch(dashboard, /#home \.quick-scroll-hint\.scroll-hint-left\{left:4px\}/);
+  assert.doesNotMatch(dashboard, /#home \.quick-scroll-hint\.scroll-hint-right\{right:4px\}/);
+  // Gizliyken yerini korur: `display:none` şeridi her kaydırmada zıplatıyordu.
+  assert.match(dashboard, /#home \.strip-row>\.quick-scroll-hint\[hidden\]\{visibility:hidden;pointer-events:none\}/);
+  assert.doesNotMatch(dashboard, /#home \.widget-scroll-hint\[hidden\],#home \.quick-scroll-hint\[hidden\]\{display:none\}/);
+  assert.match(dashboard, /#home \.widget-scroll-hint\[hidden\]\{display:none\}/);
+  // Okların rengi şeridin "+" düğmesiyle aynı dilde: koyu yeşil cam yerine orman yeşili gövde.
+  assert.match(
+    dashboard,
+    /#home \.widget-scroll-hint,#home \.quick-scroll-hint\{z-index:8;display:grid;place-items:center;padding:0;border:1px solid var\(--forest\);color:var\(--on-forest\);background:var\(--forest\);box-shadow:0 8px 18px rgba\(24,77,59,\.2\)\}/
+  );
+  assert.doesNotMatch(dashboard, /background:rgba\(20,48,38,\.8\)/);
   assert.doesNotMatch(dashboard, /scroll-hint-pulse/);
   // Sekmenin kendisi buton: eski "karta dokun, içindeki butonu tıkla" sarmalayıcısı kalktı.
   assert.doesNotMatch(dashboard, /if\(!event\.target\.closest\("button,input"\)\)toggle\(\)/);
@@ -1435,7 +1470,7 @@ test("yatay kip masaüstünü de kapsar, telefon dikey kalır", async () => {
   // Genişletilen bloklar: ana kabuk, ana ekran yerleşimi, şerit ölçüleri, hareket kısıtı, başlık eylemleri.
   assert.match(
     dashboard,
-    /@media\(orientation:landscape\) and \(min-width:901px\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{\.topbar\{display:none\}main\{max-width:none;padding:14px 20px 20px\}/
+    /@media\(orientation:landscape\) and \(min-width:901px\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{\.topbar\{display:none\}main\{--page-gutter:20px;max-width:none;padding:14px var\(--page-gutter\) 20px\}/
   );
   assert.match(
     dashboard,
