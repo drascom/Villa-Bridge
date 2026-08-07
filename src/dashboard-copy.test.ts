@@ -5679,3 +5679,91 @@ test("koşul adımındaki cihaz listesi neyi neden listelediğini söyler", asyn
   assert.match(dashboard, /automationCondPickWhy:"[^"]*Bir cihaz listede yoksa koşul olarak okunabilecek bir durumu yok demektir\."/);
   assert.match(dashboard, /automationCondPickWhy:"[^"]*If a device is missing, it has no state that can be read as a condition\."/);
 });
+
+test("ışık detay kartındaki büyük dikey kumanda yetenek bazlı çizilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Parçalar cihazın SUNDUĞU kumandalardan okunur: model ya da ad listesi yok.
+  assert.match(dashboard, /power:controls\.find\(control=>control\.kind==="switch"&&control\.id==="main"\)/);
+  assert.match(dashboard, /level:byId\("main:brightness","level"\)/);
+  assert.match(dashboard, /temperature:byId\("main:temperature","temperature"\)/);
+  assert.match(dashboard, /color:byId\("main:color","color"\)/);
+  assert.match(dashboard, /effect:controls\.find\(control=>control\.kind==="select"&&\/\(\^\|_\)effect\$\/\.test/);
+  // Kumanda ışık profiline bağlı; priz/anahtar (yalnız `switch`) etkilenmez.
+  assert.match(dashboard, /const lightPanelSupported=\(device,parts\)=>device\?\.category==="light"&&Boolean\(parts\.power\|\|parts\.level\)/);
+  assert.match(dashboard, /if\(!lightPanelSupported\(device,parts\)\)return"";/);
+  // Satırlar yalnız desteklenen yetenekte çizilir: kip düğmesi, hazır renkler, efekt.
+  assert.match(dashboard, /const modeButton=\(key,control,active\)=>control/);
+  assert.match(dashboard, /const modesHtml=modeButtons\?/);
+  assert.match(dashboard, /const presetsHtml=parts\.color/);
+  assert.match(dashboard, /const effectHtml=parts\.effect/);
+  // Serbest renk için yeni arayüz yazılmadı: paneldeki `.color-picker` + `data-color` yolu kullanıldı.
+  assert.match(dashboard, /<div class="light-color"\$\{mode==="color"\?"":" hidden"\}>/);
+  assert.match(dashboard, /<input class="color-picker" type="color" value="\$\{esc\(typeof parts\.color\.value==="string"\?parts\.color\.value:"#ffffff"\)\}" data-color=/);
+  assert.match(dashboard, /const powerButton=parts\.power/);
+  // Kumanda detay penceresinin en üstüne, mevcut düzenin ÜSTÜNE gelir; gerisi korunur.
+  assert.match(dashboard, /return`\$\{lightPanelHtml\(device\)\}<div class="device-detail-layout">/);
+  // Kolonun rengi ışığın o anki durumu: renk varsa o, renk sıcaklığı varsa Kelvin karşılığı,
+  // düz ışıkta panelin sıcak sarısı (`--sun`). Kapalıyken sönük.
+  assert.match(dashboard, /if\(typeof parts\.color\?\.value==="string"&&\/\^#\[0-9a-f\]\{6\}\$\/i\.test\(parts\.color\.value\)\)return parts\.color\.value\.toLowerCase\(\)/);
+  assert.match(dashboard, /if\(typeof parts\.temperature\?\.value==="number"\)return kelvinHex\(temperatureKelvin\(parts\.temperature\.value\)\)/);
+  assert.match(dashboard, /\.light-column-fill\{position:absolute;left:0;right:0;bottom:0;background:var\(--light-tint,var\(--sun\)\)/);
+  assert.match(dashboard, /\.light-column\.off \.light-column-fill\{opacity:\.2\}/);
+  // Göreli zaman için yeni yardımcı yazılmadı: paneldeki `ago` yeniden kullanıldı.
+  assert.match(dashboard, /<div class="light-readout-since">\$\{esc\(ago\(device\.stateUpdatedAt\)\)\}<\/div>/);
+  assert.equal((dashboard.match(/const ago=iso=>/g) || []).length, 1);
+  // Ölçüler viewport'a bağlı (sabit px yok), dokunma hedefleri 44×44, hareket kısıtı saygılı.
+  assert.match(dashboard, /\.light-column\{position:relative;width:clamp\(88px,15vw,124px\);height:clamp\(120px,28vh,220px\)/);
+  assert.match(dashboard, /\.light-mode\{min-width:44px;min-height:44px/);
+  assert.match(dashboard, /\.light-preset\{min-width:44px;min-height:44px/);
+  assert.match(dashboard, /@media\(prefers-reduced-motion:reduce\)\{\.light-column-fill\{transition:none\}\}/);
+  assert.match(dashboard, /lightPower:"Power"/);
+  assert.match(dashboard, /lightPower:"Güç"/);
+  assert.match(dashboard, /lightEffect:"Effect"/);
+  assert.match(dashboard, /lightEffect:"Efekt"/);
+  assert.match(dashboard, /lightPresetColors:"Preset colors"/);
+  assert.match(dashboard, /lightPresetColors:"Hazır renkler"/);
+});
+
+test("kolon sürüklenirken arayüz iyimser, yazma kısıtlı, bırakışta kesin değer yazılır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Pointer Events + işaretçi yakalama + `touch-action:none` (yoksa tablette sayfa kayar).
+  assert.match(dashboard, /column\.onpointerdown=event=>\{/);
+  assert.match(dashboard, /if\(column\.setPointerCapture\)column\.setPointerCapture\(event\.pointerId\)/);
+  assert.match(dashboard, /\.light-column\{[^}]*touch-action:none/);
+  // Sürüklerken önce boyanır (iyimser), sonra kısıtlı yazma sıraya girer.
+  assert.match(dashboard, /paint\(lightDrag\.fraction\);\s+write\(lightDrag\.fraction,false\);/);
+  assert.match(dashboard, /const lightWriteInterval=200;/);
+  assert.match(dashboard, /const wait=immediate\?0:lightWriteInterval-\(Date\.now\(\)-lightWrite\.at\);/);
+  assert.match(dashboard, /if\(!lightWrite\.timer\)lightWrite\.timer=setTimeout\(flushLightWrite,wait\);/);
+  // Aynı anda tek uçuşta komut: sıra doluysa son değer DÜŞMEZ, geri sıraya konur.
+  assert.match(dashboard, /if\(commandPending\(job\.id,job\.property\)\)\{lightWrite\.timer=setTimeout\(flushLightWrite,80\);return\}/);
+  // Bırakınca kesin değer bir kez daha yazılır (iptalde de).
+  assert.match(dashboard, /if\(slider\)\{paint\(fraction\);write\(fraction,true\)\}/);
+  assert.match(dashboard, /if\(moved&&slider\)write\(fraction,true\);/);
+  // Sürükleme durumu modül düzeyinde: komut sonrası yeniden bağlama parmak takibini koparmaz.
+  assert.match(dashboard, /const lightDrag=\{pointerId:null,startY:0,moved:false,fraction:0\};/);
+  assert.match(dashboard, /bindLightPanel\(\);/);
+});
+
+test("yalnız aç/kapat olan ışıkta kolon anahtar gibi çalışır ve klavyeyle kullanılabilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Parlaklık/renk sıcaklığı yoksa kip "switch": sürükleme yok, dokunma aç/kapat yapar.
+  assert.match(dashboard, /return\{kind:"switch",control:parts\.power,known:typeof parts\.power\?\.value==="boolean"/);
+  assert.match(dashboard, /lightDrag\.moved=true;\s+if\(!slider\)return;/);
+  assert.match(dashboard, /if\(parts\.power\)\{toggle\(\);return\}/);
+  // Rol ve durum bildirimi: kaydırıcıda `slider`, aç/kapat cihazında `switch`+`aria-checked`.
+  assert.match(dashboard, /role="\$\{slider\?"slider":"switch"\}"/);
+  assert.match(dashboard, /aria-valuemin="0" aria-valuemax="100" aria-valuenow="\$\{percent\}" aria-valuetext="\$\{esc\(readout\)\}"/);
+  assert.match(dashboard, /:`aria-checked="\$\{lit\}"`/);
+  assert.match(dashboard, /<div class="light-column\$\{lit\?"":" off"\}" data-light-column="\$\{esc\(device\.id\)\}"[^`]*tabindex="0"/);
+  // Klavye: ok tuşları artır/azalt, Home/End uçlar, aç/kapat cihazında Space/Enter değiştirir.
+  assert.match(dashboard, /const steps=\{ArrowUp:1,ArrowRight:1,ArrowDown:-1,ArrowLeft:-1,PageUp:2,PageDown:-2\};/);
+  assert.match(dashboard, /const edge=event\.key==="Home"\?0:event\.key==="End"\?1:null;/);
+  assert.match(dashboard, /if\(edge!==null\)\{event\.preventDefault\(\);paint\(edge\);write\(edge,true\);return\}/);
+  assert.match(dashboard, /if\(event\.key===" "\|\|event\.key==="Enter"\)\{\s+if\(!parts\.power\)return;/);
+  // Işık olmayan cihazın kumandaları değişmedi: satır tabanlı kontroller yerinde.
+  assert.match(dashboard, /const controlsBodyHtml=device\.controls\.map\(control=>controlHtml\(device,control\)\)\.join\(""\)\+deviceButtonsHtml\(device\)/);
+});

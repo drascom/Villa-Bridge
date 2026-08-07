@@ -322,6 +322,26 @@
     .card-actions.card-actions-done{margin-top:clamp(12px,1.8vh,18px)}.card-actions.card-actions-done>button{flex:1 1 100%;width:100%;min-height:clamp(44px,7vh,52px)}
     .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-controls,.device-detail-media{min-width:0}.device-detail-media{display:grid;align-content:start;gap:14px}.device-detail-media .facts{margin-top:0}.device-detail-media .device-detail-photo{margin:0}.device-detail-media .device-detail-roles{margin-top:0}.device-detail-roles .control-select{min-width:0;max-width:100%}
     @media(min-width:900px) and (orientation:landscape){dialog.device-detail-dialog{width:min(94vw,940px)}.device-detail-layout{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}.device-detail-controls{order:2}.device-detail-media{order:1}.device-detail-photo .device-photo{max-height:min(22vh,150px)}}
+    /* Işık kartındaki büyük dikey kumanda. Yükseklik viewport'a bağlı (clamp + vh), sabit px yok:
+       1024×640 tablette pencere kaydırılmadan sığar. Renk karıştıran CSS işlevi YOK — Android
+       WebView desteklemiyor; dolgunun rengi satır içi `--light-tint` ile gelir, yoksa sıcak sarı. */
+    .light-panel{display:grid;justify-items:center;gap:clamp(8px,1.5vh,15px);margin:0 0 clamp(14px,2.2vh,20px);padding:clamp(12px,2vh,20px);border:1px solid var(--line);border-radius:20px;background:var(--surface-soft)}
+    .light-readout{text-align:center}.light-readout-value{font:800 clamp(24px,4.4vh,36px)/1.05 system-ui,sans-serif}.light-readout-since{margin-top:3px;color:var(--muted);font-size:clamp(11px,1.6vh,13px)}
+    .light-column{position:relative;width:clamp(88px,15vw,124px);height:clamp(120px,28vh,220px);display:block;padding:0;border:1px solid var(--line);border-radius:clamp(16px,2.6vh,26px);background:var(--surface);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+    .light-column-fill{position:absolute;left:0;right:0;bottom:0;background:var(--light-tint,var(--sun));transition:height .18s ease}
+    .light-column.off .light-column-fill{opacity:.2}.light-column[aria-disabled="true"]{opacity:.5}
+    .light-column-glyph{position:absolute;left:50%;bottom:clamp(7px,1.3vh,13px);width:clamp(20px,3vh,26px);height:clamp(20px,3vh,26px);transform:translateX(-50%);color:var(--ink);opacity:.5;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+    .light-modes{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(7px,1.1vw,12px)}
+    .light-mode{min-width:44px;min-height:44px;display:grid;place-items:center;padding:0 clamp(9px,1.2vw,13px);border:1px solid var(--line);border-radius:14px;color:var(--muted);background:var(--surface);touch-action:manipulation}
+    .light-mode svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+    .light-mode.active{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
+    .light-mode.on{border-color:var(--forest);color:var(--forest);background:var(--forest-soft)}
+    .light-color{width:100%;max-width:clamp(216px,46vw,352px);display:grid;gap:clamp(6px,1vw,10px)}.light-color[hidden]{display:none}
+    .light-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(44px,1fr));gap:clamp(6px,1vw,10px)}
+    .light-color .color-picker{height:clamp(44px,7vh,52px)}
+    .light-preset{min-width:44px;min-height:44px;padding:0;border:1px solid var(--line);border-radius:12px;touch-action:manipulation}
+    .light-effect{width:100%;max-width:clamp(216px,52vw,360px);display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:750}.light-effect .control-select{width:100%;min-width:0}
+    @media(prefers-reduced-motion:reduce){.light-column-fill{transition:none}}
     .device-card.device-card-offline{filter:saturate(.7);opacity:.72}.device-attention .device-card.device-card-offline{filter:saturate(.85);opacity:.92}:root[data-theme="dark"] .device-card.device-card-offline{opacity:.8}:root[data-theme="dark"] .device-attention .device-card.device-card-offline{opacity:.95}
     .device-grid.devices-list-view{justify-items:center}.device-grid.devices-list-view>.device-card{width:min(100%,760px)}.device-grid.devices-list-view>.empty{width:100%}
     .device-card-hint{flex:none;display:flex;align-items:center;color:var(--muted);font-size:19px;font-weight:700;line-height:1;opacity:.6}.device-card-hint.divided{margin-right:2px;padding-right:10px;border-right:1px solid var(--line)}
@@ -840,7 +860,7 @@
     return new Set(Array.isArray(value)?value.filter(id=>typeof id==="string"):[]);
   }catch{return new Set()}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   const weatherState={location:savedWeatherLocation,data:savedWeatherSnapshot?.data||null,error:null,loading:false,updatedAt:savedWeatherSnapshot?.updatedAt||0};
   const weatherStaleAfter=7200000;
@@ -1473,6 +1493,124 @@
     if(!event)return"";
     return`<div class="device-buttons-last">${esc(t("selfHealLast",{status:t(selfHealLabelKeys[event.value]||"selfHealAttempt"),time:ago(event.at)}))}</div>`;
   };
+  /* Büyük dikey ışık kumandası — yetenek bazlı çizilir. Hangi parçanın görüneceğini cihazın
+     SUNDUĞU kumandalar belirler; model ya da ad listesi yoktur. Parçalar `DeviceControlView`
+     kimliğinden okunur: `main` aç/kapa kanalı, `main:brightness`, `main:temperature`,
+     `main:color` ve efekt `select`i. Yoksa o parça hiç çizilmez. */
+  const lightPanelParts=device=>{
+    const controls=device?.controls||[];
+    const byId=(id,kind)=>controls.find(control=>control.id===id&&control.kind===kind)||null;
+    return{
+      power:controls.find(control=>control.kind==="switch"&&control.id==="main")||controls.find(isNamedChannel)||null,
+      level:byId("main:brightness","level"),
+      temperature:byId("main:temperature","temperature"),
+      color:byId("main:color","color"),
+      effect:controls.find(control=>control.kind==="select"&&/(^|_)effect$/.test(String(control.property||"")))||null
+    };
+  };
+  /* Kumanda ışık profiline aittir: sınıf tanım verisinden (`light` expose tipi) çıkar, kullanıcının
+     seçtiği rol onu ezebilir. Priz/anahtarda çizilmez — dolan bir kolon orada olmayan bir karartmayı
+     vaat eder, o cihazlar zaten satır anahtarıyla açılıp kapanıyor. Lambayı süren röleyi kullanıcı
+     rolüyle "Işık" yapınca kumanda kendiliğinden gelir; ölçüt yine yetenek, ad değil. */
+  const lightPanelSupported=(device,parts)=>device?.category==="light"&&Boolean(parts.power||parts.level);
+  const lightPanelMode=(device,parts)=>{
+    const stored=state.lightPanelMode;
+    if(stored==="temperature"&&parts.temperature)return"temperature";
+    if(stored==="color"&&parts.color)return"color";
+    if(stored==="level"&&parts.level)return"level";
+    return parts.level?"level":parts.temperature?"temperature":"switch";
+  };
+  /* Kolonun ne ayarladığı: parlaklık, renk sıcaklığı ya da (ikisi de yoksa) yalnız aç/kapat.
+     Her kip aynı sözleşmeyi taşır: oran↔değer çevrimi ve okunacak metin. */
+  const lightColumnSpec=(device,parts,mode)=>{
+    if(mode==="temperature"&&parts.temperature){
+      const control=parts.temperature;
+      const min=Number(control.min??153);
+      const max=Number(control.max??500);
+      const span=max-min||1;
+      // Mired ters çalışır: kolonu yukarı çekince görünen Kelvin ARTSIN diye eşleme çevrilir.
+      return{kind:"temperature",control,known:typeof control.value==="number",
+        value:typeof control.value==="number"?control.value:max,
+        valueAt:fraction=>Math.round(max-fraction*span),
+        fractionOf:value=>(max-Math.min(max,Math.max(min,Number(value))))/span,
+        readoutAt:value=>`${temperatureKelvin(value)} K`};
+    }
+    if(parts.level){
+      const control=parts.level;
+      const min=Number(control.min??1);
+      const max=Number(control.max??254);
+      const span=max-min||1;
+      return{kind:"level",control,known:typeof control.value==="number",
+        value:typeof control.value==="number"?control.value:min,
+        valueAt:fraction=>Math.round(min+fraction*span),
+        fractionOf:value=>(Math.min(max,Math.max(min,Number(value)))-min)/span,
+        readoutAt:value=>`${Math.round((Math.min(max,Math.max(min,Number(value)))-min)/span*100)}%`};
+    }
+    return{kind:"switch",control:parts.power,known:typeof parts.power?.value==="boolean",
+      value:Boolean(parts.power&&binaryControlActive(parts.power)),
+      valueAt:fraction=>fraction>=.5,
+      fractionOf:value=>value?1:0,
+      readoutAt:value=>t(value?"on":"off")};
+  };
+  // Kelvin → RGB yaklaşımı (siyah cisim eğrisi): kolon renk sıcaklığını gerçekten gösterir.
+  const kelvinHex=kelvin=>{
+    const temp=Math.max(1000,Math.min(12000,Number(kelvin)||2700))/100;
+    const byte=value=>Math.max(0,Math.min(255,Math.round(value))).toString(16).padStart(2,"0");
+    const red=temp<=66?255:329.7*Math.pow(temp-60,-.1332);
+    const green=temp<=66?99.47*Math.log(temp)-161.12:288.12*Math.pow(temp-60,-.0755);
+    const blue=temp>=66?255:temp<=19?0:138.52*Math.log(temp-10)-305.04;
+    return`#${byte(red)}${byte(green)}${byte(blue)}`;
+  };
+  const lightColumnTint=parts=>{
+    if(typeof parts.color?.value==="string"&&/^#[0-9a-f]{6}$/i.test(parts.color.value))return parts.color.value.toLowerCase();
+    if(typeof parts.temperature?.value==="number")return kelvinHex(temperatureKelvin(parts.temperature.value));
+    return"";
+  };
+  const lightColorPresets=["#ffcf8e","#ffffff","#ff5147","#ff9b2e","#ffe14d","#57d17f","#3f9dff","#a06bff"];
+  const lightGlyphs={
+    power:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M7.5 6.3a7.5 7.5 0 1 0 9 0"/></svg>',
+    level:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9"/></svg>',
+    temperature:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.4"/><path d="M12 4.6a7.4 7.4 0 0 1 0 14.8Z" fill="currentColor" stroke="none"/></svg>',
+    color:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4c4.3 3.6 6.6 6.5 6.6 9.2a6.6 6.6 0 0 1-13.2 0c0-2.7 2.3-5.6 6.6-9.2Z"/></svg>',
+    column:'<svg class="light-column-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M7.5 6.3a7.5 7.5 0 1 0 9 0"/></svg>'
+  };
+  const lightPanelHtml=device=>{
+    const parts=lightPanelParts(device);
+    if(!lightPanelSupported(device,parts))return"";
+    const mode=lightPanelMode(device,parts);
+    const spec=lightColumnSpec(device,parts,mode);
+    const slider=spec.kind!=="switch";
+    const lit=parts.power?binaryControlActive(parts.power):spec.fractionOf(spec.value)>0;
+    const unknown=Boolean(parts.power&&parts.power.value===null);
+    const percent=Math.round((lit&&spec.known?spec.fractionOf(spec.value):0)*100);
+    const readout=unknown?t("unknownState"):lit?spec.readoutAt(spec.value):t("off");
+    const label=`${device.name} · ${slider?(spec.kind==="temperature"?t("colorTemperature"):t("brightness")):t("lightPower")}`;
+    const tint=lightColumnTint(parts);
+    const offline=device.availability==="offline";
+    const modeLabels={level:t("brightness"),temperature:t("colorTemperature"),color:t("color")};
+    const modeButton=(key,control,active)=>control
+      ?`<button class="light-mode${active?" active":""}" type="button" data-light-mode-button="${key}" aria-pressed="${active}" aria-label="${esc(modeLabels[key])}" title="${esc(modeLabels[key])}">${lightGlyphs[key]}</button>`
+      :"";
+    // Güç düğmesi genel komut yolunu kullanır (`data-command-value`), ayrı bir bağlama gerekmez.
+    const powerButton=parts.power
+      ?`<button class="light-mode${lit?" on":""}" type="button" data-device="${esc(device.id)}" data-property="${esc(parts.power.property)}" data-command-value="${commandValue(!lit)}" aria-pressed="${lit}" aria-label="${esc(`${device.name} · ${lit?t("off"):t("on")}`)}" title="${esc(t("lightPower"))}">${lightGlyphs.power}</button>`
+      :"";
+    const modeButtons=powerButton+modeButton("level",parts.level,mode==="level")+modeButton("temperature",parts.temperature,mode==="temperature")+modeButton("color",parts.color,mode==="color");
+    const modesHtml=modeButtons?`<div class="light-modes" role="group" aria-label="${esc(t("quickControl"))}">${modeButtons}</div>`:"";
+    /* Hazır renklerin altında panelin KENDİ renk seçicisi durur (`.color-picker` + `data-color`):
+       serbest renk için ikinci bir arayüz yazılmadı, mevcut olan yeniden kullanıldı. */
+    const presetsHtml=parts.color
+      ?`<div class="light-color"${mode==="color"?"":" hidden"}><div class="light-presets" role="group" aria-label="${esc(t("lightPresetColors"))}">${lightColorPresets.map(hex=>`<button class="light-preset" type="button" data-light-preset="${hex}" data-device="${esc(device.id)}" data-property="${esc(parts.color.property)}" aria-label="${esc(`${t("color")} ${hex}`)}" title="${hex}" style="background:${hex}"></button>`).join("")}</div><input class="color-picker" type="color" value="${esc(typeof parts.color.value==="string"?parts.color.value:"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(parts.color.property)}" aria-label="${esc(t("color"))}"></div>`
+      :"";
+    const effectHtml=parts.effect
+      ?`<label class="light-effect"><span>${esc(t("lightEffect"))}</span><select class="control-select" data-select="${esc(device.id)}" data-property="${esc(parts.effect.property)}" aria-label="${esc(t("lightEffect"))}">${(parts.effect.values||[]).map(value=>`<option value="${esc(value)}"${String(value)===String(parts.effect.value)?" selected":""}>${esc(String(value).replaceAll("_"," "))}</option>`).join("")}</select></label>`
+      :"";
+    return`<div class="light-panel" data-light-panel="${esc(device.id)}">
+        <div class="light-readout"><div class="light-readout-value" data-light-readout>${esc(readout)}</div><div class="light-readout-since">${esc(ago(device.stateUpdatedAt))}</div></div>
+        <div class="light-column${lit?"":" off"}" data-light-column="${esc(device.id)}" data-light-kind="${spec.kind}" tabindex="0" role="${slider?"slider":"switch"}" ${slider?`aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" aria-valuetext="${esc(readout)}"`:`aria-checked="${lit}"`} aria-label="${esc(label)}"${offline?' aria-disabled="true"':""}${tint?` style="--light-tint:${esc(tint)}"`:""}><div class="light-column-fill" style="height:${percent}%"></div>${lightGlyphs.column}</div>
+        ${modesHtml}${presetsHtml}${effectHtml}
+      </div>`;
+  };
   const deviceDetailBodyHtml=device=>{
     const deviceFacts=facts(device);
     const updateState=device.state.update&&typeof device.state.update==="object"?device.state.update:{};
@@ -1492,7 +1630,7 @@
     /* Bitirme düğmesi tehlike satırının ALTINDA ve tam genişlikte: "Kaldır"ın yanına konursa
        yanlış basma davetiyesi olur, ayrıca o satır `data-admin-only` — ev sakini bitiremezdi.
        Kaydedilecek bir şey yok (ad/oda/rol kendi pencerelerinde kaydedildi), bu yüzden "Bitti". */
-    return`<div class="device-detail-layout">
+    return`${lightPanelHtml(device)}<div class="device-detail-layout">
         <div class="device-detail-controls"><div class="controls">${controlsBodyHtml||`<div class="device-exposed-empty">${t("noExposedControls")}</div>`}</div></div>
         ${mediaHtml}
       </div>
@@ -1689,6 +1827,133 @@
     $$("[data-group-device]").forEach(card=>bindLongPress(card,()=>openDeviceDetail(card.dataset.groupDevice)));
     $$("[data-group-show-device]").forEach(card=>bindLongPress(card,()=>openDeviceDetail(card.dataset.groupShowDevice)));
   }
+  /* Gerçek eve yazıyoruz: sürüklerken cihaz komutla boğulmasın. Arayüz İYİMSER (parmakla birlikte
+     anında boyanır), yazma KISITLI (en çok `lightWriteInterval` ms'de bir ve aynı anda tek uçuşta
+     komut), bırakınca KESİN değer bir kez daha yazılır. Uçuşta komut varken son değer düşmez —
+     `job` yerinde kalır, sıra boşalınca yazılır; ara değerler üstüne yazıldığı için birleşir. */
+  const lightWriteInterval=200;
+  const lightWrite={at:0,timer:null,job:null};
+  // Sürükleme durumu modül düzeyinde: komut sonrası yeniden bağlama olsa da parmak takibi kopmaz.
+  const lightDrag={pointerId:null,startY:0,moved:false,fraction:0};
+  function flushLightWrite(){
+    if(lightWrite.timer){clearTimeout(lightWrite.timer);lightWrite.timer=null}
+    const job=lightWrite.job;
+    if(!job)return;
+    if(commandPending(job.id,job.property)){lightWrite.timer=setTimeout(flushLightWrite,80);return}
+    lightWrite.job=null;
+    lightWrite.at=Date.now();
+    command(job.id,job.property,job.value);
+  }
+  function queueLightWrite(id,property,value,immediate){
+    lightWrite.job={id,property,value};
+    const wait=immediate?0:lightWriteInterval-(Date.now()-lightWrite.at);
+    if(wait<=0){flushLightWrite();return}
+    if(!lightWrite.timer)lightWrite.timer=setTimeout(flushLightWrite,wait);
+  }
+  function bindLightPanel(){
+    const column=$("[data-light-column]");
+    if(!column)return;
+    const device=state.devices.find(item=>item.id===column.dataset.lightColumn);
+    if(!device)return;
+    const parts=lightPanelParts(device);
+    const spec=lightColumnSpec(device,parts,lightPanelMode(device,parts));
+    const slider=spec.kind!=="switch";
+    const blocked=()=>column.getAttribute("aria-disabled")==="true";
+    const readFraction=()=>slider
+      ?Number(column.getAttribute("aria-valuenow")||0)/100
+      :(column.getAttribute("aria-checked")==="true"?1:0);
+    const paint=fraction=>{
+      const clamped=Math.max(0,Math.min(1,fraction));
+      const percent=Math.round(clamped*100);
+      const fill=column.querySelector(".light-column-fill");
+      if(fill)fill.style.height=`${percent}%`;
+      column.classList.toggle("off",percent===0);
+      const text=spec.readoutAt(spec.valueAt(clamped));
+      if(slider){column.setAttribute("aria-valuenow",String(percent));column.setAttribute("aria-valuetext",text)}
+      const readout=$("[data-light-readout]");
+      if(readout)readout.textContent=text;
+    };
+    const write=(fraction,immediate)=>{
+      if(!spec.control)return;
+      queueLightWrite(device.id,spec.control.property,spec.valueAt(Math.max(0,Math.min(1,fraction))),immediate);
+    };
+    const toggle=()=>{
+      if(!parts.power)return;
+      const next=!binaryControlActive(parts.power);
+      column.setAttribute("aria-checked",String(next));
+      column.classList.toggle("off",!next);
+      command(device.id,parts.power.property,next);
+    };
+    const fractionAt=clientY=>{
+      const box=column.getBoundingClientRect();
+      return box.height?(box.bottom-clientY)/box.height:0;
+    };
+    column.onpointerdown=event=>{
+      if(blocked())return;
+      lightDrag.pointerId=event.pointerId;
+      lightDrag.startY=event.clientY;
+      lightDrag.moved=false;
+      lightDrag.fraction=readFraction();
+      if(column.setPointerCapture)column.setPointerCapture(event.pointerId);
+    };
+    column.onpointermove=event=>{
+      if(lightDrag.pointerId!==event.pointerId)return;
+      if(!lightDrag.moved&&Math.abs(event.clientY-lightDrag.startY)<6)return;
+      lightDrag.moved=true;
+      if(!slider)return;
+      event.preventDefault();
+      lightDrag.fraction=Math.max(0,Math.min(1,fractionAt(event.clientY)));
+      paint(lightDrag.fraction);
+      write(lightDrag.fraction,false);
+    };
+    column.onpointerup=event=>{
+      if(lightDrag.pointerId!==event.pointerId)return;
+      const moved=lightDrag.moved;
+      const fraction=lightDrag.fraction;
+      lightDrag.pointerId=null;
+      // Kısa dokunuş: aç/kapa kanalı varsa değiştirir (yalnız aç/kapat olan ışıkta tek davranış bu),
+      // yoksa dokunulan yüksekliğe ayarlar. Sürükleme bittiyse kesin değer yazılır.
+      if(!moved){
+        if(parts.power){toggle();return}
+        if(!slider)return;
+        const tapped=Math.max(0,Math.min(1,fractionAt(event.clientY)));
+        paint(tapped);
+        write(tapped,true);
+        return;
+      }
+      if(slider){paint(fraction);write(fraction,true)}
+    };
+    column.onpointercancel=()=>{
+      const moved=lightDrag.moved;
+      const fraction=lightDrag.fraction;
+      lightDrag.pointerId=null;
+      if(moved&&slider)write(fraction,true);
+    };
+    column.onkeydown=event=>{
+      if(blocked())return;
+      if(event.key===" "||event.key==="Enter"){
+        if(!parts.power)return;
+        event.preventDefault();
+        toggle();
+        return;
+      }
+      if(!slider)return;
+      const edge=event.key==="Home"?0:event.key==="End"?1:null;
+      if(edge!==null){event.preventDefault();paint(edge);write(edge,true);return}
+      const steps={ArrowUp:1,ArrowRight:1,ArrowDown:-1,ArrowLeft:-1,PageUp:2,PageDown:-2};
+      const step=steps[event.key];
+      if(step===undefined)return;
+      event.preventDefault();
+      const next=Math.max(0,Math.min(1,readFraction()+step*.05));
+      paint(next);
+      write(next,false);
+    };
+    $$("[data-light-mode-button]").forEach(button=>button.onclick=()=>{
+      state.lightPanelMode=button.dataset.lightModeButton;
+      renderDeviceDetail();
+    });
+    $$("[data-light-preset]").forEach(button=>button.onclick=()=>command(button.dataset.device,button.dataset.property,button.dataset.lightPreset));
+  }
   function bindCards(){
     bindDeviceImages();
     $$("[data-device-card]").forEach(card=>{
@@ -1708,6 +1973,7 @@
     $$("[data-select]").forEach(input=>input.onchange=()=>command(input.dataset.select,input.dataset.property,input.value));
     $$("[data-device-role-select]").forEach(input=>input.onchange=()=>changeDeviceRole(input,input.dataset.deviceRoleSelect,input.dataset.deviceRoleChannel,input.value));
     $$("[data-color]").forEach(input=>input.onchange=()=>command(input.dataset.color,input.dataset.property,input.value));
+    bindLightPanel();
     bindDashboardDeviceActions();
     $$("[data-visibility-device]:not(.tile-eye)").forEach(button=>button.onclick=()=>toggleTileVisibility(button.dataset.visibilityDevice,button.dataset.visibilityControl));
     $$("[data-change-image]").forEach(button=>button.onclick=()=>openImageChooser(button.dataset.changeImage));
@@ -3516,6 +3782,7 @@
     state.detailDevice=id;
     state.detailFromPairing=options.fromPairing===true;
     state.detailPointerDown=false;
+    state.lightPanelMode=null;
     renderDeviceDetail();
     const dialog=$("#deviceDetailDialog");
     if(!dialog.open)dialog.showModal();
