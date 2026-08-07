@@ -5334,7 +5334,12 @@
   // Motor eylem başına sınırlıdır (`maxAutomationActions` = 8). Eşleme yolunda bir hedef iki eylem
   // üretir (açılınca + kapanınca), o yüzden orada hedef sınırı yarıya iner.
   const automationMaxActions=8;
-  const automationMaxTargets=wizard=>automationMappingMode(wizard)?Math.floor(automationMaxActions/2):automationMaxActions;
+  // Tetikleyiciden sonraki bekleme de bir eylem satırı yazar: seçiliyse hedef bütçesi bir azalır,
+  // yoksa kaydederken sunucu sınırına takılırdı.
+  const automationMaxTargets=wizard=>{
+    const budget=automationMaxActions-(automationWaitSeconds(wizard)>0?1:0);
+    return automationMappingMode(wizard)?Math.floor(budget/2):budget;
+  };
   // Hedef satırı ad/cümle üreten yardımcılara eylem biçiminde verilir; kanonik bağ IEEE + özellik.
   // Hedef satırı üç yeni türü de taşır: cihaz kanalı, bekleme, grup ve sahne. Varsayılan "device".
   const automationTargetKind=target=>target?.kind||"device";
@@ -5447,7 +5452,7 @@
   // Akışın adımları. Dört bölüm: NE ZAMAN (kind…trigThreshold), KOŞUL (cond…), NE YAPSIN
   // (target…scene), SONRASI (autoOff, name). Ne zaman bölümü varsayılandır.
   const automationCondStages=["cond","condTime","condDevice","condState"];
-  const automationThenStages=["target","action","map","delay","group","groupAction","scene","sceneId"];
+  const automationThenStages=["wait","target","action","map","delay","group","groupAction","scene","sceneId"];
   const automationAfterStages=["autoOff","name"];
   const automationStageGroup=stage=>automationCondStages.includes(stage)?"cond"
     :automationThenStages.includes(stage)?"then"
@@ -5465,17 +5470,24 @@
   function openAutomationWizard(id=null){
     const existing=id?state.automations.find(item=>item.id===id):null;
     const trigger=existing?.triggers?.[0]||null;
-    const actions=(existing?.actions||[]).filter(Boolean);
+    const savedActions=(existing?.actions||[]).filter(Boolean);
+    // Tetikleyiciden sonraki bekleme kuralın **ilk** eylemidir ve kendi ara adımına çekilir.
+    // Listenin ortasındaki beklemeler eylemler arası duraklardır: yerlerinde kalır, satır olarak
+    // görünmeye devam eder — düzenlemeye açmak veri kaybettirmez.
+    const leadWait=savedActions[0]?.type==="delay"?savedActions[0]:null;
+    const actions=leadWait?savedActions.slice(1):savedActions;
+    // Eşleme tohumu da beklemesiz listeden okunur; yoksa baştaki bekleme formu bozardı.
+    const seedSource=leadWait?{...existing,actions}:existing;
     const timed=trigger?.type==="time";
     const sunny=trigger?.type==="sun";
     // §9.1 — güneş kuralı eşleme formuna geri açılır: iki olaylı kayıt olduğu gibi, tek olaylı
     // kayıt da o olayın yönü dolu, öbür yön "bir şey yapma" olarak.
     const sunSlots=sunny?automationSunSlots(existing):null;
-    const sunSeed=sunSlots?automationMapSeed(existing):null;
+    const sunSeed=sunSlots?automationMapSeed(seedSource):null;
     // Eşleme tohumu yalnız anahtar/priz yolunda geçerlidir: o satırlar değer taşımaz, yön taşır.
     // Sensör kuralı da tek eylemli `deviceState` göründüğü için buraya düşüyordu ve hedefin
     // `value` alanı silinerek eylem tersine dönüyordu — ayrım tetikleyici türünden yapılır.
-    const seed=sunSeed||(existing&&automationTriggerKind(trigger)==="deviceState"?automationMapSeed(existing):null);
+    const seed=sunSeed||(existing&&automationTriggerKind(trigger)==="deviceState"?automationMapSeed(seedSource):null);
     const sunset=sunSlots?.sunset||null;
     const sunrise=sunSlots?.sunrise||null;
     const autoOff=actions.find(action=>action.autoOff)?.autoOff||null;
@@ -5509,6 +5521,8 @@
       // §2.1 — "… ve şu kadar süredir böyleyse". Alanı olmayan eski kurallarda kapalıdır ve
       // düzenlemeye açılınca aynı ekran çıkar: davranış birebir korunur.
       triggerForSeconds:trigger?.type==="deviceState"&&Number.isFinite(trigger.forSeconds)&&trigger.forSeconds>0?trigger.forSeconds:null,
+      // Tetikleyici ile ilk eylem arasındaki bekleme (ara adım). 0 = hemen çalışsın.
+      triggerWaitSeconds:leadWait&&Number.isFinite(leadWait.seconds)?Math.min(maxAutomationDelaySeconds,Math.max(0,Math.round(leadWait.seconds))):0,
       // Koşullar (§5.3): boş liste "her zaman çalışsın" demektir.
       conditions:(existing?.conditions||[]).map(condition=>({...condition})),
       // §2.4 — kural başına tek anahtar: hepsi mi, herhangi biri mi. Alan yoksa "hepsi".
@@ -6200,6 +6214,22 @@
     const counter=custom?`<div class="automation-time" role="group" aria-label="${esc(t("automationDelayLabel"))}"><div class="automation-time-unit">${step(5,"automationDelayUp","+")}<span class="automation-time-value">${wizard.draftDelaySeconds}</span>${step(-5,"automationDelayDown","−")}</div><span class="automation-time-unit-label">${t("automationDelayUnit")}</span></div>`:"";
     return`<div class="automation-days">${chips.join("")}</div>${counter}<p class="automation-hint">${esc(t("automationDelayHint"))}</p>`;
   }
+  // ————— tetikleyiciden sonraki bekleme. Eylem listesindeki "⏳ bekle" eylemler *arasındaki*
+  // duraktır ve etkisi sıraya bağlıdır; bu ara adım ise tetikleyiciyle ilk eylem arasını sorar ve
+  // her zaman ilk eylem olarak yazılır. Ayrı bir "hemen / bekle" seçimi yok: sayacın 0:00'ı zaten
+  // "hemen çalışsın" demektir, o yüzden adım tek dokunuşla atlanabilir.
+  const automationWaitStepSeconds=5;
+  const automationWaitSeconds=wizard=>Math.min(maxAutomationDelaySeconds,Math.max(0,Math.round(Number(wizard?.triggerWaitSeconds)||0)));
+  // Sayaç bileşeni değeri "s:dd" olarak yazar; saniye verildiğinde aynı biçim "dakika:saniye" olur.
+  // Bileşen ortak: güneş kaydırması ve süre satırlarıyla aynı kadran dili, yeni bir tane türetilmez.
+  function automationWaitHtml(wizard){
+    const counter=automationCounterHtml("data-automation-wait-step",automationWaitSeconds(wizard),false,"automationWaitLabel","automationWaitDown","automationWaitUp");
+    return`${counter}<p class="automation-hint">${esc(t("automationWaitHint"))}</p>`;
+  }
+  const automationWaitLineText=wizard=>{
+    const seconds=automationWaitSeconds(wizard);
+    return seconds>0?t("automationWaitLine",{duration:automationSecondsText(seconds)}):t("automationWaitNowLine");
+  };
   const automationGroupListHtml=(wizard,hook)=>{
     const groups=[...(state.zigbeeGroups||[])].sort(automationByName);
     if(!groups.length)return`<p class="automation-empty-line">${esc(t("automationActionNoGroups"))}</p>`;
@@ -6483,6 +6513,16 @@
     }
   }
   function automationThenNodes(wizard,nodes){
+    // Bekleme satırı bölümün başındadır: okunuşu "tetiklendi → bekle → yap". Sıfırdayken sessiz
+    // durur ("hemen çalışsın") ve koşulsuz kuraldaki "her zaman çalışsın" satırıyla aynı dili konuşur.
+    if(wizard.stage==="wait"){
+      nodes.push({state:"active",label:t("automationBlockWait"),body:automationWaitHtml(wizard)});
+    }else{
+      nodes.push({
+        state:"branch",fresh:wizard.fresh==="wait",
+        body:automationSummaryHtml(esc(automationWaitLineText(wizard)),'data-automation-stage="wait"',automationWaitSeconds(wizard)===0)
+      });
+    }
     wizard.targets.forEach((target,index)=>{
       nodes.push({
         state:"done",fresh:wizard.fresh===`target-${index}`,
@@ -6496,6 +6536,7 @@
         )
       });
     });
+    if(wizard.stage==="wait")return;
     if(wizard.stage==="target"){
       nodes.push({
         state:"active",label:t("automationBlockTarget"),
@@ -6650,6 +6691,13 @@
       ()=>setAutomationTrigForSeconds(automationCounterNext(trigForMinutes(),Number(button.dataset.automationTrigForStep))*60),
       ()=>automationCounterText(trigForMinutes(),false)
     ));
+    // Tetikleyiciden sonraki bekleme: sayaç saniye gösterir (0:00–5:00), adımı beş saniyedir.
+    const waitSeconds=()=>automationWaitSeconds(state.automationWizard);
+    $$("[data-automation-wait-step]").forEach(button=>automationBindCounter(
+      button,
+      ()=>setAutomationWaitSeconds(waitSeconds()+Number(button.dataset.automationWaitStep)*automationWaitStepSeconds),
+      ()=>automationCounterText(waitSeconds(),false)
+    ));
     $$("[data-automation-cond-kind]").forEach(button=>button.onclick=()=>chooseAutomationCondKind(button.dataset.automationCondKind));
     $$("[data-automation-cond-device]").forEach(button=>button.onclick=()=>chooseAutomationCondDevice(button.dataset.automationCondDevice));
     $$("[data-automation-cond-state]").forEach(button=>button.onclick=()=>chooseAutomationCondState(button.dataset.automationCondState));
@@ -6747,11 +6795,14 @@
     &&(!automationAutoOffAvailable(wizard)||Boolean(wizard.autoOffTouched));
   // Hedefler dolduktan sonra sıra "sonrası"nda: kural bir şey açmıyorsa kapanma hiç sorulmaz.
   const automationAfterTargets=wizard=>automationAutoOffAvailable(wizard)&&!wizard.autoOffTouched?"autoOff":"name";
-  const automationAfterTrigger=wizard=>wizard.targets.length?automationAfterTargets(wizard):"target";
+  // Tetikleyici tamamlanınca sıradaki soru beklemedir: "tetiklendi → bekle → yap" bu sırayla sorulur.
+  const automationAfterTrigger=wizard=>wizard.targets.length?automationAfterTargets(wizard):"wait";
   const automationNextStage=wizard=>{
     if(wizard.stage==="kind")return wizard.triggerKind==="time"?"time":wizard.triggerKind==="sun"?"sun":"trigDevice";
     if(wizard.stage==="time"||wizard.stage==="sun"||wizard.stage==="trigEvent"||wizard.stage==="trigThreshold")return automationAfterTrigger(wizard);
     if(wizard.stage==="trigDevice")return wizard.triggerNumeric?"trigThreshold":"trigEvent";
+    // Bekleme adımı atlanabilir: hedef yoksa eylem sorusuna, varsa (düzenlemede) sonrasına geçer.
+    if(wizard.stage==="wait")return wizard.targets.length?automationAfterTargets(wizard):"target";
     if(wizard.stage==="target")return"action";
     if(wizard.stage==="action")return"map";
     if(wizard.stage==="group")return"groupAction";
@@ -6768,6 +6819,8 @@
     if(wizard.stage==="trigDevice")return Boolean(wizard.triggerDeviceId);
     if(wizard.stage==="trigEvent")return automationTriggerReady(wizard);
     if(wizard.stage==="trigThreshold")return Number.isFinite(wizard.thresholdValue);
+    // Bekleme adımı hiçbir zaman engellemez: 0:00 "hemen çalışsın" demektir, tek dokunuşla geçilir.
+    if(wizard.stage==="wait")return true;
     if(wizard.stage==="cond")return false;
     if(wizard.stage==="condTime")return Boolean(automationConditionFromDraft(wizard.draftCondition));
     if(wizard.stage==="condDevice")return Boolean(wizard.draftCondition?.deviceId);
@@ -6808,7 +6861,9 @@
     if(wizard.stage==="trigEvent"||wizard.stage==="trigThreshold")return"trigDevice";
     if(wizard.stage==="cond"||wizard.stage==="condTime"||wizard.stage==="condDevice")return automationTriggerEditStage(wizard);
     if(wizard.stage==="condState")return"condDevice";
-    if(wizard.stage==="target")return automationTriggerEditStage(wizard);
+    if(wizard.stage==="wait")return automationTriggerEditStage(wizard);
+    // İlk eylem sorusundan geri, tetikleyiciye değil araya giren bekleme adımına döner.
+    if(wizard.stage==="target")return wizard.targets.length?automationTriggerEditStage(wizard):"wait";
     if(wizard.stage==="action")return"target";
     if(wizard.stage==="delay"||wizard.stage==="group"||wizard.stage==="scene")return"target";
     if(wizard.stage==="groupAction")return"group";
@@ -6853,13 +6908,15 @@
     const titles={
       when:"automationWhenTitle",
       cond:"automationCondTitle",
-      then:wizard.stage==="map"?"automationMapTitle":mapping?"automationTargetTitle":"automationThenTitle",
+      then:wizard.stage==="wait"?"automationWaitTitle"
+        :wizard.stage==="map"?"automationMapTitle":mapping?"automationTargetTitle":"automationThenTitle",
       after:"automationReviewTitle"
     };
     const leads={
       when:"automationWhenLead",
       cond:"automationCondLead",
-      then:wizard.stage==="map"
+      then:wizard.stage==="wait"?"automationWaitLead"
+        :wizard.stage==="map"
         ?(automationSunBoth(wizard)?"automationMapSunLead":"automationMapLead")
         :mapping?"automationTargetLead":"automationThenLead",
       after:"automationReviewLead"
@@ -7435,6 +7492,13 @@
       wizard.stage=kind==="delay"?"delay":kind==="group"?"group":"scene";
     });
   }
+  // Tetikleyiciden sonraki bekleme: sıfıra inebilir (hemen çalışsın), tavanı sunucununkiyle aynı.
+  function setAutomationWaitSeconds(value){
+    const wizard=state.automationWizard;
+    if(!wizard||!Number.isFinite(value))return;
+    wizard.triggerWaitSeconds=Math.min(maxAutomationDelaySeconds,Math.max(0,Math.round(value)));
+    automationRedraw();
+  }
   function setAutomationDelay(value,custom){
     const wizard=state.automationWizard;
     if(!wizard||!Number.isFinite(value))return;
@@ -7592,6 +7656,8 @@
     if(wizard.stage==="delay"){commitAutomationDelay();return}
     if(wizard.stage==="sceneId"){chooseAutomationScene(wizard.draftSceneId);return}
     if(wizard.stage==="condTime"||wizard.stage==="condState"){commitAutomationCondition();return}
+    // Bekleme adımı cevaplanınca kapanan satır bir kez yumuşak yerleşir; öbür düğümlerle aynı dil.
+    if(wizard.stage==="wait"){automationAdvance(()=>{wizard.fresh="wait";wizard.stage=automationNextStage(wizard)});return}
     if(wizard.stage==="name"){if(automationWizardReady(wizard))await saveAutomationWizard();return}
     if(!automationStageAdvanceable(wizard))return;
     automationAdvance(()=>{wizard.stage=automationNextStage(wizard)});
@@ -7614,12 +7680,16 @@
       const autoOff=automationAutoOffPayload(wizard,target);
       return autoOff?{...action,autoOff}:action;
     };
-    const actions=automationMappingMode(wizard)
+    const built=automationMappingMode(wizard)
       ?wizard.targets.flatMap(target=>automationTargetKind(target)==="device"
         ?automationMapActionsFor(wizard,target)
         :[asAction(target)])
       // §9 — kapanış sözü açan eylemin kendi üstüne yazılır; ikinci bir kural kurulmaz.
       :wizard.targets.map(asAction);
+    // Ara adımdaki bekleme her zaman ilk eylem olarak yazılır; 0:00 seçiliyse hiç yazılmaz — daha
+    // önce yazılmış olsa bile listeye geri konmadığı için kaydedince kalkar.
+    const waitSeconds=automationWaitSeconds(wizard);
+    const actions=waitSeconds>0?[{type:"delay",seconds:waitSeconds},...built]:built;
     if(!actions.length)return;
     // Motor yalnız beklemeden oluşan bir kuralı reddeder; kullanıcı sunucu hatasıyla karşılaşmasın.
     if(actions.every(action=>action.type==="delay")){showToast(t("automationNeedRealAction"),true);return}

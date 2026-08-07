@@ -2778,6 +2778,8 @@ type AutomationSandbox = {
   api: Record<string, (...args: unknown[]) => unknown>;
   // Kaydetme yolunda sunucuya gönderilen son liste; round-trip karşılaştırması buradan okunur.
   saved: () => Record<string, unknown>[];
+  // Kullanıcıya gösterilen uyarılar: engellenen kaydetme sessiz kalmasın diye toplanır.
+  toasts: string[];
 };
 
 const automationExports = [
@@ -2798,6 +2800,7 @@ const automationExports = [
   "stepAutomationCondTime", "chooseAutomationCondPoint", "stepAutomationCondSunOffset",
   "chooseAutomationCondPreset", "editAutomationCondition", "removeAutomationCondition",
   "commitAutomationCondition",
+  "setAutomationWaitSeconds", "automationWaitSeconds", "automationBackStage", "stepBackAutomation",
   "chooseAutomationActionKind", "setAutomationDelay", "commitAutomationDelay", "chooseAutomationGroup",
   "chooseAutomationGroupValue", "chooseAutomationSceneGroup", "chooseAutomationScene",
   "automationAutoOffPayload", "automationAutoOffLine", "automationAutoOffIdleAvailable",
@@ -2813,6 +2816,7 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
   const end = source.indexOf("async function removeSimpleLink(");
   assert.ok(start > 0 && end > start);
   const bodies: string[] = [];
+  const toasts: string[] = [];
   const savedLists: Record<string, unknown>[][] = [];
   let scrollIntoViewCalls = 0;
   const nodes = new Map<string, Record<string, unknown>>();
@@ -2867,7 +2871,7 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
     isProtectedDevice: () => false,
     deviceKind: () => "kind",
     ago: () => "now",
-    showToast: () => {},
+    showToast: (message: string) => { toasts.push(String(message)); },
     deviceSeenPress: () => true,
     visiblePresses: () => [],
     deviceButtonName: () => "button",
@@ -2902,6 +2906,7 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
   )(...names.map((name) => stubs[name])) as Record<string, (...args: unknown[]) => unknown>;
   return {
     bodies,
+    toasts,
     scrollIntoViewCalls: () => scrollIntoViewCalls,
     state,
     api,
@@ -3202,6 +3207,10 @@ test("sihirbazda seçim yapılınca o soru kapanır, ekranda tek soru açık kal
   // Olay adımı seçimle kapanmaz (altındaki süre satırı erişilebilir kalsın); geçiş "İleri"dedir.
   api.chooseAutomationEvent("occupancy=true");
   await api.nextAutomationStep();
+  // Araya bekleme adımı girer: tek soru açık kalır, 0:00'da tek dokunuşla geçilir.
+  assert.equal(harness.wizard().stage, "wait");
+  assert.equal(harness.body().match(/data-automation-active/g)?.length, 1);
+  await api.nextAutomationStep();
   assert.equal(harness.wizard().stage, "target");
   assert.match(harness.body(), /data-automation-target-device="0x0011"/);
   api.chooseAutomationTargetDevice("0x0011");
@@ -3283,6 +3292,10 @@ test("ileri düğmesi pasifken nedenini söyler", async () => {
   assert.equal(reason(), "automationNeedEvent");
   api.chooseAutomationEvent("occupancy=true");
   // Olay seçilince engel kalkar ama adım kapanmaz: geçiş birincil düğmeyle olur.
+  assert.equal(reason(), "");
+  await api.nextAutomationStep();
+  // Tetikleyiciden sonraki bekleme ara adımı: hiçbir zaman engellemez, tek dokunuşla atlanır.
+  assert.equal(harness.wizard().stage, "wait");
   assert.equal(reason(), "");
   await api.nextAutomationStep();
   assert.equal(harness.wizard().stage, "target");
@@ -3392,6 +3405,166 @@ test("kayıtlı kuralın bekleme, grup ve sahne eylemleri sihirbazda görünür"
   assert.match(body, /automationActionDelayName/);
   assert.match(body, /Salon lambaları/);
   assert.match(body, /Akşam/);
+});
+
+// Tetikleyiciden sonraki bekleme kendi ara adımıdır: eylem listesinin dibindeki "⏳ bekle"
+// seçeneği sırayla ilgilidir ve kullanıcı ne zaman devreye girdiğini göremiyordu.
+// Yeni kural yolunu tetikleyiciden hemen sonra bu soru karşılar ve 0:00 "hemen çalışsın" demektir.
+async function automationWaitStepHarness(): Promise<WizardHarness> {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  await api.nextAutomationStep();
+  return harness;
+}
+
+test("tetikleyiciden sonra bekleme ara adımı sorulur ve 0:00 iken tek dokunuşla atlanır", async () => {
+  const harness = await automationWaitStepHarness();
+  const { api } = harness;
+
+  // Adım tetikleyiciyle "Ne yapsın?" arasındadır ve tek satırlık ortak sayaçtır.
+  assert.equal(harness.wizard().stage, "wait");
+  assert.equal(harness.wizard().triggerWaitSeconds, 0);
+  assert.match(harness.body(), /data-automation-wait-step="-1"/);
+  assert.match(harness.body(), /data-automation-wait-step="1"/);
+  assert.match(harness.body(), /<span class="automation-counter-value">0:00<\/span>/);
+  assert.match(harness.body(), /automationWaitHint/);
+  // Ekranda tek soru açık kalır ve hedef listesi henüz basılmaz.
+  assert.equal(harness.body().match(/data-automation-active/g)?.length, 1);
+  assert.doesNotMatch(harness.body(), /data-automation-target-device=/);
+
+  // Atlanabilir: sıfırdayken bile birincil düğme etkin, engel gerekçesi yok.
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), true);
+  assert.equal(api.automationBlockedReason(harness.wizard()), "");
+  await api.nextAutomationStep();
+  assert.equal(harness.wizard().stage, "target");
+  // Geçilen adım özet satırı olarak kalır: "hemen çalışsın" sessiz satırdır.
+  assert.match(harness.body(), /data-automation-stage="wait"/);
+  assert.match(harness.body(), /automationWaitNowLine/);
+
+  // 0:00 iken kurala hiçbir bekleme eylemi yazılmaz.
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+  await api.saveAutomationWizard();
+  const [saved] = harness.saved();
+  assert.deepEqual((saved.actions as Record<string, unknown>[]).map((action) => action.type), ["device"]);
+});
+
+test("bekleme ayarlanınca ilk eylem olarak yazılır ve geri-ileri gidişte değer korunur", async () => {
+  const harness = await automationWaitStepHarness();
+  const { api } = harness;
+
+  // Adım beş saniye; sayaç dakika:saniye yazar.
+  api.setAutomationWaitSeconds(45);
+  assert.match(harness.body(), /<span class="automation-counter-value">0:45<\/span>/);
+  api.setAutomationWaitSeconds(90);
+  assert.match(harness.body(), /<span class="automation-counter-value">1:30<\/span>/);
+  // Sunucu tavanı 300 saniye; üstü kırpılır, altı sıfıra dayanır.
+  api.setAutomationWaitSeconds(9000);
+  assert.equal(harness.wizard().triggerWaitSeconds, 300);
+  api.setAutomationWaitSeconds(-60);
+  assert.equal(harness.wizard().triggerWaitSeconds, 0);
+  api.setAutomationWaitSeconds(90);
+
+  // İleri git, geri dön: adım aynı yerden açılır ve değer kaybolmaz.
+  await api.nextAutomationStep();
+  assert.equal(harness.wizard().stage, "target");
+  assert.equal(api.automationBackStage(harness.wizard()), "wait");
+  api.stepBackAutomation();
+  assert.equal(harness.wizard().stage, "wait");
+  assert.equal(harness.wizard().triggerWaitSeconds, 90);
+  assert.match(harness.body(), /<span class="automation-counter-value">1:30<\/span>/);
+  await api.nextAutomationStep();
+  assert.equal(harness.wizard().triggerWaitSeconds, 90);
+
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+  await api.saveAutomationWizard();
+  const [saved] = harness.saved();
+  assert.deepEqual(saved.actions, [
+    { type: "delay", seconds: 90 },
+    { type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON" }
+  ]);
+});
+
+test("kayıtlı kuralda baştaki bekleme ara adıma çekilir, ortadaki bekleme eylem listesinde kalır", async () => {
+  const harness = await automationWizardHarness();
+  (harness.state.automations as unknown[]).push({
+    id: "rule3",
+    name: "Koridor",
+    enabled: true,
+    triggers: [{ type: "deviceState", deviceId: "0x0022", property: "occupancy", equals: true }],
+    conditions: [],
+    actions: [
+      { type: "delay", seconds: 30 },
+      { type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON" },
+      { type: "delay", seconds: 10 },
+      { type: "group", groupId: "group-7", property: "state", value: "OFF" }
+    ]
+  });
+  harness.api.openAutomationWizard("rule3");
+
+  // Baştaki bekleme adıma iner; ortadaki bekleme yerinde kalır ve satır olarak görünmeye devam eder.
+  assert.equal(harness.wizard().triggerWaitSeconds, 30);
+  const targets = harness.wizard().targets as Array<Record<string, unknown>>;
+  assert.deepEqual(targets.map((target) => target.kind), ["device", "delay", "group"]);
+  assert.deepEqual(targets[1], { kind: "delay", seconds: 10 });
+  assert.match(harness.body(), /automationWaitLine/);
+
+  // Hiçbir şey değiştirilmeden kaydedilince kural birebir geri yazılır: veri kaybı yok.
+  await harness.api.saveAutomationWizard();
+  const [saved] = harness.saved();
+  assert.deepEqual(saved.actions, [
+    { type: "delay", seconds: 30 },
+    { type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON" },
+    { type: "delay", seconds: 10 },
+    { type: "group", groupId: "group-7", property: "state", value: "OFF" }
+  ]);
+
+  // Sayaç sıfırlanınca daha önce yazılmış bekleme kalkar; ortadaki durak yine korunur.
+  harness.api.setAutomationWaitSeconds(0);
+  await harness.api.saveAutomationWizard();
+  const [again] = harness.saved();
+  assert.deepEqual((again.actions as Record<string, unknown>[]).map((action) => action.type), ["device", "delay", "group"]);
+});
+
+test("yalnız bekleme seçilip hiç eylem eklenmezse kural kaydedilmez", async () => {
+  const harness = await automationWaitStepHarness();
+  const { api } = harness;
+  api.setAutomationWaitSeconds(30);
+  // Hedef yokken kural hazır sayılmaz; birincil düğme de bunu yazar.
+  assert.equal(api.automationWizardReady(harness.wizard()), false);
+  await api.saveAutomationWizard();
+  assert.deepEqual(harness.saved(), []);
+  assert.deepEqual(harness.toasts, ["automationNeedRealAction"]);
+});
+
+// İki bekleme iki ayrı şeydir: biri tetikleyiciyle ilk eylem arasında, öbürü eylemler arasında.
+// Metinleri birbirine karışmasın diye ayrıştırıldı; ikisi de iki dilde durur.
+test("tetikleyici sonrası bekleme ile eylemler arası bekleme ayrı sözcüklerle anlatılır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /automationWaitTitle:"Tetiklendikten sonra beklesin mi\?"/);
+  assert.match(dashboard, /automationWaitTitle:"Wait after the trigger\?"/);
+  assert.match(dashboard, /automationWaitHint:"0:00 = hemen çalışsın\. Sayaç dakika:saniye gösterir, en çok 5:00 \(300 saniye\)\."/);
+  assert.match(dashboard, /automationWaitHint:"0:00 = run right away\. The dial shows minutes:seconds, up to 5:00 \(300 seconds\)\."/);
+  assert.match(dashboard, /automationWaitNowLine:"Tetiklenince hemen çalışsın"/);
+  assert.match(dashboard, /automationWaitNowLine:"Runs the moment it triggers"/);
+  assert.match(dashboard, /automationWaitLine:"Tetiklendikten \{duration\} sonra çalışsın"/);
+  assert.match(dashboard, /automationWaitLine:"Runs \{duration\} after the trigger"/);
+
+  // Eylem listesindeki seçenek kalkmadı: eylemler arasındaki bekleme hâlâ oradan kurulur.
+  assert.match(dashboard, /\{glyph:"⏳",title:t\("automationActionDelay"\),sub:t\("automationActionDelaySub"\),hook:'data-automation-action-kind="delay"'\}/);
+  assert.match(dashboard, /automationActionDelay:"Eylemler arasında bekle"/);
+  assert.match(dashboard, /automationActionDelay:"Wait between actions"/);
+  assert.match(dashboard, /automationActionDelaySub:"Bu listede bir sonraki eyleme geçmeden önce duraklar\."/);
+  assert.match(dashboard, /automationActionDelaySub:"Pause before the next action in this list\."/);
 });
 
 // Güneş tetikleyicisi: olay seçimi yok (her zaman iki an), kaydırma −/+ sayacıyla; ±240 dk aşılmaz.
@@ -4392,10 +4565,12 @@ test("tetikleyici adımı süreyi koşuldakiyle aynı yerde ve aynı görünümd
 test("süre ve kaydırma seçicileri tek bir sayaç bileşeninden gelir", async () => {
   const dashboard = await readDashboardBundle();
 
-  // Tek bileşen, üç çağrı: güneş kaydırması, koşul süresi, tetikleyici süresi.
+  // Tek bileşen, dört çağrı: güneş kaydırması, koşul süresi, tetikleyici süresi, tetikleyici sonrası bekleme.
   assert.match(dashboard, /const automationCounterHtml=\(hook,minutes,signed,labelKey,downKey,upKey\)=>\{/);
-  assert.equal(dashboard.match(/automationCounterHtml\("data-automation-/g)?.length, 3);
+  assert.equal(dashboard.match(/automationCounterHtml\("data-automation-/g)?.length, 4);
   assert.match(dashboard, /automationCounterHtml\("data-automation-sun-step",part\.offset,true,/);
+  // Bekleme adımı da aynı bileşeni kullanır: yeni bir sayaç türetilmedi.
+  assert.match(dashboard, /automationCounterHtml\("data-automation-wait-step",automationWaitSeconds\(wizard\),false,"automationWaitLabel","automationWaitDown","automationWaitUp"\)/);
   // Değer hep dakikadır ve "s:dd" olarak yazılır; işaret yalnız güneş kaydırmasında görünür.
   assert.match(dashboard, /const clock=`\$\{Math\.floor\(total\/60\)\}:\$\{String\(total%60\)\.padStart\(2,"0"\)\}`;/);
   assert.match(dashboard, /return!signed\|\|value===0\?clock:`\$\{value<0\?"−":"\+"\}\$\{clock\}`;/);
@@ -4498,7 +4673,7 @@ test("olay seçimi tetikleyici adımını kapatmaz, süre satırı erişilebilir
 
   // Geçiş kullanıcının elinde: birincil düğme adımı ilerletir, süre tetikleyiciye yazılır.
   await api.nextAutomationStep();
-  assert.equal(harness.wizard().stage, "target");
+  assert.equal(harness.wizard().stage, "wait");
   const [trigger] = api.automationWizardTriggers(harness.wizard()) as Record<string, unknown>[];
   assert.deepEqual(trigger, {
     type: "deviceState", deviceId: "0x0022", property: "occupancy", equals: true, forSeconds: 120
@@ -4531,7 +4706,8 @@ test("süre satırı olmayan yolda olay seçimi adımı kendiliğinden kapatır"
   wizard.stage = "trigEvent";
   assert.equal(api.automationTrigForEligible(wizard), false);
   api.chooseAutomationEvent("state=ON");
-  assert.equal(harness.wizard().stage, "target");
+  // Adım kendiliğinden kapanır; sıradaki soru tetikleyiciden sonraki beklemedir.
+  assert.equal(harness.wizard().stage, "wait");
 
   // Düğme yolu da dışarıda: tetikleyici `deviceAction` yazar, süre orada hiç kaydedilmez.
   assert.equal(api.automationTrigForEligible({ triggerKind: "button" }), false);
