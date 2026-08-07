@@ -274,6 +274,118 @@ test("cihaz ekleme arama, gizleme ve otomatik tamamlama modalı sunar", async ()
   assert.match(dashboard, /options\.body===undefined\?\{\}:\{"content-type":"application\/json"\}/);
 });
 
+test("eşleştirme beklerken çekirdekte animasyonlu wifi ikonu döner", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // İkon satır içi SVG ve panelin ikon dili: dış kaynak, GIF veya nokta yok.
+  assert.match(
+    dashboard,
+    /<span class="pairing-core"><svg class="pairing-wifi" viewBox="0 0 24 24" aria-hidden="true">/
+  );
+  assert.match(dashboard, /<path class="pairing-wave pairing-wave-3" d="M2\.5 8\.6a15 15 0 0 1 19 0"\/>/);
+  assert.match(dashboard, /<path class="pairing-wave pairing-wave-2" d="M6 12\.6a10 10 0 0 1 12 0"\/>/);
+  assert.match(dashboard, /<path class="pairing-wave pairing-wave-1" d="M9\.5 16\.6a5 5 0 0 1 5 0"\/>/);
+  assert.match(dashboard, /<circle class="pairing-wifi-dot" cx="12" cy="19\.6" r="1\.3"\/>/);
+  assert.match(
+    dashboard,
+    /\.pairing-wifi\{width:26px;height:26px;display:block;fill:none;stroke:var\(--on-forest\);stroke-width:2\.2/
+  );
+
+  // Animasyon saf CSS ve dalgalar sırayla yanar.
+  assert.match(dashboard, /\.pairing-wave\{opacity:\.24;animation:pairing-wave-pulse 1\.5s ease-in-out infinite\}/);
+  assert.match(dashboard, /\.pairing-wave-2\{animation-delay:\.22s\}\.pairing-wave-3\{animation-delay:\.44s\}/);
+  assert.match(dashboard, /@keyframes pairing-wave-pulse\{0%,100%\{opacity:\.22\}45%\{opacity:1\}\}/);
+
+  // Arama durunca ikon da durur: `timed-out` donar, `ready` yerini onay işaretine bırakır.
+  assert.match(dashboard, /\.pairing-visual\.timed-out \.pairing-wave\{animation:none;opacity:\.5\}/);
+  assert.match(dashboard, /\.pairing-visual\.ready \.pairing-wifi\{display:none\}/);
+  assert.match(dashboard, /\.pairing-visual\.ready \.pairing-core::after\{opacity:1\}/);
+
+  // Hareket azaltma isteğinde animasyon durur, ikon statik kalır.
+  assert.match(
+    dashboard,
+    /@media\(prefers-reduced-motion:reduce\)\{\.pairing-ring\{animation:none\}\.pairing-ring:first-child\{opacity:\.4\}\.pairing-wave\{animation:none;opacity:1\}\}/
+  );
+
+  // Eski üç nokta çekirdeği ve beyaz sabit rengi geri gelmemeli.
+  assert.doesNotMatch(dashboard, /\.pairing-core::before/);
+  assert.doesNotMatch(dashboard, /box-shadow:13px 0 white/);
+  assert.doesNotMatch(dashboard, /\.pairing-core[^{]*\{[^}]*background:white/);
+});
+
+test("kurulum akışının seçim kartları sabit renk değil tema belirteci kullanır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // "Bu cihaz nedir?" ve "Hangi oda?" adımları aynı sınıfı paylaşır: tek düzeltme ikisini de kapsar.
+  assert.match(dashboard, /id="deviceRoleChoices" class="device-role-choices"/);
+  assert.match(dashboard, /id="deviceRoomChoices" class="device-role-choices"/);
+  assert.match(
+    dashboard,
+    /\.device-role-choice\{min-height:96px;[^}]*border:2px solid var\(--line\);border-radius:12px;background:var\(--surface-soft\);color:var\(--ink\)/
+  );
+  assert.match(dashboard, /\.device-role-choice\[aria-pressed="true"\]\{border-color:var\(--forest\);background:var\(--forest-soft\)\}/);
+
+  // Kardeş adımlar: fotoğraf seçimi ve bulunan cihaz kutusu da belirteçlere bağlı.
+  assert.match(
+    dashboard,
+    /\.image-choice\{min-height:148px;[^}]*border:2px solid var\(--line\);border-radius:12px;background:var\(--surface-soft\);color:var\(--ink\)/
+  );
+  assert.match(dashboard, /\.pairing-device\{margin:18px 0 2px;padding:14px;border:1px solid var\(--line\);background:var\(--surface-soft\)\}/);
+
+  // Sabit açık zeminler geri gelmemeli — koyu temada metni okunmaz yapan kök buydu.
+  [/\.device-role-choice\{[^}]*\}/, /\.image-choice\{[^}]*\}/, /\.pairing-device\{[^}]*\}/].forEach((pattern) => {
+    const rule = pattern.exec(dashboard)?.[0] ?? "";
+    assert.ok(rule, `kural bulunamadı: ${pattern}`);
+    assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,6}/, `sabit renk geri geldi: ${rule}`);
+    assert.doesNotMatch(rule, /background:\s*white/, `sabit beyaz geri geldi: ${rule}`);
+  });
+  assert.doesNotMatch(dashboard, /#f7f9f6/);
+  // Artık belirteçten geldikleri için koyu tema yamasına da ihtiyaçları yok.
+  assert.doesNotMatch(dashboard, /:root\[data-theme="dark"\] \.image-choice\{/);
+  assert.doesNotMatch(dashboard, /:root\[data-theme="dark"\] \.pairing-device/);
+});
+
+test("arama alanlarının yan dolgusu görünüm genişliğiyle ölçeklenir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Cihazlar sayfasının çubuğu kenardan kenara: iç dolgu sabit px değil, viewport'a bağlı.
+  assert.match(
+    dashboard,
+    /\.search\{border:1px solid var\(--line\);border-radius:10px;padding:13px clamp\(16px,2vw,22px\);background:var\(--surface\);color:var\(--ink\);outline:0\}/
+  );
+  assert.match(dashboard, /\.search-field \.search\{width:100%;padding-right:clamp\(56px,6vw,66px\)\}/);
+  assert.match(dashboard, /\.search-clear\{position:absolute;right:clamp\(6px,1vw,12px\);top:50%/);
+
+  // Konum, dünya saati ve ev konumu pencereleri tek `.location-search-field` kuralını paylaşır.
+  assert.match(
+    dashboard,
+    /\.location-search-field input\{width:100%;min-height:48px;padding:11px clamp\(16px,2vw,22px\) 11px clamp\(44px,4\.6vw,50px\)/
+  );
+  assert.match(dashboard, /\.location-search-field svg\{position:absolute;left:clamp\(14px,1\.6vw,19px\)/);
+  ["clockCitySearch", "weatherLocationSearch", "homeLocationSearch"].forEach((id) => {
+    assert.match(dashboard, new RegExp(`id="${id}"`), `${id} arama alanı kayboldu`);
+  });
+
+  // Eski dar/sabit dolgular ve beyaz zemin geri gelmemeli.
+  assert.doesNotMatch(dashboard, /\.search\{[^}]*padding:13px 15px/);
+  assert.doesNotMatch(dashboard, /\.search\{[^}]*background:white/);
+  assert.doesNotMatch(dashboard, /\.search-field \.search\{[^}]*padding-right:52px/);
+  assert.doesNotMatch(dashboard, /\.location-search-field input\{[^}]*padding:11px 14px 11px 43px/);
+});
+
+test("sayfa eylem döşemeleri kare değil oval kenarlıdır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // "Cihaz ekle" ve "Yeni otomasyon" aynı sınıftan beslenir: yarıçap tek yerden gelir.
+  assert.match(dashboard, /id="devicesAddDevice" class="primary add-device page-action-tile"/);
+  assert.match(dashboard, /id="newAutomation" class="primary page-action-tile"/);
+  assert.match(
+    dashboard,
+    /\.page-action-tile\{[^}]*border:1px solid var\(--forest\);border-radius:999px;color:var\(--forest\);background:var\(--forest-soft\)/
+  );
+  assert.doesNotMatch(dashboard, /\.page-action-tile\{[^}]*border-radius:16px/);
+});
+
 test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
   const dashboard = await readDashboardBundle();
 
