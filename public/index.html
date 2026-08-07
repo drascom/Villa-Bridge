@@ -391,7 +391,13 @@
     .automation-node.is-branch .automation-dot{width:7px;height:7px;margin-top:15px;border-style:dashed;background:transparent}
     .automation-node-body{min-width:0;padding:2px 0 12px}.automation-node.is-done .automation-node-body{padding-bottom:6px}
     .automation-node-label{margin:0 0 8px;color:var(--forest);font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
-    .automation-actions{flex:none;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:16px;padding:16px 0 0;border-top:1px solid var(--line);background:var(--surface)}.automation-actions button{min-width:132px;min-height:52px;font-size:15px}.automation-actions button[disabled]{opacity:.45}.automation-next-hint{flex:1 1 100%;order:-1;margin:0;color:var(--muted);font-size:13px;line-height:1.4;text-align:right}.automation-next-hint.ready{color:var(--forest);font-weight:800}.automation-next-hint[hidden]{display:none}
+    .automation-actions{flex:none;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:16px;padding:16px 0 0;border-top:1px solid var(--line);background:var(--surface)}.automation-actions button{min-width:132px;min-height:52px;font-size:15px}.automation-actions button[disabled]{opacity:.45}
+    /* Özet cümlesi serbest metin gibi duruyordu. Panelin kendi bilgi kutusu dili (`.automation-alt`:
+       `--line` kenarlık + `--surface-soft` zemin) burada da geçerli; üstüne iç gölge gelince kutu
+       çukur okunur. Yükseklik clamp ile bağlı: 1024×640'ta kaydırmayı artırmaz. */
+    .automation-next-note{flex:1 1 100%;order:-1;padding:clamp(.4rem,.9vh,.6rem) clamp(.6rem,1.2vw,.85rem);border:1px solid var(--line);border-radius:clamp(.6rem,1.1vw,.85rem);background:var(--surface-soft);box-shadow:inset 0 1px 2px rgba(35,45,41,.09)}.automation-next-note[hidden]{display:none}
+    :root[data-theme="dark"] .automation-next-note{box-shadow:inset 0 1px 3px rgba(0,0,0,.42)}
+    .automation-next-hint{margin:0;color:var(--muted);font-size:clamp(.78rem,1.5vh,.85rem);line-height:1.4;text-align:left}.automation-next-hint.ready{color:var(--forest);font-weight:800}.automation-next-hint[hidden]{display:none}
     /* Cevaplanmış adım tek satır özet cümlesi: cihaz adı yeşil ve kalın, gerisi sakin, taşarsa üç nokta.
        Satırın kendisi düğmedir — basınca o adım yeniden açılır; sağda soluk bir "Değiştir" durur. */
     .automation-summary{display:flex;align-items:center;gap:4px;width:100%}.automation-summary:hover .automation-change{opacity:1}
@@ -411,6 +417,8 @@
     .automation-line-step{display:inline-grid;place-items:center;width:20px;height:20px;margin-right:6px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px;font-weight:800;line-height:1;vertical-align:middle}
     .automation-summary.is-quiet .automation-line{opacity:.78}.automation-summary.is-quiet .automation-line strong{color:var(--muted);font-weight:600}
     .automation-change{flex:none;color:var(--forest);font-size:13px;font-weight:800;opacity:.45;transition:opacity .15s}
+    /* Boş bölümün satırı zaten sönük (`is-quiet`); "Ekle" teklifi hover beklemeden okunsun. */
+    .automation-summary.is-empty .automation-change{opacity:.75}
     .automation-summary-remove{flex:none;width:44px;height:44px;display:grid;place-items:center;padding:0;border:0;border-radius:999px;background:none;color:var(--muted);font-size:15px;line-height:1;touch-action:manipulation}
     .automation-summary-remove:hover{color:var(--danger);background:var(--danger-soft)}
     .automation-summary-remove:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
@@ -763,7 +771,7 @@
 <dialog id="homeLocationDialog"><div class="modal location-modal"><h2 data-i18n="chooseHomeLocationTitle">Where is your home?</h2><p data-i18n="chooseHomeLocationLead">Pick the town your home is in. It is used only to work out sunrise and sunset here on this device.</p><button id="useWeatherLocationForHome" class="secondary location-current" type="button" data-i18n="useWeatherLocation">Use the weather location</button><div class="location-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="homeLocationSearch" type="search" autocomplete="off" data-i18n-placeholder="searchCity" placeholder="Search city…"></div><div id="homeSearchStatus" class="location-search-status"></div><div id="homeSearchResults" class="location-results"></div><details class="location-manual"><summary data-i18n="enterCoordinates">Enter coordinates by hand</summary><form id="homeLocationManualForm" class="location-fields"><div class="setting-field"><label for="homeLatitude" data-i18n="latitude">Latitude</label><input id="homeLatitude" name="latitude" type="number" step="0.000001" min="-90" max="90" inputmode="decimal" placeholder="36.8969"></div><div class="setting-field"><label for="homeLongitude" data-i18n="longitude">Longitude</label><input id="homeLongitude" name="longitude" type="number" step="0.000001" min="-180" max="180" inputmode="decimal" placeholder="30.7133"></div><button id="saveHomeLocation" class="primary" type="submit" data-i18n="save">Save</button></form></details><div class="modal-actions"><button id="closeHomeLocationDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
 <dialog id="widgetDialog"><div class="modal add-modal"><h2 data-i18n="addToDashboard">Add to dashboard</h2><div class="modal-tabs" role="tablist" data-i18n-aria="addToDashboard" aria-label="Add to dashboard"><button id="addTabWidgets" class="modal-tab" type="button" role="tab" aria-selected="true" aria-controls="addPanelWidgets" data-add-tab="widgets" data-i18n="addWidgetsTab">Widgets</button><button id="addTabGroups" class="modal-tab" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="groupForm" data-add-tab="groups" data-i18n="addGroupsTab">Device groups</button></div><section id="addPanelWidgets" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabWidgets" tabindex="0"><p data-i18n="addWidgetLead">Choose compact widgets for the information you want to see at a glance.</p><div id="widgetCatalog" class="widget-catalog"></div><div class="modal-actions"><button id="closeWidgetDialog" class="quiet" type="button" data-i18n="close">Close</button></div></section><form id="groupForm" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabGroups" tabindex="0" hidden><h2 id="groupDialogTitle" data-i18n="createDeviceGroup">Create device group</h2><p data-i18n="groupDialogLead">Give the widget a simple name, then choose its controls.</p><div class="field"><label for="groupName" data-i18n="groupName">Group name</label><input id="groupName" minlength="2" maxlength="32" autocomplete="off" required data-i18n-placeholder="groupNamePlaceholder" placeholder="Living room"><span class="room-suggest-hint" data-i18n="roomSuggestHint">Pick a suggestion or type your own name.</span><div id="roomSuggestions" class="room-suggestions"></div></div><div id="groupOrderRow" class="group-order-row" hidden><span data-i18n="groupOrder">Order</span><div class="group-order-actions"><button id="groupMoveLeft" class="secondary" type="button" data-i18n-aria="moveGroupEarlier" aria-label="Move earlier">←</button><span id="groupOrderPosition" class="group-order-position"></span><button id="groupMoveRight" class="secondary" type="button" data-i18n-aria="moveGroupLater" aria-label="Move later">→</button></div></div><div class="group-picker-head"><strong data-i18n="groupDevices">Devices and controls</strong><span id="groupSelectionCount"></span></div><div id="groupDeviceChoices" class="group-device-choices"></div><div class="modal-actions group-modal-actions"><button id="deleteGroup" class="danger-button" type="button" data-i18n="deleteGroup" hidden>Delete group</button><div><button id="cancelGroup" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveGroup" class="primary" type="submit" data-i18n="saveGroup">Save group</button></div></div></form></div></dialog>
 <dialog id="groupDeleteDialog"><div class="modal"><h2 data-i18n="deleteGroupTitle">Delete this room?</h2><p id="groupDeleteLead" class="danger-copy"></p><p class="group-delete-note" data-i18n="deleteGroupNote">The devices themselves stay untouched — only the room disappears.</p><div class="modal-actions"><button id="cancelGroupDelete" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmGroupDelete" class="danger-button" type="button" data-i18n="deleteGroup">Delete group</button></div></div></dialog>
-<dialog id="automationDialog" class="automation-dialog"><div class="modal automation-modal"><div class="automation-head"><div class="automation-head-text"><h2 id="automationTitle" data-i18n="automationWhenTitle">When should it run?</h2><p id="automationLead" data-i18n="automationWhenLead">Pick the moment that starts it.</p></div><button id="closeAutomationWizard" class="device-detail-close automation-close" type="button" data-i18n-aria="close" aria-label="Close">×</button></div><div id="automationBody" class="automation-body"></div><div class="modal-actions automation-actions"><p id="automationNextHint" class="automation-next-hint" hidden></p><button id="automationBack" class="secondary" type="button" data-i18n="back">Back</button><button id="automationNext" class="primary" type="button" data-i18n="next">Next</button></div></div></dialog>
+<dialog id="automationDialog" class="automation-dialog"><div class="modal automation-modal"><div class="automation-head"><div class="automation-head-text"><h2 id="automationTitle" data-i18n="automationWhenTitle">When should it run?</h2><p id="automationLead" data-i18n="automationWhenLead">Pick the moment that starts it.</p></div><button id="closeAutomationWizard" class="device-detail-close automation-close" type="button" data-i18n-aria="close" aria-label="Close">×</button></div><div id="automationBody" class="automation-body"></div><div class="modal-actions automation-actions"><div id="automationNextNote" class="automation-next-note" hidden><p id="automationNextHint" class="automation-next-hint"></p></div><button id="automationBack" class="secondary" type="button" data-i18n="back">Back</button><button id="automationNext" class="primary" type="button" data-i18n="next">Next</button></div></div></dialog>
 <dialog id="automationActionDialog"><div class="modal device-action-modal"><div class="device-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg></div><h2 id="automationActionName">Automation</h2><p data-i18n="automationActionLead">Choose what you want to do with this automation.</p><div class="modal-actions"><button id="closeAutomationActions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="runAutomationNow" class="secondary" type="button" data-i18n="automationRunNow">Run now</button><button id="editAutomation" class="primary" type="button" data-i18n="automationEdit">Edit</button><button id="deleteAutomation" class="danger-button" type="button" data-i18n="automationDelete">Delete</button></div></div></dialog>
 <dialog id="simpleLinkDialog" class="simple-link-dialog"><div class="modal simple-link-modal"><div id="simpleLinkStep" class="eyebrow"></div><h2 id="simpleLinkTitle" data-i18n="simpleLinkStepOneTitle">Which button?</h2><p id="simpleLinkLead" data-i18n="simpleLinkStepOneLead">Choose the button or remote that should start it.</p><div id="simpleLinkRooms" class="room-filter" data-i18n-aria="roomFilterLabel" role="group" aria-label="Filter by room" hidden></div><div id="simpleLinkChoices" class="simple-link-choices"></div><div id="simpleLinkSummary" class="simple-link-summary" hidden></div><div class="modal-actions"><button id="simpleLinkBack" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="simpleLinkSave" class="primary" type="button" data-i18n="save" disabled hidden>Save</button></div></div></dialog>
 <dialog id="matterDialog"><div class="modal"><h2 data-i18n="connectPlatform">Connect Matter system</h2><p data-i18n="matterLead">Choose “Add Matter device” in Alexa, Apple Home or a compatible Matter controller and scan this code.</p><div id="qr" class="qr"></div><div id="manualCode" class="code"></div><div id="matterWaiting" class="matter-waiting"><span class="matter-waiting-dot" aria-hidden="true"></span><span data-i18n="matterPairingWaiting">Waiting for pairing…</span></div><p class="matter-hint" data-i18n="matterEcosystemHint">Each ecosystem needs its own code: close this window and press the button again to add another controller such as Alexa.</p><div class="modal-actions"><button id="closeMatter" class="quiet" data-i18n="close">Close</button></div></div></dialog>
@@ -5983,7 +5991,15 @@
     const lead=source?`<span class="automation-map-from">${esc(source)}</span><span class="automation-map-arrow" aria-hidden="true">→</span>`:"";
     return`<span class="automation-map-pair" role="img" aria-label="${esc(label)}">${lead}<span class="automation-pill act-${mode}">${esc(result)}</span></span>`;
   };
-  const automationSummaryHtml=(line,hook,quiet,removeHook)=>`<div class="automation-summary${quiet?" is-quiet":""}"><button class="automation-summary-main" type="button" ${hook}><span class="automation-line">${line}</span><span class="automation-change">${esc(t("automationChange"))}</span></button>${removeHook?`<button class="automation-summary-remove" type="button" ${removeHook} aria-label="${esc(t("automationRemove"))}" title="${esc(t("automationRemove"))}"><span aria-hidden="true">✕</span></button>`:""}</div>`;
+  // Bölüm boşken/varsayılandayken satır bir şeyi anlatmaz, teklif eder: düğme "Ekle" der.
+  // Olmayan bir koşulu ya da beklemeyi "değiştirmek" tuhaftı. Doluysa dil yine "Değiştir".
+  // `action` = {empty, aria}: aria etiketini çağıran verir, neyin eklendiği/değiştiği duyulsun.
+  const automationSummaryAction=(empty,addKey,changeKey)=>({empty:Boolean(empty),aria:t(empty?addKey:changeKey)});
+  const automationSummaryHtml=(line,hook,quiet,removeHook,action)=>{
+    const empty=Boolean(action&&action.empty);
+    const aria=action&&action.aria?` aria-label="${esc(action.aria)}"`:"";
+    return`<div class="automation-summary${quiet?" is-quiet":""}${empty?" is-empty":""}"><button class="automation-summary-main" type="button" ${hook}${aria}><span class="automation-line">${line}</span><span class="automation-change">${esc(t(empty?"add":"automationChange"))}</span></button>${removeHook?`<button class="automation-summary-remove" type="button" ${removeHook} aria-label="${esc(t("automationRemove"))}" title="${esc(t("automationRemove"))}"><span aria-hidden="true">✕</span></button>`:""}</div>`;
+  };
   // Adım içinde seçim yapılınca uzun liste yerine tek satır durur: tamamlanmış düğümlerdeki
   // aynı özet bileşeni, aynı "Değiştir" metniyle. Basınca liste geri açılır, seçim korunur.
   // Adım kapanmadığı için altındaki süre satırı ("… ve şu kadar süredir böyleyse") görünür kalır.
@@ -6916,7 +6932,8 @@
           automationConditionLine(condition),
           `data-automation-edit-cond="${index}"`,
           false,
-          `data-automation-remove-cond="${index}"`
+          `data-automation-remove-cond="${index}"`,
+          automationSummaryAction(false,"automationCondAddAria","automationCondChangeAria")
         )
       });
     });
@@ -6939,7 +6956,10 @@
       return;
     }
     if(!wizard.conditions.length){
-      nodes.push({state:"branch",body:automationSummaryHtml(esc(t("automationCondAlwaysLine")),'data-automation-stage="cond"',true)});
+      nodes.push({state:"branch",body:automationSummaryHtml(
+        esc(t("automationCondAlwaysLine")),'data-automation-stage="cond"',true,null,
+        automationSummaryAction(true,"automationCondAddAria","automationCondChangeAria")
+      )});
       return;
     }
     if(wizard.conditions.length<maxAutomationConditions){
@@ -6957,7 +6977,10 @@
     // satırıyla aynı dili konuşur.
     nodes.push({
       state:"branch",fresh:wizard.fresh==="wait",
-      body:automationSummaryHtml(esc(automationWaitLineText(wizard)),'data-automation-stage="wait"',automationWaitSeconds(wizard)===0)
+      body:automationSummaryHtml(
+        esc(automationWaitLineText(wizard)),'data-automation-stage="wait"',automationWaitSeconds(wizard)===0,null,
+        automationSummaryAction(automationWaitSeconds(wizard)===0,"automationWaitAddAria","automationWaitChangeAria")
+      )
     });
   }
   function automationThenNodes(wizard,nodes){
@@ -7021,7 +7044,10 @@
       const quiet=wizard.autoOffMode==="none";
       nodes.push({
         state:"done",fresh:wizard.fresh==="autooff",
-        body:automationSummaryHtml(esc(automationAutoOffLineText(wizard)),'data-automation-stage="autoOff"',quiet)
+        body:automationSummaryHtml(
+          esc(automationAutoOffLineText(wizard)),'data-automation-stage="autoOff"',quiet,null,
+          automationSummaryAction(quiet,"automationAutoOffAddAria","automationAutoOffChangeAria")
+        )
       });
     }
     if(wizard.stage==="autoOff"){
@@ -7362,6 +7388,9 @@
     hint.textContent=sentence||(reason?t(reason):"");
     hint.classList.toggle("ready",Boolean(sentence));
     hint.hidden=!hint.textContent;
+    // Kutu metinle birlikte gizlenir: boş kutu kenarlık+gölgesiyle görünür kalmasın.
+    const note=$("#automationNextNote");
+    if(note)note.hidden=hint.hidden;
   }
   function renderAutomationWizard(){
     const wizard=state.automationWizard;

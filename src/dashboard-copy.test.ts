@@ -2025,7 +2025,7 @@ test("saat kuralı sihirbazı akış rayında cihaz+özellik çiftini kaydeder",
   assert.match(dashboard, /api\(`\/api\/automations\/\$\{encodeURIComponent\(id\)\}\/runs\?limit=20`\)/);
 
   // Sihirbaz gezinmesi: tek birincil eylem, altta sabit şerit.
-  assert.match(dashboard, /<div class="modal-actions automation-actions"><p id="automationNextHint" class="automation-next-hint" hidden><\/p><button id="automationBack" class="secondary" type="button" data-i18n="back">/);
+  assert.match(dashboard, /<div class="modal-actions automation-actions"><div id="automationNextNote" class="automation-next-note" hidden><p id="automationNextHint" class="automation-next-hint"><\/p><\/div><button id="automationBack" class="secondary" type="button" data-i18n="back">/);
   assert.match(dashboard, /id="automationBack"[\s\S]*?id="automationNext" class="primary"/);
   assert.match(dashboard, /\.automation-actions\{flex:none;flex-wrap:wrap;justify-content:space-between/);
   assert.match(dashboard, /\.automation-actions button\{min-width:132px;min-height:52px/);
@@ -2079,8 +2079,8 @@ test("sihirbaz akışı dikey bir rayda okunur, cevaplanan soru tek satıra iner
   assert.match(dashboard, /\.automation-node\.is-branch \.automation-dot\{[^}]*border-style:dashed/);
 
   // Cevaplanan soru tek satırlık özet olur; satırın kendisi gerçek bir düğmedir.
-  assert.match(dashboard, /const automationSummaryHtml=\(line,hook,quiet,removeHook\)=>/);
-  assert.match(dashboard, /<button class="automation-summary-main" type="button" \$\{hook\}/);
+  assert.match(dashboard, /const automationSummaryHtml=\(line,hook,quiet,removeHook,action\)=>\{/);
+  assert.match(dashboard, /<button class="automation-summary-main" type="button" \$\{hook\}\$\{aria\}/);
   assert.match(dashboard, /\$\$\("\[data-automation-stage\]"\)\.forEach\(button=>button\.onclick=\(\)=>goToAutomationStage\(button\.dataset\.automationStage\)\)/);
   assert.match(dashboard, /\.automation-summary-main\{[^}]*min-height:48px/);
   assert.match(dashboard, /\.automation-summary-main:focus-visible\{outline:3px solid var\(--forest-soft\)/);
@@ -2833,7 +2833,7 @@ test("sihirbazda tek birincil eylem var ve pasifken nedenini söylüyor", async 
   assert.match(dashboard, /buttons\.forEach\(button=>\{button\.disabled=false\}\);showToast\(automationErrorText\(error\),true\)/);
 
   // Sessiz pasif düğme yok: eksik olan şey düğmenin yanında yazıyor.
-  assert.match(dashboard, /<p id="automationNextHint" class="automation-next-hint" hidden><\/p>/);
+  assert.match(dashboard, /<div id="automationNextNote" class="automation-next-note" hidden><p id="automationNextHint" class="automation-next-hint"><\/p><\/div>/);
   assert.match(dashboard, /const reason=paths\|\|ready\?"":automationBlockedReason\(wizard\);\s*hint\.textContent=sentence\|\|\(reason\?t\(reason\):""\);/);
   assert.match(dashboard, /automationNeedTrigger:"Kuralı neyin başlatacağını seçin\."/);
   assert.match(dashboard, /automationNeedTrigger:"Pick what should start the rule\."/);
@@ -2848,6 +2848,28 @@ test("sihirbazda tek birincil eylem var ve pasifken nedenini söylüyor", async 
   assert.match(dashboard, /\$\("#automationBack"\)\.onclick=stepBackAutomation;/);
 
   assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+});
+
+// Kuralı düz cümleyle anlatan özet serbest metin gibi duruyordu. Panelin kendi bilgi kutusu dili
+// (`.automation-alt`: `--line` kenarlık + `--surface-soft` zemin) buraya da geldi; iç gölge kutuyu
+// çukur gösterir. Cümlenin kendisi değişmedi, yalnız sarmalayıcı ve biçim.
+test("sihirbazın özet cümlesi çukur bir bilgi kutusunda durur", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /<div id="automationNextNote" class="automation-next-note" hidden><p id="automationNextHint" class="automation-next-hint"><\/p><\/div>/);
+  // Ölçüler clamp'li: 1024×640'ta kutu son adımın kaydırmasını artırmasın. Renk karışımı yok.
+  assert.match(
+    dashboard,
+    /\.automation-next-note\{flex:1 1 100%;order:-1;padding:clamp\(\.4rem,\.9vh,\.6rem\) clamp\(\.6rem,1\.2vw,\.85rem\);border:1px solid var\(--line\);border-radius:clamp\(\.6rem,1\.1vw,\.85rem\);background:var\(--surface-soft\);box-shadow:inset 0 1px 2px rgba\(35,45,41,\.09\)\}/
+  );
+  assert.match(dashboard, /\.automation-next-note\[hidden\]\{display:none\}/);
+  // Koyu temada iç gölge ayrı yazılır; metin `--forest`/`--muted` olduğu için iki temada da okunur.
+  assert.match(dashboard, /:root\[data-theme="dark"\] \.automation-next-note\{box-shadow:inset 0 1px 3px rgba\(0,0,0,\.42\)\}/);
+  assert.match(dashboard, /\.automation-next-hint\{margin:0;color:var\(--muted\);font-size:clamp\(\.78rem,1\.5vh,\.85rem\);line-height:1\.4;text-align:left\}/);
+  assert.match(dashboard, /\.automation-next-hint\.ready\{color:var\(--forest\);font-weight:800\}/);
+  // Boş kutu kenarlığıyla ortada kalmaz: sarmalayıcı metinle birlikte gizlenir.
+  assert.match(dashboard, /const note=\$\("#automationNextNote"\);\s*if\(note\)note\.hidden=hint\.hidden;/);
+  assert.doesNotMatch(dashboard, /\.automation-next-note\{[^}]*color-mix\(/);
 });
 
 test("Matter modalı eşleştirmenin bittiğini kendisi fark eder", async () => {
@@ -3764,6 +3786,56 @@ test("kayıtlı kural düzenlenirken bütün sorular kapalı satır olarak gelir
   // "Sonra kapat" satırı da kapalı gelir, üstüne basınca açılır.
   harness.api.goToAutomationStage("autoOff");
   assert.match(harness.body(), /data-automation-autooff="none"/);
+});
+
+// Var olmayan bir şey "değiştirilmez": boş/varsayılan bölüm ekleme dili konuşur, dolu bölüm
+// değiştirme dili. Aynı kural düğmenin aria etiketinde de geçerli — neyin eklendiği duyulmalı.
+test("son adımda boş bölüm Ekle, dolu bölüm Değiştir der", async () => {
+  const harness = await automationWizardHarness();
+  const rule = (id: string, conditions: unknown[]): Record<string, unknown> => ({
+    id,
+    name: "Koridor",
+    enabled: true,
+    triggers: [{ type: "deviceState", deviceId: "0x0022", property: "occupancy", equals: true }],
+    conditions,
+    actions: [{ type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON" }]
+  });
+  (harness.state.automations as unknown[]).push(
+    rule("rule1", []),
+    rule("rule2", [{ type: "deviceState", deviceId: "0x0011", property: "state", equals: "ON" }])
+  );
+
+  harness.api.openAutomationWizard("rule1");
+  assert.equal(harness.wizard().stage, "name");
+  // KOŞUL boş: "Her zaman çalışsın" satırı koşul ekmeyi teklif eder.
+  assert.match(
+    harness.body(),
+    /<div class="automation-summary is-quiet is-empty"><button class="automation-summary-main" type="button" data-automation-stage="cond" aria-label="automationCondAddAria"><span class="automation-line">automationCondAlwaysLine<\/span><span class="automation-change">add<\/span>/
+  );
+  // GEREKİYORSA boş: bekleme satırında da aynı dil.
+  assert.match(
+    harness.body(),
+    /<div class="automation-summary is-quiet is-empty"><button class="automation-summary-main" type="button" data-automation-stage="wait" aria-label="automationWaitAddAria"><span class="automation-line">automationWaitNowLine<\/span><span class="automation-change">add<\/span>/
+  );
+  // Dolu bölüm bozulmadı: hedef satırı hâlâ "Değiştir" der.
+  assert.match(harness.body(), /data-automation-edit-target="0"><span class="automation-line">[\s\S]*?<span class="automation-change">automationChange<\/span>/);
+  assert.doesNotMatch(harness.body(), /aria-label="automationCondChangeAria"/);
+
+  // Bekleme girilince satır dolar: metin de aria da değiştirme diline döner.
+  harness.api.goToAutomationStage("wait");
+  harness.api.toggleAutomationWait("1");
+  harness.api.setAutomationWaitSeconds(45);
+  harness.api.goToAutomationStage("name");
+  assert.match(
+    harness.body(),
+    /<div class="automation-summary"><button class="automation-summary-main" type="button" data-automation-stage="wait" aria-label="automationWaitChangeAria"><span class="automation-line">automationWaitLine<\/span><span class="automation-change">automationChange<\/span>/
+  );
+  assert.doesNotMatch(harness.body(), /aria-label="automationWaitAddAria"/);
+
+  // Koşullu kuralda koşul satırı doludur: "Ekle" hiç geçmez, aria "değiştir" der.
+  harness.api.openAutomationWizard("rule2");
+  assert.match(harness.body(), /data-automation-edit-cond="0" aria-label="automationCondChangeAria"/);
+  assert.doesNotMatch(harness.body(), /aria-label="automationCondAddAria"/);
 });
 
 // Aynı değeri iki ayrı yoldan girme kalktı: hazır süre çipleri asıl yol, sayaç yalnız "Başka süre".
