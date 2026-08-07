@@ -244,6 +244,8 @@ const automationEngine = new AutomationEngine({
       ? value
       : undefined;
   },
+  // §4.1 — "şu kadar süredir böyleyse" koşulunun okuduğu değişim defteri.
+  stateSince: (deviceId, property) => store.stateSince(deviceId, property),
   runLog: automationRunLog
 });
 const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });

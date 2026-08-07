@@ -9,6 +9,7 @@ import {
   type AutomationDeviceAction,
   type AutomationDeviceStateTrigger,
   type AutomationSunTrigger,
+  type AutomationTimePoint,
   type AutomationTimeTrigger,
   type AutomationsStore
 } from "./automations.js";
@@ -92,6 +93,11 @@ export interface AutomationEngineOptions {
   location?: () => HomeLocation | null;
   /** Koşulların okuduğu anlık cihaz durumu; verilmezse `deviceState` koşulu hep `false` olur. */
   deviceState?: (deviceId: string, property: string) => JsonScalar | undefined;
+  /**
+   * §4.1 — kanalın değeri ne zamandan beri aynı (`DeviceStore.stateSince`). Verilmezse
+   * `forSeconds` taşıyan koşullar hep `false` olur; süresiz koşullar etkilenmez.
+   */
+  stateSince?: (deviceId: string, property: string) => Date | null;
   /** Çalışma günlüğü — "neden çalıştı / neden çalışmadı". */
   runLog?: Pick<AutomationRunLog, "append">;
 }
@@ -123,14 +129,48 @@ const previousWeekday = (weekday: number): number => weekday === 1 ? 7 : weekday
  * Kaydırma günü aşarsa (ör. gün doğumundan 4 saat önce, kutup dışı kışta) elde edilen `HH:MM`
  * yine o günün gün ölçütüyle karşılaştırılır — sınırdaki bu durum bilinçli olarak basit tutuldu.
  */
+const sunMoment = (
+  event: "sunrise" | "sunset",
+  offsetMinutes: number,
+  times: SunTimes | null
+): Date | null => {
+  const base = event === "sunrise" ? times?.sunrise : times?.sunset;
+  if (!base) return null;
+  return new Date(base.getTime() + offsetMinutes * 60_000);
+};
+
 export const automationSunTime = (
   trigger: AutomationSunTrigger,
   times: SunTimes | null
 ): string | null => {
-  const base = trigger.event === "sunrise" ? times?.sunrise : times?.sunset;
-  if (!base) return null;
-  return localTimeStamp(new Date(base.getTime() + trigger.offsetMinutes * 60_000));
+  const moment = sunMoment(trigger.event, trigger.offsetMinutes, times);
+  return moment ? localTimeStamp(moment) : null;
 };
+
+/** Gün içi dakika (0..1439) — sarma kontrolü dize değil, sayı karşılaştırmasıyla yapılır. */
+const minutesOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
+
+/**
+ * §2.3 — aralık ucunun gün içi dakikası. Güneş ucu konum yoksa ya da güneş o gün ufku kesmiyorsa
+ * `null` döner; çağıran bunu koşulun `false` sebebine çevirir.
+ */
+export const automationTimePointMinutes = (
+  point: AutomationTimePoint,
+  times: SunTimes | null
+): number | null => {
+  if (point.kind === "clock") {
+    const hour = Number(point.at.slice(0, 2));
+    const minute = Number(point.at.slice(3, 5));
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return hour * 60 + minute;
+  }
+  const moment = sunMoment(point.event, point.offsetMinutes, times);
+  return moment ? minutesOfDay(moment) : null;
+};
+
+/** Dakikadan "HH:MM" — günlükteki sebep metni güneş ucunu da okunur saatle yazsın diye. */
+const minuteStampOf = (minutes: number): string =>
+  `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 
 /** Zamanı gelen zaman/güneş tetikleyicisi — yoksa `null`. */
 export const automationDueTrigger = (
@@ -162,6 +202,13 @@ export const automationDueAt = (
 export interface AutomationConditionOptions {
   /** §2.4 — `all` (varsayılan) hepsini, `any` en az birini arar. */
   mode?: "all" | "any";
+  /** §2.3 — güneş uçlu aralıklar için o günün güneş saatleri; yoksa o koşul sağlanmaz. */
+  times?: SunTimes | null;
+  /**
+   * §4.1 — kanalın şu anki değeri ne zamandan beri aynı (`DeviceStore` değişim defteri).
+   * `null` "bilinmiyor" demektir; süre koşulu bunu kapalı tarafa yorumlar (§2.5).
+   */
+  stateSince?: (deviceId: string, property: string) => Date | null;
 }
 
 /**
@@ -177,23 +224,35 @@ export const evaluateAutomationConditions = (
   const results: AutomationRunConditionResult[] = [];
   for (const condition of conditions) {
     if (condition.type === "timeRange") {
-      const time = localTimeStamp(date);
+      const times = options.times ?? null;
+      const from = automationTimePointMinutes(condition.from, times);
+      const to = automationTimePointMinutes(condition.to, times);
+      if (from === null || to === null) {
+        // Güneş ucu hesaplanamıyor: kapalı tarafa düşülür ve sebebi günlükte durur.
+        results.push({
+          type: "timeRange",
+          ok: false,
+          reason: "Evin konumu ayarlı değil ya da güneş bugün ufku kesmiyor;"
+            + " güneşe göre aralık hesaplanamadı."
+        });
+        continue;
+      }
+      const now = minutesOfDay(date);
       // Gece yarısını aşan aralık: 22:00→06:00 iki parçadan oluşur.
-      const wraps = condition.from > condition.to;
-      const inRange = wraps
-        ? time >= condition.from || time < condition.to
-        : time >= condition.from && time < condition.to;
+      const wraps = from > to;
+      const inRange = wraps ? now >= from || now < to : now >= from && now < to;
       if (!inRange) {
         results.push({
           type: "timeRange",
           ok: false,
-          reason: `Saat ${time}, ${condition.from}-${condition.to} aralığının dışında.`
+          reason: `Saat ${localTimeStamp(date)}, `
+            + `${minuteStampOf(from)}-${minuteStampOf(to)} aralığının dışında.`
         });
         continue;
       }
       if (condition.days) {
         // Aralık geceyi aşıyorsa ve şu an sabah tarafındaysak, gün ölçütü dünü gösterir.
-        const weekday = wraps && time < condition.to
+        const weekday = wraps && now < to
           ? previousWeekday(isoWeekday(date))
           : isoWeekday(date);
         if (!condition.days.includes(weekday)) {
@@ -214,6 +273,10 @@ export const evaluateAutomationConditions = (
       });
       continue;
     }
+    // Önce değer ölçütü. Süre ölçütü (§2.1) bunun **üstüne** biner, yerine geçmez: değer
+    // tutmuyorsa süreye hiç bakılmaz — "1 dakikadır hareket var" önce "hareket var" demektir.
+    let ok: boolean;
+    let reason: string | undefined;
     if (condition.above !== undefined || condition.below !== undefined) {
       // Koşulda semantik kenar değil, o anki değerdir: "şu an eşiğin üstünde/altında mı".
       const current = numericValue(value);
@@ -225,32 +288,43 @@ export const evaluateAutomationConditions = (
         });
         continue;
       }
-      const inside = (condition.above === undefined || current > condition.above)
+      ok = (condition.above === undefined || current > condition.above)
         && (condition.below === undefined || current < condition.below);
       const limit = condition.above !== undefined && condition.below !== undefined
         ? `${condition.above}-${condition.below} aralığında değil`
         : condition.above !== undefined
           ? `${condition.above} üstünde değil`
           : `${condition.below} altında değil`;
-      results.push({
-        type: "deviceState",
-        ok: inside,
-        reason: inside
-          ? undefined
-          : `${condition.deviceId} "${condition.property}" değeri ${current}, ${limit}.`
-      });
-      continue;
-    }
-    const ok = condition.equals !== undefined
-      ? value === condition.equals
-      : value !== condition.not;
-    results.push({
-      type: "deviceState",
-      ok,
-      reason: ok
+      reason = ok
         ? undefined
-        : `${condition.deviceId} "${condition.property}" değeri ${JSON.stringify(value)}.`
-    });
+        : `${condition.deviceId} "${condition.property}" değeri ${current}, ${limit}.`;
+    } else {
+      ok = condition.equals !== undefined
+        ? value === condition.equals
+        : value !== condition.not;
+      reason = ok
+        ? undefined
+        : `${condition.deviceId} "${condition.property}" değeri ${JSON.stringify(value)}.`;
+    }
+    if (ok && condition.forSeconds !== undefined) {
+      const since = options.stateSince?.(condition.deviceId, condition.property) ?? null;
+      if (since === null) {
+        // §2.5 — defter bellektedir. Bilgi yoksa kapalı tarafa düşülür ve sebebi açıkça yazılır;
+        // sessiz `false` olmazsa kullanıcı yeniden başlatma penceresini günlükten görebilir.
+        ok = false;
+        reason = `${condition.deviceId} "${condition.property}" ne zamandır bu durumda`
+          + ` bilinmiyor (yeniden başlatmadan beri kayıt yok),`
+          + ` ${condition.forSeconds} saniye gerekiyor.`;
+      } else {
+        const elapsed = Math.floor((date.getTime() - since.getTime()) / 1_000);
+        ok = elapsed >= condition.forSeconds;
+        reason = ok
+          ? undefined
+          : `${condition.deviceId} "${condition.property}" ${elapsed} saniyedir bu durumda,`
+            + ` ${condition.forSeconds} saniye gerekiyor.`;
+      }
+    }
+    results.push({ type: "deviceState", ok, reason });
   }
   // `any` modunda da **tüm** koşullar değerlendirilip döner: günlükte hangisinin tuttuğu görünsün.
   // Koşul listesi boşsa kural koşulsuzdur; iki modda da geçer (`some` boş listede false döner).
@@ -364,14 +438,25 @@ export const automationMatchesEvent = (
  * §5.4 — `when` taşımayan eylem her zaman çalışır (geriye uyumluluk). `when` taşıyan eylem
  * yalnızca tetikleyen olayın değeri eşleşince çalışır; olay yoksa (zaman tetikleyicisi ya da
  * elle çalıştırma) eşleşecek değer de yoktur, eylem atlanır.
+ *
+ * §9.1 — cihaz olayı olmayan tek istisna `sun`: eşleşme değeri olay adıdır ("sunrise"/"sunset"),
+ * böylece gün doğumu ve gün batımı tek kuralda iki ayrı işe bağlanır. `time` bilinçli olarak
+ * dışarıdadır: eşleşecek değeri yoktur, `when` taşıyan eylemleri atlanmaya devam eder.
  */
 export const automationActionApplies = (
   action: AutomationAction,
-  event?: AutomationDeviceEvent
+  event?: AutomationDeviceEvent,
+  triggerValue?: JsonScalar
 ): boolean => {
   if (!action.when) return true;
-  return event !== undefined && action.when.equals === event.value;
+  if (event !== undefined) return action.when.equals === event.value;
+  return triggerValue !== undefined && action.when.equals === triggerValue;
 };
+
+/** §9.1 — zamanlı yolda eyleme eşleşecek değer; yalnız güneş tetikleyicisi üretir. */
+export const automationTriggerMatchValue = (
+  trigger: AutomationRunTriggerInfo
+): JsonScalar | undefined => trigger.kind === "sun" ? trigger.value : undefined;
 
 /** Aynı eylem kümesinin tekrarını tanımak için kararlı imza. */
 export const automationActionSignature = (actions: AutomationAction[]): string =>
@@ -487,20 +572,32 @@ export class AutomationEngine {
     return { times, reason: times ? null : "sunUnavailable" };
   }
 
-  /** Panelin "bu kural neden pasif" sorusuna yanıt; UI sonraki turda okuyacak. */
+  /**
+   * Panelin "bu kural neden pasif" sorusuna yanıt; UI sonraki turda okuyacak.
+   * Güneş yalnız tetikleyicide değil, §2.3 ile `timeRange` koşulunun ucunda da olabilir —
+   * konum eksikse iki durumda da kural sessizce durur, ikisini de bildiririz.
+   */
   inactiveReason(automation: Automation): { code: string; message: string } | null {
-    if (!automation.triggers.some((trigger) => trigger.type === "sun")) return null;
+    const sunTrigger = automation.triggers.some((trigger) => trigger.type === "sun");
+    const sunCondition = automation.conditions.some((condition) =>
+      condition.type === "timeRange"
+      && (condition.from.kind === "sun" || condition.to.kind === "sun"));
+    if (!sunTrigger && !sunCondition) return null;
     const { reason } = this.resolveSun(this.now());
     if (reason === "locationMissing") {
       return {
         code: "locationMissing",
-        message: "Evin konumu ayarlı değil; güneş tetikleyicisi çalışmıyor."
+        message: sunTrigger
+          ? "Evin konumu ayarlı değil; güneş tetikleyicisi çalışmıyor."
+          : "Evin konumu ayarlı değil; güneşe göre saat aralığı hesaplanamıyor."
       };
     }
     if (reason === "sunUnavailable") {
       return {
         code: "sunUnavailable",
-        message: "Güneş bugün bu enlemde ufku kesmiyor; güneş tetikleyicisi bugün atlanıyor."
+        message: sunTrigger
+          ? "Güneş bugün bu enlemde ufku kesmiyor; güneş tetikleyicisi bugün atlanıyor."
+          : "Güneş bugün bu enlemde ufku kesmiyor; güneşe göre saat aralığı bugün hesaplanamıyor."
       };
     }
     return null;
@@ -590,7 +687,12 @@ export class AutomationEngine {
       const trigger = automationDueTrigger(automation, date, sun.times);
       if (!trigger) continue;
       this.firedMinutes.set(automation.id, stamp);
-      await this.dispatch(automation, undefined, { kind: trigger.type === "sun" ? "sun" : "time" });
+      // §9.1 — güneş yolunda olay adı da yazılır: hem günlükte görünür hem `when` eşlemesini besler.
+      await this.dispatch(
+        automation,
+        undefined,
+        trigger.type === "sun" ? { kind: "sun", value: trigger.event } : { kind: "time" }
+      );
     }
   }
 
@@ -906,7 +1008,9 @@ export class AutomationEngine {
     event?: AutomationDeviceEvent,
     trigger: AutomationRunTriggerInfo = { kind: "manual" }
   ): Promise<AutomationRunResult> {
-    const actions = automation.actions.filter((action) => automationActionApplies(action, event));
+    const triggerValue = automationTriggerMatchValue(trigger);
+    const actions = automation.actions
+      .filter((action) => automationActionApplies(action, event, triggerValue));
     // Hiçbir eylem eşleşmediyse çalıştırma sayılmaz: ne kilit alınır ne de `lastRunOk` bozulur.
     if (actions.length === 0) {
       this.note(`Otomasyon "${automation.name}" atlandı: koşullara uyan eylem yok.`);
@@ -923,11 +1027,18 @@ export class AutomationEngine {
     // §5.3 — koşullar kuralın bağlama biçimiyle; sağlanmazsa kural çalışmaz ve sebebi günlüğe düşer.
     if (automation.conditions.length > 0) {
       const anyMode = automation.conditionMode === "any";
+      const now = this.now();
+      // Güneş uçlu aralıklar için o günün güneş saatleri; hesap yerel gün başına önbelleklidir.
       const evaluation = evaluateAutomationConditions(
         automation.conditions,
-        this.now(),
+        now,
         (deviceId, property) => this.options.deviceState?.(deviceId, property),
-        { mode: automation.conditionMode }
+        {
+          mode: automation.conditionMode,
+          times: this.resolveSun(now).times,
+          stateSince: (deviceId, property) =>
+            this.options.stateSince?.(deviceId, property) ?? null
+        }
       );
       if (!evaluation.ok) {
         const failed = evaluation.results.find((result) => !result.ok);

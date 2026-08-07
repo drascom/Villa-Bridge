@@ -202,6 +202,10 @@ Sihirbazın koşul kolu bugün üç aşama: `cond` (tür seçimi) → `condTime`
 
 ## 6. Uygulama sırası
 
+**Durum (2026-08-07):** beş adımın **beşi de yazıldı**, `npm test` 485/485 + runtime 47/47 yeşil.
+Adım 1–2 canlıda (`1b5269d`); Adım 3–5 commit bekliyor. Kalan tek şey kullanıcının **1024×640'ta
+göz testi** (§9.4) ve ardından sunucu + tablet deploy'u.
+
 Her adım kendi testleriyle kapanır; `npm test` tek kapı. Adımlar birbirine sırayla bağlı
 (hepsi `automations.ts` + `automation-engine.ts` + `index.html` dosyalarına dokunuyor) —
 **paralel worker verilmez, sıraya konur.**
@@ -306,6 +310,22 @@ Yapılacak (Adım 4 turuyla birlikte):
 - Cihaz satırında hangi özelliğin koşula gireceği önden görünsün (bugün cihaza girmeden belli değil).
 - Boş liste hâli sessiz kalmasın: koşula uygun özelliği olmayan cihaz neden listelenmiyor, tek
   satırla söylensin.
+
+### 9.4 Panel oturumunun handoff'undan gelen iki kısıt
+
+`HANDOFF-2026-08-07.md`'den, bu işi doğrudan bağlayan iki madde:
+
+- **Tabletin gerçek CSS alanı 1024×640** (Nokia T10, 1280×800 @ 200 dpi). Koşul adımı bu turlarda
+  üç yeni satır kazandı (eşik karşılaştırması, iki uçlu güneş seçimi, süre satırı) — **göz testi
+  1024×640'ta yapılmalı**, 1280×800'de "sığıyor" görünen taşabilir. Ölçüler sabit px değil
+  `clamp()` + viewport birimiyle yazılır. **`color-mix()` kullanılmaz** (Android WebView
+  desteklemiyor); bu turların diff'i kontrol edildi, temiz.
+- **Güneş hesabı host saat dilimine bağlı.** Handoff'un "karar bekleyenler" maddesi: tablet
+  Londra, sunucu İstanbul; sunucu düşüp tablet devralırsa gün doğumu/batımı iki saat kayar.
+  Bu iş güneşi **bir yerden üç yere** çıkarıyor (mevcut `sun` tetikleyicisi + Adım 3'ün güneş uçlu
+  aralığı + Adım 5'in eşleme formu), yani kayma da üç yerde görünür hale gelir. Ayrı bir iş olarak
+  çözülmeli: ya konumdan saat dilimi türetilir ya güneş anları UTC üzerinden hesaplanır.
+  **Bu planın kapsamında değil**, ama failover senaryosunda beklenen davranış budur.
 
 ---
 

@@ -254,6 +254,41 @@ test("eylem koşulu (when) doğrulanır ve bilinmeyen alan reddedilir", () => {
   assert.equal("when" in (validateAutomations([automation()])[0]?.actions[0] ?? {}), false);
 });
 
+// §9.1 — gün doğumu ve gün batımı tek kuralda. Veri modeli değişmedi: bu test o kararın kilidi.
+test("iki güneş tetikleyicisi ve olay adına eşlenen eylemler doğrulanır", () => {
+  const parsed = validateAutomations([automation({
+    triggers: [
+      { type: "sun", event: "sunset", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+      { type: "sun", event: "sunrise", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }
+    ],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "sunset" } },
+      { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "sunrise" } }
+    ]
+  })], lookup);
+  assert.deepEqual(parsed[0]?.triggers, [
+    { type: "sun", event: "sunset", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+    { type: "sun", event: "sunrise", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }
+  ]);
+  assert.deepEqual(parsed[0]?.actions, [
+    { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "sunset" } },
+    { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "sunrise" } }
+  ]);
+  // İki olay ayrı kaydırma ve ayrı gün seçimi taşıyabilir.
+  assert.deepEqual(validateAutomations([automation({
+    triggers: [
+      { type: "sun", event: "sunset", offsetMinutes: -15, days: [1, 2, 3, 4, 5] },
+      { type: "sun", event: "sunrise", offsetMinutes: 30, days: [6, 7] }
+    ],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "sunset" } }
+    ]
+  })], lookup)[0]?.triggers, [
+    { type: "sun", event: "sunset", offsetMinutes: -15, days: [1, 2, 3, 4, 5] },
+    { type: "sun", event: "sunrise", offsetMinutes: 30, days: [6, 7] }
+  ]);
+});
+
 test("döngü doğrulaması when taşıyan eylemlerde de çalışır", () => {
   assert.throws(() => validateAutomations([automation({
     triggers: [{ type: "deviceState", deviceId: lampId, property: "state" }],
@@ -601,7 +636,12 @@ test("koşullar kabul edilir; bilinmeyen tür ve bozuk alan reddedilir", () => {
     ]
   })]);
   assert.deepEqual(result[0]?.conditions, [
-    { type: "timeRange", from: "22:00", to: "06:00", days: [1, 5] },
+    {
+      type: "timeRange",
+      from: { kind: "clock", at: "22:00" },
+      to: { kind: "clock", at: "06:00" },
+      days: [1, 5]
+    },
     { type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" }
   ]);
 
@@ -669,8 +709,79 @@ test("koşulda sayısal eşik kabul edilir; üçlü dışlama ve ters aralık re
   assert.deepEqual(legacy[0]?.conditions, [
     { type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" },
     { type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true },
-    { type: "timeRange", from: "22:00", to: "06:00" }
+    // Eski dize biçimi bozulmadan doğrulanır, nesne biçimine yükseltilir (§2.3).
+    { type: "timeRange", from: { kind: "clock", at: "22:00" }, to: { kind: "clock", at: "06:00" } }
   ]);
+});
+
+test("zaman aralığının uçları güneşe göreli olabilir; giriş iki biçimi de kabul eder", () => {
+  // Girdide üç biçim, çıktıda tek biçim: eski dize `{kind:"clock"}`'a yükselir.
+  const result = validateAutomations([automation({
+    conditions: [
+      { type: "timeRange", from: "22:00", to: { kind: "clock", at: "06:00" } },
+      { type: "timeRange", from: { kind: "sun", event: "sunset", offsetMinutes: -15 }, to: { kind: "sun", event: "sunrise" } },
+      // `kind` yoksa alanlardan çıkarılır — plan §2.3'teki kısa biçim.
+      { type: "timeRange", from: { event: "sunset" }, to: "23:00", days: [6, 7] },
+      { type: "timeRange", from: { kind: "sun", event: "sunrise", offsetMinutes: "30" }, to: "23:00" }
+    ]
+  })]);
+  assert.deepEqual(result[0]?.conditions, [
+    { type: "timeRange", from: { kind: "clock", at: "22:00" }, to: { kind: "clock", at: "06:00" } },
+    {
+      type: "timeRange",
+      from: { kind: "sun", event: "sunset", offsetMinutes: -15 },
+      to: { kind: "sun", event: "sunrise", offsetMinutes: 0 }
+    },
+    {
+      type: "timeRange",
+      from: { kind: "sun", event: "sunset", offsetMinutes: 0 },
+      to: { kind: "clock", at: "23:00" },
+      days: [6, 7]
+    },
+    {
+      type: "timeRange",
+      from: { kind: "sun", event: "sunrise", offsetMinutes: 30 },
+      to: { kind: "clock", at: "23:00" }
+    }
+  ]);
+
+  const range = (from: unknown, to: unknown): unknown[] => [automation({
+    conditions: [{ type: "timeRange", from, to }]
+  })];
+  // Bozuk uçlar.
+  assert.throws(() => validateAutomations(range({ kind: "sun", event: "noon" }, "06:00")),
+    /güneş olayı/);
+  assert.throws(() => validateAutomations(range({ kind: "moon", event: "sunset" }, "06:00")),
+    /saat aralığı geçersiz/);
+  assert.throws(() => validateAutomations(range({ kind: "clock", at: "24:00" }, "06:00")),
+    /saat aralığı geçersiz/);
+  assert.throws(() => validateAutomations(range(null, "06:00")), /saat aralığı geçersiz/);
+  assert.throws(() => validateAutomations(range(["22:00"], "06:00")), /saat aralığı geçersiz/);
+  // Kaydırma sınırı tetikleyiciyle aynı: tam sayı, ±240 dakika.
+  assert.throws(() => validateAutomations(range({ kind: "sun", event: "sunset", offsetMinutes: 241 }, "06:00")),
+    /güneş kaydırması/);
+  assert.throws(() => validateAutomations(range({ kind: "sun", event: "sunset", offsetMinutes: -241 }, "06:00")),
+    /güneş kaydırması/);
+  assert.throws(() => validateAutomations(range({ kind: "sun", event: "sunset", offsetMinutes: 10.5 }, "06:00")),
+    /güneş kaydırması/);
+
+  // Aynı anı gösteren iki uç reddedilir; karışık uçlarda kontrol yoktur.
+  assert.throws(() => validateAutomations(range("22:00", { kind: "clock", at: "22:00" })),
+    /başlangıç ve bitişi aynı/);
+  assert.throws(() => validateAutomations(range(
+    { kind: "sun", event: "sunset", offsetMinutes: -15 },
+    { kind: "sun", event: "sunset", offsetMinutes: -15 }
+  )), /başlangıç ve bitişi aynı/);
+  // Aynı olay ama farklı kaydırma gerçek bir aralıktır.
+  assert.equal(validateAutomations(range(
+    { kind: "sun", event: "sunset", offsetMinutes: -15 },
+    { kind: "sun", event: "sunset", offsetMinutes: 15 }
+  ))[0]?.conditions.length, 1);
+  // Doğuş ile batış farklı anlardır.
+  assert.equal(validateAutomations(range(
+    { kind: "sun", event: "sunset" },
+    { kind: "sun", event: "sunrise" }
+  ))[0]?.conditions.length, 1);
 });
 
 test("koşul bağlama biçimi yalnız `any` olduğunda saklanır", () => {
@@ -690,9 +801,9 @@ test("koşul bağlama biçimi yalnız `any` olduğunda saklanır", () => {
   const nulled = validateAutomations([automation({ conditions, conditionMode: null })]);
   assert.equal("conditionMode" in (nulled[0] ?? {}), false);
 
-  // Geriye uyumluluk: alansız eski kural aynen doğrulanır, koşulları değişmez.
+  // Geriye uyumluluk: alansız eski kural aynen doğrulanır, ölçütleri değişmez.
   assert.deepEqual(absent[0]?.conditions, [
-    { type: "timeRange", from: "22:00", to: "06:00" },
+    { type: "timeRange", from: { kind: "clock", at: "22:00" }, to: { kind: "clock", at: "06:00" } },
     { type: "deviceState", deviceId: lampId, property: "state_l1", not: "ON" }
   ]);
 
@@ -799,4 +910,45 @@ test("geriye dönük uyumluluk: eski kural dosyası aynen çalışır", async (c
     actions: [{ type: "device", deviceId: lampId, property: "state_l1", value: "OFF" }]
   }]);
   assert.deepEqual(withoutConditions[0]?.conditions, []);
+});
+
+// §2.1 — "şu kadar süredir böyleyse": değer ölçütünün üstüne binen süre alanı.
+test("koşul süresi tam sayı ve 1..86400 aralığında kabul edilir", () => {
+  const withFor = (extra: Record<string, unknown>): unknown[] => [automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", ...extra }]
+  })];
+  const first = (value: unknown[]): Record<string, unknown> =>
+    validateAutomations(value)[0]?.conditions[0] as unknown as Record<string, unknown>;
+
+  assert.equal(first(withFor({ equals: true, forSeconds: 60 })).forSeconds, 60);
+  assert.equal(first(withFor({ equals: true, forSeconds: 1 })).forSeconds, 1);
+  assert.equal(first(withFor({ equals: true, forSeconds: 86_400 })).forSeconds, 86_400);
+  // "10 dakikadır hareket yoksa" — `not` ile de kurulur.
+  assert.equal(first(withFor({ not: true, forSeconds: 600 })).forSeconds, 600);
+  // Sayısal eşikle birleşir: "sıcaklık 5 dakikadır 25'in üstündeyse".
+  const threshold = first(withFor({ above: 25, forSeconds: 300 }));
+  assert.equal(threshold.above, 25);
+  assert.equal(threshold.forSeconds, 300);
+  assert.equal(first(withFor({ above: 10, below: 20, forSeconds: 30 })).forSeconds, 30);
+
+  // Alan yoksa (ya da null'sa) hiç yazılmaz: eski davranış birebir korunur.
+  assert.equal("forSeconds" in first(withFor({ equals: true })), false);
+  assert.equal("forSeconds" in first(withFor({ equals: true, forSeconds: null })), false);
+  assert.equal("forSeconds" in first(withFor({ above: 25 })), false);
+});
+
+test("geçersiz koşul süresi reddedilir", () => {
+  const withFor = (forSeconds: unknown): unknown[] => [automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true, forSeconds }]
+  })];
+  assert.throws(() => validateAutomations(withFor(0)), /koşulu süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor(-60)), /koşulu süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor(60.5)), /koşulu süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor(86_401)), /koşulu süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor("60")), /koşulu süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor(Number.NaN)), /koşulu süresi geçersiz/);
+  // Süre alanı değer ölçütünün yerine geçmez: tek başına verilirse koşul yine eksiktir.
+  assert.throws(() => validateAutomations([automation({
+    conditions: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", forSeconds: 60 }]
+  })]), /tam biri olmalıdır/);
 });

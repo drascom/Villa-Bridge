@@ -21,6 +21,19 @@ interface StateEntry {
   updatedAt: Date;
 }
 
+/**
+ * §4.1 — kanal başına "ne zamandır bu değerde" defteri. Süre koşulunun (`forSeconds`) tek
+ * altyapısı budur; olay akışının dar "interesting" listesinden bağımsızdır, böylece
+ * `temperature` gibi olay üretmeyen özellikler için de süre işler.
+ */
+interface ChannelSinceEntry {
+  value: JsonScalar;
+  since: Date;
+}
+
+/** Defterin üst sınırı — durum haritasıyla aynı büyüklük sınıfı; taşarsa en eski düşer. */
+const maxChannelSinceEntries = 5_000;
+
 interface PairingDevice {
   id: string;
   name: string;
@@ -74,6 +87,11 @@ export function featureValues(exposes: unknown, property: string): string[] {
   };
   visit(exposes);
   return [...values].sort();
+}
+
+/** Durum haritasının anahtarı: cihazın MQTT konusundaki adı (`buildDeviceViews` ile aynı kural). */
+function deviceSourceName(device: BridgeDevice): string {
+  return device.friendly_name ?? device.ieee_address ?? "unknown";
 }
 
 function scalar(value: unknown): JsonScalar | undefined {
@@ -251,6 +269,11 @@ interface DeviceSnapshot {
 export class DeviceStore {
   private readonly aliases: Map<string, string>;
   private readonly states = new Map<string, StateEntry>();
+  /**
+   * `sourceName|property` → değerin kaçtan beri aynı olduğu. Anahtar durum haritasıyla aynı
+   * uzayda tutulur (kaynak adı); okuma yolu IEEE adresini kaynak adına çevirir (UID kuralı).
+   */
+  private readonly channelSince = new Map<string, ChannelSinceEntry>();
   private readonly availability = new Map<string, "online" | "offline">();
   private devices: BridgeDevice[] = [];
   private groups: BridgeGroup[] = [];
@@ -345,7 +368,14 @@ export class DeviceStore {
     const topic = normalizeTopicPart(relativeTopic);
     const parsed = this.parse(payload);
     if (topic === "bridge/devices" && Array.isArray(parsed)) {
+      const previousNames = new Set(this.devices.map(deviceSourceName));
       this.devices = parsed.filter(isObject) as BridgeDevice[];
+      // Silinen cihazın defter kayıtları kalmasın; aynı ad geri gelirse süre sıfırdan sayılır.
+      for (const name of previousNames) {
+        if (!this.devices.some((device) => deviceSourceName(device) === name)) {
+          this.forgetChannelSince(name);
+        }
+      }
       this.topology += 1;
       this.invalidate();
       return;
@@ -426,10 +456,49 @@ export class DeviceStore {
         }
       }
       this.recordEvents(events);
+      this.trackChannelSince(topic, parsed, at);
       this.states.set(topic, { value: parsed, updatedAt: at });
       this.invalidate();
       this.completeReconnectedPairingFromState(topic);
     }
+  }
+
+  /**
+   * §4.1 — defteri günceller. **Yalnızca değer gerçekten değiştiyse** `since` tazelenir: aynı
+   * değerin yeniden bildirilmesi süreyi sıfırlamaz, "1 dakikadır hareket var" ancak böyle çalışır.
+   */
+  private trackChannelSince(sourceName: string, payload: JsonObject, at: Date): void {
+    for (const [property, raw] of Object.entries(payload)) {
+      const value = scalar(raw);
+      if (value === undefined) continue;
+      const key = `${sourceName}|${property}`;
+      const previous = this.channelSince.get(key);
+      if (previous && previous.value === value) continue;
+      // Yeniden ekleme sırayı da tazeler: Map'in ekleme sırası = değişim sırası, en eski baştadır.
+      this.channelSince.delete(key);
+      this.channelSince.set(key, { value, since: at });
+    }
+    while (this.channelSince.size > maxChannelSinceEntries) {
+      const oldest = this.channelSince.keys().next();
+      if (oldest.done) break;
+      this.channelSince.delete(oldest.value);
+    }
+  }
+
+  private forgetChannelSince(sourceName: string): void {
+    const prefix = `${sourceName}|`;
+    for (const key of [...this.channelSince.keys()]) {
+      if (key.startsWith(prefix)) this.channelSince.delete(key);
+    }
+  }
+
+  /**
+   * §2.1 — kanalın şu anki değeri ne zamandan beri aynı. Defter bellektedir: yeniden başlatmadan
+   * sonra bilgi yoktur ve `null` döner; süre koşulu bunu kapalı tarafa yorumlar (§2.5).
+   */
+  stateSince(deviceId: string, property: string): Date | null {
+    const sourceName = this.getDevice(deviceId)?.sourceName ?? deviceId;
+    return this.channelSince.get(`${sourceName}|${property}`)?.since ?? null;
   }
 
   getEvents(limit = 20): DeviceEventView[] {

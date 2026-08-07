@@ -701,3 +701,83 @@ test("çok kanallı cihazda rol kanal başınadır", () => {
   assert.equal(channels().get("l2")?.role, "switch");
   assert.equal(channels().get("l1")?.role, "light");
 });
+
+/** §4.1 — süre koşulunun (`forSeconds`) altyapısı: kanal başına değişim defteri. */
+const sinceStore = (): DeviceStore => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0x1111111111111111",
+    friendly_name: "Koridor Sensor",
+    definition: { exposes: [{ type: "binary", property: "occupancy", access: 1 }] }
+  }])));
+  return store;
+};
+
+test("aynı değer yeniden bildirilince kanalın süresi sıfırlanmaz", async () => {
+  const store = sinceStore();
+  store.ingest("Koridor Sensor", Buffer.from('{"occupancy":true}'));
+  const first = store.stateSince("0x1111111111111111", "occupancy");
+  assert.ok(first instanceof Date);
+  // Cihazlar aynı durumu periyodik olarak yeniden bildirir; "1 dakikadır hareket var"
+  // ancak bu tekrarlar süreyi sıfırlamazsa çalışır.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  store.ingest("Koridor Sensor", Buffer.from('{"occupancy":true}'));
+  store.ingest("Koridor Sensor", Buffer.from('{"occupancy":true,"linkquality":90}'));
+  assert.equal(store.stateSince("0x1111111111111111", "occupancy")?.getTime(), first.getTime());
+});
+
+test("kanal değeri değişince süre tazelenir", async () => {
+  const store = sinceStore();
+  store.ingest("Koridor Sensor", Buffer.from('{"occupancy":true}'));
+  const first = store.stateSince("0x1111111111111111", "occupancy");
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  store.ingest("Koridor Sensor", Buffer.from('{"occupancy":false}'));
+  const second = store.stateSince("0x1111111111111111", "occupancy");
+  assert.ok(first && second && second.getTime() > first.getTime());
+});
+
+test("olay akışına girmeyen özellikler için de süre tutulur", () => {
+  const store = sinceStore();
+  // `temperature` olay üretmez (interesting listesinde yok) ama süre koşulu okuyabilmeli:
+  // "sıcaklık 5 dakikadır 25'in üstündeyse".
+  store.ingest("Koridor Sensor", Buffer.from('{"temperature":26.5,"illuminance":400}'));
+  assert.ok(store.stateSince("0x1111111111111111", "temperature") instanceof Date);
+  assert.ok(store.stateSince("0x1111111111111111", "illuminance") instanceof Date);
+  assert.equal(
+    store.getEvents().some((event) => event.property === "temperature"),
+    false
+  );
+});
+
+test("bilinmeyen kanalın süresi null döner", () => {
+  const store = sinceStore();
+  store.ingest("Koridor Sensor", Buffer.from('{"occupancy":true}'));
+  assert.equal(store.stateSince("0x1111111111111111", "humidity"), null);
+  assert.equal(store.stateSince("0x2222222222222222", "occupancy"), null);
+});
+
+test("cihaz silinince değişim defteri kayıtları temizlenir", () => {
+  const store = sinceStore();
+  store.ingest("Koridor Sensor", Buffer.from('{"occupancy":true}'));
+  assert.ok(store.stateSince("0x1111111111111111", "occupancy") instanceof Date);
+  // Cihaz listesinden düşen cihazın defteri de düşer; aynı ad geri gelirse süre sıfırdan sayılır.
+  store.ingest("bridge/devices", Buffer.from("[]"));
+  assert.equal(store.stateSince("0x1111111111111111", "occupancy"), null);
+});
+
+test("değişim defteri üst sınırı aşılınca en eski kayıt düşer", () => {
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: "0x3333333333333333",
+    friendly_name: "Cok Kanalli",
+    definition: { exposes: [] }
+  }])));
+  store.ingest("Cok Kanalli", Buffer.from('{"first_channel":1}'));
+  assert.ok(store.stateSince("0x3333333333333333", "first_channel") instanceof Date);
+  // 5000 kayıt tavanı: taşma anında en eski anahtar atılır, yenisi durur.
+  const payload: Record<string, number> = {};
+  for (let index = 0; index < 5_000; index += 1) payload[`p${index}`] = index;
+  store.ingest("Cok Kanalli", Buffer.from(JSON.stringify(payload)));
+  assert.equal(store.stateSince("0x3333333333333333", "first_channel"), null);
+  assert.ok(store.stateSince("0x3333333333333333", "p4999") instanceof Date);
+});

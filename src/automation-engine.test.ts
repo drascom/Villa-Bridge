@@ -10,10 +10,17 @@ import {
 } from "./automation-engine.js";
 import type { AutomationRunRecord } from "./automation-runs.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
-import type { AutomationCondition } from "./automations.js";
+import type { AutomationCondition, AutomationTimePoint } from "./automations.js";
 import type { HomeLocation } from "./location.js";
-import { sunTimes } from "./sun.js";
+import { sunTimes, type SunTimes } from "./sun.js";
 import type { JsonObject, JsonScalar } from "./types.js";
+
+/** §2.3 — aralık uçları artık nesne; sabit saatli testler bu kısayolla okunur kalır. */
+const clockPoint = (at: string): AutomationTimePoint => ({ kind: "clock", at });
+const sunPoint = (
+  event: "sunrise" | "sunset",
+  offsetMinutes = 0
+): AutomationTimePoint => ({ kind: "sun", event, offsetMinutes });
 
 const lampId = "0x00124b0011cc22dd";
 /** Kullanıcının TS0043 sahne anahtarı — üç buton, tek IEEE adresi. */
@@ -875,6 +882,76 @@ test("güneş tetikleyicisi hesaplanan yerel dakikada çalışır", async (conte
   assert.equal(source.calls.length, 1);
 });
 
+/** §9.1 — gün doğumu ve gün batımı tek kuralda: iki tetikleyici, `when` taşıyan iki eylem. */
+const sunMapRule = (): Record<string, unknown> => automation({
+  id: "gun-dongusu",
+  name: "Gün döngüsü",
+  triggers: [
+    { type: "sun", event: "sunset", offsetMinutes: 0 },
+    { type: "sun", event: "sunrise", offsetMinutes: 0 }
+  ],
+  actions: [
+    { type: "device", deviceId: lampId, property: "state", value: "ON", when: { equals: "sunset" } },
+    { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "sunrise" } }
+  ]
+});
+
+test("güneş tetikleyicisi eylemlere olay adını eşleştirir", async (context) => {
+  const sunset = sunMoment(istanbul, 2026, 6, 21, "sunset", 0);
+  const { engine, source, runs, setClock } = await harness(context, [sunMapRule()], {
+    location: istanbul,
+    start: sunset.toISOString()
+  });
+
+  // Gün batımı: yalnız "sunset" taşıyan eylem çalışır.
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state: "ON" } }]);
+  assert.equal(runs.at(-1)?.trigger?.kind, "sun");
+  assert.equal(runs.at(-1)?.trigger?.value, "sunset");
+
+  // Ertesi sabah gün doğumu: bu kez yalnız "sunrise" taşıyan eylem çalışır.
+  const sunrise = sunMoment(istanbul, 2026, 6, 22, "sunrise", 0);
+  setClock(sunrise.toISOString());
+  await engine.tick();
+  assert.deepEqual(source.calls, [
+    { id: lampId, command: { state: "ON" } },
+    { id: lampId, command: { state: "OFF" } }
+  ]);
+  assert.equal(runs.at(-1)?.trigger?.value, "sunrise");
+});
+
+test("güneş kuralında hiçbir eylem eşleşmezse çalıştırma başarısız sayılmaz", async (context) => {
+  const sunset = sunMoment(istanbul, 2026, 6, 21, "sunset", 0);
+  const { engine, source, store, runs } = await harness(context, [automation({
+    id: "gun-dongusu",
+    triggers: [{ type: "sun", event: "sunset", offsetMinutes: 0 }],
+    actions: [
+      { type: "device", deviceId: lampId, property: "state", value: "OFF", when: { equals: "sunrise" } }
+    ]
+  })], { location: istanbul, start: sunset.toISOString() });
+
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+  assert.equal(runs.at(-1)?.outcome, "skipped");
+  // Atlama hata değildir: `lastRunAt`/`lastRunOk` dokunulmadan kalır.
+  const saved = await store.get();
+  assert.equal(saved[0]?.lastRunAt, null);
+  assert.equal(saved[0]?.lastRunOk, null);
+});
+
+test("güneş kuralı elle çalıştırılınca when taşıyan eylemler atlanır", async (context) => {
+  const sunset = sunMoment(istanbul, 2026, 6, 21, "sunset", 0);
+  const { engine, source, store } = await harness(context, [sunMapRule()], {
+    location: istanbul,
+    start: new Date(sunset.getTime() - 60 * 60_000).toISOString()
+  });
+
+  // Elle çalıştırmada olay değeri yoktur; iki eylem de eşleşmez.
+  assert.equal(await engine.run("gun-dongusu"), "skipped");
+  assert.equal(source.calls.length, 0);
+  assert.equal((await store.get())[0]?.lastRunAt, null);
+});
+
 test("konum yoksa güneş kuralı çalışmaz ve sebebi günde bir kez günlüğe düşer", async (context) => {
   const target = sunMoment(istanbul, 2026, 6, 21, "sunset", 0);
   const { engine, source, runs, notes, setClock } = await harness(context, [sunRule(0)], {
@@ -913,6 +990,38 @@ test("kutup gününde kural atlanır ve günlüğe yazılır", async (context) =
   assert.equal(engine.sunSummary().sunset, null);
 });
 
+test("güneş uçlu koşul taşıyan kural konum yoksa pasif sebebini bildirir", async (context) => {
+  const dark = {
+    type: "timeRange",
+    from: { kind: "sun", event: "sunset", offsetMinutes: 0 },
+    to: { kind: "sun", event: "sunrise", offsetMinutes: 0 }
+  };
+  const { engine, source, runs, setLocation } = await harness(context, [
+    automation({ id: "karanlikta-salon", conditions: [dark] }),
+    automation({ id: "saatli-salon", conditions: [{ type: "timeRange", from: "18:00", to: "23:00" }] })
+  ]);
+  const [sunRuled, clockRuled] = await engine["options"].store.get();
+  assert.ok(sunRuled && clockRuled);
+
+  const reason = engine.inactiveReason(sunRuled);
+  assert.equal(reason?.code, "locationMissing");
+  assert.match(reason?.message ?? "", /saat aralığı/);
+  // Sabit saatli koşul güneşe bakmaz: o kural pasif sayılmaz.
+  assert.equal(engine.inactiveReason(clockRuled), null);
+
+  // Konum yokken kural gerçekten de durur; sabit saatli kardeşi çalışmaya devam eder.
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+  const blocked = runs.filter((run) => run.automationId === "karanlikta-salon");
+  assert.equal(blocked[0]?.outcome, "blocked");
+  assert.equal(blocked[0]?.reason, "conditionFalse");
+  assert.match(blocked[0]?.detail ?? "", /konumu ayarlı değil/);
+
+  // Konum girilince pasiflik kalkar.
+  setLocation(istanbul);
+  assert.equal(engine.inactiveReason(sunRuled), null);
+});
+
 test("güneş anı yerel saate çevrilir ve kaydırma uygulanır", () => {
   const times = sunTimes(new Date(2026, 5, 21, 12, 0, 0), istanbul.latitude, istanbul.longitude);
   const withoutOffset = automationSunTime(
@@ -938,7 +1047,7 @@ test("güneş anı yerel saate çevrilir ve kaydırma uygulanır", () => {
 });
 
 test("gece yarısını aşan saat aralığı doğru değerlendirilir", () => {
-  const range = { type: "timeRange", from: "22:00", to: "06:00" } as const;
+  const range = { type: "timeRange", from: clockPoint("22:00"), to: clockPoint("06:00") } as const;
   const at = (hour: number, minute = 0, day = 3): Date => new Date(2026, 7, day, hour, minute);
   const check = (date: Date): boolean =>
     evaluateAutomationConditions([range], date, () => undefined).ok;
@@ -952,7 +1061,7 @@ test("gece yarısını aşan saat aralığı doğru değerlendirilir", () => {
   assert.equal(check(at(21, 59)), false);
 
   // Normal (aynı gün içi) aralık da bozulmadı.
-  const day = { type: "timeRange", from: "08:00", to: "20:00" } as const;
+  const day = { type: "timeRange", from: clockPoint("08:00"), to: clockPoint("20:00") } as const;
   assert.equal(evaluateAutomationConditions([day], at(12), () => undefined).ok, true);
   assert.equal(evaluateAutomationConditions([day], at(21), () => undefined).ok, false);
   assert.equal(evaluateAutomationConditions([day], at(7), () => undefined).ok, false);
@@ -962,8 +1071,8 @@ test("gece yarısını aşan aralıkta gün ölçütü aralığın başladığı
   // 2026-08-07 Cuma. "Cuma gecesi" = cuma 22:00 → cumartesi 06:00.
   const fridayNight: AutomationCondition = {
     type: "timeRange",
-    from: "22:00",
-    to: "06:00",
+    from: clockPoint("22:00"),
+    to: clockPoint("06:00"),
     days: [5]
   };
   const check = (date: Date): boolean =>
@@ -974,6 +1083,110 @@ test("gece yarısını aşan aralıkta gün ölçütü aralığın başladığı
   // Cumartesi gecesi (yani pazar sabahı) kapsam dışı.
   assert.equal(check(new Date(2026, 7, 8, 23, 0)), false);
   assert.equal(check(new Date(2026, 7, 9, 2, 0)), false);
+});
+
+/** Sahte güneş saatleri — konum ve gerçek hesap olmadan uçlar sabitlenir (doğuş 06:12, batış 19:44). */
+const fakeSun = (): SunTimes => ({
+  sunrise: new Date(2026, 7, 3, 6, 12),
+  sunset: new Date(2026, 7, 3, 19, 44)
+});
+
+test("batıştan doğuşa aralık gece geçer, öğlen geçmez", () => {
+  const dark: AutomationCondition = {
+    type: "timeRange",
+    from: sunPoint("sunset"),
+    to: sunPoint("sunrise")
+  };
+  const times = fakeSun();
+  const check = (hour: number, minute = 0): boolean =>
+    evaluateAutomationConditions([dark], new Date(2026, 7, 3, hour, minute), () => undefined, { times }).ok;
+
+  assert.equal(check(23), true);
+  assert.equal(check(2), true);
+  assert.equal(check(19, 44), true);
+  assert.equal(check(19, 43), false);
+  assert.equal(check(6, 11), true);
+  // Bitiş ucu hariç: doğuşta karanlık biter.
+  assert.equal(check(6, 12), false);
+  assert.equal(check(12), false);
+});
+
+test("güneş ucunun dakika kaydırması aralığın sınırını taşır", () => {
+  const times = fakeSun();
+  const early: AutomationCondition = {
+    type: "timeRange",
+    from: sunPoint("sunset", -15),
+    to: sunPoint("sunrise", 30)
+  };
+  const check = (hour: number, minute = 0): boolean =>
+    evaluateAutomationConditions([early], new Date(2026, 7, 3, hour, minute), () => undefined, { times }).ok;
+
+  // Batıştan 15 dk önce (19:29) başlar, doğuştan 30 dk sonra (06:42) biter.
+  assert.equal(check(19, 29), true);
+  assert.equal(check(19, 28), false);
+  assert.equal(check(6, 41), true);
+  assert.equal(check(6, 42), false);
+});
+
+test("karışık uçlu aralık: gün batımından 23:00'a", () => {
+  const times = fakeSun();
+  const evening: AutomationCondition = {
+    type: "timeRange",
+    from: sunPoint("sunset"),
+    to: clockPoint("23:00")
+  };
+  const check = (hour: number, minute = 0): boolean =>
+    evaluateAutomationConditions([evening], new Date(2026, 7, 3, hour, minute), () => undefined, { times }).ok;
+
+  assert.equal(check(20), true);
+  assert.equal(check(19, 44), true);
+  assert.equal(check(19, 43), false);
+  assert.equal(check(22, 59), true);
+  assert.equal(check(23), false);
+  assert.equal(check(2), false);
+});
+
+test("güneş uçlu aralıkta gün ölçütü aralığın başladığı güne bakar", () => {
+  const times = fakeSun();
+  // 2026-08-07 Cuma. Cuma gecesi = cuma batışı → cumartesi doğuşu.
+  const fridayNight: AutomationCondition = {
+    type: "timeRange",
+    from: sunPoint("sunset"),
+    to: sunPoint("sunrise"),
+    days: [5]
+  };
+  const check = (date: Date): boolean =>
+    evaluateAutomationConditions([fridayNight], date, () => undefined, { times }).ok;
+
+  assert.equal(check(new Date(2026, 7, 7, 23, 0)), true);
+  assert.equal(check(new Date(2026, 7, 8, 2, 0)), true);
+  assert.equal(check(new Date(2026, 7, 8, 23, 0)), false);
+  assert.equal(check(new Date(2026, 7, 9, 2, 0)), false);
+});
+
+test("güneş saatleri yoksa güneş uçlu aralık sağlanmaz ve sebebi yazılır", () => {
+  const dark: AutomationCondition = {
+    type: "timeRange",
+    from: sunPoint("sunset"),
+    to: sunPoint("sunrise")
+  };
+  const at = new Date(2026, 7, 3, 23, 0);
+
+  for (const times of [null, { sunrise: null, sunset: null } as SunTimes]) {
+    const result = evaluateAutomationConditions([dark], at, () => undefined, { times });
+    assert.equal(result.ok, false);
+    assert.match(result.results[0]?.reason ?? "", /konumu ayarlı değil/);
+  }
+  // Seçenek hiç verilmezse de aynı sonuç: kapalı tarafa düşülür.
+  assert.equal(evaluateAutomationConditions([dark], at, () => undefined).ok, false);
+
+  // Sabit saatli aralık güneş saatleri olmadan da çalışmaya devam eder.
+  const fixed: AutomationCondition = {
+    type: "timeRange",
+    from: clockPoint("22:00"),
+    to: clockPoint("06:00")
+  };
+  assert.equal(evaluateAutomationConditions([fixed], at, () => undefined).ok, true);
 });
 
 test("sayısal eşik koşulu o anki değere bakar; tam sınır dışarıda kalır", () => {
@@ -1017,7 +1230,7 @@ test("`any` modu tek koşulun tutmasıyla geçer; sonuçlar hepsini taşır", ()
   const at = new Date(2026, 7, 3, 12, 0);
   // Biri tutan, biri tutmayan iki koşul: fark yalnız moddan gelir.
   const conditions: AutomationCondition[] = [
-    { type: "timeRange", from: "08:00", to: "20:00" },
+    { type: "timeRange", from: clockPoint("08:00"), to: clockPoint("20:00") },
     { type: "deviceState", deviceId: lampId, property: "state_l1", equals: "ON" }
   ];
   const read = (): JsonScalar => "OFF";
@@ -1270,4 +1483,113 @@ test("çalışma günlüğü başarıyı, tetikleyeni ve hatayı taşır", async
   assert.equal(failed?.outcome, "failed");
   assert.equal(failed?.trigger?.kind, "manual");
   assert.equal(failed?.actions?.[0]?.ok, false);
+});
+
+// §2.1 + §2.5 — "şu kadar süredir böyleyse": değer ölçütünün üstüne binen süre ölçütü.
+test("süre koşulu tam sınırda sağlanır, altında sağlanmaz", () => {
+  const now = new Date(2026, 7, 7, 12, 0, 0);
+  const condition: AutomationCondition = {
+    type: "deviceState",
+    deviceId: "0x00124b0022ab34cd",
+    property: "occupancy",
+    equals: true,
+    forSeconds: 60
+  };
+  // `since` ne kadar geride olursa geçen süre o kadar uzundur.
+  const check = (agoSeconds: number) => evaluateAutomationConditions(
+    [condition],
+    now,
+    () => true,
+    { stateSince: () => new Date(now.getTime() - agoSeconds * 1_000) }
+  );
+
+  assert.equal(check(59).ok, false);
+  assert.equal(check(60).ok, true);
+  assert.equal(check(61).ok, true);
+  assert.equal(check(600).ok, true);
+  // Sağlanmayan tur sebebini açıkça söyler: kaç saniye geçti, kaç gerekiyor.
+  assert.match(check(40).results[0]?.reason ?? "", /40 saniyedir bu durumda, 60 saniye gerekiyor/);
+  assert.equal(check(60).results[0]?.reason, undefined);
+});
+
+test("süre bilgisi yoksa koşul sağlanmaz ve sebebi yeniden başlatmayı söyler", () => {
+  const now = new Date(2026, 7, 7, 12, 0, 0);
+  const condition: AutomationCondition = {
+    type: "deviceState",
+    deviceId: "0x00124b0022ab34cd",
+    property: "occupancy",
+    equals: true,
+    forSeconds: 60
+  };
+  // §2.5 — defter bellektedir; yeniden başlatmadan sonra kayıt yoktur. Kapalı tarafa düşülür.
+  const missing = evaluateAutomationConditions([condition], now, () => true, { stateSince: () => null });
+  assert.equal(missing.ok, false);
+  assert.match(missing.results[0]?.reason ?? "", /yeniden başlatmadan beri kayıt yok/);
+  // `stateSince` hiç bağlanmamışsa da aynı: sessiz `true` olmaz.
+  const unwired = evaluateAutomationConditions([condition], now, () => true);
+  assert.equal(unwired.ok, false);
+  assert.match(unwired.results[0]?.reason ?? "", /60 saniye gerekiyor/);
+});
+
+test("değer ölçütü tutmuyorsa süreye bakılmadan sağlanmaz", () => {
+  const now = new Date(2026, 7, 7, 12, 0, 0);
+  let asked = false;
+  const result = evaluateAutomationConditions(
+    [{
+      type: "deviceState",
+      deviceId: "0x00124b0022ab34cd",
+      property: "occupancy",
+      equals: true,
+      forSeconds: 60
+    }],
+    now,
+    () => false,
+    {
+      stateSince: () => {
+        asked = true;
+        return new Date(2026, 7, 1);
+      }
+    }
+  );
+  assert.equal(result.ok, false);
+  // Sebep değer ölçütünü anlatır, süreyi değil — defter hiç okunmaz.
+  assert.match(result.results[0]?.reason ?? "", /değeri false/);
+  assert.equal(asked, false);
+});
+
+test("süre ölçütü sayısal eşiğin üstüne biner", () => {
+  const now = new Date(2026, 7, 7, 12, 0, 0);
+  const condition: AutomationCondition = {
+    type: "deviceState",
+    deviceId: "0x00124b0022ab34cd",
+    property: "temperature",
+    above: 25,
+    forSeconds: 300
+  };
+  const check = (value: number, agoSeconds: number) => evaluateAutomationConditions(
+    [condition],
+    now,
+    () => value,
+    { stateSince: () => new Date(now.getTime() - agoSeconds * 1_000) }
+  );
+
+  assert.equal(check(26, 300).ok, true);
+  assert.equal(check(26, 299).ok, false);
+  // Eşik tutmuyorsa süre uzun olsa da sağlanmaz.
+  assert.equal(check(24, 3_600).ok, false);
+  assert.match(check(24, 3_600).results[0]?.reason ?? "", /25 üstünde değil/);
+});
+
+test("süre alanı olmayan koşullar defterden etkilenmez", () => {
+  const now = new Date(2026, 7, 7, 12, 0, 0);
+  // Geriye uyumluluk: `forSeconds` yoksa `stateSince` hiç okunmaz, sonuç eskisiyle birebir aynı.
+  let asked = false;
+  const result = evaluateAutomationConditions(
+    [{ type: "deviceState", deviceId: "0x00124b0022ab34cd", property: "occupancy", equals: true }],
+    now,
+    () => true,
+    { stateSince: () => { asked = true; return null; } }
+  );
+  assert.equal(result.ok, true);
+  assert.equal(asked, false);
 });

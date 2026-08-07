@@ -75,15 +75,27 @@ export const isAutomationScheduleTrigger = (
   trigger.type === "time" || trigger.type === "sun";
 
 /**
- * §5.3 — koşullar yalnızca **VE** ile değerlendirilir; VEYA bilinçli olarak yok.
- * `timeRange` gece yarısını aşabilir (22:00→06:00): `from > to` ise aralık ertesi güne taşar.
+ * §2.3 — zaman aralığının bir ucu: ya sabit saat ya güneşe göreli bir an. "Hava karanlıkken"
+ * ayrı bir tür değil, bu ucun bir ön ayarıdır (batış→doğuş).
+ *
+ * Doğrulama girdide eski `"19:00"` dizesini de kabul eder ama **her zaman nesne yazar**: eski
+ * dosyalar dokunulmadan geçerli kalır, ilk kaydetmede kendiliğinden yükselir.
+ */
+export type AutomationTimePoint =
+  | { kind: "clock"; at: string }
+  | { kind: "sun"; event: "sunrise" | "sunset"; offsetMinutes: number };
+
+/**
+ * §5.3 — koşullar varsayılan olarak **VE** ile değerlendirilir (§2.4 ile `any` de mümkün).
+ * `timeRange` gece yarısını aşabilir (22:00→06:00): uçlar gün içi dakikaya çözülür ve
+ * başlangıç bitişten büyükse aralık ertesi güne taşar.
  */
 export interface AutomationTimeRangeCondition {
   type: "timeRange";
-  /** Yerel saat, "HH:MM" — dahil. */
-  from: string;
-  /** Yerel saat, "HH:MM" — hariç. */
-  to: string;
+  /** Aralığın başlangıcı — dahil. */
+  from: AutomationTimePoint;
+  /** Aralığın bitişi — hariç. */
+  to: AutomationTimePoint;
   /**
    * 1 = Pazartesi … 7 = Pazar. Verilmezse her gün. Gece yarısını aşan aralıkta gün ölçütü
    * aralığın **başladığı** güne bakar: 22:00→06:00 + Cuma = "cuma gecesi".
@@ -111,6 +123,12 @@ export interface AutomationDeviceStateCondition {
   above?: number;
   /** Değer şu an bunun altındaysa koşul sağlanır. */
   below?: number;
+  /**
+   * §2.1 — değer ölçütünün **kesintisiz** sağlanması gereken süre (saniye, 1..86400).
+   * Değer ölçütünün üstüne biner, yerine geçmez: "hareket 1 dakikadır var" =
+   * `equals: true` + `forSeconds: 60`. Alan yoksa davranış eskisiyle birebir aynıdır.
+   */
+  forSeconds?: number;
 }
 
 export type AutomationCondition =
@@ -237,6 +255,12 @@ export const maxAutomationDelaySeconds = 300;
 export const maxAutomationAutoOffSeconds = 86_400;
 /** Bekleyen kapatma sayısı; durum dosyası şişmesin. */
 export const maxAutomationAutoOffEntries = 128;
+/**
+ * §2.1 — koşulun "şu kadar süredir böyleyse" tavanı. "Sonra kapat" ile aynı tavan (bir gün),
+ * ama ayrı sabit: ikisi farklı kavramdır (biri koşul ölçütü, biri eylem sonucu) ve biri
+ * değişince öbürü peşinden sürüklenmemelidir.
+ */
+export const maxAutomationConditionForSeconds = 86_400;
 
 /** §8.1 — otomasyonu onaylayacak insan yok; bu kontroller eylem olamaz. */
 export const forbiddenAutomationControlKinds: ReadonlySet<string> = new Set(["lock", "siren"]);
@@ -276,6 +300,66 @@ const thresholdNumber = (value: unknown, message: string): number | undefined =>
   if (typeof numeric !== "number" || !Number.isFinite(numeric)) throw new Error(message);
   return numeric;
 };
+
+/**
+ * Güneş kaydırması — tetikleyici ve `timeRange` ucu aynı sınırı paylaşır: tam sayı dakika,
+ * `maxAutomationSunOffsetMinutes` içinde. Verilmezse 0.
+ */
+const sunOffsetMinutes = (value: unknown, message: string): number => {
+  const offsetMinutes = value === undefined || value === null
+    ? 0
+    : (typeof value === "string" ? Number(value.trim()) : value);
+  if (
+    typeof offsetMinutes !== "number"
+    || !Number.isInteger(offsetMinutes)
+    || Math.abs(offsetMinutes) > maxAutomationSunOffsetMinutes
+  ) {
+    throw new Error(message);
+  }
+  return offsetMinutes;
+};
+
+/**
+ * §2.3 — aralık ucu. Girdide üç biçim kabul edilir (eski `"HH:MM"` dizesi, `{kind:"clock"}`,
+ * `{kind:"sun"}`), çıktıda tek biçim yazılır. `kind` yoksa alanlardan çıkarılır: canlı sunucudaki
+ * eski kurallar bozulmadan yükselsin diye giriş bilinçli olarak geniş, çıkış dar tutuldu.
+ */
+const validateTimePoint = (value: unknown): AutomationTimePoint => {
+  const clock = (raw: unknown): AutomationTimePoint => {
+    const at = typeof raw === "string" ? raw.trim() : "";
+    if (!timePattern.test(at)) throw new Error("Otomasyon koşulu saat aralığı geçersiz.");
+    return { kind: "clock", at };
+  };
+  if (typeof value === "string") return clock(value);
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Otomasyon koşulu saat aralığı geçersiz.");
+  }
+  const candidate = value as Record<string, unknown>;
+  const kind = candidate.kind ?? (candidate.event !== undefined ? "sun" : "clock");
+  if (kind === "clock") return clock(candidate.at);
+  if (kind !== "sun") throw new Error("Otomasyon koşulu saat aralığı geçersiz.");
+  if (candidate.event !== "sunrise" && candidate.event !== "sunset") {
+    throw new Error("Otomasyon koşulu güneş olayı geçersiz.");
+  }
+  return {
+    kind: "sun",
+    event: candidate.event,
+    offsetMinutes: sunOffsetMinutes(
+      candidate.offsetMinutes,
+      "Otomasyon koşulu güneş kaydırması geçersiz."
+    )
+  };
+};
+
+/**
+ * İki uç aynı anı mı gösteriyor? Aynı saat ya da aynı güneş olayı + aynı kaydırma "hiç mi hep mi"
+ * belirsizliğidir. Karışık uçlarda (saat ↔ güneş) çakışma günden güne değişir, kontrol edilmez.
+ */
+const sameTimePoint = (from: AutomationTimePoint, to: AutomationTimePoint): boolean =>
+  from.kind === "clock" && to.kind === "clock"
+    ? from.at === to.at
+    : from.kind === "sun" && to.kind === "sun"
+      && from.event === to.event && from.offsetMinutes === to.offsetMinutes;
 
 /** 1 = Pazartesi … 7 = Pazar; yinelenenler ayıklanır, sıralanır. */
 const validateDays = (value: unknown, label: string): number[] => {
@@ -340,17 +424,10 @@ const validateTriggers = (value: unknown): AutomationTrigger[] => {
       if (candidate.event !== "sunrise" && candidate.event !== "sunset") {
         throw new Error("Otomasyon güneş olayı geçersiz.");
       }
-      const raw = candidate.offsetMinutes;
-      const offsetMinutes = raw === undefined || raw === null
-        ? 0
-        : (typeof raw === "string" ? Number(raw.trim()) : raw);
-      if (
-        typeof offsetMinutes !== "number"
-        || !Number.isInteger(offsetMinutes)
-        || Math.abs(offsetMinutes) > maxAutomationSunOffsetMinutes
-      ) {
-        throw new Error("Otomasyon güneş kaydırması geçersiz.");
-      }
+      const offsetMinutes = sunOffsetMinutes(
+        candidate.offsetMinutes,
+        "Otomasyon güneş kaydırması geçersiz."
+      );
       // Gün listesi opsiyoneldir; sihirbaz vermezse her gün.
       const days = candidate.days === undefined || candidate.days === null
         ? [1, 2, 3, 4, 5, 6, 7]
@@ -382,6 +459,23 @@ const validateConditionMode = (value: unknown): "any" | undefined => {
   throw new Error("Otomasyon koşul bağlama biçimi geçersiz.");
 };
 
+/**
+ * §2.1 — "şu kadar süredir böyleyse". Yokluk eski davranıştır ve **hiç yazılmaz**. Sıfır ve
+ * ondalık reddedilir: yarım saniyelik bir ölçüt cihaz raporlama aralığının altında kalır.
+ */
+const validateConditionForSeconds = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (
+    typeof value !== "number"
+    || !Number.isInteger(value)
+    || value < 1
+    || value > maxAutomationConditionForSeconds
+  ) {
+    throw new Error("Otomasyon koşulu süresi geçersiz.");
+  }
+  return value;
+};
+
 /** §5.3 — koşullar varsayılan olarak VE ile değerlendirilir; bilinmeyen tür reddedilir. */
 const validateConditions = (value: unknown): AutomationCondition[] => {
   if (!Array.isArray(value) || value.length > maxAutomationConditions) {
@@ -393,13 +487,12 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
     }
     const candidate = entry as Record<string, unknown>;
     if (candidate.type === "timeRange") {
-      const from = typeof candidate.from === "string" ? candidate.from.trim() : "";
-      const to = typeof candidate.to === "string" ? candidate.to.trim() : "";
-      if (!timePattern.test(from) || !timePattern.test(to)) {
-        throw new Error("Otomasyon koşulu saat aralığı geçersiz.");
+      const from = validateTimePoint(candidate.from);
+      const to = validateTimePoint(candidate.to);
+      // Aynı anı gösteren iki uç "hiç" mi "hep" mi belirsizdir; kullanıcı hatasıdır.
+      if (sameTimePoint(from, to)) {
+        throw new Error("Otomasyon koşulu saat aralığı başlangıç ve bitişi aynı olamaz.");
       }
-      // Aynı iki saat "hiç" mi "hep" mi belirsizdir; kullanıcı hatasıdır.
-      if (from === to) throw new Error("Otomasyon koşulu saat aralığı başlangıç ve bitişi aynı olamaz.");
       const condition: AutomationTimeRangeCondition = { type: "timeRange", from, to };
       if (candidate.days !== undefined && candidate.days !== null) {
         condition.days = validateDays(candidate.days, "Otomasyon koşulu günleri geçersiz.");
@@ -428,6 +521,8 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
         "Otomasyon koşulunda `equals`, `not` ya da sayısal eşik alanlarından tam biri olmalıdır."
       );
     }
+    // §2.1 — süre ölçütü üç değer ölçütünün de üstüne binebilir, o yüzden dallardan önce okunur.
+    const forSeconds = validateConditionForSeconds(candidate.forSeconds);
     if (hasThreshold) {
       // İkisi birden verilmişse ölçüt "aralıkta"dır; ters aralık hiçbir zaman sağlanmaz.
       if (above !== undefined && below !== undefined && above >= below) {
@@ -436,13 +531,16 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
       const condition: AutomationDeviceStateCondition = { type: "deviceState", deviceId, property };
       if (above !== undefined) condition.above = above;
       if (below !== undefined) condition.below = below;
+      if (forSeconds !== undefined) condition.forSeconds = forSeconds;
       return condition;
     }
     const raw = hasEquals ? candidate.equals : candidate.not;
     if (!isJsonScalar(raw)) throw new Error("Otomasyon koşulu değeri geçersiz.");
-    return hasEquals
-      ? { type: "deviceState", deviceId, property, equals: raw } satisfies AutomationDeviceStateCondition
-      : { type: "deviceState", deviceId, property, not: raw } satisfies AutomationDeviceStateCondition;
+    const condition: AutomationDeviceStateCondition = hasEquals
+      ? { type: "deviceState", deviceId, property, equals: raw }
+      : { type: "deviceState", deviceId, property, not: raw };
+    if (forSeconds !== undefined) condition.forSeconds = forSeconds;
+    return condition;
   });
 };
 
