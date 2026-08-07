@@ -9,7 +9,7 @@ import { AutomationRunLog } from "./automation-runs.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
-import { hexToXy, soleSwitchChannelId } from "./device-controls.js";
+import { normalizeControlValue, soleSwitchChannelId } from "./device-controls.js";
 import { DeviceImageCache } from "./device-image-cache.js";
 import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
@@ -246,6 +246,8 @@ const automationEngine = new AutomationEngine({
   },
   // §4.1 — "şu kadar süredir böyleyse" koşulunun okuduğu değişim defteri.
   stateSince: (deviceId, property) => store.stateSince(deviceId, property),
+  // Eylem değeri panelin geçtiği normalizasyondan geçsin diye aynı kumanda arayıcısı.
+  controls: (deviceId) => store.getDevice(deviceId),
   runLog: automationRunLog
 });
 const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
@@ -1027,31 +1029,16 @@ app.post<{
   if (control.adminOnly && request.villaSession?.role !== "admin") {
     return reply.code(403).send({ ok: false, error: "Bu cihaz ayarı için yönetici yetkisi gerekiyor." });
   }
-  let value: unknown = request.body?.value;
-  if (["switch", "fan", "siren"].includes(control.kind)) {
-    if (typeof value !== "boolean") return reply.code(400).send({ ok: false, error: "Aç/kapat değeri geçersiz." });
-    value = value ? control.valueOn ?? "ON" : control.valueOff ?? "OFF";
-  } else if (control.kind === "color") {
-    if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value)) {
-      return reply.code(400).send({ ok: false, error: "Renk değeri geçersiz." });
-    }
-    value = hexToXy(value);
-  } else if (["cover", "lock", "select"].includes(control.kind)) {
-    if (
-      (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
-      || (control.values?.length && !control.values.includes(value))
-    ) {
-      return reply.code(400).send({ ok: false, error: "Seçilen cihaz komutu geçersiz." });
-    }
-  } else {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return reply.code(400).send({ ok: false, error: "Sayısal denetim değeri geçersiz." });
-    }
-    const clamped = Math.min(control.max ?? value, Math.max(control.min ?? value, value));
-    const step = control.step;
-    value = step && step > 0
-      ? Number((Math.round((clamped - (control.min ?? 0)) / step) * step + (control.min ?? 0)).toFixed(6))
-      : clamped;
+  // Değer dönüşümü/doğrulaması panelle otomasyonun paylaştığı tek fonksiyondadır; burada yalnız
+  // hatanın HTTP karşılığı verilir. Panel aç/kapat değerini `boolean` yollar, otomasyon yollamaz.
+  let value: unknown;
+  try {
+    value = normalizeControlValue(control, request.body?.value, { booleanSwitch: true });
+  } catch (error) {
+    return reply.code(400).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
   try {
     await source.setDevice(id, { [control.property]: value } satisfies JsonObject);

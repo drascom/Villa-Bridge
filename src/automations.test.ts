@@ -1016,3 +1016,59 @@ test("süreli tetikleyicinin cihazı döngü koruması ve cihaz silme tarafında
   })]);
   assert.equal((idle[0]?.actions[0] as AutomationDeviceAction).autoOff?.mode, "idle");
 });
+
+// ————— değer eylemleri kaydetme anında kumandaya göre doğrulanır (renk biçimi, sayısal aralık).
+const valueLookup: AutomationDeviceLookup = (deviceId) => deviceId === lampId
+  ? {
+    controls: [
+      control("state_l1", "switch"),
+      { id: "main:brightness", property: "brightness", name: "Parlaklık", kind: "level", value: null, min: 1, max: 254 },
+      { id: "main:color", property: "color", name: "Renk", kind: "color", value: null }
+    ]
+  }
+  : undefined;
+
+const valueAutomation = (property: string, value: unknown, extra: Record<string, unknown> = {}) =>
+  automation({ actions: [{ type: "device", deviceId: lampId, property, value, ...extra }] });
+
+test("eylemin değeri kumandaya uymuyorsa kural kaydedilmez", () => {
+  // Geçerli değerler olduğu gibi kabul edilir: kural ham birimi taşır, panel yüzdeyi gösterir.
+  assert.equal(
+    (validateAutomations([valueAutomation("brightness", 200)], valueLookup)[0]?.actions[0] as AutomationDeviceAction).value,
+    200
+  );
+  assert.equal(
+    (validateAutomations([valueAutomation("color", "#FF0000")], valueLookup)[0]?.actions[0] as AutomationDeviceAction).value,
+    "#FF0000"
+  );
+
+  // Bozuk renk ve aralık dışı sayı reddedilir.
+  assert.throws(() => validateAutomations([valueAutomation("color", "kırmızı")], valueLookup), /renk değeri geçersiz/);
+  assert.throws(() => validateAutomations([valueAutomation("color", 16711680)], valueLookup), /renk değeri geçersiz/);
+  assert.throws(() => validateAutomations([valueAutomation("brightness", 900)], valueLookup), /aralığı dışında/);
+  assert.throws(() => validateAutomations([valueAutomation("brightness", 0)], valueLookup), /aralığı dışında/);
+
+  // "Sonra kapat" değeri de aynı kumandanın aralığındadır.
+  assert.throws(
+    () => validateAutomations(
+      [valueAutomation("brightness", 200, { autoOff: { mode: "after", seconds: 60, value: 900 } })],
+      valueLookup
+    ),
+    /aralığı dışında/
+  );
+  assert.equal(
+    validateAutomations(
+      [valueAutomation("brightness", 200, { autoOff: { mode: "after", seconds: 60, value: 1 } })],
+      valueLookup
+    ).length,
+    1
+  );
+});
+
+test("kumanda arayıcısı yoksa değer doğrulaması atlanır — geriye uyumluluk", () => {
+  // Arayıcı hiç verilmemiş: eski davranış aynen sürer, disk okunamaz hâle gelmez.
+  assert.equal(validateAutomations([valueAutomation("color", "kırmızı")]).length, 1);
+  assert.equal(validateAutomations([valueAutomation("brightness", 900)]).length, 1);
+  // Arayıcı var ama cihazı tanımıyor (henüz keşfedilmemiş): yine engellenmez.
+  assert.equal(validateAutomations([valueAutomation("brightness", 900)], lookup).length, 1);
+});

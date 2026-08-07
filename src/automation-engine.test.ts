@@ -13,7 +13,8 @@ import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import type { AutomationCondition, AutomationTimePoint } from "./automations.js";
 import type { HomeLocation } from "./location.js";
 import { sunTimes, type SunTimes } from "./sun.js";
-import type { JsonObject, JsonScalar } from "./types.js";
+import type { DeviceControlView, JsonObject, JsonScalar } from "./types.js";
+import { hexToXy } from "./device-controls.js";
 
 /** §2.3 — aralık uçları artık nesne; sabit saatli testler bu kısayolla okunur kalır. */
 const clockPoint = (at: string): AutomationTimePoint => ({ kind: "clock", at });
@@ -134,6 +135,8 @@ const harness = async (
     actionTimeoutMs?: number;
     location?: HomeLocation | null;
     start?: string;
+    /** Eylem değerini panelle aynı yoldan geçiren kumanda arayıcısı (§ değer eylemleri). */
+    controls?: (deviceId: string) => { controls: DeviceControlView[] } | undefined;
   } = {}
 ) => {
   const directory = await mkdtemp(join(tmpdir(), "villa-engine-"));
@@ -164,6 +167,7 @@ const harness = async (
     deviceState: (deviceId, property) => states.get(`${deviceId}|${property}`),
     stateSince: (deviceId, property) => sinces.get(`${deviceId}|${property}`) ?? null,
     runLog: { append: (record) => runs.push(record) },
+    ...(engineOptions.controls === undefined ? {} : { controls: engineOptions.controls }),
     ...(engineOptions.actionTimeoutMs === undefined
       ? {}
       : { actionTimeoutMs: engineOptions.actionTimeoutMs })
@@ -1785,4 +1789,82 @@ test("süreli tetikleyici 'hareket bitince kapat' sözünü kurabilir", async (c
   timers.fire();
   await settle();
   assert.deepEqual(source.calls[1], { id: lampId, command: { state_l1: "OFF" } });
+});
+
+// ————— değer eylemleri: motorun yazdığı değer panelin geçtiği normalizasyondan geçer.
+const lampControls: DeviceControlView[] = [
+  { id: "main", property: "state", name: "Salon", kind: "switch", value: null, valueOn: "ON", valueOff: "OFF", valueToggle: "TOGGLE" },
+  { id: "main:brightness", property: "brightness", name: "Parlaklık", kind: "level", value: null, min: 1, max: 254 },
+  { id: "main:color", property: "color", name: "Renk", kind: "color", value: null }
+];
+const lampLookup = (deviceId: string): { controls: DeviceControlView[] } | undefined =>
+  deviceId === lampId ? { controls: lampControls } : undefined;
+
+test("renk eylemi cihaza xy olarak gider, aralık dışı sayı kırpılır", async (context) => {
+  const { engine, source } = await harness(
+    context,
+    [automation({
+      id: "renk-ve-parlaklik",
+      actions: [
+        { type: "device", deviceId: lampId, property: "color", value: "#ff0000" },
+        { type: "device", deviceId: lampId, property: "brightness", value: 900 }
+      ]
+    })],
+    { controls: lampLookup }
+  );
+
+  await engine.tick();
+  assert.deepEqual(source.calls, [
+    { id: lampId, command: { color: hexToXy("#ff0000") } },
+    { id: lampId, command: { brightness: 254 } }
+  ]);
+});
+
+test("kumanda arayıcısı verilmezse değer ham gider — eski davranış korunur", async (context) => {
+  const { engine, source } = await harness(context, [automation({
+    id: "renk-ham",
+    actions: [{ type: "device", deviceId: lampId, property: "color", value: "#ff0000" }]
+  })]);
+
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { color: "#ff0000" } }]);
+});
+
+test("normalize edilemeyen değer motoru durdurmaz, ham yazılır", async (context) => {
+  const { engine, source, store } = await harness(
+    context,
+    [automation({
+      id: "bozuk-renk",
+      // Elle yazılmış eski bir kural: arayıcı geldi diye eylem sessizce düşmemeli.
+      actions: [{ type: "device", deviceId: lampId, property: "color", value: "kırmızı" }]
+    })],
+    { controls: lampLookup }
+  );
+
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { color: "kırmızı" } }]);
+  assert.equal((await store.get())[0]?.lastRunOk, true);
+});
+
+test("sonra kapat değeri de aynı normalizasyondan geçer", async (context) => {
+  const { engine, source, advance } = await harness(
+    context,
+    [automation({
+      id: "parlaklik-sonra-kapat",
+      actions: [{
+        type: "device",
+        deviceId: lampId,
+        property: "brightness",
+        value: 254,
+        autoOff: { mode: "after", seconds: 60, value: 0 }
+      }]
+    })],
+    { controls: lampLookup }
+  );
+
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { brightness: 254 } }]);
+  await advance(60_000);
+  // Kumandanın alt sınırı 1: kuralda yazan 0 cihaza kırpılmış gider.
+  assert.deepEqual(source.calls[1], { id: lampId, command: { brightness: 1 } });
 });

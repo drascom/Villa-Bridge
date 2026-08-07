@@ -2208,15 +2208,17 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   // Tek basış hem açıp hem kapatabilsin: seçenek yalnız cihaz destekliyorsa listelenir.
   assert.match(dashboard, /const automationCanToggle=control=>control\?\.valueToggle!==undefined&&control\?\.valueToggle!==null/);
   assert.match(dashboard, /const toggle=automationCanToggle\(control\)\?choice\("toggle","automationTurnToggle"\):"";/);
-  assert.match(dashboard, /<div class="automation-choices">\$\{choice\("on","automationTurnOn"\)\}\$\{choice\("off","automationTurnOff"\)\}\$\{toggle\}<\/div>/);
+  assert.match(dashboard, /<div class="automation-choices">\$\{choice\("on","automationTurnOn"\)\}\$\{choice\("off","automationTurnOff"\)\}\$\{toggle\}\$\{valueChoices\}<\/div>/);
   // Kaydedilen değer cihazın kendi bildirdiği değer; arayüzde uydurulmuyor.
   assert.match(dashboard, /if\(mode==="toggle"&&!automationCanToggle\(control\)\)return;/);
   assert.match(dashboard, /const value=mode==="toggle"\?control\.valueToggle:automationControlValue\(control,mode==="on"\);/);
   // Özet yine tam şablon anahtarıyla kuruluyor; üçüncü biçim için ayrı anahtar var.
-  assert.match(dashboard, /const automationSentenceKeys=\{on:"automationWillTurnOn",off:"automationWillTurnOff",toggle:"automationWillToggle"\}/);
-  assert.match(dashboard, /const automationCardKeys=\{on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles"\}/);
-  assert.match(dashboard, /const actionKey=automationSentenceKeys\[automationActionMode\(action\)\];/);
-  assert.match(dashboard, /const actionKey=automationCardKeys\[automationActionMode\(action\)\];/);
+  assert.match(dashboard, /const automationSentenceKeys=\{\s*on:"automationWillTurnOn",off:"automationWillTurnOff",toggle:"automationWillToggle",/);
+  assert.match(dashboard, /const automationCardKeys=\{\s*on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles",/);
+  // Değer eylemlerinin cümlesi de aynı sözlükten çıkar; şablon değeri kendi içinde taşır.
+  assert.match(dashboard, /const actionKey=automationActionPhrase\(automationSentenceKeys,action\);/);
+  assert.match(dashboard, /const actionKey=automationActionPhrase\(automationCardKeys,action\);/);
+  assert.match(dashboard, /return t\(keys\[mode\]\|\|keys\.on,\{value:automationValueText\(automationControl\(action\),action\?\.value\)\}\);/);
   // Aynı kelime iki yerde aynı kalır: eylem kartı ve eşleme formu "Değiştir" / "Toggle" der.
   assert.match(dashboard, /automationTurnToggle:"Değiştir"/);
   assert.match(dashboard, /automationTurnToggle:"Toggle"/);
@@ -3206,7 +3208,11 @@ const automationExports = [
   "automationAutoOffPayload", "automationAutoOffLine", "automationAutoOffIdleAvailable",
   "automationConditionLine", "automationTargetLine", "automationTriggerLine", "automationWizardTrigger",
   "automationRunRowHtml", "automationReasonText", "automationOutcomeText", "saveAutomationWizard",
-  "nextAutomationStep"
+  "nextAutomationStep",
+  // Değer eylemleri: parlaklık / ışık sıcaklığı / renk.
+  "chooseAutomationValue", "stepAutomationValue", "setAutomationValueColor",
+  "automationValueControls", "automationValuePercent", "automationValueRaw", "automationValueText",
+  "automationWizardSentence", "automationCardLine"
 ];
 
 // `messages` boş bırakılırsa `t()` anahtarı olduğu gibi döndürür (çoğu test bunu bekler). Gerçek
@@ -3296,6 +3302,8 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
       return { automations: stored() };
     },
     simpleLinks: () => [],
+    // Renk seçici ışık kumandasının hazır renklerini paylaşır; sabitin kendisi dilimin dışında.
+    lightColorPresets: ["#ffcf8e", "#ffffff", "#ff5147", "#ff9b2e", "#ffe14d", "#57d17f", "#3f9dff", "#a06bff"],
     confirm: (message: string) => { confirms.push(String(message)); return confirmAnswer; },
     $: (selector: string) => node(selector),
     $$: () => [],
@@ -6189,4 +6197,258 @@ test("göz kumandanın içine taşındı ve aç/kapa satırı yalnız gözü ta�
   assert.match(dashboard, /\.visibility-toggle\{width:44px;height:44px/);
   // Koyu temada göz zaten tanımlı; panelde ayrı bir tema kuralı gerekmedi.
   assert.match(dashboard, /:root\[data-theme="dark"\] \.visibility-toggle\{border-color:#33413a\}/);
+});
+
+// ————— değer eylemleri: parlaklık, ışık sıcaklığı ve renk. Sihirbaz cihazın SUNDUĞU kumandalara
+// göre çizer; yüzde↔ham dönüşümü kumandanın kendi `min`/`max`/`step` alanından çıkar.
+async function automationValueHarness(messages: Record<string, string> = {}): Promise<WizardHarness> {
+  const dashboard = await readFile(dashboardUrl, "utf8");
+  const sandbox = automationSandbox(
+    dashboard,
+    [
+      {
+        // Kısılabilir, renkli lamba: üç değer kumandası da sunuluyor.
+        id: "0x0011", name: "Salon lambası", buttons: [], features: [], state: {},
+        controls: [
+          { id: "main", property: "state", name: "Salon lambası", kind: "switch", valueOn: "ON", valueOff: "OFF", valueToggle: "TOGGLE" },
+          { id: "main:brightness", property: "brightness", name: "Parlaklık", kind: "level", value: 128, min: 1, max: 254 },
+          { id: "main:temperature", property: "color_temp", name: "Işık sıcaklığı", kind: "temperature", value: 300, min: 153, max: 500 },
+          { id: "main:color", property: "color", name: "Renk", kind: "color", value: "#ffffff" }
+        ]
+      },
+      {
+        // Düz priz: değer kumandası yok, ekranda da hiç çıkmamalı.
+        id: "0x0022", name: "Bahçe prizi", buttons: [], features: [], state: {},
+        controls: [{ id: "main", property: "state", name: "Bahçe prizi", kind: "switch", valueOn: "ON", valueOff: "OFF" }]
+      },
+      { id: "0x0033", name: "Koridor sensörü", buttons: [], features: ["occupancy"], state: { occupancy: false }, controls: [] }
+    ],
+    [],
+    messages
+  );
+  return {
+    ...sandbox,
+    wizard: () => sandbox.state.automationWizard as Record<string, unknown>,
+    body: () => sandbox.bodies[sandbox.bodies.length - 1]
+  };
+}
+
+const openValueAction = (harness: WizardHarness, deviceId: string): void => {
+  harness.api.openAutomationWizard(null);
+  harness.api.chooseAutomationPath("rule");
+  harness.api.chooseAutomationTrigger("sensor");
+  harness.api.chooseAutomationTriggerDevice("0x0033");
+  harness.api.chooseAutomationEvent("occupancy=true");
+  harness.api.chooseAutomationTargetDevice(deviceId);
+};
+
+test("değer seçenekleri yalnız cihazın sunduğu kumandalardan çizilir", async () => {
+  const harness = await automationValueHarness();
+
+  openValueAction(harness, "0x0011");
+  // Aç/kapat varsayılan kalır ve aynı satırda durur; değer seçenekleri onun yanındadır.
+  assert.match(harness.body(), /data-automation-action="0x0011\|main\|on"/);
+  assert.match(harness.body(), /data-automation-action="0x0011\|main\|off"/);
+  assert.match(harness.body(), /data-automation-value="0x0011\|main:brightness"/);
+  assert.match(harness.body(), /data-automation-value="0x0011\|main:temperature"/);
+  assert.match(harness.body(), /data-automation-value="0x0011\|main:color"/);
+  // Seçim yapılmadan sayaç ya da renk seçici açılmaz: akış uzamaz.
+  assert.doesNotMatch(harness.body(), /data-automation-value-step=/);
+  assert.doesNotMatch(harness.body(), /data-automation-value-color=/);
+
+  // Sabit liste yok: değer kumandası bildirmeyen cihazda seçenek hiç görünmez.
+  const plain = await automationValueHarness();
+  openValueAction(plain, "0x0022");
+  assert.match(plain.body(), /data-automation-action="0x0022\|main\|on"/);
+  assert.doesNotMatch(plain.body(), /data-automation-value=/);
+
+  // Yardımcı doğrudan da aynı şeyi söyler: kanal kimliği kardeşleri bağlar.
+  const controls = harness.api.automationValueControls(
+    (harness.state.devices as Record<string, unknown>[])[0],
+    "main"
+  ) as Array<{ id: string }>;
+  assert.deepEqual(controls.map((control) => control.id), ["main:brightness", "main:temperature", "main:color"]);
+  assert.deepEqual(
+    harness.api.automationValueControls((harness.state.devices as Record<string, unknown>[])[1], "main"),
+    []
+  );
+});
+
+test("yüzde↔ham dönüşümü kumandanın kendi aralığından çıkar", async () => {
+  const harness = await automationValueHarness();
+  const { api } = harness;
+  const level = { kind: "level", min: 1, max: 254 };
+  const warmth = { kind: "temperature", min: 153, max: 500 };
+  const percentScale = { kind: "level", min: 0, max: 100 };
+
+  // Sınırlar: %0 alt uç, %100 üst uç. Sabit 0–254 varsayımı yok.
+  assert.equal(api.automationValueRaw(level, 0), 1);
+  assert.equal(api.automationValueRaw(level, 100), 254);
+  assert.equal(api.automationValueRaw(warmth, 0), 153);
+  assert.equal(api.automationValueRaw(warmth, 100), 500);
+  assert.equal(api.automationValueRaw(percentScale, 40), 40);
+
+  // Aralık dışı yüzde kırpılır; ham değer tam sayıya oturur.
+  assert.equal(api.automationValueRaw(level, -20), 1);
+  assert.equal(api.automationValueRaw(level, 240), 254);
+  assert.equal(api.automationValueRaw(level, 50), 128);
+
+  // Geri dönüş: ham değerin yüzdesi kullanıcıya gösterilen sayıdır.
+  assert.equal(api.automationValuePercent(level, 1), 0);
+  assert.equal(api.automationValuePercent(level, 254), 100);
+  assert.equal(api.automationValuePercent(warmth, 500), 100);
+
+  // Adım bildiren kumanda kendi ızgarasına oturur.
+  assert.equal(api.automationValueRaw({ kind: "climate", min: 5, max: 30, step: 0.5 }, 50), 17.5);
+});
+
+test("parlaklık eylemi yüzdeyle ayarlanır, kurala kumandanın ham birimi yazılır", async () => {
+  const harness = await automationValueHarness();
+  const { api } = harness;
+
+  openValueAction(harness, "0x0011");
+  api.chooseAutomationValue("0x0011|main:brightness");
+  // Seçenek açılınca sayaç görünür ve cihazın o anki değerinden başlar (%50).
+  assert.match(harness.body(), /data-automation-value-step="1"/);
+  assert.match(harness.body(), /data-automation-value-step="-1"/);
+  assert.equal(harness.wizard().draftValue, 128);
+
+  // Bir dokunuş onda bir aralık ilerletir.
+  api.stepAutomationValue(1);
+  assert.equal(api.automationValuePercent({ kind: "level", min: 1, max: 254 }, harness.wizard().draftValue), 60);
+  api.stepAutomationValue(-3);
+  assert.equal(harness.wizard().draftValue, 77);
+
+  // Aç/kapat tek dokunuşla biterken değer "İleri" ile kesinleşir.
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), true);
+  await api.nextAutomationStep();
+  assert.deepEqual(harness.wizard().targets, [
+    { deviceId: "0x0011", property: "brightness", controlId: "main:brightness", value: 77 }
+  ]);
+
+  await api.saveAutomationWizard();
+  const saved = harness.saved()[0] as { actions: Record<string, unknown>[] };
+  assert.deepEqual(saved.actions, [
+    { type: "device", deviceId: "0x0011", property: "brightness", controlId: "main:brightness", value: 77 }
+  ]);
+});
+
+test("renk eylemi ışık kumandasının hazır renklerini ve seçicisini yeniden kullanır", async () => {
+  const harness = await automationValueHarness();
+  const { api } = harness;
+
+  openValueAction(harness, "0x0011");
+  api.chooseAutomationValue("0x0011|main:color");
+  // Panelin `.light-presets` / `.color-picker` bileşenlerinin aynısı; yeni seçici yazılmadı.
+  assert.match(harness.body(), /class="light-presets"/);
+  assert.match(harness.body(), /data-automation-value-preset="#3f9dff"/);
+  assert.match(harness.body(), /<input class="color-picker" type="color"/);
+
+  api.setAutomationValueColor("#3f9dff");
+  assert.equal(harness.wizard().draftValue, "#3f9dff");
+  // Geçersiz biçim taslağa hiç girmez; kurala her zaman `#rrggbb` yazılır.
+  api.setAutomationValueColor("mavi");
+  assert.equal(harness.wizard().draftValue, "#3f9dff");
+
+  await api.nextAutomationStep();
+  await api.saveAutomationWizard();
+  const saved = harness.saved()[0] as { actions: Record<string, unknown>[] };
+  assert.deepEqual(saved.actions, [
+    { type: "device", deviceId: "0x0011", property: "color", controlId: "main:color", value: "#3f9dff" }
+  ]);
+});
+
+test("kayıtlı değer eylemi düzenlemeye ayarlayıcısı açık gelir", async () => {
+  const harness = await automationValueHarness();
+  const { api } = harness;
+
+  (harness.state.automations as unknown[]).push({
+    id: "rule-parlaklik",
+    name: "Parlaklık",
+    enabled: true,
+    triggers: [{ type: "deviceState", deviceId: "0x0033", property: "occupancy", equals: true }],
+    conditions: [],
+    actions: [{ type: "device", deviceId: "0x0011", property: "brightness", controlId: "main:brightness", value: 200 }],
+    lastRunAt: null,
+    lastRunOk: null
+  });
+  api.openAutomationWizard("rule-parlaklik");
+  api.editAutomationTarget(0);
+  assert.deepEqual(harness.wizard().draftValueTarget, { deviceId: "0x0011", controlId: "main:brightness" });
+  assert.equal(harness.wizard().draftValue, 200);
+  assert.match(harness.body(), /data-automation-value-step="1"/);
+
+  // Dokunmadan kaydetmek kuralı değiştirmez.
+  await api.nextAutomationStep();
+  await api.saveAutomationWizard();
+  const saved = harness.saved().find((item) => item.id === "rule-parlaklik") as { actions: Record<string, unknown>[] };
+  assert.deepEqual(saved.actions, [
+    { type: "device", deviceId: "0x0011", property: "brightness", controlId: "main:brightness", value: 200 }
+  ]);
+});
+
+test("değer eylemlerinin cümlesi tam şablon anahtarıdır ve tr/en paritesi tam", async () => {
+  const [dashboard, englishSource, turkishSource] = await Promise.all([
+    readFile(dashboardUrl, "utf8"),
+    readFile(englishLocaleUrl, "utf8"),
+    readFile(turkishLocaleUrl, "utf8")
+  ]);
+  const english = JSON.parse(englishSource).translations as Record<string, string>;
+  const turkish = JSON.parse(turkishSource).translations as Record<string, string>;
+
+  const keys = [
+    "automationSetBrightness", "automationSetWarmth", "automationSetColor",
+    "automationValuePercent", "automationValueWarmthText",
+    "automationWarmthCool", "automationWarmthNeutral", "automationWarmthWarm",
+    "automationValueDown", "automationValueUp",
+    "automationValueBrightnessHint", "automationValueWarmthHint", "automationValueColorHint",
+    "automationPillBrightness", "automationPillWarmth", "automationPillColor",
+    "automationWillSetBrightness", "automationWillSetWarmth", "automationWillSetColor",
+    "automationSetsBrightness", "automationSetsWarmth", "automationSetsColor"
+  ];
+  for (const key of keys) {
+    assert.equal(typeof turkish[key], "string", `tr eksik: ${key}`);
+    assert.equal(typeof english[key], "string", `en eksik: ${key}`);
+  }
+  // Cümle parçadan kurulmuyor: değer şablonun içinde durur.
+  for (const key of ["automationWillSetBrightness", "automationSetsBrightness", "automationPillBrightness"]) {
+    assert.match(turkish[key], /\{value\}/);
+    assert.match(english[key], /\{value\}/);
+  }
+  assert.doesNotMatch(dashboard, /color-mix\(/);
+
+  // Gerçek katalogla: özet cümlesi ve kart satırı okunur çıkıyor.
+  const harness = await automationValueHarness(turkish);
+  const { api } = harness;
+  openValueAction(harness, "0x0011");
+  api.chooseAutomationValue("0x0011|main:brightness");
+  api.stepAutomationValue(-1);
+  await api.nextAutomationStep();
+  assert.equal(
+    api.automationTargetLine(harness.wizard(), (harness.wizard().targets as unknown[])[0]),
+    '<strong>Salon lambası</strong> <span class="automation-pill act-level">Parlaklık %40</span>'
+  );
+
+  // Özet ekranındaki cümle ve kural kartındaki satır aynı eylemi okunur anlatır.
+  assert.equal(
+    api.automationWizardSentence(harness.wizard()),
+    "Koridor sensörü hareket algılayınca Salon lambası parlaklığı %40 olacak."
+  );
+  assert.equal(
+    api.automationCardLine(
+      { type: "deviceState", deviceId: "0x0033", property: "occupancy", equals: true },
+      { type: "device", deviceId: "0x0011", property: "color", value: "#3f9dff" }
+    ),
+    "Koridor sensörü hareket algılayınca → Salon lambası rengi #3f9dff olur"
+  );
+
+  // Işık sıcaklığı yüzdeyi sıcak↔soğuk anlamıyla birlikte okur.
+  assert.equal(
+    api.automationValueText({ kind: "temperature", min: 153, max: 500 }, 500),
+    "%100 sıcak"
+  );
+  assert.equal(
+    api.automationValueText({ kind: "temperature", min: 153, max: 500 }, 153),
+    "%0 soğuk"
+  );
 });

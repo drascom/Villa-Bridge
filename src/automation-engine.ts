@@ -11,8 +11,10 @@ import {
   type AutomationSunTrigger,
   type AutomationTimePoint,
   type AutomationTimeTrigger,
+  type AutomationDeviceLookup,
   type AutomationsStore
 } from "./automations.js";
+import { normalizeControlValueOrRaw } from "./device-controls.js";
 import type {
   AutomationRunActionResult,
   AutomationRunConditionResult,
@@ -100,6 +102,12 @@ export interface AutomationEngineOptions {
   stateSince?: (deviceId: string, property: string) => Date | null;
   /** Çalışma günlüğü — "neden çalıştı / neden çalışmadı". */
   runLog?: Pick<AutomationRunLog, "append">;
+  /**
+   * Eylemin yazacağı değeri panelin geçtiği yoldan geçirmek için kumanda arayıcısı: renk
+   * `#rrggbb`'den xy'ye çevrilir, sayısal değer `min`/`max`'a kırpılıp `step`'e yuvarlanır.
+   * Verilmezse değer ham yazılır (eski davranış).
+   */
+  controls?: AutomationDeviceLookup;
 }
 
 const pad = (value: number): string => String(value).padStart(2, "0");
@@ -988,7 +996,9 @@ export class AutomationEngine {
     this.autoOff.delete(key);
     this.persistAutoOff();
     try {
-      await this.setDevice(pending.deviceId, { [pending.property]: pending.value });
+      await this.setDevice(pending.deviceId, {
+        [pending.property]: this.commandValue(pending.deviceId, pending.property, pending.value)
+      });
       this.note(`Otomasyon "${pending.automationName}" hedefi otomatik olarak geri aldı.`);
     } catch (error) {
       this.logger.error(
@@ -1272,7 +1282,9 @@ export class AutomationEngine {
       await this.withTimeout(groupScene(action.groupId, action.sceneId, "recall"));
       return;
     }
-    await this.setDevice(action.deviceId, { [action.property]: action.value });
+    await this.setDevice(action.deviceId, {
+      [action.property]: this.commandValue(action.deviceId, action.property, action.value)
+    });
     // Kapatma sözü ancak komut gerçekten gittiyse kurulur (§9).
     this.armAutoOff(automation, action, event);
   }
@@ -1318,5 +1330,15 @@ export class AutomationEngine {
 
   private async setDevice(deviceId: string, command: JsonObject): Promise<void> {
     await this.withTimeout(this.options.source.setDevice(deviceId, command));
+  }
+
+  /**
+   * Kuralda yazan değeri cihaza yazılacak değere çevirir. Arayıcı yoksa ya da kanal bulunmuyorsa
+   * değer olduğu gibi gider — kural dosyası motorun bilmediği bir kanala yazıyorsa engellemeyiz.
+   */
+  private commandValue(deviceId: string, property: string, value: JsonScalar): unknown {
+    const control = this.options.controls?.(deviceId)?.controls
+      .find((item) => item.property === property);
+    return control ? normalizeControlValueOrRaw(control, value) : value;
   }
 }

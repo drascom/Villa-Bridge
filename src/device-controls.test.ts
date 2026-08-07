@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { deviceControls, hexToXy, isNamedChannelControl, soleSwitchChannelId } from "./device-controls.js";
+import {
+  deviceControls,
+  hexToXy,
+  isNamedChannelControl,
+  normalizeControlValue,
+  normalizeControlValueOrRaw,
+  soleSwitchChannelId
+} from "./device-controls.js";
+import type { DeviceControlView } from "./types.js";
 
 test("ana ve alt Zigbee kanalları UID tabanlı ortak isimlerle sunulur", () => {
   const aliases = new Map([
@@ -254,4 +263,108 @@ test("perde, kilit ve cihazın yayımladığı ikili ayarlar adlandırılabilir 
     new Map()
   );
   assert.equal(soleSwitchChannelId(mixed), "main");
+});
+
+// ————— ortak değer normalizasyonu: panelin rotası da otomasyon motoru da buradan geçer.
+const control = (overrides: Partial<DeviceControlView>): DeviceControlView => ({
+  id: "main",
+  property: "state",
+  name: "Lamba",
+  kind: "switch",
+  value: null,
+  ...overrides
+} as DeviceControlView);
+
+test("aç/kapat değeri panelde boolean, otomasyonda kumandanın kendi değeridir", () => {
+  const relay = control({ kind: "switch", valueOn: "ON", valueOff: "OFF", valueToggle: "TOGGLE" });
+
+  // Panel yolu: yalnız boolean kabul edilir, hata metni rotanın bugünkü yanıtıdır.
+  assert.equal(normalizeControlValue(relay, true, { booleanSwitch: true }), "ON");
+  assert.equal(normalizeControlValue(relay, false, { booleanSwitch: true }), "OFF");
+  assert.throws(
+    () => normalizeControlValue(relay, "ON", { booleanSwitch: true }),
+    /Aç\/kapat değeri geçersiz\./
+  );
+
+  // Otomasyon yolu: kuralda yazan değer olduğu gibi tanınır.
+  assert.equal(normalizeControlValue(relay, "ON"), "ON");
+  assert.equal(normalizeControlValue(relay, "OFF"), "OFF");
+  assert.equal(normalizeControlValue(relay, "TOGGLE"), "TOGGLE");
+  assert.throws(() => normalizeControlValue(relay, "AÇIK"), /Aç\/kapat değeri geçersiz\./);
+
+  // Değerleri dize olmayan kumandada da ölçüt kumandanın kendi tanımıdır.
+  const plug = control({ kind: "switch", valueOn: true, valueOff: false });
+  assert.equal(normalizeControlValue(plug, true), true);
+  assert.equal(normalizeControlValue(plug, false), false);
+  // "Değiştir" bildirmeyen kumanda TOGGLE kabul etmez.
+  assert.throws(() => normalizeControlValue(plug, "TOGGLE"), /Aç\/kapat değeri geçersiz\./);
+
+  // Fan ve siren aynı yolu paylaşır.
+  assert.equal(normalizeControlValue(control({ kind: "fan", valueOn: "ON", valueOff: "OFF" }), true), "ON");
+  assert.equal(normalizeControlValue(control({ kind: "siren", valueOn: "ON", valueOff: "OFF" }), false), "OFF");
+});
+
+test("renk #rrggbb doğrulanıp xy'ye çevrilir, başka biçim reddedilir", () => {
+  const color = control({ id: "main:color", property: "color", kind: "color" });
+
+  assert.deepEqual(normalizeControlValue(color, "#ff0000"), hexToXy("#ff0000"));
+  // Büyük harfli yazım da geçerlidir; çıktı yine xy'dir.
+  assert.deepEqual(normalizeControlValue(color, "#00FF00"), hexToXy("#00ff00"));
+  for (const bad of ["ff0000", "#f00", "#gggggg", 16711680, true, null]) {
+    assert.throws(() => normalizeControlValue(color, bad), /Renk değeri geçersiz\./);
+  }
+});
+
+test("sayısal değer kumandanın aralığına kırpılır ve adımına yuvarlanır", () => {
+  const level = control({ id: "main:brightness", property: "brightness", kind: "level", min: 1, max: 254 });
+
+  assert.equal(normalizeControlValue(level, 200), 200);
+  assert.equal(normalizeControlValue(level, 400), 254);
+  assert.equal(normalizeControlValue(level, -5), 1);
+  assert.throws(() => normalizeControlValue(level, "200"), /Sayısal denetim değeri geçersiz\./);
+  assert.throws(() => normalizeControlValue(level, Number.NaN), /Sayısal denetim değeri geçersiz\./);
+
+  // Adım verilmişse değer adım ızgarasına oturur; taban `min`dir, sıfır değil.
+  const setpoint = control({ id: "climate:sp", property: "occupied_heating_setpoint", kind: "climate", min: 5, max: 30, step: 0.5 });
+  assert.equal(normalizeControlValue(setpoint, 21.3), 21.5);
+  assert.equal(normalizeControlValue(setpoint, 99), 30);
+
+  // Işık sıcaklığı ve konum da aynı yoldan geçer.
+  assert.equal(normalizeControlValue(control({ kind: "temperature", min: 153, max: 500 }), 600), 500);
+  assert.equal(normalizeControlValue(control({ kind: "position", min: 0, max: 100 }), 42), 42);
+});
+
+test("liste kumandaları yalnız kendi bildirdikleri değerleri kabul eder", () => {
+  const cover = control({ id: "cover:state", property: "state", kind: "cover", values: ["OPEN", "STOP", "CLOSE"] });
+
+  assert.equal(normalizeControlValue(cover, "OPEN"), "OPEN");
+  assert.throws(() => normalizeControlValue(cover, "AÇ"), /Seçilen cihaz komutu geçersiz\./);
+  assert.throws(() => normalizeControlValue(cover, { x: 1 }), /Seçilen cihaz komutu geçersiz\./);
+
+  // Değer listesi bildirmeyen `select` skaler kabul eder.
+  const effect = control({ id: "select:effect", property: "effect", kind: "select" });
+  assert.equal(normalizeControlValue(effect, "blink"), "blink");
+});
+
+test("otomasyon sarmalayıcısı normalize eder, edemediğini ham bırakır", () => {
+  const color = control({ id: "main:color", property: "color", kind: "color" });
+  const level = control({ id: "main:brightness", property: "brightness", kind: "level", min: 1, max: 254 });
+
+  assert.deepEqual(normalizeControlValueOrRaw(color, "#ff0000"), hexToXy("#ff0000"));
+  assert.equal(normalizeControlValueOrRaw(level, 999), 254);
+  // Diskteki eski bir kural bir doğrulama sıkılaşmasıyla sessizce çalışmaz hâle gelmesin.
+  assert.equal(normalizeControlValueOrRaw(color, "kırmızı"), "kırmızı");
+  assert.equal(normalizeControlValueOrRaw(level, "az"), "az");
+});
+
+test("cihaz komutu rotası değer mantığını ortak fonksiyona bırakır ve hatayı 400 döner", async () => {
+  const server = await readFile(new URL("./index.js", import.meta.url), "utf8");
+
+  // Rotanın kendi kopyası kalmadı: tür ayrımı da, kırpma da tek yerde.
+  assert.match(server, /normalizeControlValue\(control, request\.body\?\.value, \{ booleanSwitch: true \}\)/);
+  assert.doesNotMatch(server, /hexToXy\(value\)/);
+  assert.doesNotMatch(server, /Math\.min\(control\.max \?\? value/);
+  // Doğrulama hatası eskisi gibi 400, cihaz hatası eskisi gibi 503.
+  assert.match(server, /return reply\.code\(400\)\.send\(\{\s*ok: false,\s*error: error instanceof Error \? error\.message : String\(error\)\s*\}\);/);
+  assert.match(server, /await source\.setDevice\(id, \{ \[control\.property\]: value \}/);
 });

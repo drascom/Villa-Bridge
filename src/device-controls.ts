@@ -127,6 +127,89 @@ export const hexToXy = (hex: string): { x: number; y: number } => {
   };
 };
 
+/** `#rrggbb` — panelin, otomasyonun ve kaydetme doğrulamasının paylaştığı tek renk biçimi. */
+export const hexColorPattern = /^#[0-9a-f]{6}$/i;
+export const isHexColor = (value: unknown): value is string =>
+  typeof value === "string" && hexColorPattern.test(value);
+
+/** Kumandaya yazılabilir değer: skaler ya da rengin xy karşılığı. */
+export type ControlCommandValue = JsonScalar | { x: number; y: number };
+
+export interface ControlValueOptions {
+  /**
+   * Panel aç/kapat değerini `boolean` yollar ve başka bir şey kabul edilmez; otomasyon kuralı ise
+   * kumandanın kendi değerini (`valueOn`/`valueOff`/`valueToggle`) taşır. Tek fark budur.
+   */
+  booleanSwitch?: boolean;
+}
+
+const switchLikeKinds = new Set(["switch", "fan", "siren"]);
+const listKinds = new Set(["cover", "lock", "select"]);
+
+/**
+ * Kumandaya yazılacak değerin **tek** doğrulama/dönüştürme yolu. Panelin `/api/devices/:id/command`
+ * rotası da, otomasyon motoru da buradan geçer: renk `#rrggbb` olarak doğrulanıp xy'ye çevrilir,
+ * sayısal değer `min`/`max`'a kırpılıp `step`'e yuvarlanır, liste kumandaları kendi değer listesine
+ * denetlenir. Kabul edilmeyen değer anlaşılır bir hata fırlatır; hata metinleri rotanın bugünkü
+ * yanıtlarıyla birebir aynıdır.
+ */
+export const normalizeControlValue = (
+  control: Pick<
+    DeviceControlView,
+    "kind" | "min" | "max" | "step" | "values" | "valueOn" | "valueOff" | "valueToggle"
+  >,
+  value: unknown,
+  options: ControlValueOptions = {}
+): ControlCommandValue => {
+  if (switchLikeKinds.has(control.kind)) {
+    const valueOn = control.valueOn ?? "ON";
+    const valueOff = control.valueOff ?? "OFF";
+    if (typeof value === "boolean") return value ? valueOn : valueOff;
+    if (options.booleanSwitch) throw new Error("Aç/kapat değeri geçersiz.");
+    if (value === valueOn) return valueOn;
+    if (value === valueOff) return valueOff;
+    if (control.valueToggle !== undefined && value === control.valueToggle) return control.valueToggle;
+    throw new Error("Aç/kapat değeri geçersiz.");
+  }
+  if (control.kind === "color") {
+    if (!isHexColor(value)) throw new Error("Renk değeri geçersiz.");
+    return hexToXy(value);
+  }
+  if (listKinds.has(control.kind)) {
+    if (
+      (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
+      || (control.values?.length && !control.values.includes(value))
+    ) {
+      throw new Error("Seçilen cihaz komutu geçersiz.");
+    }
+    return value;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("Sayısal denetim değeri geçersiz.");
+  }
+  const clamped = Math.min(control.max ?? value, Math.max(control.min ?? value, value));
+  const step = control.step;
+  return step && step > 0
+    ? Number((Math.round((clamped - (control.min ?? 0)) / step) * step + (control.min ?? 0)).toFixed(6))
+    : clamped;
+};
+
+/**
+ * Otomasyon yolu için hoşgörülü sarmalayıcı: normalize edilebilen değer panelinkiyle aynı yoldan
+ * geçer, edilemeyen değer olduğu gibi gider. Diskteki eski kurallar bir doğrulama sıkılaşmasıyla
+ * sessizce çalışmaz hâle gelmesin diye eylem burada reddedilmez.
+ */
+export const normalizeControlValueOrRaw = (
+  control: Parameters<typeof normalizeControlValue>[0],
+  value: unknown
+): unknown => {
+  try {
+    return normalizeControlValue(control, value);
+  } catch {
+    return value;
+  }
+};
+
 export function deviceControls(
   id: string,
   deviceName: string,

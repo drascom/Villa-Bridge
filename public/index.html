@@ -475,7 +475,7 @@
        ince kenarlık taşır; dolgusu aynı renkten süzülür. `currentColor` alfası yerine iki katman
        (::before kenarlık, ::after dolgu) — eski Android WebView'da da çalışır. */
     .automation-parts{display:grid;gap:4px;margin-top:4px}
-    .automation-part{display:grid;gap:9px;padding:10px 0}.automation-part+.automation-part{border-top:1px solid var(--line)}
+    .automation-part{display:grid;gap:9px;padding:10px 0}.automation-part+.automation-part{border-top:1px solid var(--line)}.automation-value{display:grid;gap:clamp(8px,1.4vh,14px);margin-top:clamp(8px,1.4vh,14px)}.automation-value .automation-counter{margin-top:0}.automation-value .automation-counter-value{font:800 clamp(22px,3.2vw,32px)/1 system-ui,sans-serif}.automation-value .color-picker{height:clamp(42px,6.4vh,52px)}.light-preset.is-on{box-shadow:0 0 0 clamp(2px,.4vw,3px) var(--forest)}
     .automation-part-name{margin:0;color:var(--muted);font-size:13px;font-weight:800;overflow-wrap:anywhere}
     .automation-choices{display:flex;flex-wrap:wrap;gap:9px}
     .automation-choice{position:relative;z-index:0;min-height:42px;padding:9px 18px;border:0;border-radius:999px;background:none;font-size:14.5px;font-weight:800;touch-action:manipulation}
@@ -5050,6 +5050,66 @@
   const automationControlValue=(control,on)=>on?(control.valueOn??"ON"):(control.valueOff??"OFF");
   // Tek basışta hem açan hem kapatan seçenek yalnızca cihaz bunu bildiriyorsa sunulur.
   const automationCanToggle=control=>control?.valueToggle!==undefined&&control?.valueToggle!==null;
+  /* ————— değer eylemleri: parlaklık, ışık sıcaklığı ve renk. Kural aç/kapattan ibaret değil.
+     Hangi seçeneğin çıkacağını cihazın SUNDUĞU kumandalar belirler (`lightPanelParts` ile aynı
+     yaklaşım): kimlik `<kanal>:brightness` / `<kanal>:temperature` / `<kanal>:color` biçimindedir,
+     yoksa seçenek hiç görünmez. Model ya da ad listesi yok. */
+  const automationValueKinds=["level","temperature","color"];
+  const automationValueChannel=control=>String(control?.id||"").split(":")[0];
+  const isAutomationValueControl=control=>automationValueKinds.includes(control?.kind)
+    &&control.adminOnly!==true
+    &&String(control.id||"").includes(":");
+  // Bir aç/kapa kanalının değer kumandaları: `main` kanalının `main:brightness` gibi kardeşleri.
+  const automationValueControls=(device,channel)=>isProtectedDevice(device)?[]:(device?.controls||[])
+    .filter(control=>isAutomationValueControl(control)&&automationValueChannel(control)===channel);
+  const automationValueControl=(deviceId,controlId)=>{
+    const device=state.devices.find(item=>item.id===deviceId)||null;
+    if(!device||isProtectedDevice(device))return null;
+    return(device.controls||[]).find(control=>control.id===controlId&&isAutomationValueControl(control))||null;
+  };
+  /* Kullanıcı YÜZDE seçer, kurala kumandanın KENDİ birimi yazılır. Aralık kumandanın `min`/`max`
+     alanından okunur — cihazların ölçekleri farklıdır (biri 1–254, öbürü 0–100), sabit varsayım yok.
+     Ham değer `step` verilmişse ona yuvarlanır, verilmemişse tam sayıya; sonra aralığa kırpılır.
+     Sunucudaki ortak normalizasyon da aynı kırpmayı yapar, panel oraya geçersiz değer yollamaz. */
+  const automationValueRange=control=>{
+    const min=Number.isFinite(control?.min)?Number(control.min):0;
+    const max=Number.isFinite(control?.max)?Number(control.max):100;
+    return max>min?{min,max}:{min,max:min+1};
+  };
+  const automationValuePercent=(control,raw)=>{
+    const{min,max}=automationValueRange(control);
+    const value=Math.min(max,Math.max(min,Number(raw)||min));
+    return Math.round((value-min)/(max-min)*100);
+  };
+  const automationValueRaw=(control,percent)=>{
+    const{min,max}=automationValueRange(control);
+    const clamped=Math.min(100,Math.max(0,Math.round(Number(percent)||0)));
+    const exact=min+(max-min)*clamped/100;
+    const step=Number(control?.step);
+    const snapped=step>0?min+Math.round((exact-min)/step)*step:Math.round(exact);
+    return Math.min(max,Math.max(min,Number(snapped.toFixed(6))));
+  };
+  // Sayaç bir dokunuşta onda bir aralık ilerler: uçtan uca on dokunuş, tablette rahat.
+  const automationValuePercentStep=10;
+  // Işık sıcaklığında yüzde tek başına bir şey söylemez: mired büyüdükçe ışık sıcaklaşır.
+  const automationWarmthKey=percent=>percent<=33?"automationWarmthCool"
+    :percent<=66?"automationWarmthNeutral":"automationWarmthWarm";
+  const automationValueText=(control,value)=>{
+    if(control?.kind==="color")return String(value||"").toLowerCase();
+    const percent=automationValuePercent(control,value);
+    return control?.kind==="temperature"
+      ?t("automationValueWarmthText",{percent,warmth:t(automationWarmthKey(percent))})
+      :t("automationValuePercent",{percent});
+  };
+  const automationValueDefaultColor="#ffcf8e";
+  const automationValueSeed=control=>{
+    if(control?.kind==="color"){
+      return/^#[0-9a-fA-F]{6}$/.test(String(control.value||""))?String(control.value).toLowerCase():automationValueDefaultColor;
+    }
+    return Number.isFinite(control?.value)
+      ?automationValueRaw(control,automationValuePercent(control,control.value))
+      :automationValueRaw(control,control?.kind==="temperature"?50:100);
+  };
   // Sınıflandırma sunucudan gelir: `category` standart `definition.exposes[].type` tahminidir,
   // kullanıcı rol seçtiyse onunla ezilmiştir. İstemcide model listesi ya da satıcıya özgü
   // özellik adına bakan hiçbir kural yok — öyle bir kural yalnız tek bir evde çalışır.
@@ -5099,6 +5159,8 @@
   const automationControl=action=>automationDevice(action)?.controls.find(control=>control.property===action?.property)||null;
   const automationActionMode=action=>{
     const control=automationControl(action);
+    // Değer eylemlerinde "yön" yoktur: kip kumandanın türüdür, değeri cümle ayrıca söyler.
+    if(control&&automationValueKinds.includes(control.kind))return control.kind;
     if(control&&automationCanToggle(control)&&action?.value===control.valueToggle)return"toggle";
     if(control)return action?.value===automationControlValue(control,true)?"on":"off";
     if(String(action?.value).toUpperCase()==="TOGGLE")return"toggle";
@@ -5218,22 +5280,34 @@
       .find(row=>row.token===token);
     return match?match.label:`${trigger?.property??""}`;
   };
-  const automationSentenceValues=(trigger,action,actionKey)=>({
+  const automationSentenceValues=(trigger,action,phrase)=>({
     time:trigger.at,
     days:automationDayList(trigger.days),
     device:automationActionName(action),
-    action:t(actionKey)
+    action:phrase
   });
-  const automationEventValues=(trigger,action,actionKey)=>({
+  const automationEventValues=(trigger,action,phrase)=>({
     device:automationTriggerDeviceName(trigger),
     button:automationButtonLabel(automationTriggerDevice(trigger),trigger.action),
     event:automationEventLabel(trigger),
     target:automationActionName(action),
-    action:t(actionKey)
+    action:phrase
   });
-  // Her eylem biçimi için ayrı tam anahtar; TR/EN cümleleri parçadan kurulmuyor.
-  const automationSentenceKeys={on:"automationWillTurnOn",off:"automationWillTurnOff",toggle:"automationWillToggle"};
-  const automationCardKeys={on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles"};
+  // Her eylem biçimi için ayrı tam anahtar; TR/EN cümleleri parçadan kurulmuyor. Değer eylemlerinin
+  // şablonu değeri de içinde taşır ("parlaklığı {value} olacak"): "parlaklık" + "%40" diye
+  // birleştirilmez, çünkü TR/EN kelime sırası ve ek yapısı farklıdır.
+  const automationSentenceKeys={
+    on:"automationWillTurnOn",off:"automationWillTurnOff",toggle:"automationWillToggle",
+    level:"automationWillSetBrightness",temperature:"automationWillSetWarmth",color:"automationWillSetColor"
+  };
+  const automationCardKeys={
+    on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles",
+    level:"automationSetsBrightness",temperature:"automationSetsWarmth",color:"automationSetsColor"
+  };
+  const automationActionPhrase=(keys,action)=>{
+    const mode=automationActionMode(action);
+    return t(keys[mode]||keys.on,{value:automationValueText(automationControl(action),action?.value)});
+  };
   // §5.4 anahtar/priz yolu: tetikleyicide durum tutulmaz, yön eylemlerin `when` alanındadır.
   const automationMapModes=["on","off","toggle","none"];
   const automationStateValue=(deviceId,property,on)=>{
@@ -5352,7 +5426,7 @@
     });
   };
   const automationSentence=(trigger,action)=>{
-    const actionKey=automationSentenceKeys[automationActionMode(action)];
+    const actionKey=automationActionPhrase(automationSentenceKeys,action);
     if(trigger.type==="deviceAction")return t("automationSummaryButton",automationEventValues(trigger,action,actionKey));
     if(trigger.type==="sun"){
       const values={...automationSentenceValues(trigger,action,actionKey),time:automationSunSentenceTime(trigger)};
@@ -5371,7 +5445,7 @@
     );
   };
   const automationCardLine=(trigger,action)=>{
-    const actionKey=automationCardKeys[automationActionMode(action)];
+    const actionKey=automationActionPhrase(automationCardKeys,action);
     if(trigger.type==="deviceAction")return t("automationCardSummaryButton",automationEventValues(trigger,action,actionKey));
     if(trigger.type==="sun"){
       const values={...automationSentenceValues(trigger,action,actionKey),time:automationSunSentenceTime(trigger)};
@@ -5938,6 +6012,10 @@
       draftTargetId:null,
       draftProperty:null,
       draftControlId:null,
+      // Ayarlanmakta olan değer kumandası (parlaklık / ışık sıcaklığı / renk) ve ham değeri.
+      // Boşsa eylem aç/kapattır — varsayılan yol değişmedi.
+      draftValueTarget:null,
+      draftValue:null,
       draftMapOn:"on",
       draftMapOff:"off",
       draftDelaySeconds:10,
@@ -5972,8 +6050,17 @@
   const automationReducedMotion=()=>typeof reducedMotion==="function"&&reducedMotion()===true;
   const automationJoin=(...parts)=>parts.filter(Boolean).join(" · ");
   const automationStrong=text=>`<strong>${esc(text)}</strong>`;
-  const automationPillKeys={on:"automationPillOn",off:"automationPillOff",toggle:"automationPillToggle",none:"automationPillNothing"};
-  const automationPillHtml=mode=>`<span class="automation-pill act-${mode}">${esc(t(automationPillKeys[mode]||automationPillKeys.on))}</span>`;
+  const automationPillKeys={
+    on:"automationPillOn",off:"automationPillOff",toggle:"automationPillToggle",none:"automationPillNothing",
+    level:"automationPillBrightness",temperature:"automationPillWarmth",color:"automationPillColor"
+  };
+  // Değer pill'i değeri de taşır ("Parlaklık %40"); şablonun tamamı tek anahtardır.
+  const automationPillHtml=(mode,values)=>`<span class="automation-pill act-${mode}">${esc(t(automationPillKeys[mode]||automationPillKeys.on,values||{}))}</span>`;
+  const automationTargetPillHtml=target=>{
+    const mode=automationTargetMode(target);
+    if(!automationValueKinds.includes(mode))return automationPillHtml(mode);
+    return automationPillHtml(mode,{value:automationValueText(automationTargetControl(target),target?.value)});
+  };
   // ————— eşleme çifti: "kaynak → sonuç". Satırda iki ayrı öbek durur, çünkü kural iki ayrı
   // eşlemedir; tek cümle gibi akmasın diye her çift kendi kutusundadır.
   // Çevirinin tamamı tek anahtardır (parça birleştirme YOK): kelime sırası tr/en'de farklı, o yüzden
@@ -6603,9 +6690,41 @@
       const choice=(key,labelKey)=>automationChoiceHtml(key,labelKey,false,`data-automation-action="${esc(device.id)}|${esc(control.id)}|${key}"`);
       // "Değiştir" yalnızca cihaz tek basışta iki yönü de destekliyorsa görünür.
       const toggle=automationCanToggle(control)?choice("toggle","automationTurnToggle"):"";
+      // Aç/kapat varsayılan kalır; değer seçenekleri onun yanında, aynı satırdadır — akış uzamaz.
+      // Yalnız cihazın gerçekten sunduğu kumandalar çıkar, sabit liste yok.
+      const values=automationValueControls(device,automationValueChannel(control));
+      const valueChoices=values.map(item=>automationChoiceHtml(
+        item.kind,automationValueChoiceKeys[item.kind],automationValueOpen(wizard,device.id,item.id),
+        `data-automation-value="${esc(device.id)}|${esc(item.id)}"`
+      )).join("");
+      const open=values.find(item=>automationValueOpen(wizard,device.id,item.id))||null;
       const name=single?"":`<p class="automation-part-name">${esc(control.name)}</p>`;
-      return`<div class="automation-part">${name}<div class="automation-choices">${choice("on","automationTurnOn")}${choice("off","automationTurnOff")}${toggle}</div></div>`;
+      return`<div class="automation-part">${name}<div class="automation-choices">${choice("on","automationTurnOn")}${choice("off","automationTurnOff")}${toggle}${valueChoices}</div>${open?automationValueEditorHtml(wizard,open):""}</div>`;
     }).join("")}</div>`;
+  }
+  const automationValueChoiceKeys={level:"automationSetBrightness",temperature:"automationSetWarmth",color:"automationSetColor"};
+  const automationValueOpen=(wizard,deviceId,controlId)=>wizard?.draftValueTarget?.deviceId===deviceId
+    &&wizard?.draftValueTarget?.controlId===controlId;
+  const automationValueDraftControl=wizard=>wizard?.draftValueTarget
+    ?automationValueControl(wizard.draftValueTarget.deviceId,wizard.draftValueTarget.controlId)
+    :null;
+  // Renk seçici ışık kumandasının KENDİSİDİR: aynı hazır renkler, aynı `.color-picker`. Sihirbaza
+  // ikinci bir seçici yazılmadı — iki yerde iki ayrı renk dili olmasın.
+  const automationColorPresetsHtml=hex=>`<div class="light-presets" role="group" aria-label="${esc(t("lightPresetColors"))}">${lightColorPresets.map(preset=>{
+    const on=preset.toLowerCase()===String(hex||"").toLowerCase();
+    return`<button class="light-preset${on?" is-on":""}" type="button" data-automation-value-preset="${preset}" aria-pressed="${on}" aria-label="${esc(`${t("color")} ${preset}`)}" title="${preset}" style="background:${preset}"></button>`;
+  }).join("")}</div>`;
+  // Sayaç dili bekleme ve güneş kaydırmasıyla bilerek aynı: "−  değer  +". Değer yüzdedir;
+  // kurala yazılan ham birim kullanıcıya hiç gösterilmez.
+  function automationValueEditorHtml(wizard,control){
+    if(control.kind==="color"){
+      const hex=String(wizard.draftValue||automationValueDefaultColor).toLowerCase();
+      return`<div class="automation-value">${automationColorPresetsHtml(hex)}<input class="color-picker" type="color" value="${esc(hex)}" data-automation-value-color="1" aria-label="${esc(t("automationSetColor"))}"><p class="automation-hint">${esc(t("automationValueColorHint"))}</p></div>`;
+    }
+    const warmth=control.kind==="temperature";
+    const labelKey=warmth?"automationSetWarmth":"automationSetBrightness";
+    const step=(direction,key,glyph)=>`<button class="automation-time-step" type="button" data-automation-value-step="${direction}" aria-label="${esc(t(key))}">${glyph}</button>`;
+    return`<div class="automation-value"><div class="automation-counter" role="group" aria-label="${esc(t(labelKey))}">${step(-1,"automationValueDown","−")}<span class="automation-counter-value">${esc(automationValueText(control,wizard.draftValue))}</span>${step(1,"automationValueUp","+")}</div><p class="automation-hint">${esc(t(warmth?"automationValueWarmthHint":"automationValueBrightnessHint"))}</p></div>`;
   }
   // Eşleme formu: her yön için ne yapılacağını kullanıcı seçer. Tablette geniş satır, geniş pill.
   function automationMapHtml(wizard){
@@ -6817,7 +6936,7 @@
     if(kind==="group")return`<span class="automation-line-glyph" aria-hidden="true">◇</span> ${automationStrong(automationGroupName(target.groupId))} ${automationPillHtml(automationGroupMode(target))}`;
     if(kind==="scene")return`<span class="automation-line-glyph" aria-hidden="true">🎬</span> ${automationStrong(automationGroupName(target.groupId))} <span class="automation-line-meta">${esc(automationSceneName(target.groupId,target.sceneId))}</span>`;
     const name=automationStrong(automationActionName(automationTargetRef(target)));
-    if(!automationMappingMode(wizard))return`${name} ${automationPillHtml(automationTargetMode(target))}`;
+    if(!automationMappingMode(wizard))return`${name} ${automationTargetPillHtml(target)}`;
     const sun=automationSunBoth(wizard);
     const pairs=[];
     if(target.mapOn!=="none")pairs.push(automationMapPairHtml(sun?"sunset":"on",target.mapOn));
@@ -7130,6 +7249,19 @@
     $$("[data-automation-channel]").forEach(button=>button.onclick=()=>chooseAutomationChannel(button.dataset.automationChannel));
     $$("[data-automation-state-instead]").forEach(button=>button.onclick=()=>automationUseStateInstead(button.dataset.automationStateInstead));
     $$("[data-automation-action]").forEach(button=>button.onclick=()=>chooseAutomationAction(button.dataset.automationAction));
+    $$("[data-automation-value]").forEach(button=>button.onclick=()=>chooseAutomationValue(button.dataset.automationValue));
+    // Değer sayacı da basılı tutuşu destekler; okuma her adımda tazedir, ekran çizilmez.
+    const valueText=()=>{
+      const control=automationValueDraftControl(state.automationWizard);
+      return control?automationValueText(control,state.automationWizard.draftValue):"";
+    };
+    $$("[data-automation-value-step]").forEach(button=>automationBindCounter(
+      button,
+      ()=>stepAutomationValue(Number(button.dataset.automationValueStep)),
+      valueText
+    ));
+    $$("[data-automation-value-preset]").forEach(button=>button.onclick=()=>setAutomationValueColor(button.dataset.automationValuePreset));
+    $$("[data-automation-value-color]").forEach(input=>{input.onchange=()=>setAutomationValueColor(input.value)});
     $$("[data-automation-target]").forEach(button=>button.onclick=()=>chooseAutomationTarget(button.dataset.automationTarget));
     $$("[data-automation-map]").forEach(button=>button.onclick=()=>chooseAutomationMap(button.dataset.automationMap));
     $$("[data-automation-edit-target]").forEach(button=>button.onclick=()=>editAutomationTarget(Number(button.dataset.automationEditTarget)));
@@ -7320,7 +7452,10 @@
     if(wizard.stage==="group"||wizard.stage==="scene")return Boolean(wizard.draftGroupId);
     if(wizard.stage==="groupAction")return false;
     if(wizard.stage==="sceneId")return wizard.draftSceneId!==null&&wizard.draftSceneId!==undefined;
-    if(wizard.stage==="action")return automationMappingMode(wizard)&&Boolean(wizard.draftProperty);
+    // Aç/kapat seçilince adım kendiliğinden ilerler; değer eyleminde "İleri" ayarı kesinleştirir.
+    if(wizard.stage==="action")return automationMappingMode(wizard)
+      ?Boolean(wizard.draftProperty)
+      :Boolean(automationValueDraftControl(wizard));
     if(wizard.stage==="map")return automationDraftMapReady(wizard);
     // Son adımda tek iş kalır: kaydetmek. Eksik varsa düğme pasiftir, gerekçesi yanında yazar.
     if(wizard.stage==="name")return automationWizardReady(wizard);
@@ -7656,6 +7791,8 @@
       wizard.draftTargetId=deviceId;
       wizard.draftProperty=null;
       wizard.draftControlId=null;
+      wizard.draftValueTarget=null;
+      wizard.draftValue=null;
       wizard.targetQuery="";
       if(automationMappingMode(wizard)&&controls.length===1){
         wizard.draftProperty=controls[0].property;
@@ -7680,6 +7817,8 @@
     wizard.draftTargetId=null;
     wizard.draftProperty=null;
     wizard.draftControlId=null;
+    wizard.draftValueTarget=null;
+    wizard.draftValue=null;
     wizard.targetQuery="";
     wizard.targetTab="all";
   }
@@ -7694,6 +7833,52 @@
     const value=mode==="toggle"?control.valueToggle:automationControlValue(control,mode==="on");
     automationAdvance(()=>{
       automationCommitTarget(wizard,{deviceId,property:control.property,controlId:control.id,value});
+      wizard.stage=automationAfterTargets(wizard);
+    });
+  }
+  // Değer seçeneği (parlaklık / ışık sıcaklığı / renk) ayarlanacak kumandayı açar. İkinci dokunuş
+  // kapatır: aç/kapat yine varsayılan yoldur, değer ona alternatiftir.
+  function chooseAutomationValue(token){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    const [deviceId,controlId]=String(token).split("|");
+    const control=automationValueControl(deviceId,controlId);
+    if(!control)return;
+    if(automationValueOpen(wizard,deviceId,controlId)){
+      wizard.draftValueTarget=null;
+      wizard.draftValue=null;
+      automationRedraw();
+      return;
+    }
+    wizard.draftValueTarget={deviceId,controlId};
+    wizard.draftValue=automationValueSeed(control);
+    automationRedraw();
+  }
+  function stepAutomationValue(direction){
+    const wizard=state.automationWizard;
+    const control=automationValueDraftControl(wizard);
+    if(!control||control.kind==="color")return;
+    const percent=automationValuePercent(control,wizard.draftValue)+Number(direction)*automationValuePercentStep;
+    wizard.draftValue=automationValueRaw(control,percent);
+    automationRedraw();
+  }
+  function setAutomationValueColor(hex){
+    const wizard=state.automationWizard;
+    const control=automationValueDraftControl(wizard);
+    if(!control||control.kind!=="color")return;
+    const value=String(hex||"").toLowerCase();
+    if(!/^#[0-9a-f]{6}$/.test(value))return;
+    wizard.draftValue=value;
+    automationRedraw();
+  }
+  // Aç/kapat tek dokunuşla biter; değer önce ayarlanır, "İleri" ile kesinleşir.
+  function automationCommitValueTarget(){
+    const wizard=state.automationWizard;
+    const control=automationValueDraftControl(wizard);
+    if(!control)return;
+    const deviceId=wizard.draftValueTarget.deviceId;
+    automationAdvance(()=>{
+      automationCommitTarget(wizard,{deviceId,property:control.property,controlId:control.id,value:wizard.draftValue});
       wizard.stage=automationAfterTargets(wizard);
     });
   }
@@ -8083,6 +8268,8 @@
       wizard.draftTargetId=null;
       wizard.draftProperty=null;
       wizard.draftControlId=null;
+      wizard.draftValueTarget=null;
+      wizard.draftValue=null;
       wizard.targetQuery="";
       wizard.targetTab="all";
       wizard.stage="target";
@@ -8113,6 +8300,11 @@
       wizard.draftControlId=target.controlId;
       wizard.draftMapOn=target.mapOn||"on";
       wizard.draftMapOff=target.mapOff||"off";
+      // Değer eylemi düzenlemeye ayarlayıcısı açık gelir: satıra basınca sayaç/renk seçici hazır.
+      const control=automationTargetControl(target);
+      const valued=control&&isAutomationValueControl(control);
+      wizard.draftValueTarget=valued?{deviceId:target.deviceId,controlId:control.id}:null;
+      wizard.draftValue=valued?target.value:null;
       wizard.stage=automationMappingMode(wizard)?"map":"action";
     });
   }
@@ -8188,6 +8380,7 @@
     cancelAutomationAdvance();
     if(!wizard||wizard.stage==="path")return;
     // Bekleyen eşleme cevabı önce kesinleşir; ancak ondan sonra kaydetme sırası gelir.
+    if(wizard.stage==="action"&&!automationMappingMode(wizard)){automationCommitValueTarget();return}
     if(wizard.stage==="map"){automationCommitMapTarget();return}
     if(wizard.stage==="delay"){commitAutomationDelay();return}
     if(wizard.stage==="sceneId"){chooseAutomationScene(wizard.draftSceneId);return}

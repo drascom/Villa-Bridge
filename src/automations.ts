@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { writeJsonAtomic } from "./atomic-file.js";
+import { isHexColor } from "./device-controls.js";
 import type { DeviceControlView, JsonScalar } from "./types.js";
 
 export interface AutomationTimeTrigger {
@@ -693,6 +694,42 @@ const rejectForbiddenControl = (
   if (hit) throw new Error("Kilit ve siren bir otomasyon eylemi olamaz.");
 };
 
+/** Sayısal kumandalar: değeri kendi aralığının dışına çıkan eylem kaydedilmez. */
+const numericAutomationControlKinds = new Set([
+  "level",
+  "temperature",
+  "number",
+  "position",
+  "climate"
+]);
+
+/**
+ * Eylemin değeri kumandaya uyuyor mu? Kumanda arayıcısı yoksa (eski davranış) doğrulama atlanır.
+ * Ölçüt kumandanın kendi tanım verisidir: renk `#rrggbb` biçimindedir, sayısal değer `min`/`max`
+ * arasındadır. Panel zaten bu değerleri üretiyor; buradaki denetim elle yazılmış kural içindir.
+ */
+const rejectInvalidActionValue = (
+  deviceId: string,
+  property: string,
+  value: JsonScalar,
+  lookup?: AutomationDeviceLookup
+): void => {
+  const control = lookup?.(deviceId)?.controls.find((item) => item.property === property);
+  if (!control) return;
+  if (control.kind === "color") {
+    if (!isHexColor(value)) throw new Error("Otomasyon eylemi renk değeri geçersiz.");
+    return;
+  }
+  if (!numericAutomationControlKinds.has(control.kind) || typeof value !== "number") return;
+  if (!Number.isFinite(value)) throw new Error("Otomasyon eylemi değeri geçersiz.");
+  if (
+    (control.min !== undefined && value < control.min)
+    || (control.max !== undefined && value > control.max)
+  ) {
+    throw new Error("Otomasyon eylemi değeri kumandanın aralığı dışında.");
+  }
+};
+
 const validateActions = (
   value: unknown,
   lookup?: AutomationDeviceLookup,
@@ -786,6 +823,8 @@ const validateActions = (
       action.autoOff = validateAutoOff(candidate.autoOff, action.value);
     }
     rejectForbiddenControl(deviceId, property, lookup);
+    rejectInvalidActionValue(deviceId, property, action.value, lookup);
+    if (action.autoOff) rejectInvalidActionValue(deviceId, property, action.autoOff.value, lookup);
     return action;
   });
 };
