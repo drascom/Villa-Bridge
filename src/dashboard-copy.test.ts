@@ -373,10 +373,10 @@ test("arama alanlarının yan dolgusu görünüm genişliğiyle ölçeklenir", a
   assert.doesNotMatch(dashboard, /\.location-search-field input\{[^}]*padding:11px 14px 11px 43px/);
 });
 
-test("sayfa eylem döşemeleri kare değil oval kenarlıdır", async () => {
+test("sayfa eylem döşemesi soldaki menü düğmesinin ikizidir: aynı hap, yalnız ikon", async () => {
   const dashboard = await readDashboardBundle();
 
-  // "Cihaz ekle" ve "Yeni otomasyon" aynı sınıftan beslenir: yarıçap tek yerden gelir.
+  // "Cihaz ekle" ve "Yeni otomasyon" aynı sınıftan beslenir: biçim tek yerden gelir.
   assert.match(dashboard, /id="devicesAddDevice" class="primary add-device page-action-tile"/);
   assert.match(dashboard, /id="newAutomation" class="primary page-action-tile"/);
   assert.match(
@@ -384,6 +384,62 @@ test("sayfa eylem döşemeleri kare değil oval kenarlıdır", async () => {
     /\.page-action-tile\{[^}]*border:1px solid var\(--forest\);border-radius:999px;color:var\(--forest\);background:var\(--forest-soft\)/
   );
   assert.doesNotMatch(dashboard, /\.page-action-tile\{[^}]*border-radius:16px/);
+
+  // Ölçü belirteçleri menü düğmesiyle birebir aynı: genişlik `--head-action-w`, yükseklik
+  // `--head-action-h`. Daire (`height:var(--head-action-w)`) hali geri gelmemeli.
+  assert.match(dashboard, /\.page-action-tile\{[^}]*width:var\(--head-action-w\);min-width:var\(--head-action-w\);height:var\(--head-action-h\)/);
+  assert.doesNotMatch(dashboard, /\.page-action-tile\{[^}]*height:var\(--head-action-w\)/);
+  // Menü düğmesi de aynı çifti kullanır — ikisi tek ölçü sözleşmesine bağlı.
+  assert.match(dashboard, /\.app-menu-button\{width:var\(--head-action-w\);height:var\(--head-action-h\)/);
+
+  // Yalnız ikon: iki satırlık etiketi taşıyan sütun düzeni gitti, yerine tek hücre ızgara geldi.
+  assert.match(dashboard, /\.page-action-tile\{[^}]*display:grid;place-items:center/);
+  assert.doesNotMatch(dashboard, /\.page-action-tile\{[^}]*flex-direction:column/);
+  // İkon optik ağırlığı menü düğmesiyle eşit: 26px, 1.9 kalınlık.
+  assert.match(dashboard, /\.page-action-tile \.page-action-glyph\{display:block;width:26px;height:26px;stroke-width:1\.9\}/);
+  assert.match(dashboard, /\.app-menu-button svg\{width:26px;height:26px;[^}]*stroke-width:1\.9/);
+});
+
+test("sayfa eylem etiketi silinmez, yalnız görsel olarak gizlenir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Etiket DOM'da duruyor: ekran okuyucu hâlâ okuyor, çeviri kancası yerinde.
+  assert.match(dashboard, /id="devicesAddDevice"[^>]*>[\s\S]{0,400}?<span class="page-action-label" data-i18n="addDevice">Add device<\/span>/);
+  assert.match(dashboard, /id="newAutomation"[^>]*>[\s\S]{0,400}?<span class="page-action-label" data-i18n="newAutomation">New automation<\/span>/);
+
+  // Gizleme panelin mevcut deseniyle: 1px kırpma, `display:none` DEĞİL (okuyucudan düşerdi).
+  assert.match(
+    dashboard,
+    /\.page-action-tile \.page-action-label\{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect\(0,0,0,0\)!important;white-space:nowrap!important;border:0!important\}/
+  );
+  assert.doesNotMatch(dashboard, /\.page-action-tile \.page-action-label\{[^}]*display:none/);
+
+  // İkon tek başına kaldığı için ne yaptığı `aria-label`'dan okunur; çeviriyle de eşitlenir.
+  assert.match(dashboard, /id="devicesAddDevice"[^>]*data-i18n-aria="addDevice" aria-label="Add device"/);
+  assert.match(dashboard, /id="newAutomation"[^>]*data-i18n-aria="newAutomation" aria-label="New automation"/);
+});
+
+test("koyu temada başlık düğmeleri açık dolguya çevrilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Menü/„genel görünüm" düğmesi ve sağdaki sayfa eylemi birlikte ters çevrilir: koyu zeminde
+  // açık nane dolgu (--forest #71c6a2), koyu ikon (--on-forest #0b1c15).
+  assert.match(
+    dashboard,
+    /:root\[data-theme="dark"\] \.app-menu-button,:root\[data-theme="dark"\] \.page-action-tile\{color:var\(--on-forest\);border-color:#a5dec5;background:var\(--forest\)\}/
+  );
+  assert.match(
+    dashboard,
+    /:root\[data-theme="dark"\] \.app-menu-button:hover,:root\[data-theme="dark"\] \.page-action-tile:hover\{color:var\(--on-forest\);background:#a5dec5\}/
+  );
+  assert.match(dashboard, /:root\[data-theme="dark"\] \.app-menu-button:focus-visible\{outline-color:#eafaf2\}/);
+
+  // Açık tema bozulmadı: taban kural hâlâ koyu yeşil ikon + soluk yeşil dolgu.
+  assert.match(dashboard, /\.app-menu-button\{[^}]*color:var\(--forest\);background:var\(--forest-soft\)\}/);
+  // Koyu temanın kendi belirteçleri: dolgu açık, üstündeki ikon koyu.
+  assert.match(dashboard, /:root\[data-theme="dark"\]\{[\s\S]{0,400}?--forest:#71c6a2;--forest-soft:#203d32;--on-forest:#0b1c15/);
+
+  assert.doesNotMatch(dashboard, /color-mix\(/);
 });
 
 test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
@@ -395,13 +451,13 @@ test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
   assert.doesNotMatch(dashboard, /Yeni cihaz ekle/);
   // `add-device` davranış kancası olarak kalır; biçim ayrı, sunumsal `.page-action-tile` sınıfından gelir.
   assert.match(dashboard, /id="devicesAddDevice" class="primary add-device page-action-tile"[^>]*><svg class="page-action-glyph"/);
-  assert.match(dashboard, /\.page-action-tile \.page-action-label\{position:static;/);
+  assert.match(dashboard, /\.page-action-tile \.page-action-label\{position:absolute!important;/);
   assert.match(dashboard, /id="refreshButton"><svg class="page-action-glyph"/);
   assert.match(dashboard, /#home \.home-actions button,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
   assert.match(dashboard, /pullToRefresh:"Pull to refresh"/);
   assert.match(dashboard, /pullToRefresh:"Yenilemek için aşağı çekin"/);
-  // Döşemenin kare kenarı başlık ızgarasının yan sütunuyla aynı belirteçten gelir: sabit px yok.
-  assert.match(dashboard, /@media\(min-width:561px\)\{\.page-action-tile\{width:var\(--head-action-w\);min-width:var\(--head-action-w\);height:var\(--head-action-w\);flex:none;align-self:center;display:flex;flex-direction:column/);
+  // Döşemenin ölçüsü başlık ızgarasının yan sütunuyla aynı belirteçten gelir: sabit px yok.
+  assert.match(dashboard, /@media\(min-width:561px\)\{\.page-action-tile\{position:relative;width:var\(--head-action-w\);min-width:var\(--head-action-w\);height:var\(--head-action-h\);flex:none;align-self:center;display:grid;place-items:center/);
   assert.doesNotMatch(dashboard, /\.page-action-tile\{[^}]*width:88px/);
   assert.doesNotMatch(dashboard, /#devices \.page-head>\.add-device\{/);
   assert.match(dashboard, /#devices #refreshButton \.page-action-label\{position:absolute!important/);
