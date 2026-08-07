@@ -5541,7 +5541,9 @@
       targetQuery:"",
       name:existing?.name||"",
       // Az önce tamamlanan düğüm; bir kez yumuşak yerleşme animasyonu alır.
-      fresh:null
+      fresh:null,
+      // Açık adımın seçenek listesi açık mı: seçim yapılınca tek satıra daralır (§2.1).
+      pickerOpen:true
     };
     const dialog=$("#automationDialog");
     if(!dialog.open)dialog.showModal();
@@ -5556,6 +5558,10 @@
   const automationPillKeys={on:"automationPillOn",off:"automationPillOff",toggle:"automationPillToggle",none:"automationPillNothing"};
   const automationPillHtml=mode=>`<span class="automation-pill act-${mode}">${esc(t(automationPillKeys[mode]||automationPillKeys.on))}</span>`;
   const automationSummaryHtml=(line,hook,quiet,removeHook)=>`<div class="automation-summary${quiet?" is-quiet":""}"><button class="automation-summary-main" type="button" ${hook}><span class="automation-line">${line}</span><span class="automation-change">${esc(t("automationChange"))}</span></button>${removeHook?`<button class="automation-summary-remove" type="button" ${removeHook} aria-label="${esc(t("automationRemove"))}" title="${esc(t("automationRemove"))}"><span aria-hidden="true">✕</span></button>`:""}</div>`;
+  // Adım içinde seçim yapılınca uzun liste yerine tek satır durur: tamamlanmış düğümlerdeki
+  // aynı özet bileşeni, aynı "Değiştir" metniyle. Basınca liste geri açılır, seçim korunur.
+  // Adım kapanmadığı için altındaki süre satırı ("… ve şu kadar süredir böyleyse") görünür kalır.
+  const automationPickedRowHtml=label=>automationSummaryHtml(automationStrong(label),'data-automation-reopen="1"');
   const automationOptHtml=option=>`<button class="automation-opt${option.on?" is-on":""}" type="button" ${option.hook||""}${option.disabled?' disabled aria-disabled="true"':""} aria-pressed="${Boolean(option.on)}"><span class="automation-opt-glyph" aria-hidden="true">${option.glyph||"›"}</span><span class="automation-opt-body"><span class="automation-opt-title">${esc(option.title)}</span>${option.sub?`<span class="automation-opt-sub">${esc(option.sub)}</span>`:""}</span>${option.badge?`<span class="automation-badge">${esc(option.badge)}</span>`:`<span class="automation-tick" aria-hidden="true">✓</span>`}</button>`;
   const automationOptionsHtml=options=>`<div class="automation-options">${options.map(automationOptHtml).join("")}</div>`;
   const automationAddHtml=(label,hook)=>`<button class="automation-add" type="button" ${hook}><span class="automation-plus" aria-hidden="true">+</span><span>${esc(label)}</span></button>`;
@@ -5938,9 +5944,12 @@
   // aynı yerde, aynı görünümde bulmalı: bu yüzden koşulun görsel dili (`automation-cond-for`
   // kesikli sessiz bloğu) bilerek aynen paylaşılır, yeni bir stil türetilmez.
   // Süre yalnız hedefi olan tetikleyicide anlamlıdır: anahtar eşleme yolunda ("her değişimde")
-  // neyin kaç saniyedir sürdüğü tanımsızdır, sunucu da orada reddeder.
+  // neyin kaç saniyedir sürdüğü tanımsızdır, sunucu da orada reddeder. Düğme de dışarıdadır:
+  // düğme yolu `deviceAction` yazar, sunucu süreyi yalnız `deviceState` üstünde okur — orada
+  // satır çizilseydi ayarlanan süre kaydederken sessizce düşerdi.
   const automationTrigForEligible=wizard=>Boolean(wizard)
     &&!automationMappingMode(wizard)
+    &&wizard.triggerKind!=="button"
     &&automationDeviceKinds.includes(wizard.triggerKind);
   function automationTrigForHtml(wizard){
     if(!automationTrigForEligible(wizard))return"";
@@ -5958,7 +5967,9 @@
     if(!rows.length)return`<p class="automation-empty-line">${esc(t("automationCondNoState"))}</p>`;
     if(draft.numeric)return`${automationCondThresholdHtml(draft,device)}${automationCondForHtml(draft)}`;
     const negate=(value,key)=>automationChoiceHtml(value?"off":"on",key,Boolean(draft.negate)===value,`data-automation-cond-negate="${value?1:0}"`);
-    const list=automationOptionsHtml(rows.map(row=>({
+    const picked=rows.find(row=>!row.numeric&&draft.property===row.property&&draft.value===row.equals)||null;
+    // Seçildikten sonra liste seçilen satıra daralır; "Değiştir" listeyi geri açar.
+    const list=picked&&!wizard.pickerOpen?automationPickedRowHtml(picked.label):automationOptionsHtml(rows.map(row=>({
       title:row.label,
       on:!row.numeric&&draft.property===row.property&&draft.value===row.equals,
       hook:`data-automation-cond-state="${esc(row.token)}"`
@@ -6123,8 +6134,11 @@
       ?`<div class="automation-alt"><p>${esc(t("automationButtonStateAlternative"))}</p>${automationAddHtml(t("automationButtonStateAlternativeAction"),`data-automation-state-instead="${esc(device.id)}"`)}</div>`
       :"";
     const hint=wizard.triggerKind==="button"?`<p class="automation-hint">${esc(automationButtonHint(device))}</p>`:"";
+    // Seçildikten sonra liste seçilen satıra daralır; "Değiştir" listeyi geri açar. Koşuldakiyle aynı.
+    const picked=events.find(event=>automationEventPicked(wizard,event))||null;
+    const body=picked&&!picked.numeric&&!wizard.pickerOpen?automationPickedRowHtml(picked.label):(events.length?list:"");
     // §2.1 — süre satırı listenin altında, koşuldakiyle aynı yerde durur; varsayılan kapalıdır.
-    return`${warning}${alternative}${events.length?list:""}${hint}${automationTrigForHtml(wizard)}`;
+    return`${warning}${alternative}${body}${hint}${automationTrigForHtml(wizard)}`;
   }
   // Hedef cihazın alt öğeleri: her kanal bir satır, satırın altında eylem pill'leri.
   function automationTargetPartsHtml(wizard,device){
@@ -6593,6 +6607,7 @@
     if(!wizard)return;
     $$("[data-automation-path]").forEach(button=>button.onclick=()=>chooseAutomationPath(button.dataset.automationPath));
     $$("[data-automation-stage]").forEach(button=>button.onclick=()=>goToAutomationStage(button.dataset.automationStage));
+    $$("[data-automation-reopen]").forEach(button=>button.onclick=()=>reopenAutomationPicker());
     $$("[data-automation-trigger]").forEach(button=>button.onclick=()=>chooseAutomationTrigger(button.dataset.automationTrigger));
     $$("[data-automation-time]").forEach(button=>button.onclick=()=>{
       const [unit,amount]=button.dataset.automationTime.split(":");
@@ -6712,6 +6727,9 @@
     const apply=()=>{
       automationAdvanceTimer=null;
       mutate();
+      // Yeni bir adıma girilirken liste her zaman açık gelir; daralma yalnız adım içinde
+      // seçim yapıldığında olur (bkz. automationPickedRowHtml).
+      wizard.pickerOpen=true;
       automationAnimate=true;
       renderAutomationWizard();
     };
@@ -6871,6 +6889,14 @@
       wizard.stage=stage;
     });
   }
+  // Daralmış seçim satırındaki "Değiştir": liste geri açılır, seçim silinmez — kullanıcı
+  // vazgeçip aynı satırı seçerse hiçbir şey değişmez.
+  function reopenAutomationPicker(){
+    const wizard=state.automationWizard;
+    if(!wizard||wizard.pickerOpen)return;
+    wizard.pickerOpen=true;
+    automationRedraw();
+  }
   function chooseAutomationTrigger(kind){
     const wizard=state.automationWizard;
     const choice=automationTriggerChoices.find(entry=>entry.kind===kind);
@@ -6989,11 +7015,17 @@
     if(!event)return;
     // Seçim engellenmez ama uyarı bir kez daha yüzeye çıkar: kullanıcı sonucu bilerek ilerlesin.
     if(automationButtonUnproven(wizard,device))showToast(t("automationButtonUnprovenWarning"),true);
-    // §2.1 — süre satırı açıkken adım hemen kapanmaz: kullanıcı süreyi de ayarlayacak,
-    // "Devam" ile geçer. Koşul adımındaki davranışın aynısı.
-    if(wizard.triggerForSeconds>0&&!event.numeric){
+    // §2.1 — süre satırı listenin altındadır: seçim adımı kapatsaydı satıra hiç ulaşılamazdı
+    // (açmak için ekranda kalmak, kalmak için açmış olmak gerekirdi). Bu yüzden satırın
+    // uygulanabilir olduğu her yolda adım açık kalır: seçilen olay işaretli durur, süre
+    // erişilebilir kalır, kullanıcı alttaki birincil düğmeyle geçer. Sayısal eşik yolu eşik
+    // ekranına gider; satır orada da var. Koşul adımındaki davranışın aynısı.
+    if(automationTrigForEligible(wizard)&&!event.numeric){
       automationApplyEvent(wizard,event);
       automationPruneTargets(wizard);
+      wizard.fresh="trigger";
+      // Adım açık kalır ama liste daralır: yalnız seçilen satır + "Değiştir" görünür.
+      wizard.pickerOpen=false;
       automationRedraw();
       return;
     }
@@ -7223,9 +7255,10 @@
     draft.numeric=false;
     draft.property=row.property;
     draft.value=row.equals;
-    // Süre satırı açıkken hemen kapanmaz: kullanıcı süreyi de ayarlayacak, "Devam" ile geçer.
-    if(draft.forSeconds>0){automationRedraw();return}
-    commitAutomationCondition();
+    // Süre satırı listenin altındadır: seçim adımı kapatsaydı satıra hiç ulaşılamazdı. Adım
+    // açık kalır, liste seçilen satıra daralır, kullanıcı alttaki birincil düğmeyle kesinleştirir.
+    wizard.pickerOpen=false;
+    automationRedraw();
   }
   // §9.2 — süre ölçütünü aç/kapat. Açılışta bir dakika: en sık kurulan "1 dakikadır hareket var".
   function toggleAutomationCondFor(value){

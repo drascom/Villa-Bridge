@@ -2783,13 +2783,14 @@ type AutomationSandbox = {
 const automationExports = [
   "openAutomationWizard", "chooseAutomationPath", "chooseAutomationTrigger", "chooseAutomationTriggerDevice",
   "chooseAutomationEvent", "chooseAutomationTargetDevice", "chooseAutomationAction", "chooseAutomationAutoOff",
-  "goToAutomationStage", "addAutomationTarget", "editAutomationTarget", "removeAutomationTarget",
+  "goToAutomationStage", "reopenAutomationPicker",
+  "addAutomationTarget", "editAutomationTarget", "removeAutomationTarget",
   "chooseAutomationChannel", "chooseAutomationTarget", "chooseAutomationMap", "automationWizardReady",
   "setAutomationAutoOffMinutes", "openAutomationAutoOffCustom", "automationBlockedReason",
   "automationStageAdvanceable", "chooseAutomationSunEdit",
   "setAutomationSunOffset", "automationCounterNext", "automationCounterText",
   "toggleAutomationCondFor", "setAutomationCondForSeconds",
-  "toggleAutomationTrigFor", "setAutomationTrigForSeconds",
+  "toggleAutomationTrigFor", "setAutomationTrigForSeconds", "automationTrigForEligible",
   "automationWizardTriggers", "toggleAutomationDay",
   "chooseAutomationThresholdDir", "stepAutomationThreshold", "addAutomationCondition", "chooseAutomationCondKind",
   "chooseAutomationCondDevice", "chooseAutomationCondState", "chooseAutomationCondNegate",
@@ -3195,9 +3196,12 @@ test("sihirbazda seçim yapılınca o soru kapanır, ekranda tek soru açık kal
   // Cihaz satırının "Değiştir"i listeye döner.
   api.goToAutomationStage("trigDevice");
   assert.match(harness.body(), /data-automation-trigger-device="0x0022"/);
+  api.chooseAutomationTriggerDevice("0x0022");
 
   // Hedef adımı da iki soruludur: cihaz seçilince liste kapanır, eylem seçenekleri açılır.
+  // Olay adımı seçimle kapanmaz (altındaki süre satırı erişilebilir kalsın); geçiş "İleri"dedir.
   api.chooseAutomationEvent("occupancy=true");
+  await api.nextAutomationStep();
   assert.equal(harness.wizard().stage, "target");
   assert.match(harness.body(), /data-automation-target-device="0x0011"/);
   api.chooseAutomationTargetDevice("0x0011");
@@ -3278,6 +3282,9 @@ test("ileri düğmesi pasifken nedenini söyler", async () => {
   api.chooseAutomationTriggerDevice("0x0022");
   assert.equal(reason(), "automationNeedEvent");
   api.chooseAutomationEvent("occupancy=true");
+  // Olay seçilince engel kalkar ama adım kapanmaz: geçiş birincil düğmeyle olur.
+  assert.equal(reason(), "");
+  await api.nextAutomationStep();
   assert.equal(harness.wizard().stage, "target");
   assert.equal(reason(), "automationNeedTarget");
   api.chooseAutomationTargetDevice("0x0011");
@@ -3641,6 +3648,8 @@ test("koşul bölümü saat aralığı ve cihaz durumu koşulu ekler", async () 
   assert.match(harness.body(), /data-automation-cond-negate="1"/);
   api.chooseAutomationCondNegate("1");
   api.chooseAutomationCondState("state=ON");
+  // Durum seçimi adımı kapatmaz; koşul birincil düğmeyle kesinleşir.
+  api.commitAutomationCondition();
   const all = harness.wizard().conditions as Array<Record<string, unknown>>;
   assert.equal(all.length, 2);
   assert.deepEqual(all[1], { type: "deviceState", deviceId: "0x0011", property: "state", not: "ON" });
@@ -3794,6 +3803,7 @@ test("koşul sayısı ikiye çıkınca hepsi/herhangi biri anahtarı görünür 
   api.chooseAutomationCondKind("deviceState");
   api.chooseAutomationCondDevice("0x0011");
   api.chooseAutomationCondState("state=ON");
+  api.commitAutomationCondition();
   assert.match(harness.body(), /data-automation-cond-mode="all"/);
   assert.match(harness.body(), /data-automation-cond-mode="any"/);
   assert.match(harness.body(), /automationCondModeAll/);
@@ -4347,13 +4357,14 @@ test("tetikleyici adımı süreyi koşuldakiyle aynı yerde ve aynı görünümd
   assert.match(dashboard, /wizard\.triggerForSeconds=Math\.max\(60,Math\.min\(maxAutomationCondForSeconds,Math\.round\(seconds\)\)\);/);
 
   // Satır hem olay listesinin hem sayısal eşik ekranının altına biner.
-  assert.match(dashboard, /\$\{events\.length\?list:""\}\$\{hint\}\$\{automationTrigForHtml\(wizard\)\}`;/);
+  assert.match(dashboard, /\$\{warning\}\$\{alternative\}\$\{body\}\$\{hint\}\$\{automationTrigForHtml\(wizard\)\}`;/);
   assert.match(dashboard, /esc\(t\("automationThresholdHint"\)\)\}<\/p>\$\{automationTrigForHtml\(wizard\)\}`;/);
 
   // Süre yalnız hedefi olan tetikleyicide sorulur: anahtar eşleme yolunda hiç görünmez.
+  // Düğme yolunda da görünmez: orada tetikleyici `deviceAction` yazar, sunucu süreyi okumaz.
   assert.match(
     dashboard,
-    /const automationTrigForEligible=wizard=>Boolean\(wizard\)\s*&&!automationMappingMode\(wizard\)\s*&&automationDeviceKinds\.includes\(wizard\.triggerKind\);/
+    /const automationTrigForEligible=wizard=>Boolean\(wizard\)\s*&&!automationMappingMode\(wizard\)\s*&&wizard\.triggerKind!=="button"\s*&&automationDeviceKinds\.includes\(wizard\.triggerKind\);/
   );
 
   // Etiketler zaman yönünü taşır ve "sonra kapansın" ile farkı ipucunda yazar.
@@ -4452,6 +4463,243 @@ test("süre sayacı bir dakika ile yirmi dört saat arasında kalır", async () 
   api.setAutomationCondForSeconds(Number(api.automationCounterNext(60, 1)) * 60);
   assert.equal((harness.wizard().draftCondition as Record<string, unknown>).forSeconds, 4500);
   assert.match(harness.body(), /<span class="automation-counter-value">1:15<\/span>/);
+});
+
+// §2.1 — süre satırı olay listesinin altındadır. Seçim adımı kapatsaydı satır hiç görülemezdi:
+// açmak için ekranda kalmak, kalmak için açmış olmak gerekirdi. Ulaşılamaz olan bu döngü kırıldı.
+test("olay seçimi tetikleyici adımını kapatmaz, süre satırı erişilebilir kalır", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+
+  // Seçim yapılmadan alttaki birincil düğme pasiftir ve sebebini yazar.
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), false);
+  assert.equal(api.automationBlockedReason(harness.wizard()), "automationNeedEvent");
+
+  // Süre kapalıyken bile adım seçimle kapanmaz.
+  assert.equal(harness.wizard().triggerForSeconds, null);
+  api.chooseAutomationEvent("occupancy=true");
+  assert.equal(harness.wizard().stage, "trigEvent");
+  // Adım açık kalır ama liste seçilen tek satıra daralır (bkz. daralma testi).
+  assert.match(harness.body(), /data-automation-reopen="1"/);
+  // Süre satırı hâlâ ekranda ve birincil düğme artık etkin.
+  assert.match(harness.body(), /data-automation-trig-for="1"/);
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), true);
+  assert.equal(api.automationBlockedReason(harness.wizard()), "");
+
+  // Süre buradan açılıp ayarlanabiliyor; ekran yine kapanmıyor.
+  api.toggleAutomationTrigFor("1");
+  api.setAutomationTrigForSeconds(120);
+  assert.equal(harness.wizard().stage, "trigEvent");
+  assert.match(harness.body(), /<span class="automation-counter-value">0:02<\/span>/);
+
+  // Geçiş kullanıcının elinde: birincil düğme adımı ilerletir, süre tetikleyiciye yazılır.
+  await api.nextAutomationStep();
+  assert.equal(harness.wizard().stage, "target");
+  const [trigger] = api.automationWizardTriggers(harness.wizard()) as Record<string, unknown>[];
+  assert.deepEqual(trigger, {
+    type: "deviceState", deviceId: "0x0022", property: "occupancy", equals: true, forSeconds: 120
+  });
+});
+
+// Sayısal eşik yolu bugünkü gibi eşik ekranına geçer: süre satırı zaten orada da var.
+test("sayısal olay seçimi eşik adımına geçmeyi sürdürür", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0044");
+  api.chooseAutomationEvent("num:temperature");
+  assert.equal(harness.wizard().stage, "trigThreshold");
+  assert.match(harness.body(), /data-automation-trig-for="1"/);
+});
+
+// Süre satırının hiç çizilmediği yollarda kendiliğinden ilerleme aynen kalır: fazladan dokunuş yok.
+test("süre satırı olmayan yolda olay seçimi adımı kendiliğinden kapatır", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("deviceState");
+  const wizard = harness.wizard();
+  // Eşleme yolu: süre satırı uygulanabilir değil.
+  wizard.triggerDeviceId = "0x0011";
+  wizard.stage = "trigEvent";
+  assert.equal(api.automationTrigForEligible(wizard), false);
+  api.chooseAutomationEvent("state=ON");
+  assert.equal(harness.wizard().stage, "target");
+
+  // Düğme yolu da dışarıda: tetikleyici `deviceAction` yazar, süre orada hiç kaydedilmez.
+  assert.equal(api.automationTrigForEligible({ triggerKind: "button" }), false);
+});
+
+// Koşul adımında aynı tuzak vardı: durum seçimi koşulu anında kapatıyordu, süre satırı altındaydı.
+test("koşul durumu seçimi adımı kapatmaz, süre satırı erişilebilir kalır", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  await api.nextAutomationStep();
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+
+  api.goToAutomationStage("cond");
+  api.chooseAutomationCondKind("deviceState");
+  api.chooseAutomationCondDevice("0x0011");
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), false);
+
+  api.chooseAutomationCondState("state=ON");
+  // Koşul henüz listeye girmedi: adım açık, liste seçilen satıra daraldı, süre satırı yerinde.
+  assert.equal(harness.wizard().stage, "condState");
+  assert.equal((harness.wizard().conditions as unknown[]).length, 0);
+  assert.match(harness.body(), /data-automation-reopen="1"/);
+  assert.match(harness.body(), /data-automation-cond-for="1"/);
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), true);
+
+  api.toggleAutomationCondFor("1");
+  api.setAutomationCondForSeconds(180);
+  assert.equal(harness.wizard().stage, "condState");
+
+  // Kesinleşme birincil düğmeyle olur ve süre koşula yazılır.
+  await api.nextAutomationStep();
+  const conditions = harness.wizard().conditions as Array<Record<string, unknown>>;
+  assert.deepEqual(conditions, [
+    { type: "deviceState", deviceId: "0x0011", property: "state", equals: "ON", forSeconds: 180 }
+  ]);
+});
+
+// Adım açık kalıyor ama bütün liste açık kalmıyor: seçimden sonra yalnız seçilen satır durur.
+// Bileşen yeni değil — tamamlanmış düğümlerdeki özet satırının ta kendisi, aynı "Değiştir" metniyle.
+const collapsedRow = /<div class="automation-summary"><button class="automation-summary-main" type="button" data-automation-reopen="1"><span class="automation-line"><strong>[^<]+<\/strong><\/span><span class="automation-change">automationChange<\/span><\/button><\/div>/;
+
+test("tetikleyicide olay seçilince liste tek satıra daralır, Değiştir listeyi geri açar", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+
+  // Seçimden önce liste açık: seçenek satırları çizili, daralmış satır yok.
+  assert.match(harness.body(), /data-automation-event="occupancy=true"/);
+  assert.doesNotMatch(harness.body(), /data-automation-reopen=/);
+
+  api.chooseAutomationEvent("occupancy=true");
+  // Seçimden sonra: yalnız seçilen satır + "Değiştir". Diğer seçenekler hiç çizilmez.
+  assert.equal(harness.wizard().stage, "trigEvent");
+  assert.equal(harness.wizard().pickerOpen, false);
+  assert.match(harness.body(), collapsedRow);
+  assert.doesNotMatch(harness.body(), /data-automation-event=/);
+  // Daraltmanın amacı bu: süre satırı daralmış hâlde de erişilebilir kalır.
+  assert.match(harness.body(), /data-automation-trig-for="1"/);
+  // Alttaki birincil düğme etkin kalır.
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), true);
+
+  // "Değiştir" listeyi geri açar; seçim silinmez, seçili satır işaretli gelir.
+  api.reopenAutomationPicker();
+  assert.equal(harness.wizard().stage, "trigEvent");
+  assert.doesNotMatch(harness.body(), /data-automation-reopen=/);
+  assert.match(
+    harness.body(),
+    /<button class="automation-opt is-on" type="button" data-automation-event="occupancy=true" aria-pressed="true">/
+  );
+  // Süre satırı açık listede de yerinde durur.
+  assert.match(harness.body(), /data-automation-trig-for="1"/);
+
+  // Vazgeçip aynı satır yeniden seçilirse tetikleyici değişmez, liste tekrar daralır.
+  api.chooseAutomationEvent("occupancy=true");
+  assert.match(harness.body(), collapsedRow);
+  assert.deepEqual(api.automationWizardTriggers(harness.wizard()), [
+    { type: "deviceState", deviceId: "0x0022", property: "occupancy", equals: true }
+  ]);
+});
+
+test("koşulda durum seçilince liste tek satıra daralır, Değiştir listeyi geri açar", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  await api.nextAutomationStep();
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+  api.goToAutomationStage("cond");
+  api.chooseAutomationCondKind("deviceState");
+  api.chooseAutomationCondDevice("0x0011");
+
+  assert.match(harness.body(), /data-automation-cond-state="state=ON"/);
+  assert.doesNotMatch(harness.body(), /data-automation-reopen=/);
+
+  api.chooseAutomationCondState("state=ON");
+  assert.equal(harness.wizard().stage, "condState");
+  assert.equal(harness.wizard().pickerOpen, false);
+  assert.match(harness.body(), collapsedRow);
+  assert.doesNotMatch(harness.body(), /data-automation-cond-state=/);
+  assert.match(harness.body(), /data-automation-cond-for="1"/);
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), true);
+
+  api.reopenAutomationPicker();
+  assert.doesNotMatch(harness.body(), /data-automation-reopen=/);
+  assert.match(
+    harness.body(),
+    /<button class="automation-opt is-on" type="button" data-automation-cond-state="state=ON" aria-pressed="true">/
+  );
+  assert.match(harness.body(), /data-automation-cond-for="1"/);
+
+  // Aynı satır yeniden seçilirse koşul taslağı değişmez.
+  api.chooseAutomationCondState("state=ON");
+  assert.match(harness.body(), collapsedRow);
+  await api.nextAutomationStep();
+  assert.deepEqual(harness.wizard().conditions, [
+    { type: "deviceState", deviceId: "0x0011", property: "state", equals: "ON" }
+  ]);
+});
+
+// Daralma yalnız adım içi seçime aittir: tamamlanmış satırdaki "Değiştir" ile adıma dönülünce
+// liste açık gelir — kullanıcı zaten değiştirmeye geldi.
+test("tamamlanmış satırdan adıma dönülünce seçenek listesi açık gelir", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+  api.chooseAutomationEvent("occupancy=true");
+  await api.nextAutomationStep();
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+
+  api.goToAutomationStage("trigEvent");
+  assert.equal(harness.wizard().pickerOpen, true);
+  assert.match(
+    harness.body(),
+    /<button class="automation-opt is-on" type="button" data-automation-event="occupancy=true" aria-pressed="true">/
+  );
+});
+
+// Sayısal eşik yolunda davranış değişmez: seçim adımı kapatır, daralmış satır hiç çizilmez.
+test("sayısal eşik yolunda daraltma devreye girmez", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0044");
+  api.chooseAutomationEvent("num:temperature");
+  assert.equal(harness.wizard().stage, "trigThreshold");
+  assert.doesNotMatch(harness.body(), /data-automation-reopen=/);
 });
 
 // Tek yönü boş bırakmak kuralı tek yönlü yapar; iki yön de boşsa kural kaydedilemez.
