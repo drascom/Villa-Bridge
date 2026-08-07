@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyReply } from "fastify";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { normalizeControlValue, soleSwitchChannelId } from "./device-controls.js";
+import { deviceMissingResponse } from "./device-departures.js";
 import { DeviceImageCache } from "./device-image-cache.js";
 import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
@@ -311,17 +312,25 @@ const visibleDevices = (role: "admin" | "resident" | undefined) => store.getDevi
     : device.controls
 }));
 
+/**
+ * Kurulum sırasında cihaz saniyeler içinde ağdan düşebiliyor; o an gelen "Kaydet" isteği düz 404
+ * dönünce kullanıcı ekranda hiçbir sebep göremiyordu. Ortak yanıt, "hiç tanımadım" ile "az önce
+ * ayrıldı/kaldırıldı" arasındaki farkı makine koduyla panele taşır.
+ */
+const replyDeviceMissing = (reply: FastifyReply, id: string): FastifyReply =>
+  reply.code(404).send(deviceMissingResponse(source.recentDeparture?.(id)));
+
 app.get("/api/devices", async (request) => ({
   devices: visibleDevices(request.villaSession?.role)
 }));
 app.get<{ Params: { id: string } }>("/api/devices/:id/note", async (request, reply) => {
   const id = request.params.id.toLowerCase();
-  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
   return { ok: true, note: await deviceNotesStore.get(id) };
 });
 app.put<{ Params: { id: string }; Body?: { note?: unknown } }>("/api/devices/:id/note", async (request, reply) => {
   const id = request.params.id.toLowerCase();
-  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
   try {
     return { ok: true, note: await deviceNotesStore.set(id, request.body?.note) };
   } catch (error) {
@@ -333,7 +342,7 @@ app.put<{ Params: { id: string }; Body?: { note?: unknown } }>("/api/devices/:id
 app.get<{ Params: { id: string } }>("/api/devices/:id/role", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   return {
     ok: true,
     role: device.role,
@@ -356,7 +365,7 @@ app.put<{ Params: { id: string }; Body?: { role?: unknown; channel?: unknown } }
   async (request, reply) => {
     const id = request.params.id.toLowerCase();
     const device = store.getDevice(id);
-    if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+    if (!device) return replyDeviceMissing(reply, id);
     const requestedChannel = request.body?.channel;
     if (requestedChannel !== undefined && requestedChannel !== null && typeof requestedChannel !== "string") {
       return reply.code(400).send({ ok: false, error: "Kanal kimliği geçersiz." });
@@ -582,7 +591,7 @@ app.post<{ Body?: { value?: unknown } }>("/api/zigbee/install-code", async (requ
 
 app.post<{ Params: { id: string } }>("/api/devices/:id/reconfigure", async (request, reply) => {
   const id = request.params.id.toLowerCase();
-  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
   try {
     await source.reconfigureDevice(id);
     return { ok: true, device: store.getDevice(id) };
@@ -623,7 +632,7 @@ app.put<{ Params: { id: string }; Body?: { enabled?: unknown } }>(
 app.post<{ Params: { id: string } }>("/api/devices/:id/ota-check", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   if (!store.getDevice(id)) {
-    return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+    return replyDeviceMissing(reply, id);
   }
   try {
     return { ok: true, ota: await source.checkOta(id) };
@@ -639,7 +648,7 @@ app.put<{
   Body?: { transition?: unknown; debounce?: unknown; retain?: unknown };
 }>("/api/devices/:id/options", async (request, reply) => {
   const id = request.params.id.toLowerCase();
-  if (!store.getDevice(id)) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
   const transition = request.body?.transition === undefined ? undefined : Number(request.body.transition);
   const debounce = request.body?.debounce === undefined ? undefined : Number(request.body.debounce);
   const retain = request.body?.retain;
@@ -704,7 +713,9 @@ app.get("/api/overview", async (request) => ({
   devices: visibleDevices(request.villaSession?.role),
   groups: store.getGroups(),
   pairing: store.getPairing(),
-  events: store.getEvents(20)
+  events: store.getEvents(20),
+  // Panel kurulum akışında cihazın neden kaybolduğunu buradan öğrenir; shadow modda boş kalır.
+  departures: source.recentDepartures?.() ?? []
 }));
 
 app.get("/api/onboarding", async (_request, reply) => {
@@ -985,7 +996,7 @@ app.put<{
 }>("/api/devices/:id/image", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   const imageModel = request.body?.imageModel;
   if (imageModel !== null && typeof imageModel !== "string") {
     return reply.code(400).send({ ok: false, error: "Görsel seçimi geçersiz." });
@@ -1020,7 +1031,7 @@ app.post<{
 }>("/api/devices/:id/command", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   if (device.preparing) {
     return reply.code(409).send({
       ok: false,
@@ -1058,7 +1069,7 @@ app.put<{
 }>("/api/devices/:id/name", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   const name = request.body?.name?.trim() ?? "";
   if (name.length < 2 || Buffer.byteLength(name, "utf8") > 32) {
     return reply.code(400).send({ ok: false, error: "İsim 2–32 bayt arasında olmalı." });
@@ -1107,7 +1118,7 @@ app.delete<{
 }>("/api/devices/:id", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   if (!isDeviceRemovalConfirmation(request.body?.confirmation)) {
     return reply.code(400).send({ ok: false, error: "Silmek için küçük harflerle yes veya evet yazın." });
   }

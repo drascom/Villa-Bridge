@@ -1,3 +1,4 @@
+import type { DeviceDeparture } from "./device-departures.js";
 import type { JsonObject } from "./types.js";
 
 export interface ZigbeeNetworkMap {
@@ -60,4 +61,10 @@ export interface ZigbeeSource {
   setSelfHealingEnabled?(enabled: boolean): void;
   /** Çevrimdışı cihaz yoklaması (Faz 2); yine yalnız koordinatör sahibinde anlamlıdır. */
   setSelfHealProbeEnabled?(enabled: boolean): void;
+  /**
+   * Son dakikalarda ağdan ayrılmış/kaldırılmış cihazın kaydı. Yalnız koordinatörün sahibi bunu
+   * bilebilir; shadow modda yoktur, bu yüzden isteğe bağlıdır.
+   */
+  recentDeparture?(id: string): DeviceDeparture | undefined;
+  recentDepartures?(): DeviceDeparture[];
 }

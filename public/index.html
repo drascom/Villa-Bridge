@@ -163,7 +163,7 @@
     .pairing-modal{text-align:center}.pairing-visual{position:relative;width:128px;height:128px;margin:2px auto 22px;display:grid;place-items:center}.pairing-core{position:relative;z-index:3;width:48px;height:48px;display:grid;place-items:center;border-radius:50%;background:var(--forest);box-shadow:0 8px 20px rgba(24,77,59,.2)}
     /* Çekirdeğin içi: üç noktalı bekleme yerine yayılan wifi dalgaları. Dalgalar sırayla yanıp
        söner; arama durduğunda (`ready`/`timed-out`) animasyon biter ve ikon sabit kalır. */
-    .pairing-wifi{width:26px;height:26px;display:block;fill:none;stroke:var(--on-forest);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}.pairing-wave{opacity:.24;animation:pairing-wave-pulse 1.5s ease-in-out infinite}.pairing-wave-2{animation-delay:.22s}.pairing-wave-3{animation-delay:.44s}.pairing-wifi-dot{fill:var(--on-forest);stroke:none}.pairing-visual.found .pairing-wave{animation-duration:.9s}.pairing-visual.timed-out .pairing-wave{animation:none;opacity:.5}.pairing-visual.ready .pairing-wifi{display:none}.pairing-core::after{content:"";position:absolute;left:50%;top:50%;width:20px;height:10px;border-left:3px solid var(--on-forest);border-bottom:3px solid var(--on-forest);opacity:0;transform:translate(-50%,-65%) rotate(-45deg)}.pairing-visual.ready .pairing-core::after{opacity:1}@keyframes pairing-wave-pulse{0%,100%{opacity:.22}45%{opacity:1}}.pairing-ring{position:absolute;inset:0;border:2px solid rgba(24,77,59,.24);border-radius:50%;animation:pairing-scan 2s ease-out infinite}.pairing-ring:nth-child(2){inset:18px;animation-delay:.45s}.pairing-ring:nth-child(3){inset:36px;animation-delay:.9s}.pairing-visual.found .pairing-ring{border-color:rgba(44,154,104,.45);animation-duration:1.15s}.pairing-visual.ready .pairing-ring{animation:none;opacity:0}.pairing-visual.timed-out .pairing-ring{animation:none;opacity:.12}.pairing-device{margin:18px 0 2px;padding:14px;border:1px solid var(--line);background:var(--surface-soft)}.pairing-device span{display:block;color:var(--muted);font-size:12px}.pairing-device strong{display:block;margin-top:3px;font-size:18px}.pairing-device[hidden]{display:none}@keyframes pairing-scan{0%{opacity:.7;transform:scale(.62)}75%,100%{opacity:0;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.pairing-ring{animation:none}.pairing-ring:first-child{opacity:.4}.pairing-wave{animation:none;opacity:1}}
+    .pairing-wifi{width:26px;height:26px;display:block;fill:none;stroke:var(--on-forest);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}.pairing-wave{opacity:.24;animation:pairing-wave-pulse 1.5s ease-in-out infinite}.pairing-wave-2{animation-delay:.22s}.pairing-wave-3{animation-delay:.44s}.pairing-wifi-dot{fill:var(--on-forest);stroke:none}.pairing-visual.found .pairing-wave{animation-duration:.9s}.pairing-visual.timed-out .pairing-wave{animation:none;opacity:.5}.pairing-visual.ready .pairing-wifi{display:none}.pairing-core::after{content:"";position:absolute;left:50%;top:50%;width:20px;height:10px;border-left:3px solid var(--on-forest);border-bottom:3px solid var(--on-forest);opacity:0;transform:translate(-50%,-65%) rotate(-45deg)}.pairing-visual.ready .pairing-core::after{opacity:1}@keyframes pairing-wave-pulse{0%,100%{opacity:.22}45%{opacity:1}}.pairing-ring{position:absolute;inset:0;border:2px solid rgba(24,77,59,.24);border-radius:50%;animation:pairing-scan 2s ease-out infinite}.pairing-ring:nth-child(2){inset:18px;animation-delay:.45s}.pairing-ring:nth-child(3){inset:36px;animation-delay:.9s}.pairing-visual.found .pairing-ring{border-color:rgba(44,154,104,.45);animation-duration:1.15s}.pairing-visual.ready .pairing-ring{animation:none;opacity:0}.pairing-visual.timed-out .pairing-ring{animation:none;opacity:.12}.pairing-device{margin:18px 0 2px;padding:14px;border:1px solid var(--line);background:var(--surface-soft)}.pairing-device span{display:block;color:var(--muted);font-size:12px}.pairing-device strong{display:block;margin-top:3px;font-size:18px}.pairing-device[hidden]{display:none}.pairing-warning{margin:0.9em 0 0;padding:0.7em 0.9em;border-left:0.25em solid var(--sun);background:var(--surface-soft);color:var(--muted);font-size:0.85rem;text-align:left}.pairing-warning[hidden]{display:none}.device-lost-modal{max-width:34em;text-align:left}@keyframes pairing-scan{0%{opacity:.7;transform:scale(.62)}75%,100%{opacity:0;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.pairing-ring{animation:none}.pairing-ring:first-child{opacity:.4}.pairing-wave{animation:none;opacity:1}}
     .image-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}.device-role-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}.device-role-choice{min-height:96px;display:grid;place-items:center;align-content:center;gap:7px;padding:14px;border:2px solid var(--line);border-radius:12px;background:var(--surface-soft);color:var(--ink);font-weight:750}.device-role-choice[aria-pressed="true"]{border-color:var(--forest);background:var(--forest-soft)}.device-role-choice .device-type-svg{width:30px;height:30px}.device-role-choice small{color:var(--muted);font-size:11px;font-weight:650}.device-room-create{display:grid;gap:8px;margin:4px 0 8px}.device-room-create label{color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.device-room-create-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px}.device-room-create-row input{min-height:44px;padding:10px 13px;border:1px solid var(--line);border-radius:11px;color:var(--ink);background:var(--surface-soft);font:inherit}.device-room-create-row button{min-height:44px}.device-room-empty{margin:14px 0;color:var(--muted);font-size:13px}.image-choice{min-height:148px;display:grid;place-items:center;align-content:center;gap:8px;padding:14px;border:2px solid var(--line);border-radius:12px;background:var(--surface-soft);color:var(--ink);font-weight:750}.image-choice.selected{border-color:var(--forest);background:var(--forest-soft);box-shadow:0 0 0 3px rgba(24,77,59,.08)}.image-choice .device-visual{width:78px;height:78px}.image-choice small{color:var(--muted);font-weight:650}.image-family{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--muted);font-size:13px}.image-family input{margin-top:2px;accent-color:var(--forest)}
     :root[data-theme="dark"] .quiet,:root[data-theme="dark"] .light-modal-head button{background:#26322c}
     :root[data-theme="dark"] .device-icon,:root[data-theme="dark"] .device-fallback{background:#223029}
@@ -758,8 +758,9 @@
 <dialog id="deviceOptionsDialog"><form id="deviceOptionsForm" class="modal"><h2 data-i18n="deviceOptions">Device options</h2><p id="deviceOptionsName"></p><div class="settings-grid"><div class="field"><label for="deviceTransition" data-i18n="transition">Smooth transition (seconds)</label><input id="deviceTransition" type="number" min="0" max="60" step=".1" value="0"></div><div class="field"><label for="deviceDebounce" data-i18n="debounce">Ignore repeats (seconds)</label><input id="deviceDebounce" type="number" min="0" max="60" step=".1" value="0"></div></div><label class="image-family"><input id="deviceRetain" type="checkbox"><span data-i18n="retainState">Keep the last MQTT state</span></label><div class="modal-actions"><button id="cancelDeviceOptions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button class="primary" type="submit" data-i18n="save">Save</button></div></form></dialog>
 <dialog id="deviceRoleDialog"><div class="modal"><h2 data-i18n="deviceRoleTitle">What is this device?</h2><p id="deviceRoleLead"></p><div id="deviceRoleChoices" class="device-role-choices"></div><div class="modal-actions"><button id="skipDeviceRole" class="quiet" type="button" data-i18n="skip">Skip</button></div></div></dialog>
 <dialog id="deviceRoomDialog"><div class="modal"><h2 data-i18n="deviceRoomTitle">Which room?</h2><p id="deviceRoomLead"></p><div id="deviceRoomChoices" class="device-role-choices"></div><form id="deviceRoomForm" class="device-room-create"><label for="deviceRoomName" data-i18n="deviceRoomNewLabel">Or create a new room</label><div class="device-room-create-row"><input id="deviceRoomName" type="text" maxlength="32" autocomplete="off" data-i18n-placeholder="deviceRoomNewPlaceholder" placeholder="Living room"><button class="secondary" type="submit" data-i18n="deviceRoomCreate">Create</button></div></form><div class="modal-actions"><button id="skipDeviceRoom" class="quiet" type="button" data-i18n="deviceRoomLater">Later</button></div></div></dialog>
+<dialog id="deviceLostDialog"><div class="modal device-lost-modal"><h2 id="deviceLostTitle" data-i18n="deviceLostTitle">Device left the network</h2><p id="deviceLostLead" data-i18n="deviceLostLead">The device dropped off the network before setup finished, so nothing was saved. Put it back into pairing mode and try again.</p><div class="modal-actions"><button id="closeDeviceLost" class="quiet" type="button" data-i18n="close">Close</button><button id="retryDeviceLost" class="primary" type="button" data-i18n="retrySetup">Try again</button></div></div></dialog>
 <dialog id="imageDialog"><form id="imageForm" class="modal" method="dialog"><h2 data-i18n="chooseDeviceImage">Which one looks like your device?</h2><p id="imageDialogLead"></p><div id="imageChoices" class="image-choices"></div><label class="image-family"><input id="applyImageToModel" type="checkbox"><span data-i18n="useForSameModel">Use this picture automatically for devices with the same model.</span></label><div class="modal-actions"><button id="cancelImage" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveImage" class="primary" type="submit" data-i18n="saveImage">Save picture</button></div></form></dialog>
-<dialog id="pairingDialog"><div class="modal pairing-modal"><div id="pairingVisual" class="pairing-visual" aria-hidden="true"><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-core"><svg class="pairing-wifi" viewBox="0 0 24 24" aria-hidden="true"><path class="pairing-wave pairing-wave-3" d="M2.5 8.6a15 15 0 0 1 19 0"/><path class="pairing-wave pairing-wave-2" d="M6 12.6a10 10 0 0 1 12 0"/><path class="pairing-wave pairing-wave-1" d="M9.5 16.6a5 5 0 0 1 5 0"/><circle class="pairing-wifi-dot" cx="12" cy="19.6" r="1.3"/></svg></span></div><div class="eyebrow" id="pairingPhase" data-i18n="pairingSearching">Searching</div><h2 id="pairingModalTitle" data-i18n="pairingTitle">Searching for new devices</h2><p id="pairingModalText" data-i18n="pairingHint">Put the nearby device into pairing mode.</p><div id="pairingDevice" class="pairing-device" hidden><span data-i18n="deviceFound">Device found</span><strong id="pairingDeviceName">—</strong></div><div class="modal-actions"><button id="hidePairing" class="quiet" type="button" data-i18n="hidePairing">Hide</button><button id="cancelPairing" class="secondary" type="button" data-i18n="stopSearch">Stop searching</button></div></div></dialog>
+<dialog id="pairingDialog"><div class="modal pairing-modal"><div id="pairingVisual" class="pairing-visual" aria-hidden="true"><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-ring"></span><span class="pairing-core"><svg class="pairing-wifi" viewBox="0 0 24 24" aria-hidden="true"><path class="pairing-wave pairing-wave-3" d="M2.5 8.6a15 15 0 0 1 19 0"/><path class="pairing-wave pairing-wave-2" d="M6 12.6a10 10 0 0 1 12 0"/><path class="pairing-wave pairing-wave-1" d="M9.5 16.6a5 5 0 0 1 5 0"/><circle class="pairing-wifi-dot" cx="12" cy="19.6" r="1.3"/></svg></span></div><div class="eyebrow" id="pairingPhase" data-i18n="pairingSearching">Searching</div><h2 id="pairingModalTitle" data-i18n="pairingTitle">Searching for new devices</h2><p id="pairingModalText" data-i18n="pairingHint">Put the nearby device into pairing mode.</p><div id="pairingDevice" class="pairing-device" hidden><span data-i18n="deviceFound">Device found</span><strong id="pairingDeviceName">—</strong></div><p id="pairingWarning" class="pairing-warning" data-i18n="pairingRemovedWarning" hidden>This device was removed a moment ago. If pairing does not finish, wait a minute and try again.</p><div class="modal-actions"><button id="hidePairing" class="quiet" type="button" data-i18n="hidePairing">Hide</button><button id="cancelPairing" class="secondary" type="button" data-i18n="stopSearch">Stop searching</button></div></div></dialog>
 <dialog id="removeDialog"><div class="modal"><h2 data-i18n="removeDeviceTitle">Remove from Zigbee network?</h2><p id="removeDeviceWarning" class="danger-copy"></p><p class="force-remove-copy" data-i18n="forceRemoveLead">If the device no longer responds, force delete removes only its stale coordinator record.</p><div class="field"><label id="removeDeviceInstruction" for="removeConfirmation"></label><input id="removeConfirmation" autocomplete="off" autocapitalize="none" spellcheck="false"></div><div class="modal-actions remove-actions"><button id="cancelRemove" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmRemove" class="danger-button" type="button" data-i18n="removePermanently" disabled>Remove permanently</button><button id="forceRemove" class="danger-button force-delete-button" type="button" data-i18n="forceRemove" disabled>Force delete record</button></div></div></dialog>
 <dialog id="repairDialog" class="repair-dialog"><div class="modal repair-modal" role="status" aria-live="polite"><span class="command-spinner repair-spinner" aria-hidden="true"></span><h2 data-i18n="repairInProgress">Repairing device…</h2><p id="repairDeviceName"></p></div></dialog>
 <dialog id="homeBackupDialog"><div class="modal home-backup-modal"><h2 data-i18n="homeRestoreTitle">Restore this backup?</h2><p id="homeBackupFileMeta" class="home-backup-meta"></p><div id="homeBackupSummary" class="home-backup-summary" role="status" aria-live="polite"></div><div class="home-backup-modes" role="radiogroup" data-i18n-aria="homeRestoreModeLabel" aria-label="How should it be restored?"><label class="home-backup-mode"><input type="radio" name="homeBackupMode" value="merge" checked><span><strong data-i18n="homeRestoreMergeTitle">Add alongside</strong><small data-i18n="homeRestoreMergeLead">Bring the backup back and keep anything you have added since.</small></span></label><label class="home-backup-mode replace-mode"><input type="radio" name="homeBackupMode" value="replace"><span><strong data-i18n="homeRestoreReplaceTitle">Replace everything</strong><small data-i18n="homeRestoreReplaceLead">Return exactly to the backup. Anything added since it was taken disappears.</small></span></label></div><div class="modal-actions"><button id="cancelHomeRestore" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmHomeRestore" class="primary" type="button" data-i18n="homeRestoreApply" disabled>Restore now</button></div></div></dialog>
@@ -890,7 +891,7 @@
     return new Set(Array.isArray(value)?value.filter(id=>typeof id==="string"):[]);
   }catch{return new Set()}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   const weatherState={location:savedWeatherLocation,data:savedWeatherSnapshot?.data||null,error:null,loading:false,updatedAt:savedWeatherSnapshot?.updatedAt||0};
   const weatherStaleAfter=7200000;
@@ -937,7 +938,7 @@
   const reducedMotion=()=>window.matchMedia?.("(prefers-reduced-motion: reduce)").matches===true;
   const ago=iso=>{if(!iso)return t("noData");const seconds=Math.max(0,Math.floor((Date.now()-new Date(iso))/1000));return seconds<8?t("justNow"):seconds<60?t("secondsAgo",{count:seconds}):seconds<3600?t("minutesAgo",{count:Math.floor(seconds/60)}):t("hoursAgo",{count:Math.floor(seconds/3600)})};
   const showToast=(message,error=false)=>{const toast=$("#toast");toast.textContent=message;toast.className=`toast show${error?" error":""}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className="toast",error?6000:3200)};
-  const api=async(url,options={})=>{const method=String(options.method||"GET").toUpperCase();const csrf=state.auth.csrfToken&&["POST","PUT","PATCH","DELETE"].includes(method)?{"x-villa-csrf":state.auth.csrfToken}:{};const response=await fetch(url,{cache:"no-store",...options,headers:{...(options.body===undefined?{}:{"content-type":"application/json"}),...csrf,...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(response.status===401&&!url.startsWith("/api/auth/")){state.auth={configured:true,authenticated:false,user:null,csrfToken:null,expiresAt:null};applyAuthUi();openAuthGate()}if(!response.ok)throw new Error(data.error||t("operationFailed"));return data};
+  const api=async(url,options={})=>{const method=String(options.method||"GET").toUpperCase();const csrf=state.auth.csrfToken&&["POST","PUT","PATCH","DELETE"].includes(method)?{"x-villa-csrf":state.auth.csrfToken}:{};const response=await fetch(url,{cache:"no-store",...options,headers:{...(options.body===undefined?{}:{"content-type":"application/json"}),...csrf,...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(response.status===401&&!url.startsWith("/api/auth/")){state.auth={configured:true,authenticated:false,user:null,csrfToken:null,expiresAt:null};applyAuthUi();openAuthGate()}if(!response.ok){const failure=new Error(data.error||t("operationFailed"));failure.status=response.status;if(data.code)failure.code=data.code;throw failure}return data};
   function setAuthState(data){
     state.auth={
       configured:data.configured===true,
@@ -3436,7 +3437,7 @@
     restoreDeviceFocus(focusToken);
   }
   async function refresh(){
-    try{const data=await api("/api/overview");const signature=JSON.stringify([data.devices,data.health,data.pairing,data.events,data.groups]);state.connectionError=null;state.devices=data.devices;state.zigbeeGroups=data.groups||[];state.events=data.events||[];state.health=data.health;state.pairing=data.pairing;state.overviewLoaded=true;trackPairingProgress();if(signature!==state.overviewSignature){state.overviewSignature=signature;render()}else renderSystemAlertBar();return true;}
+    try{const data=await api("/api/overview");const signature=JSON.stringify([data.devices,data.health,data.pairing,data.events,data.groups,data.departures]);state.connectionError=null;state.devices=data.devices;state.zigbeeGroups=data.groups||[];state.events=data.events||[];state.health=data.health;state.pairing=data.pairing;state.departures=data.departures||[];state.overviewLoaded=true;trackPairingProgress();watchSetupFlowDevice();if(signature!==state.overviewSignature){state.overviewSignature=signature;render()}else renderSystemAlertBar();return true;}
     catch(error){state.connectionError=error.message;$("#sideDot").className="status-dot bad";$("#sideStatus").textContent=t("serverUnreachable");renderSystemAlertBar();showToast(error.message,true);return false}
   }
   const pullRefreshState={tracking:false,refreshing:false,startX:0,startY:0,distance:0};
@@ -3537,6 +3538,11 @@
     if(pairingDevice)$("#pairingDeviceName").textContent=device?.name||pairingDevice.name||pairingDevice.id;
     $("#hidePairing").hidden=session.phase==="ready"||session.phase==="timed-out";
     $("#cancelPairing").textContent=t(session.phase==="timed-out"?"close":"stopSearch");
+    /* Az önce kaldırılan bir cihaz yeniden eşleşmeye başlıyorsa uyar: silme sırasında cihaza giden
+       "ağdan ayrıl" komutu mesh'te gecikirse yeni oturumu düşürebilir. */
+    const removedRecently=Boolean(pairingDevice)&&(state.departures||[]).some(item=>item.id===pairingDevice.id&&item.reason==="removed");
+    $("#pairingWarning").hidden=!removedRecently;
+    if(removedRecently)$("#pairingWarning").textContent=t("pairingRemovedWarning");
   }
   function trackPairingProgress(){
     const session=state.pairingSession;if(!session||session.phase==="ready")return;
@@ -3560,6 +3566,52 @@
       return;
     }
     if(state.pairing?.open===false)session.phase="timed-out";
+  }
+  /* Kurulum akışının hangi cihaz üstünde olduğunu tek yerden söyler: isim, görsel, rol ve oda
+     adımlarının hepsi aynı cihazı taşır. */
+  function setupFlowDeviceId(){
+    if(state.editing?.afterPairing)return state.editing.id;
+    if(state.imageEditing?.afterPairing)return state.imageEditing.id;
+    if(state.roleEditing?.afterPairing)return state.roleEditing.id;
+    if(state.roomEditing?.afterPairing)return state.roomEditing.id;
+    return null;
+  }
+  function deviceGoneCode(error){
+    return error?.code==="DEVICE_LEFT"||error?.code==="DEVICE_REMOVED"?error.code:null;
+  }
+  /* Kurulum açıkken cihaz listeden düşerse kullanıcı "Kaydet"e basana kadar bekletilmez: panel
+     zaten periyodik yeniliyor, sebep düştüğü anda söylenir. */
+  function watchSetupFlowDevice(){
+    if(state.deviceLost)return;
+    const id=setupFlowDeviceId();
+    if(!id||state.devices.some(device=>device.id===id))return;
+    const departure=(state.departures||[]).find(item=>item.id===id);
+    openDeviceLost(id,departure?.reason==="removed"?"DEVICE_REMOVED":"DEVICE_LEFT");
+  }
+  function renderDeviceLost(){
+    const lost=state.deviceLost;if(!lost)return;
+    const removed=lost.code==="DEVICE_REMOVED";
+    $("#deviceLostTitle").textContent=t(removed?"deviceRemovedTitle":"deviceLostTitle");
+    $("#deviceLostLead").textContent=t(removed?"deviceRemovedLead":"deviceLostLead");
+  }
+  /* Akış kilitli kalmaz: her adım kapatılır, kullanıcıya baştan deneme ya da kapatma bırakılır. */
+  function openDeviceLost(id,code){
+    state.deviceLost={id,code};
+    state.editing=null;state.imageEditing=null;state.roleEditing=null;state.roomEditing=null;state.pairingSession=null;
+    ["#nameDialog","#imageDialog","#deviceRoleDialog","#deviceRoomDialog","#pairingDialog"].forEach(selector=>{
+      const dialog=$(selector);if(dialog?.open)dialog.close();
+    });
+    renderDeviceLost();
+    if(!$("#deviceLostDialog").open)$("#deviceLostDialog").showModal();
+  }
+  function closeDeviceLost(){
+    state.deviceLost=null;
+    if($("#deviceLostDialog").open)$("#deviceLostDialog").close();
+    render();
+  }
+  function retryDeviceLost(){
+    closeDeviceLost();
+    startPairing(true);
   }
   async function startPairing(open=true){
     if(open&&!state.overviewLoaded)return;
@@ -3631,7 +3683,10 @@
       state.editing=null;$("#nameDialog").close();showToast(t("nameSaved"));await refresh();
       if(editing.afterPairing)continuePairingFlow(editing.id);
     }
-    catch(error){showToast(error.message,true)}
+    catch(error){
+      const gone=deviceGoneCode(error);
+      if(gone)openDeviceLost(editing.id,gone);else showToast(error.message,true);
+    }
   }
   function cancelName(){
     const editing=state.editing;
@@ -3680,7 +3735,8 @@
       render();
     }catch(error){
       button.disabled=false;
-      showToast(error.message,true);
+      const gone=deviceGoneCode(error);
+      if(gone)openDeviceLost(editing.id,gone);else showToast(error.message,true);
     }
   }
   function removeDevice(id){
@@ -4530,7 +4586,10 @@
       await saveDeviceRole(editing.id,role);
       showToast(t("deviceRoleSaved"));
       $("#deviceRoleDialog").close();
-    }catch(error){showToast(error.message,true)}
+    }catch(error){
+      const gone=deviceGoneCode(error);
+      if(gone)openDeviceLost(editing.id,gone);else showToast(error.message,true);
+    }
   }
   function askDeviceRole(id,afterPairing=false){
     const device=state.devices.find(item=>item.id===id);
@@ -9052,6 +9111,7 @@
   $("#deviceRoleDialog").onclose=()=>{const editing=state.roleEditing;state.roleEditing=null;if(editing?.afterPairing)askDeviceRoom(editing.id,true);else render()};
   $("#skipDeviceRoom").onclick=()=>$("#deviceRoomDialog").close();
   $("#deviceRoomForm").onsubmit=createDeviceRoom;
+  $("#closeDeviceLost").onclick=closeDeviceLost;$("#retryDeviceLost").onclick=retryDeviceLost;$("#deviceLostDialog").onclose=()=>{state.deviceLost=null};
   $("#deviceRoomDialog").onclose=()=>{const editing=state.roomEditing;state.roomEditing=null;if(editing?.afterPairing)finishPairingFlow(editing.id);else render()};
   $("#groupForm").onsubmit=event=>{event.preventDefault();saveDashboardGroup()};
   $("#groupName").oninput=updateGroupSelection;

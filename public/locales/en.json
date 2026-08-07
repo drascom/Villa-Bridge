@@ -1139,6 +1139,12 @@
     "automationThresholdAboveHeldShort": "{reading} stays above {value}",
     "automationThresholdBelowHeldShort": "{reading} stays below {value}",
     "automationSummaryStateFor": "When {device} {event} for {duration}, {target} will {action}.",
-    "automationCardSummaryStateFor": "{device} {event} for {duration} → {target} {action}"
+    "automationCardSummaryStateFor": "{device} {event} for {duration} → {target} {action}",
+    "deviceLostTitle": "Device left the network",
+    "deviceLostLead": "The device dropped off the network before setup finished, so nothing was saved. Put it back into pairing mode and try again.",
+    "deviceRemovedTitle": "This device was just removed",
+    "deviceRemovedLead": "You removed this device a moment ago, so its settings could not be saved. Add it again from the start when you are ready.",
+    "retrySetup": "Try again",
+    "pairingRemovedWarning": "This device was removed a moment ago. If pairing does not finish, wait a minute and try again."
   }
 }

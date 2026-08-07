@@ -994,3 +994,72 @@ test("çevrimdışı yoklama kapalıyken hiçbir şey yapılmaz", async (context
   await probeRound(source);
   assert.deepEqual(fixture.calls, ["read:genBasic:zclVersion:5000", "configure"]);
 });
+
+test("ağdan ayrılan cihaz kısa süreli hafızaya yazılır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-departure-leave-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  const store = new DeviceStore(new Map());
+  const source = new DirectZigbeeSource(
+    { devices: { [fixture.device.ieeeAddr]: { friendly_name: "Hall Switch" } }, groups: {}, dataDir: directory } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false,
+    new Map(),
+    (async () => fixture.definition) as never,
+    { enabled: false, spacingMs: 0 }
+  );
+  Object.assign(source, { controller: fixture.controller, refreshDevices: async () => undefined });
+  (source as unknown as { attachEvents(controller: unknown): void }).attachEvents(fixture.controller);
+
+  assert.equal(source.recentDeparture(fixture.device.ieeeAddr), undefined);
+
+  await fixture.handlers.get("deviceLeave")?.({ ieeeAddr: fixture.device.ieeeAddr } as never);
+
+  const departure = source.recentDeparture(fixture.device.ieeeAddr);
+  assert.equal(departure?.reason, "left");
+  assert.deepEqual(source.recentDepartures().map((entry) => entry.id), [fixture.device.ieeeAddr]);
+});
+
+test("silinen cihaz yeniden eşleşme uyarısı için 'kaldırıldı' diye anılır", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "villa-departure-remove-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const configurationFile = join(directory, "configuration.yaml");
+  await writeFile(configurationFile, "devices:\n  '0x00124b00self':\n    friendly_name: Hall Switch\n", "utf8");
+  const fixture = selfHealFixture();
+  const removals: string[] = [];
+  Object.assign(fixture.device, {
+    async removeFromNetwork() {
+      removals.push("network");
+    },
+    removeFromDatabase() {
+      removals.push("database");
+    }
+  });
+  const store = new DeviceStore(new Map());
+  const source = new DirectZigbeeSource(
+    {
+      devices: { [fixture.device.ieeeAddr]: { friendly_name: "Hall Switch" } },
+      groups: {},
+      dataDir: directory,
+      configurationFile
+    } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false,
+    new Map(),
+    (async () => fixture.definition) as never,
+    { enabled: false, spacingMs: 0 }
+  );
+  Object.assign(source, { controller: fixture.controller, refreshDevices: async () => undefined });
+  (source as unknown as { attachEvents(controller: unknown): void }).attachEvents(fixture.controller);
+
+  await source.removeDevice(fixture.device.ieeeAddr);
+
+  assert.deepEqual(removals, ["network"]);
+  assert.equal(source.recentDeparture(fixture.device.ieeeAddr)?.reason, "removed");
+
+  // Havadan giden "ağdan ayrıl" komutunun gecikmeli yankısı sebebi bozmamalı.
+  await fixture.handlers.get("deviceLeave")?.({ ieeeAddr: fixture.device.ieeeAddr } as never);
+  assert.equal(source.recentDeparture(fixture.device.ieeeAddr)?.reason, "removed");
+});

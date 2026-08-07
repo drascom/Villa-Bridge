@@ -1139,6 +1139,12 @@
     "automationThresholdAboveHeldShort": "{reading} {value} üstünde kalınca",
     "automationThresholdBelowHeldShort": "{reading} {value} altında kalınca",
     "automationSummaryStateFor": "{device} {duration} boyunca {event} sürerse {target} {action}.",
-    "automationCardSummaryStateFor": "{device} {duration} boyunca {event} → {target} {action}"
+    "automationCardSummaryStateFor": "{device} {duration} boyunca {event} → {target} {action}",
+    "deviceLostTitle": "Cihaz ağdan ayrıldı",
+    "deviceLostLead": "Cihaz kurulum bitmeden ağdan düştü, bu yüzden hiçbir şey kaydedilmedi. Cihazı yeniden eşleştirme moduna alıp tekrar deneyin.",
+    "deviceRemovedTitle": "Bu cihazı az önce kaldırdınız",
+    "deviceRemovedLead": "Cihazı az önce kaldırdığınız için ayarları kaydedilemedi. Hazır olduğunuzda baştan yeniden ekleyin.",
+    "retrySetup": "Tekrar dene",
+    "pairingRemovedWarning": "Bu cihaz az önce kaldırıldı. Eşleştirme tamamlanmazsa bir dakika bekleyip tekrar deneyin."
   }
 }

@@ -12,6 +12,7 @@ import {
 import { writeFileAtomic, writeJsonAtomic } from "./atomic-file.js";
 import type { DirectZigbeeConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
+import { DeviceDepartureLog, type DeviceDeparture } from "./device-departures.js";
 import { DeviceStore, featureValues } from "./device-store.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
@@ -210,6 +211,8 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private readonly otaUpdates = new Set<string>();
   /** Tuya tuş çerçevelerinin son ZCL sıra numarası; cihazın tekrarlarını eler. */
   private readonly lastButtonSequences = new Map<string, number>();
+  /** Az önce ağdan düşen/kaldırılan cihazlar; kurulum uçları sebebi buradan okur. */
+  private readonly departures = new DeviceDepartureLog();
   private readonly selfHeal: SelfHealScheduler;
 
   constructor(
@@ -653,6 +656,10 @@ export class DirectZigbeeSource implements ZigbeeSource {
     if (!device) throw new Error("Cihaz bulunamadı.");
     const previousName = this.config.devices[id]?.friendly_name ?? id;
     await removeZigbeeDevice(device, force);
+    // Zorlamasız silmede cihaza havadan "ağdan ayrıl" komutu gider; mesh'te geciken bu komut,
+    // kullanıcı aynı cihazı hemen yeniden eşleştirirse yeni oturumu düşürebilir. Kayıt panelin
+    // "bu cihazı az önce kaldırdınız" uyarısını verebilmesi için tutulur.
+    this.departures.record(id, "removed");
     delete this.config.devices[id];
     await this.persistDeviceConfiguration(id, null);
     this.definitions.delete(id);
@@ -671,6 +678,14 @@ export class DirectZigbeeSource implements ZigbeeSource {
       data: { friendly_name: previousName, ieee_address: id }
     });
     await this.persistStates();
+  }
+
+  recentDeparture(id: string): DeviceDeparture | undefined {
+    return this.departures.get(id);
+  }
+
+  recentDepartures(): DeviceDeparture[] {
+    return this.departures.list();
   }
 
   async prepareNetworkBackup(): Promise<null> {
@@ -763,6 +778,9 @@ export class DirectZigbeeSource implements ZigbeeSource {
     });
     controller.on("deviceLeave", async ({ ieeeAddr }) => {
       const friendlyName = this.config.devices[ieeeAddr]?.friendly_name ?? ieeeAddr;
+      // Cihaz listeden düşmeden önce sebebi not et: bundan sonraki her kurulum isteği
+      // "bulunamadı" yerine "az önce ağdan ayrıldı" diyebilsin.
+      this.departures.record(ieeeAddr, "left");
       this.publish("bridge/event", {
         type: "device_leave",
         data: { friendly_name: friendlyName, ieee_address: ieeeAddr }
