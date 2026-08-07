@@ -5772,7 +5772,7 @@ test("yalnız aç/kapat olan ışıkta kolon anahtar gibi çalışır ve klavyey
   );
 });
 
-test("büyük kumandanın çizildiği ışıkta parlaklık ve renk sıcaklığı satırları listeden düşer", async () => {
+test("büyük kumandanın çizildiği ışıkta parlaklık, renk sıcaklığı ve renk satırları listeden düşer", async () => {
   const dashboard = await readDashboardBundle();
 
   /* Eleme kumandanın KENDİ parçalarına dayanır: aynı `lightPanelParts`/`lightPanelSupported`
@@ -5780,22 +5780,33 @@ test("büyük kumandanın çizildiği ışıkta parlaklık ve renk sıcaklığı
      küme boştur — o cihazda hiçbir satır kaybolmaz. */
   assert.match(dashboard, /const lightPanelCoveredControls=device=>\{/);
   assert.match(dashboard, /const parts=lightPanelParts\(device\);\s+if\(!lightPanelSupported\(device,parts\)\)return new Set\(\);/);
-  // Yalnız parlaklık ve renk sıcaklığı düşer; aç/kapat ve renk satırlarına dokunulmadı.
-  assert.match(dashboard, /return new Set\(\[parts\.level,parts\.temperature\]\.filter\(Boolean\)\);/);
+  // Parlaklık, renk sıcaklığı, renk ve (yalnız devralınmışsa) güç kanalı düşer.
+  assert.match(
+    dashboard,
+    /return new Set\(\[parts\.level,parts\.temperature,parts\.color,lightPanelCoversPower\(device,parts\)\?parts\.power:null\]\.filter\(Boolean\)\);/
+  );
   /* Nesne kimliğiyle elenir, kimlik dizesiyle değil: kumandanın gerçekten bağladığı kumanda
      nesnesi düşer, `l2:brightness` gibi kumandanın dokunmadığı kanal satırı listede kalır. */
   assert.match(dashboard, /const covered=lightPanelCoveredControls\(device\);/);
   assert.match(dashboard, /\.filter\(control=>!covered\.has\(control\)\)/);
-  /* Göz ve kalem kaybolmadı, çünkü düşen satırlarda zaten yoktu: göz yalnız
-     `dashboardControlKinds` üyelerinde çıkar ve `level`/`temperature` o kümede DEĞİL; kalem
-     yalnız adlı aç/kapa kanalında çıkar. Bu iki koşul sabitlenir. */
+  /* Renk satırı bedelsiz düşer: kumanda renk kipinde AYNI arayüzü gösteriyor (`.color-picker` +
+     `data-color`), o satırda ne göz ne kalem vardı. Satır şablonunda ikisinin de olmadığı sabit. */
+  assert.match(
+    dashboard,
+    /if\(control\.kind==="color"\)return`<div class="control-row\$\{adminClass\}"\$\{adminAttr\}><div><div class="control-name">\$\{t\("color"\)\}<\/div>/
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /if\(control\.kind==="color"\)return`[^`]*(?:visibilityButton|renameControlButton)/
+  );
+  /* `level`/`temperature` satırlarında da göz yoktu: göz yalnız `dashboardControlKinds`
+     üyelerinde çıkar ve bu kind'lar o kümede DEĞİL. */
   assert.match(
     dashboard,
     /const dashboardControlKinds=new Set\(\["switch","fan","siren","cover","position","lock","climate"\]\);/
   );
-  assert.doesNotMatch(dashboard, /const dashboardControlKinds=new Set\(\[[^\]]*"(?:level|temperature)"/);
+  assert.doesNotMatch(dashboard, /const dashboardControlKinds=new Set\(\[[^\]]*"(?:level|temperature|color)"/);
   assert.match(dashboard, /const isDashboardControl=control=>dashboardControlKinds\.has\(control\.kind\)&&control\.adminOnly!==true;/);
-  assert.match(dashboard, /const renameControlButton=\(device,control\)=>\{\s+if\(!isNamedChannel\(control\)\|\|!deviceHasChannelNames\(device\)\)return"";/);
   assert.match(dashboard, /const isNamedChannel=control=>control\?\.kind==="switch"&&!String\(control\.id\|\|""\)\.includes\(":"\);/);
   // Kaydırıcı satırındaki göz yalnız `position`/`climate` için çıkar; onlar elenmiyor.
   assert.match(dashboard, /<div class="control-actions">\$\{isDashboardControl\(control\)\?visibilityButton\(device,control\):""\}<input type="range"/);
@@ -5804,4 +5815,47 @@ test("büyük kumandanın çizildiği ışıkta parlaklık ve renk sıcaklığı
     dashboard,
     /\$\{controlsBodyHtml\|\|\(panelHtml\?"":`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\)\}/
   );
+});
+
+test("göz kumandanın içine taşındı ve aç/kapa satırı yalnız gözü taşınmışsa düşer", async () => {
+  const dashboard = await readDashboardBundle();
+
+  /* Göz kip düğmelerinin yanında, kumandanın içinde. Yeni bileşen YOK: satırdakiyle birebir aynı
+     `visibilityButton` çağrısı, dolayısıyla sınıf, `role="switch"`/`aria-checked` ve etiket
+     bugünküyle aynı; bağlama da aynı genel seçiciden geliyor, ayrı bir kablo çekilmedi. */
+  assert.match(dashboard, /const eyeHtml=lightPanelCoversPower\(device,parts\)\?visibilityButton\(device,parts\.power\):"";/);
+  assert.match(
+    dashboard,
+    /const actionsHtml=modesHtml\|\|eyeHtml\?`<div class="light-actions">\$\{modesHtml\}\$\{eyeHtml\}<\/div>`:"";/
+  );
+  assert.match(dashboard, /\$\{actionsHtml\}\$\{presetsHtml\}\$\{effectHtml\}/);
+  assert.doesNotMatch(dashboard, /\$\{modesHtml\}\$\{presetsHtml\}/);
+  assert.match(
+    dashboard,
+    /return`<button class="visibility-toggle\$\{hidden\?" is-hidden":""\}" type="button" role="switch" aria-checked="\$\{hidden\?"false":"true"\}" data-visibility-device=/
+  );
+  assert.match(dashboard, /\$\$\("\[data-visibility-device\]:not\(\.tile-eye\)"\)\.forEach\(button=>button\.onclick=\(\)=>toggleTileVisibility\(/);
+  // Tek `visibilityButton` tanımı: panelde kopyası türetilmedi.
+  assert.equal((dashboard.match(/const visibilityButton=\(device,control\)=>\{/g) || []).length, 1);
+
+  /* Satır elenir ⟺ gözü kumanda taşır. Kalem taşıyan (çok kanallı) cihazda satır DURUR: kanal adı
+     ve kalem orada yaşıyor, kumandada kanal adı diye bir yer yok — işlev kaybıyla bitmez. */
+  assert.match(
+    dashboard,
+    /const lightPanelCoversPower=\(device,parts\)=>Boolean\(parts\.power\)&&isDashboardControl\(parts\.power\)&&!deviceHasChannelNames\(device\);/
+  );
+  assert.match(dashboard, /const deviceHasChannelNames=device=>deviceNamedChannels\(device\)\.length>1;/);
+  assert.match(dashboard, /const renameControlButton=\(device,control\)=>\{\s+if\(!isNamedChannel\(control\)\|\|!deviceHasChannelNames\(device\)\)return"";/);
+  // Aç/kapa satırı şablonu (kalem + göz) olduğu gibi duruyor: elenmeyen cihazda hiçbir şey değişmedi.
+  assert.match(
+    dashboard,
+    /<div class="control-name">\$\{esc\(name\)\}\$\{renameControlButton\(device,control\)\}<\/div>/
+  );
+
+  // Kumandanın görsel dili: 44×44 dokunma hedefi korunur, ölçüler viewport'a bağlı, sabit px eklenmedi.
+  assert.match(dashboard, /\.light-actions\{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:clamp\(7px,1\.1vw,12px\)\}/);
+  assert.match(dashboard, /\.light-actions \.visibility-toggle\{border-radius:14px\}/);
+  assert.match(dashboard, /\.visibility-toggle\{width:44px;height:44px/);
+  // Koyu temada göz zaten tanımlı; panelde ayrı bir tema kuralı gerekmedi.
+  assert.match(dashboard, /:root\[data-theme="dark"\] \.visibility-toggle\{border-color:#33413a\}/);
 });

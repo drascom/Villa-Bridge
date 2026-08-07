@@ -331,6 +331,8 @@
     .light-column-fill{position:absolute;left:0;right:0;bottom:0;background:var(--light-tint,var(--sun));transition:height .18s ease}
     .light-column.off .light-column-fill{opacity:.2}.light-column[aria-disabled="true"]{opacity:.5}
     .light-column-glyph{position:absolute;left:50%;bottom:clamp(7px,1.3vh,13px);width:clamp(20px,3vh,26px);height:clamp(20px,3vh,26px);transform:translateX(-50%);color:var(--ink);opacity:.5;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+    .light-actions{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:clamp(7px,1.1vw,12px)}
+    .light-actions .visibility-toggle{border-radius:14px}
     .light-modes{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(7px,1.1vw,12px)}
     .light-mode{min-width:44px;min-height:44px;display:grid;place-items:center;padding:0 clamp(9px,1.2vw,13px);border:1px solid var(--line);border-radius:14px;color:var(--muted);background:var(--surface);touch-action:manipulation}
     .light-mode svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -1513,6 +1515,15 @@
      vaat eder, o cihazlar zaten satır anahtarıyla açılıp kapanıyor. Lambayı süren röleyi kullanıcı
      rolüyle "Işık" yapınca kumanda kendiliğinden gelir; ölçüt yine yetenek, ad değil. */
   const lightPanelSupported=(device,parts)=>device?.category==="light"&&Boolean(parts.power||parts.level);
+  /* Kumandanın güç düğmesi aç/kapa satırıyla aynı kanalı sürüyor; satırı elemek için o satırın TAŞIDIĞI
+     her şeyin yukarı taşınmış olması gerekir. Göz (`visibilityButton`) kumandaya taşındı, kalem değil:
+     kalem yalnız ÇOK KANALLI cihazda çıkar ve o satır kanalın adını da taşır — kumandada kanal adı diye
+     bir yer yok, ayrıca kumanda yalnız ilk kanalı sürdüğünden öteki kanalların satırları listede kalır;
+     birini eleyip ötekini bırakmak listeyi asimetrik yapardı. Bu yüzden çok kanallı cihazda satır DURUR,
+     gözü de kendi satırında kalır (panelde çıkmaz) — her kanalın gözü tek yerde.
+     Yönetici-only kanal da elenmez: orada satırda zaten göz yoktu, satırın `data-admin-only` gizlemesi
+     korunur. Kısacası: satır elenir ⟺ gözü kumanda taşır. */
+  const lightPanelCoversPower=(device,parts)=>Boolean(parts.power)&&isDashboardControl(parts.power)&&!deviceHasChannelNames(device);
   const lightPanelMode=(device,parts)=>{
     const stored=state.lightPanelMode;
     if(stored==="temperature"&&parts.temperature)return"temperature";
@@ -1597,6 +1608,11 @@
       :"";
     const modeButtons=powerButton+modeButton("level",parts.level,mode==="level")+modeButton("temperature",parts.temperature,mode==="temperature")+modeButton("color",parts.color,mode==="color");
     const modesHtml=modeButtons?`<div class="light-modes" role="group" aria-label="${esc(t("quickControl"))}">${modeButtons}</div>`:"";
+    /* Göz kip düğmelerinin yanında, kumandanın içinde durur. Yeni bileşen yok: satırdakiyle BİREBİR
+       aynı `visibilityButton` çağrısı — aynı sınıf, aynı `role="switch"`/`aria-checked`, aynı
+       `data-visibility-*` bağlaması. Panoya ekleme/çıkarma davranışı değişmedi, yalnız yeri değişti. */
+    const eyeHtml=lightPanelCoversPower(device,parts)?visibilityButton(device,parts.power):"";
+    const actionsHtml=modesHtml||eyeHtml?`<div class="light-actions">${modesHtml}${eyeHtml}</div>`:"";
     /* Hazır renklerin altında panelin KENDİ renk seçicisi durur (`.color-picker` + `data-color`):
        serbest renk için ikinci bir arayüz yazılmadı, mevcut olan yeniden kullanıldı. */
     const presetsHtml=parts.color
@@ -1608,21 +1624,24 @@
     return`<div class="light-panel" data-light-panel="${esc(device.id)}">
         <div class="light-readout"><div class="light-readout-value" data-light-readout>${esc(readout)}</div><div class="light-readout-since">${esc(ago(device.stateUpdatedAt))}</div></div>
         <div class="light-column${lit?"":" off"}" data-light-column="${esc(device.id)}" data-light-kind="${spec.kind}" tabindex="0" role="${slider?"slider":"switch"}" ${slider?`aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" aria-valuetext="${esc(readout)}"`:`aria-checked="${lit}"`} aria-label="${esc(label)}"${offline?' aria-disabled="true"':""}${tint?` style="--light-tint:${esc(tint)}"`:""}><div class="light-column-fill" style="height:${percent}%"></div>${lightGlyphs.column}</div>
-        ${modesHtml}${presetsHtml}${effectHtml}
+        ${actionsHtml}${presetsHtml}${effectHtml}
       </div>`;
   };
-  /* Büyük kumanda parlaklığı ve renk sıcaklığını zaten sürüyor; aynı kanalın satır kopyası listeden
-     düşer, tek iş iki arayüzle yapılmaz. Eleme DAR tutulur: yalnız kumandanın çizildiği cihazda ve
-     yalnız kumandanın gerçekten bağladığı kumanda NESNELERİ (`main:brightness`, `main:temperature`)
-     düşer — kumanda çizilmeyen cihazda, ve çok kanallı bir cihazın `l2:brightness` gibi kumandanın
-     dokunmadığı kanallarında satır aynen kalır.
-     Sessiz işlev kaybı yok: düşen satırlar göz ya da kalem taşımıyordu. Göz (`visibilityButton`)
-     yalnız `dashboardControlKinds` üyesi kumandalarda çıkar, `level`/`temperature` o kümede değil;
-     kalem (`renameControlButton`) yalnız adlı aç/kapa kanalında çıkar. İkisi de yerinde duruyor. */
+  /* Büyük kumanda parlaklığı, renk sıcaklığını, rengi ve gücü zaten sürüyor; aynı kanalın satır
+     kopyası listeden düşer, tek iş iki arayüzle yapılmaz. Eleme DAR tutulur: yalnız kumandanın
+     çizildiği cihazda ve yalnız kumandanın gerçekten bağladığı kumanda NESNELERİ (`main:brightness`,
+     `main:temperature`, `main:color` ve devraldığı güç kanalı) düşer — kumanda çizilmeyen cihazda, ve
+     çok kanallı bir cihazın `l2:brightness` gibi kumandanın dokunmadığı kanallarında satır aynen kalır.
+     Sessiz işlev kaybı yok. `level`/`temperature`/`color` satırları ne göz ne kalem taşıyordu: göz
+     (`visibilityButton`) yalnız `dashboardControlKinds` üyelerinde çıkar ve bu üç kind o kümede DEĞİL,
+     kalem (`renameControlButton`) yalnız adlı aç/kapa kanalında çıkar. Renk satırı ayrıca bedelsiz:
+     kumanda renk kipinde aynı `.color-picker` + `data-color` arayüzünü gösteriyor. Aç/kapa satırı ise
+     yalnız `lightPanelCoversPower` doğruyken düşer — yani gözü kumandaya taşınmış, kalemi olmayan
+     kanalda; gerekçesi orada yazılı. */
   const lightPanelCoveredControls=device=>{
     const parts=lightPanelParts(device);
     if(!lightPanelSupported(device,parts))return new Set();
-    return new Set([parts.level,parts.temperature].filter(Boolean));
+    return new Set([parts.level,parts.temperature,parts.color,lightPanelCoversPower(device,parts)?parts.power:null].filter(Boolean));
   };
   const deviceDetailBodyHtml=device=>{
     const deviceFacts=facts(device);
