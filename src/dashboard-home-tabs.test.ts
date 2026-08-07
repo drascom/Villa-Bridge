@@ -284,24 +284,57 @@ test("eşleştirme akışının son adımı oda seçimi", async () => {
   assert.match(dashboard, /<dialog id="deviceRoomDialog">/);
 });
 
-test("cihazı olmayan grup Genel görünümde kart basmaz, sekmesi durur", async () => {
-  const source = await readDashboard();
+/* Boş grup kartı Genel görünümde basılmaz — ne cihazsız grup ne de tüm cihazları gizlenmiş grup.
+   Düzenleme kipi ayrı: göz düğmelerine ulaşılabilsin diye kart görünür kalır. */
+function runGroupWidgets(source: string, editing: boolean): string[] {
   const rendered: string[] = [];
   const run = new Function(
     "rendered",
+    "editing",
     `
-    const groups=[{id:"auto:lights",items:[]},{id:"salon",items:["a"]},{id:"bos",items:[]}];
+    const groups=[
+      {id:"auto:lights",items:[]},
+      {id:"salon",items:[{device:{id:"a"},control:null}]},
+      {id:"bos",items:[]},
+      {id:"gizli",items:[{device:{id:"b"},control:null}]}
+    ];
+    const state={dashboardEditing:editing};
     const dashboardGroups=()=>groups;
     const groupControlEntries=group=>group.items;
+    const isTileHidden=deviceId=>deviceId==="b";
     const groupWidgetHtml=group=>group.id;
     const $$=()=>[];
     const $=()=>({insertAdjacentHTML:(_position,html)=>rendered.push(html)});
+    ${extractFunction(source, "overviewGroupEntries")}
+    ${extractFunction(source, "groupHasVisibleEntries")}
     ${extractFunction(source, "renderGroupWidgets")}
     renderGroupWidgets();
   `
-  ) as (rendered: string[]) => void;
-  run(rendered);
-  assert.deepEqual(rendered, ["salon"]);
+  ) as (rendered: string[], editing: boolean) => void;
+  run(rendered, editing);
+  return rendered;
+}
+
+test("cihazı olmayan grup Genel görünümde kart basmaz, sekmesi durur", async () => {
+  const source = await readDashboard();
+
+  assert.deepEqual(runGroupWidgets(source, false), ["salon"]);
+});
+
+test("tüm cihazları gizlenmiş grup kart basmaz, düzenleme kipinde görünür kalır", async () => {
+  const source = await readDashboard();
+
+  // Normal görünümde "gizli" grubunun tek cihazı gizli → kart hiç basılmaz.
+  assert.deepEqual(runGroupWidgets(source, false), ["salon"]);
+  // Düzenleme kipinde kart döner: göz düğmesi olmadan kullanıcı gizlediğini geri açamaz.
+  assert.deepEqual(runGroupWidgets(source, true), ["salon", "gizli"]);
+  // Sekme şeridindeki sayı da aynı ölçüte bağlı, yoksa şeritteki sayı ekrandakiyle uyuşmaz.
+  assert.match(
+    source,
+    /const cards=groups\.filter\(group=>groupInOverview\(group\)&&groupHasVisibleEntries\(group\)\)\.length/
+  );
+  // Sekme şeridi girdi sayısına bakmaz: grup alt şeritte kalır.
+  assert.match(extractFunction(source, "homeTabItems"), /inOverview:groupInOverview\(group\)&&entries\.length>0/);
 });
 
 /* Görünürlük artık kart sırasından ayrı: anahtar `hiddenGroups`'a yazar ve sunucuya gider,

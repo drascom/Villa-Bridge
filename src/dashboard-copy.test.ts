@@ -395,6 +395,38 @@ test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async 
   ));
 });
 
+/* Eşleştirmenin son penceresi cihaz detayı: kullanıcı orada "bitti" diyebilmeli. Düğme tehlike
+   satırının altında ve tam genişlikte — "Kaldır"ın yanına konulmadı (yanlış basma) ve
+   `data-admin-only` almadı (ev sakini de bitirebilmeli). */
+test("cihaz detayında bitirme düğmesi tehlike satırının altında ve tam genişlikte", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(
+    dashboard,
+    /<div class="card-actions card-actions-done"><button class="primary" type="button" data-close-detail>\$\{esc\(t\(state\.detailFromPairing\?"finishSetup":"close"\)\)\}<\/button><\/div>/
+  );
+  // Sıra önemli: tehlike satırı önce, bitirme düğmesi sonra.
+  assert.match(dashboard, /card-actions-danger[\s\S]{0,400}?card-actions-done/);
+  assert.doesNotMatch(dashboard, /card-actions card-actions-done" data-admin-only/);
+  assert.match(
+    dashboard,
+    /\.card-actions\.card-actions-done>button\{flex:1 1 100%;width:100%;min-height:clamp\(44px,7vh,52px\)\}/
+  );
+  // Bağlam eşleştirmeden taşınır ve pencere kapanınca sıfırlanır.
+  assert.match(dashboard, /showDevice\(id,\{fromPairing:true\}\)/);
+  assert.match(dashboard, /function showDevice\(id,options=\{\}\)\{/);
+  assert.match(dashboard, /function openDeviceDetail\(id,options=\{\}\)\{/);
+  assert.match(dashboard, /state\.detailFromPairing=options\.fromPairing===true/);
+  assert.match(dashboard, /"close",\(\)=>\{state\.detailDevice=null;state\.detailFromPairing=false/);
+  assert.match(dashboard, /\$\$\("\[data-close-detail\]"\)\.forEach\(button=>button\.onclick=closeDeviceDetail\)/);
+  // Metin kurulum sihirbazının `finishSetup` anahtarıyla ortak: aynı cümle iki kez yazılmaz.
+  assert.match(dashboard, /finishSetup:"Finish setup"/);
+  assert.match(dashboard, /finishSetup:"Kurulumu tamamla"/);
+  assert.doesNotThrow(() => new Function(
+    dashboardScripts(dashboard)
+  ));
+});
+
 test("belirsiz cihaz görseli eşleştirme sonrasında kullanıcıya seçtirilir", async () => {
   const dashboard = await readDashboardBundle();
 
@@ -1353,7 +1385,7 @@ test("Ana Sayfa dışında 5 dakika boşta kalınca panel Ana Sayfa'ya döner", 
   assert.match(dashboard, /\["pointerdown","keydown","wheel"\]\.forEach\(type=>document\.addEventListener\(type,\(\)=>\{if\(!state\.screensaverOpen\)\{scheduleScreensaver\(\);scheduleIdleHomeReturn\(\)\}\},\{capture:true,passive:true\}\)\)/);
   assert.doesNotMatch(dashboard, /setInterval\([^)]*idleHomeReturn/);
   // Görünüm değişince sıfırlanır ve Ana Sayfa'ya dönünce ekran koruyucu kendi süresini sayar.
-  assert.match(dashboard, /closeScreensaver\(\);\s*scheduleScreensaver\(\);\s*scheduleIdleHomeReturn\(\);\s*\}\s*function showDevice\(id\)\{/);
+  assert.match(dashboard, /closeScreensaver\(\);\s*scheduleScreensaver\(\);\s*scheduleIdleHomeReturn\(\);\s*\}\s*function showDevice\(id,options=\{\}\)\{/);
   // Tek zamanlayıcı, sızıntısız.
   assert.match(dashboard, /function clearIdleHomeReturn\(\)\{if\(idleHomeReturnTimer!==null\)\{clearTimeout\(idleHomeReturnTimer\);idleHomeReturnTimer=null\}\}/);
   // Düzenleme modunun 60 saniyelik otomatik çıkışı ayrı ve değişmedi.
