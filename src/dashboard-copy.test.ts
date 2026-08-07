@@ -2197,11 +2197,11 @@ test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla göste
   // Düğmeler kontrol sütununun içinde, kontrollerin altında durur; ayrı bir alt blokta tekrarlanmaz.
   assert.match(
     dashboard,
-    /const controlsBodyHtml=device\.controls\.map\(control=>controlHtml\(device,control\)\)\.join\(""\)\+deviceButtonsHtml\(device\);/
+    /const controlsBodyHtml=device\.controls\.filter\(control=>!covered\.has\(control\)\)\.map\(control=>controlHtml\(device,control\)\)\.join\(""\)\+deviceButtonsHtml\(device\);/
   );
   assert.match(
     dashboard,
-    /<div class="device-detail-controls"><div class="controls">\$\{controlsBodyHtml\|\|`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\}<\/div><\/div>/
+    /<div class="device-detail-controls"><div class="controls">\$\{controlsBodyHtml\|\|\(panelHtml\?"":`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\)\}<\/div><\/div>/
   );
   assert.doesNotMatch(dashboard, /\$\{deviceButtonsHtml\(device\)\}\s*\$\{deviceRoomsHtml\(device\)\}/);
   assert.match(dashboard, /\.device-detail-controls \.controls>\.device-buttons\{margin-top:0\}/);
@@ -5702,7 +5702,8 @@ test("ışık detay kartındaki büyük dikey kumanda yetenek bazlı çizilir", 
   assert.match(dashboard, /<input class="color-picker" type="color" value="\$\{esc\(typeof parts\.color\.value==="string"\?parts\.color\.value:"#ffffff"\)\}" data-color=/);
   assert.match(dashboard, /const powerButton=parts\.power/);
   // Kumanda detay penceresinin en üstüne, mevcut düzenin ÜSTÜNE gelir; gerisi korunur.
-  assert.match(dashboard, /return`\$\{lightPanelHtml\(device\)\}<div class="device-detail-layout">/);
+  assert.match(dashboard, /const panelHtml=lightPanelHtml\(device\);/);
+  assert.match(dashboard, /return`\$\{panelHtml\}<div class="device-detail-layout">/);
   // Kolonun rengi ışığın o anki durumu: renk varsa o, renk sıcaklığı varsa Kelvin karşılığı,
   // düz ışıkta panelin sıcak sarısı (`--sun`). Kapalıyken sönük.
   assert.match(dashboard, /if\(typeof parts\.color\?\.value==="string"&&\/\^#\[0-9a-f\]\{6\}\$\/i\.test\(parts\.color\.value\)\)return parts\.color\.value\.toLowerCase\(\)/);
@@ -5765,5 +5766,42 @@ test("yalnız aç/kapat olan ışıkta kolon anahtar gibi çalışır ve klavyey
   assert.match(dashboard, /if\(edge!==null\)\{event\.preventDefault\(\);paint\(edge\);write\(edge,true\);return\}/);
   assert.match(dashboard, /if\(event\.key===" "\|\|event\.key==="Enter"\)\{\s+if\(!parts\.power\)return;/);
   // Işık olmayan cihazın kumandaları değişmedi: satır tabanlı kontroller yerinde.
-  assert.match(dashboard, /const controlsBodyHtml=device\.controls\.map\(control=>controlHtml\(device,control\)\)\.join\(""\)\+deviceButtonsHtml\(device\)/);
+  assert.match(
+    dashboard,
+    /const controlsBodyHtml=device\.controls\.filter\(control=>!covered\.has\(control\)\)\.map\(control=>controlHtml\(device,control\)\)\.join\(""\)\+deviceButtonsHtml\(device\)/
+  );
+});
+
+test("büyük kumandanın çizildiği ışıkta parlaklık ve renk sıcaklığı satırları listeden düşer", async () => {
+  const dashboard = await readDashboardBundle();
+
+  /* Eleme kumandanın KENDİ parçalarına dayanır: aynı `lightPanelParts`/`lightPanelSupported`
+     ikilisi hem kumandayı çiziyor hem satırı düşürüyor, ikisi ayrışamaz. Kumanda çizilmiyorsa
+     küme boştur — o cihazda hiçbir satır kaybolmaz. */
+  assert.match(dashboard, /const lightPanelCoveredControls=device=>\{/);
+  assert.match(dashboard, /const parts=lightPanelParts\(device\);\s+if\(!lightPanelSupported\(device,parts\)\)return new Set\(\);/);
+  // Yalnız parlaklık ve renk sıcaklığı düşer; aç/kapat ve renk satırlarına dokunulmadı.
+  assert.match(dashboard, /return new Set\(\[parts\.level,parts\.temperature\]\.filter\(Boolean\)\);/);
+  /* Nesne kimliğiyle elenir, kimlik dizesiyle değil: kumandanın gerçekten bağladığı kumanda
+     nesnesi düşer, `l2:brightness` gibi kumandanın dokunmadığı kanal satırı listede kalır. */
+  assert.match(dashboard, /const covered=lightPanelCoveredControls\(device\);/);
+  assert.match(dashboard, /\.filter\(control=>!covered\.has\(control\)\)/);
+  /* Göz ve kalem kaybolmadı, çünkü düşen satırlarda zaten yoktu: göz yalnız
+     `dashboardControlKinds` üyelerinde çıkar ve `level`/`temperature` o kümede DEĞİL; kalem
+     yalnız adlı aç/kapa kanalında çıkar. Bu iki koşul sabitlenir. */
+  assert.match(
+    dashboard,
+    /const dashboardControlKinds=new Set\(\["switch","fan","siren","cover","position","lock","climate"\]\);/
+  );
+  assert.doesNotMatch(dashboard, /const dashboardControlKinds=new Set\(\[[^\]]*"(?:level|temperature)"/);
+  assert.match(dashboard, /const isDashboardControl=control=>dashboardControlKinds\.has\(control\.kind\)&&control\.adminOnly!==true;/);
+  assert.match(dashboard, /const renameControlButton=\(device,control\)=>\{\s+if\(!isNamedChannel\(control\)\|\|!deviceHasChannelNames\(device\)\)return"";/);
+  assert.match(dashboard, /const isNamedChannel=control=>control\?\.kind==="switch"&&!String\(control\.id\|\|""\)\.includes\(":"\);/);
+  // Kaydırıcı satırındaki göz yalnız `position`/`climate` için çıkar; onlar elenmiyor.
+  assert.match(dashboard, /<div class="control-actions">\$\{isDashboardControl\(control\)\?visibilityButton\(device,control\):""\}<input type="range"/);
+  // Her şeyi kumanda devraldıysa "kumanda yok" metni yanlış olurdu: kumanda çizilmişken çıkmaz.
+  assert.match(
+    dashboard,
+    /\$\{controlsBodyHtml\|\|\(panelHtml\?"":`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\)\}/
+  );
 });

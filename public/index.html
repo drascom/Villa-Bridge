@@ -1611,6 +1611,19 @@
         ${modesHtml}${presetsHtml}${effectHtml}
       </div>`;
   };
+  /* Büyük kumanda parlaklığı ve renk sıcaklığını zaten sürüyor; aynı kanalın satır kopyası listeden
+     düşer, tek iş iki arayüzle yapılmaz. Eleme DAR tutulur: yalnız kumandanın çizildiği cihazda ve
+     yalnız kumandanın gerçekten bağladığı kumanda NESNELERİ (`main:brightness`, `main:temperature`)
+     düşer — kumanda çizilmeyen cihazda, ve çok kanallı bir cihazın `l2:brightness` gibi kumandanın
+     dokunmadığı kanallarında satır aynen kalır.
+     Sessiz işlev kaybı yok: düşen satırlar göz ya da kalem taşımıyordu. Göz (`visibilityButton`)
+     yalnız `dashboardControlKinds` üyesi kumandalarda çıkar, `level`/`temperature` o kümede değil;
+     kalem (`renameControlButton`) yalnız adlı aç/kapa kanalında çıkar. İkisi de yerinde duruyor. */
+  const lightPanelCoveredControls=device=>{
+    const parts=lightPanelParts(device);
+    if(!lightPanelSupported(device,parts))return new Set();
+    return new Set([parts.level,parts.temperature].filter(Boolean));
+  };
   const deviceDetailBodyHtml=device=>{
     const deviceFacts=facts(device);
     const updateState=device.state.update&&typeof device.state.update==="object"?device.state.update:{};
@@ -1625,13 +1638,16 @@
     const mediaHtml=`<div class="device-detail-media">${photoHtml}${factsHtml}${rolesHtml}</div>`;
     // Düğme de bir kontroldür: kumandayı zaten onunla kullanıyoruz. Bu yüzden düğmeler kontrol
     // sütununda, kontrollerin altında durur; aşağıda ikinci bir kopya gösterilmez.
-    const controlsBodyHtml=device.controls.map(control=>controlHtml(device,control)).join("")+deviceButtonsHtml(device);
-    // Boş-durum metni yalnızca ne kontrol ne de düğme kaldığında (sensör gibi) çıkar.
+    const covered=lightPanelCoveredControls(device);
+    const controlsBodyHtml=device.controls.filter(control=>!covered.has(control)).map(control=>controlHtml(device,control)).join("")+deviceButtonsHtml(device);
+    /* Boş-durum metni yalnızca ne kontrol ne de düğme kaldığında (sensör gibi) çıkar. Kumanda
+       çizilmişken çıkmaz: her şeyi kumanda devraldıysa "kumanda yok" demek yanlış olurdu. */
     /* Bitirme düğmesi tehlike satırının ALTINDA ve tam genişlikte: "Kaldır"ın yanına konursa
        yanlış basma davetiyesi olur, ayrıca o satır `data-admin-only` — ev sakini bitiremezdi.
        Kaydedilecek bir şey yok (ad/oda/rol kendi pencerelerinde kaydedildi), bu yüzden "Bitti". */
-    return`${lightPanelHtml(device)}<div class="device-detail-layout">
-        <div class="device-detail-controls"><div class="controls">${controlsBodyHtml||`<div class="device-exposed-empty">${t("noExposedControls")}</div>`}</div></div>
+    const panelHtml=lightPanelHtml(device);
+    return`${panelHtml}<div class="device-detail-layout">
+        <div class="device-detail-controls"><div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div></div>
         ${mediaHtml}
       </div>
       ${deviceRoomsHtml(device)}
