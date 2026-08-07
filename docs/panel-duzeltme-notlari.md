@@ -4,6 +4,11 @@ Kullanıcının panelde gezerken aldığı 8 not, koddaki karşılıkları ve uy
 Devir dokümanı: `../../HANDOFF-2026-08-07.md`. Hepsi `public/index.html`'e dokunuyor,
 biri ayrıca `src/location.ts` + `src/index.ts` istiyor.
 
+**Durum (2026-08-07, 04:30):** A, B ve C turları **yazıldı ve canlıya çıktı** (`2b57042`).
+Sekiz notun sekizi de uygulandı. `npm test` 521/521. Kalan: **kullanıcının 1024×640 göz testi**
+ve **D turu** (handoff'un kendi backlog'u — `/api/favorites` emekliliği, hub'a iki şehir,
+hava durumu detayı). D bilinçli olarak yapılmadı: sahibi uyanıkken yapılacak iş.
+
 ## 0. Kısıtlar
 
 | Kısıt | Kaynak | Sonuç |
