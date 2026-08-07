@@ -835,6 +835,7 @@
     "automationTargetLead": "Choose the device it should control.",
     "automationMapTitle": "What should happen?",
     "automationMapLead": "Choose what happens when it turns on and when it turns off.",
+    "automationMapLaterHint": "You will decide what happens in each case after you pick the device to run.",
     "automationMapWhenOn": "When {device} turns on",
     "automationMapWhenOff": "When {device} turns off",
     "automationMapNothing": "Do nothing",

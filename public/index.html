@@ -6854,9 +6854,14 @@
       return;
     }
     if(automationTriggerReady(wizard)){
+      // §5.4 — eşleme yolunda durum sorulmaz: hangi durumda ne olacağı hedef seçilince belirlenir.
+      // Tek satırlık ipucu bunu önden söyler; hedef seçilir seçilmez susar, eşleme formu zaten anlatır.
+      const mapHint=automationMappingMode(wizard)&&!wizard.targets.length&&!wizard.draftTargetId
+        ?`<p class="automation-hint">${esc(t("automationMapLaterHint"))}</p>`
+        :"";
       nodes.push({
         state:"done",fresh:wizard.fresh==="trigger",
-        body:automationSummaryHtml(automationTriggerLine(wizard),`data-automation-stage="${automationTriggerEditStage(wizard)}"`)
+        body:`${automationSummaryHtml(automationTriggerLine(wizard),`data-automation-stage="${automationTriggerEditStage(wizard)}"`)}${mapHint}`
       });
     }
   }

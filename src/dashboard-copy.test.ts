@@ -4285,6 +4285,77 @@ test("güneşin iki olayı tek kuralda eşleme formuyla kurulur", async () => {
   ]);
 });
 
+// §5.4 — eşleme yolunda "açık mı kapalı mı" sorusu hiç sorulmaz. Kullanıcı bunu eksik sanıp
+// gereksiz koşul eklemeye kalkıyordu: tetikleyici satırının altındaki tek satır cevabın nerede
+// verileceğini söyler. Yalnız eşleme yolunda ve yalnız hedef seçilmeden önce durur.
+test("eşleme yolunda tetikleyici satırının altında ne zaman karar verileceği yazar", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  // Tetikleyici kanalı hedef listesinden düşer: ikinci bir anahtar gerekiyor.
+  (harness.state.devices as unknown[]).push({
+    id: "0x0077", name: "Salon lambası", buttons: [], features: [], state: {},
+    controls: [{ id: "switch:state", property: "state", name: "Salon lambası", kind: "switch", valueOn: "ON", valueOff: "OFF", valueToggle: "TOGGLE" }]
+  });
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("deviceState");
+  api.chooseAutomationTriggerDevice("0x0011");
+
+  // Tetikleyici tamam: ipucu görünür, hedef henüz seçilmedi.
+  assert.match(harness.body(), /automationMapLaterHint/);
+
+  // Hedef listesi açıkken de durur: cevabın nerede verileceğini seçim anında hatırlatır.
+  await api.nextAutomationStep();
+  assert.equal(harness.wizard().stage, "target");
+  assert.match(harness.body(), /automationMapLaterHint/);
+
+  // Hedef seçilince eşleme formu zaten anlatır: ipucu susar.
+  api.chooseAutomationTargetDevice("0x0077");
+  assert.equal(harness.wizard().stage, "map");
+  assert.doesNotMatch(harness.body(), /automationMapLaterHint/);
+
+  // Güneş yolu da eşleme formuna düşer: aynı ipucu orada da durur.
+  const sun = await automationWizardHarness();
+  sun.api.openAutomationWizard(null);
+  sun.api.chooseAutomationPath("rule");
+  sun.api.chooseAutomationTrigger("sun");
+  await sun.api.nextAutomationStep();
+  assert.match(sun.body(), /automationMapLaterHint/);
+  sun.api.chooseAutomationTargetDevice("0x0011");
+  assert.equal(sun.wizard().stage, "map");
+  assert.doesNotMatch(sun.body(), /automationMapLaterHint/);
+
+  // Eşlemeye düşmeyen tetikleyicide çıkmaz: orada durum zaten baştan soruluyor.
+  const sensor = await automationWizardHarness();
+  sensor.api.openAutomationWizard(null);
+  sensor.api.chooseAutomationPath("rule");
+  sensor.api.chooseAutomationTrigger("sensor");
+  sensor.api.chooseAutomationTriggerDevice("0x0022");
+  sensor.api.chooseAutomationEvent("occupancy=true");
+  await sensor.api.nextAutomationStep();
+  // Tetikleyici satırı gerçekten basıldı; ipucunun yokluğu boş gövdeden gelmiyor.
+  assert.match(sensor.body(), /data-automation-stage="trigEvent"/);
+  assert.doesNotMatch(sensor.body(), /automationMapLaterHint/);
+});
+
+test("ne zaman karar verileceğini söyleyen satır tek şablon anahtarıdır", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Koşul yolu değil: satır yalnız eşleme kipinde ve hedef seçilmeden önce basılır.
+  assert.match(
+    dashboard,
+    /const mapHint=automationMappingMode\(wizard\)&&!wizard\.targets\.length&&!wizard\.draftTargetId\s*\?`<p class="automation-hint">\$\{esc\(t\("automationMapLaterHint"\)\)\}<\/p>`\s*:"";/
+  );
+  // Panelin mevcut ipucu dili kullanıldı: yeni bileşen yok.
+  assert.match(dashboard, /\.automation-hint\{margin:12px 0 0;max-width:56ch/);
+  // Tam şablon: parça birleştirme yok, iki dilde de geliştirici sözlüğü geçmiyor.
+  assert.match(dashboard, /automationMapLaterHint:"Hangi durumda ne olacağını, çalıştıracağın cihazı seçtikten sonra belirleyeceksin\."/);
+  assert.match(dashboard, /automationMapLaterHint:"You will decide what happens in each case after you pick the device to run\."/);
+  for (const word of ["eşleme formu", "tetikleyici", "koşul", "mapping form", "trigger", "condition"]) {
+    assert.doesNotMatch(dashboard, new RegExp(`automationMapLaterHint:"[^"]*${word}`, "i"));
+  }
+});
+
 // Tek `sun` tetikleyicisi taşıyan eski kural yeni ekrana kayıpsız düşer: kendi yönü dolu,
 // öbür yön "bir şey yapma". Canlıda böyle kurallar var, düzenlemede sessizce bozulmamalı.
 test("tek olaylı eski güneş kuralı iki olaylı ekrana kayıpsız açılır", async () => {

@@ -835,6 +835,7 @@
     "automationTargetLead": "Kontrol edeceği cihazı seçin.",
     "automationMapTitle": "Ne olsun?",
     "automationMapLead": "Açıldığında ve kapandığında ne olacağını seçin.",
+    "automationMapLaterHint": "Hangi durumda ne olacağını, çalıştıracağın cihazı seçtikten sonra belirleyeceksin.",
     "automationMapWhenOn": "{device} açıldığında",
     "automationMapWhenOff": "{device} kapandığında",
     "automationMapNothing": "Bir şey yapma",
