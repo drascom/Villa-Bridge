@@ -1087,7 +1087,10 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const shown=pending\?!controlAction\.active:controlAction\?\.active===true/);
   assert.match(dashboard, /class="group-control-tile \$\{visualState\}\$\{pending\?" pending":""\}\$\{failed\?" command-failed":""\}"/);
   assert.match(dashboard, /\.device-card\.command-failed,\.group-control-tile\.command-failed\{border-color:var\(--danger\)/);
-  assert.match(dashboard, /catch\(error\)\{for\(const \{device\} of entries\)flagCommandError\(device\.id\);showToast\(error\.message,true\)\}/);
+  // Döşemenin hata işareti tek cihaz komut yolundan gelir; toplu güç düğmesi kalktığı için
+  // gruba yayılan hata döngüsü artık yok.
+  assert.match(dashboard, /const failed=commandFailed\(device\.id\)/);
+  assert.doesNotMatch(dashboard, /for\(const \{device\} of entries\)flagCommandError\(device\.id\)/);
   assert.doesNotMatch(dashboard, /class="quick-state /);
   assert.match(dashboard, /const lowBatteryThreshold=\(\)=>state\.settings\?\.alerts\?\.lowBatteryThreshold\?\?15/);
   assert.match(dashboard, /const linkQualityPercent=device=>/);
@@ -1341,8 +1344,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /function runDashboardCommand\(button,deviceId,property,value\)\{\s*const messageKey=button\?\.dataset\.confirmCommand;\s*if\(messageKey\)\{confirmDashboardCommand\(deviceId,property,value,messageKey\);return\}/);
   assert.match(dashboard, /\$\$\("\[data-command-value\]"\)\.forEach\(button=>button\.onclick=\(\)=>runDashboardCommand\(button,button\.dataset\.device,button\.dataset\.property,JSON\.parse\(button\.dataset\.commandValue\)\)\)/);
   assert.match(dashboard, /\$\$\("\[data-group-device\]"\)\.forEach\(button=>button\.onclick=\(\)=>runDashboardCommand\(button,button\.dataset\.groupDevice/);
-  // Aynı onay diyaloğu toplu güç düğmesine de hizmet eder: grup kimliği varsa grup komutu çalışır.
-  assert.match(dashboard, /\$\("#confirmDeviceAction"\)\.onclick=\(\)=>\{const pending=state\.pendingConfirm;\$\("#deviceActionDialog"\)\.close\(\);if\(!pending\)return;if\(pending\.groupId\)commandDashboardGroup\(pending\.groupId\);else command\(pending\.id,pending\.property,pending\.value\)\}/);
+  // Onay diyaloğu tek cihaz komutunu taşır; toplu güç düğmesi kalktığı için grup dalı yok.
+  assert.match(dashboard, /\$\("#confirmDeviceAction"\)\.onclick=\(\)=>\{const pending=state\.pendingConfirm;\$\("#deviceActionDialog"\)\.close\(\);if\(!pending\)return;command\(pending\.id,pending\.property,pending\.value\)\}/);
   assert.match(dashboard, /confirmUnlockDevice:"Unlock \{name\}\? The door will open\."/);
   assert.match(dashboard, /confirmUnlockDevice:"\{name\} kilidi açılsın mı\? Kapı açılacak\."/);
   assert.match(dashboard, /const longPressDelay=560/);
@@ -1380,10 +1383,17 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /const groupDeviceControlId="@device"/);
   assert.match(dashboard, /data-group-show-device=/);
   assert.match(dashboard, /groupDeviceVisualState\(device\)/);
-  assert.match(dashboard, /data-group-power=/);
-  assert.match(dashboard, /const groupPowerIcon=.*class="group-action-svg"/);
+  // Toplu güç düğmesi kartın başlığından kalktı; başlıkta yalnız grup düzenleme düğmesi durur.
+  assert.doesNotMatch(dashboard, /data-group-power=/);
+  assert.doesNotMatch(dashboard, /groupPowerIcon/);
   assert.match(dashboard, /const groupEditIcon=.*class="group-action-svg"/);
-  assert.doesNotMatch(dashboard, /groupPending\?[^:]+:"⏻"/);
+  // Kalem yerine liste: panelde zaten kullanılan üç çubuk yolu, kendi görsel dilini açmıyor.
+  assert.match(dashboard, /const groupEditIcon=\(\)=>'<svg class="group-action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"\/><\/svg>'/);
+  assert.doesNotMatch(dashboard, /const groupEditIcon=[^\n]*M4 20h4L19 9l-4-4L4 16v4Z/);
+  // Davranış değişmedi: düğme hâlâ grup düzenleyicisini açar, etiketi de bunu söyler.
+  assert.match(dashboard, /data-edit-group="\$\{esc\(group\.id\)\}" aria-label="\$\{t\("editGroup"\)\}">\$\{groupEditIcon\(\)\}/);
+  assert.match(dashboard, /editGroup:"Edit group"/);
+  assert.match(dashboard, /editGroup:"Grubu düzenle"/);
   assert.match(dashboard, /createDeviceGroup:"Create device group"/);
   assert.match(dashboard, /createDeviceGroup:"Cihaz grubu oluştur"/);
   assert.match(dashboard, /data-widget-move="left">←/);
@@ -1539,9 +1549,10 @@ test("günlük cihaz tipleri göster/gizle, Quick Control ve dashboard grupları
   assert.match(dashboard, /const controls=device\.controls\.filter\(isDashboardControl\)/);
   assert.match(dashboard, /data-group-command-value=/);
   assert.match(dashboard, /JSON\.parse\(button\.dataset\.groupCommandValue\)/);
-  assert.match(dashboard, /groupPowerControl=control=>\["switch","fan","siren","cover"\]\.includes\(control\.kind\)/);
-  assert.match(dashboard, /function matchingZigbeePowerGroup\(entries\)/);
-  assert.match(dashboard, /api\(`\/api\/groups\/\$\{encodeURIComponent\(zigbeeGroup\.id\)\}\/command`/);
+  // Toplu güç düğmesiyle birlikte grup komutu yolu da kalktı: yalnız tek döşeme komutu var.
+  assert.doesNotMatch(dashboard, /groupPowerControl/);
+  assert.doesNotMatch(dashboard, /matchingZigbeePowerGroup/);
+  assert.doesNotMatch(dashboard, /api\(`\/api\/groups\/\$\{encodeURIComponent\(zigbeeGroup\.id\)\}\/command`/);
   assert.match(dashboard, /data-ota-check=/);
   assert.match(dashboard, /function checkOta\(id\)/);
   assert.match(dashboard, /\/ota-check`/);
