@@ -210,15 +210,17 @@ test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
   assert.match(dashboard, /addDevice:"Cihaz ekle"/);
   assert.match(dashboard, /addDevice:"Add device"/);
   assert.doesNotMatch(dashboard, /Yeni cihaz ekle/);
-  assert.match(dashboard, /id="devicesAddDevice" class="primary add-device"[^>]*><svg class="page-action-glyph"/);
-  assert.match(dashboard, /#devices \.page-head>\.add-device \.page-action-label\{position:static;/);
+  // `add-device` davranış kancası olarak kalır; biçim ayrı, sunumsal `.page-action-tile` sınıfından gelir.
+  assert.match(dashboard, /id="devicesAddDevice" class="primary add-device page-action-tile"[^>]*><svg class="page-action-glyph"/);
+  assert.match(dashboard, /\.page-action-tile \.page-action-label\{position:static;/);
   assert.match(dashboard, /id="refreshButton"><svg class="page-action-glyph"/);
   assert.match(dashboard, /#home \.home-actions button,#refreshButton\{[^}]*background:transparent;box-shadow:none\}/);
   assert.match(dashboard, /pullToRefresh:"Pull to refresh"/);
   assert.match(dashboard, /pullToRefresh:"Yenilemek için aşağı çekin"/);
-  assert.match(dashboard, /@media\(min-width:561px\)\{#devices \.page-head>\.add-device\{width:88px;min-width:88px;height:88px;flex:none;align-self:flex-start;display:flex;flex-direction:column/);
-  assert.doesNotMatch(dashboard, /#devices \.page-head>\.add-device\{width:auto!important/);
-  assert.doesNotMatch(dashboard, /#devices \.page-head>\.add-device\{margin-top:32px\}/);
+  // Döşemenin kare kenarı başlık ızgarasının yan sütunuyla aynı belirteçten gelir: sabit px yok.
+  assert.match(dashboard, /@media\(min-width:561px\)\{\.page-action-tile\{width:var\(--head-action-w\);min-width:var\(--head-action-w\);height:var\(--head-action-w\);flex:none;align-self:center;display:flex;flex-direction:column/);
+  assert.doesNotMatch(dashboard, /\.page-action-tile\{[^}]*width:88px/);
+  assert.doesNotMatch(dashboard, /#devices \.page-head>\.add-device\{/);
   assert.match(dashboard, /#devices #refreshButton \.page-action-label\{position:absolute!important/);
   assert.match(dashboard, /addEventListener\("touchmove"/);
   assert.match(dashboard, /\{passive:false\}/);
@@ -277,8 +279,10 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /const mediaHtml=`<div class="device-detail-media">\$\{photoHtml\}\$\{factsHtml\}\$\{rolesHtml\}<\/div>`/);
   assert.match(dashboard, /\.device-detail-roles \.control-select\{min-width:0;max-width:100%\}/);
   assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls"><div class="controls">\$\{controlsBodyHtml\|\|/);
-  assert.match(dashboard, /#devices \.page-head \.lead,#home \.page-head \.lead\{display:none\}/);
-  assert.match(dashboard, /<p class="lead" data-i18n="devicesLead">/);
+  // Alt sayfalarda `.lead` artık markup'ta yok; gizleme kuralı yalnız ana ekran için kaldı.
+  assert.match(dashboard, /#home \.page-head \.lead\{display:none\}/);
+  assert.doesNotMatch(dashboard, /data-i18n="devicesLead"/);
+  assert.doesNotMatch(dashboard, /devicesLead:/);
   assert.match(dashboard, /<div class="card-actions card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="\$\{esc\(device\.id\)\}">/);
   assert.match(dashboard, /\.card-actions-danger\{justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:1px solid var\(--line\)\}/);
   assert.match(dashboard, /\.device-detail-layout\{display:grid;gap:18px;margin-bottom:18px\}/);
@@ -1502,18 +1506,21 @@ test("dar sütunda hareket satırları dikey yığılır ve kapasite yeni satır
 test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
   const dashboard = await readDashboardBundle();
 
-  // Menü penceresindeki beşinci düğme: Home / Cihazlar / Otomasyon / Bağlantılar / Ayarlar.
-  const automationNav = dashboard.indexOf('data-view="automations"');
-  const devicesNav = dashboard.indexOf('data-view="devices"');
-  const connectionsNav = dashboard.indexOf('data-view="connections"');
-  assert.ok(devicesNav >= 0 && devicesNav < automationNav && automationNav < connectionsNav);
-  assert.match(dashboard, /<button class="nav-button" type="button" data-view="automations" data-admin-only>/);
+  // Otomasyon menüden çıktı, ana ekranın dördüncü hızlı düğmesi oldu: menü alt sayfalardan
+  // kalkınca "Ayarlar → Otomasyonlar" iki dokunuş olacaktı; şimdi tek dokunuş.
+  assert.doesNotMatch(dashboard, /class="nav-button"[^>]*data-view="automations"/);
+  assert.match(dashboard, /<button id="homeAutomations" class="quiet" type="button" data-view-link="automations" data-admin-only><svg class="home-action-glyph"/);
+  assert.match(dashboard, /id="homeAutomations"[\s\S]{0,300}?<span class="home-action-label" data-i18n="navAutomations">/);
   assert.match(dashboard, /navAutomations:"Automations"/);
   assert.match(dashboard, /navAutomations:"Otomasyon"/);
+  // Ana ekranın dört eylemi tek satırda, kaynak sırasında: Ekle · Düzenle · Otomasyon · Menü.
+  assert.match(dashboard, /<div class="home-actions"><button id="addWidget"[\s\S]*?<button id="editDashboard"[\s\S]*?<button id="homeAutomations"[\s\S]*?<button class="app-menu-button"[\s\S]*?<\/div><\/header>/);
 
   // Sayfa ve iki yollu giriş; yol seçimi artık sayfada değil, sihirbaz modalinin ilk adımında.
   assert.match(dashboard, /<section id="automations" class="view" data-admin-only>/);
-  assert.match(dashboard, /id="newAutomation" class="primary"/);
+  assert.match(dashboard, /id="newAutomation" class="primary page-action-tile"/);
+  // Görsel dil birliği biçimden gelir; davranış kancası `add-device` asla verilmez.
+  assert.doesNotMatch(dashboard, /id="newAutomation"[^>]*add-device/);
   assert.doesNotMatch(dashboard, /id="automationPaths"/);
   // Yol seçimi satır dilinde: çerçeveli kart yok, ikon + metin satırı var.
   assert.match(dashboard, /data-automation-path="link"/);
@@ -4392,15 +4399,33 @@ test("üst gezinme şeridi kalkar, yerine her ekranda duran tek menü düğmesi 
   assert.doesNotMatch(dashboard, /class="nav-utility/);
   assert.doesNotMatch(dashboard, /landscapeLanguageCode/);
 
-  // Menü düğmesi HER görünümün başlık satırında: yoksa kullanıcı ana ekrana dönemez.
+  // Menü düğmesi YALNIZ ana ekranda. Alt sayfalarda yerini aynı ölçüdeki "Genel görünüm"
+  // düğmesi alır — o pencere açmadığı için `aria-haspopup`/`aria-expanded` taşımaz.
   const menuButton =
     /<button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu">/g;
-  assert.equal(dashboard.match(menuButton)?.length, 5);
-  for (const view of ["home", "devices", "automations", "connections", "settings"]) {
+  assert.equal(dashboard.match(menuButton)?.length, 1);
+  const backButton =
+    /<button class="app-menu-button" type="button" data-view-link="home" data-i18n-aria="backToOverview" aria-label="Back to overview">/g;
+  assert.equal(dashboard.match(backButton)?.length, 4);
+  const viewHead = (view: string): string => {
     const section = dashboard.slice(dashboard.indexOf(`<section id="${view}" class="view`));
-    const head = section.slice(0, section.indexOf("</header>"));
-    assert.ok(head.includes("data-app-menu"), `${view} başlığında menü düğmesi yok`);
+    return section.slice(0, section.indexOf("</header>"));
+  };
+  assert.ok(viewHead("home").includes("data-app-menu"), "ana ekran başlığında menü düğmesi yok");
+  for (const view of ["devices", "automations", "connections", "settings"]) {
+    const head = viewHead(view);
+    assert.ok(head.includes('data-view-link="home"'), `${view} başlığında genel görünüm düğmesi yok`);
+    assert.ok(!head.includes("data-app-menu"), `${view} başlığında menü düğmesi kalmış`);
+    assert.ok(!head.includes("aria-haspopup"), `${view} başlığında ölü aria-haspopup kalmış`);
+    assert.ok(!head.includes("aria-expanded"), `${view} başlığında ölü aria-expanded kalmış`);
   }
+  // Simge alt şeritteki "Genel görünüm" sekmesinin ta kendisi: iki farklı "eve dön" görseli olmasın.
+  assert.match(dashboard, /overview:'<path d="M4 11 12 4l8 7"\/><path d="M6 10v9h12v-9"\/><path d="M10 19v-5h4v5"\/>'/);
+  assert.match(dashboard, /data-i18n-aria="backToOverview" aria-label="Back to overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7"\/><path d="M6 10v9h12v-9"\/><path d="M10 19v-5h4v5"\/><\/svg>/);
+  assert.match(dashboard, /backToOverview:"Back to overview"/);
+  assert.match(dashboard, /backToOverview:"Genel görünüme dön"/);
+  // Görünüm değiştiren düğmeler `.nav-button` DEĞİL: o sınıf menü ızgarasının biçimini taşıyor.
+  assert.match(dashboard, /\$\$\("\[data-view-link\]"\)\.forEach\(button=>button\.onclick=\(\)=>activateView\(button\.dataset\.viewLink\)\);/);
 
   // Hamburger seçildi: dişli bu panelde zaten "Ayarlar" görünümünü anlatıyor.
   assert.match(dashboard, /class="app-menu-button"[^>]*>\s*<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"\/>/);
@@ -4413,8 +4438,8 @@ test("üst gezinme şeridi kalkar, yerine her ekranda duran tek menü düğmesi 
   assert.match(dashboard, /openMenu:"Open menu"/);
   assert.match(dashboard, /openMenu:"Menüyü aç"/);
 
-  // Şeritteki her şey menüye taşındı: beş görünüm + tema + dil + çıkış + bağlantı durumu.
-  for (const view of ["home", "devices", "automations", "connections", "settings"]) {
+  // Şeritteki her şey menüye taşındı; Otomasyon ana ekrana çıktığı için menüde dört görünüm kalır.
+  for (const view of ["home", "devices", "connections", "settings"]) {
     assert.match(dashboard, new RegExp(`class="nav-button[^"]*" type="button" data-view="${view}"`));
   }
   const menuDialog = dashboard.slice(
@@ -4445,7 +4470,64 @@ test("üst gezinme şeridi kalkar, yerine her ekranda duran tek menü düğmesi 
   assert.doesNotMatch(dashboard, /color-mix\(/);
 });
 
-test("villa menüsü tam ekran açılır ve beş görünüm kare ızgara olur", async () => {
+test("alt sayfalar ortak başlık omurgasını paylaşır: ana sayfa · ortada başlık · sayfa eylemi", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Simetrik üç sütun: yan sütunlar aynı belirteçten geldiği için sağ hücre boşken bile
+  // başlık gerçekten ortada durur. Esnek `justify-content` düğme genişliğiyle kayardı.
+  assert.match(
+    dashboard,
+    /\.page-head\{display:grid;grid-template-columns:var\(--head-action-w\) minmax\(0,1fr\) var\(--head-action-w\);align-items:center;gap:var\(--head-action-gap\);margin-bottom:30px\}/,
+  );
+  assert.doesNotMatch(dashboard, /\n\s*\.page-head\{display:flex/);
+  // Ana ekran şablonun dışında: hub, metrik satırı ve `.home-actions` kendi düzeninde.
+  assert.match(dashboard, /#home \.page-head\{display:flex;justify-content:space-between;align-items:flex-start;gap:28px\}/);
+  // Başlık taşarsa üç nokta; sabit px yok, yükseklik viewport'tan türer.
+  assert.match(dashboard, /\.page-head-title\{min-width:0;text-align:center\}/);
+  assert.match(
+    dashboard,
+    /\.page-head-title h1\{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp\(26px,4\.6vh,40px\);line-height:1\.12\}/,
+  );
+
+  // Dört alt sayfanın orta hücresi tek başlıktır: `.eyebrow` ve `.lead` kalktı.
+  for (const [view, key] of [
+    ["devices", "navDevices"],
+    ["automations", "navAutomations"],
+    ["connections", "navConnections"],
+    ["settings", "navSettings"],
+  ]) {
+    const section = dashboard.slice(dashboard.indexOf(`<section id="${view}" class="view`));
+    const head = section.slice(0, section.indexOf("</header>"));
+    assert.ok(head.includes(`<div class="page-head-title"><h1 data-i18n="${key}">`), `${view} başlığı orta hücrede değil`);
+    assert.ok(!head.includes('class="eyebrow"'), `${view} başlığında eyebrow kalmış`);
+    assert.ok(!head.includes('class="lead"'), `${view} başlığında lead kalmış`);
+  }
+  for (const key of [
+    "allEquipment",
+    "automationEyebrow",
+    "phonesAssistants",
+    "systemConnections",
+    "devicesLead",
+    "automationsLead",
+    "connectionsLead",
+    "settingsLead",
+  ]) {
+    assert.doesNotMatch(dashboard, new RegExp(`${key}[:"]`), `${key} artık kullanılmıyor, sözlükten de düşmeli`);
+  }
+
+  // Sağ hücre yalnız Cihazlar ve Otomasyonlar'da dolu; ikisi de aynı sunumsal döşemeyi giyer.
+  const tiles = dashboard.match(/class="[^"]*page-action-tile[^"]*"/g) ?? [];
+  assert.equal(tiles.length, 2);
+  for (const view of ["connections", "settings"]) {
+    const section = dashboard.slice(dashboard.indexOf(`<section id="${view}" class="view`));
+    const head = section.slice(0, section.indexOf("</header>"));
+    assert.ok(!head.includes("page-action-tile"), `${view} başlığında olmayan bir sayfa eylemi var`);
+  }
+
+  assert.doesNotMatch(dashboard, /color-mix\(/);
+});
+
+test("villa menüsü tam ekran açılır ve kalan görünümler kare ızgara olur", async () => {
   const dashboard = await readDashboardBundle();
 
   // Sütun sayısı ekrandan türer: `auto-fit` + `minmax`, hiçbir yerde sabit sütun sayısı yok.
