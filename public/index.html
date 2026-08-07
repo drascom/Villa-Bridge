@@ -399,7 +399,14 @@
     .automation-summary-main:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     .automation-line{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:16px;line-height:1.35}
     .automation-line strong{color:var(--forest);font-weight:700}
-    .automation-line-meta,.automation-line-when,.automation-line-dot{color:var(--muted)}
+    .automation-line-meta{color:var(--muted)}
+    /* Eşleme satırı iki ayrı çift taşır: "açılınca → kapanır" ve "kapanınca → açılır". Nokta ayracı
+       yetmiyordu — çiftler tek cümle gibi akıyordu — o yüzden her çift kendi kutusunda durur.
+       Çift içinde kırılma yok; sığmayan çift bir alt satıra iner, harf kesilmez. */
+    .automation-line:has(.automation-map-pairs){display:flex;flex-wrap:wrap;align-items:center;gap:clamp(.25rem,.6vw,.45rem);white-space:normal;overflow:visible;text-overflow:clip}
+    .automation-map-pairs{display:inline-flex;flex-wrap:wrap;align-items:center;gap:clamp(.3rem,.9vw,.55rem);vertical-align:middle;white-space:normal}
+    .automation-map-pair{display:inline-flex;align-items:center;gap:clamp(.2rem,.5vw,.35rem);padding:clamp(.05rem,.2vh,.15rem) clamp(.25rem,.6vw,.4rem);border:1px solid var(--line);border-radius:999px;white-space:nowrap}
+    .automation-map-from,.automation-map-arrow{color:var(--muted);font-size:clamp(.72rem,1.4vw,.82rem);font-weight:700;line-height:1.2}
     .automation-line-glyph{margin-right:2px}
     .automation-line-step{display:inline-grid;place-items:center;width:20px;height:20px;margin-right:6px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px;font-weight:800;line-height:1;vertical-align:middle}
     .automation-summary.is-quiet .automation-line{opacity:.78}.automation-summary.is-quiet .automation-line strong{color:var(--muted);font-weight:600}
@@ -5959,6 +5966,23 @@
   const automationStrong=text=>`<strong>${esc(text)}</strong>`;
   const automationPillKeys={on:"automationPillOn",off:"automationPillOff",toggle:"automationPillToggle",none:"automationPillNothing"};
   const automationPillHtml=mode=>`<span class="automation-pill act-${mode}">${esc(t(automationPillKeys[mode]||automationPillKeys.on))}</span>`;
+  // ————— eşleme çifti: "kaynak → sonuç". Satırda iki ayrı öbek durur, çünkü kural iki ayrı
+  // eşlemedir; tek cümle gibi akmasın diye her çift kendi kutusundadır.
+  // Çevirinin tamamı tek anahtardır (parça birleştirme YOK): kelime sırası tr/en'de farklı, o yüzden
+  // ok bile şablonun içinde `{arrow}` olarak durur — yerini çeviri seçer, kod değil.
+  // Ok yalnız süstür: `aria-hidden` ile okuyucudan gizlenir, çiftin tam metni `aria-label`da kalır.
+  const automationMapPairKeys={on:"On",off:"Off",sunset:"Sunset",sunrise:"Sunrise",toggle:"Toggle",none:"Nothing"};
+  const automationMapPairKey=(from,mode)=>`automationMapPair${automationMapPairKeys[from]||"On"}${automationMapPairKeys[mode]||"On"}`;
+  const automationMapPairHtml=(from,mode)=>{
+    // Şablon ayracı: `{arrow}` yerine görünmez bir işaret koyup ikiye böleriz. Çeviri oku
+    // taşımıyorsa (ya da anahtar eksikse) metnin tamamı sonuç öbeği olur, uydurma ok çizilmez.
+    const halves=t(automationMapPairKey(from,mode),{arrow:"\u001f"}).split("\u001f");
+    const source=halves.length>1?halves[0].trim():"";
+    const result=(halves.length>1?halves[1]:halves[0]).trim();
+    const label=[source,result].filter(Boolean).join(" ");
+    const lead=source?`<span class="automation-map-from">${esc(source)}</span><span class="automation-map-arrow" aria-hidden="true">→</span>`:"";
+    return`<span class="automation-map-pair" role="img" aria-label="${esc(label)}">${lead}<span class="automation-pill act-${mode}">${esc(result)}</span></span>`;
+  };
   const automationSummaryHtml=(line,hook,quiet,removeHook)=>`<div class="automation-summary${quiet?" is-quiet":""}"><button class="automation-summary-main" type="button" ${hook}><span class="automation-line">${line}</span><span class="automation-change">${esc(t("automationChange"))}</span></button>${removeHook?`<button class="automation-summary-remove" type="button" ${removeHook} aria-label="${esc(t("automationRemove"))}" title="${esc(t("automationRemove"))}"><span aria-hidden="true">✕</span></button>`:""}</div>`;
   // Adım içinde seçim yapılınca uzun liste yerine tek satır durur: tamamlanmış düğümlerdeki
   // aynı özet bileşeni, aynı "Değiştir" metniyle. Basınca liste geri açılır, seçim korunur.
@@ -6778,12 +6802,13 @@
     if(kind==="scene")return`<span class="automation-line-glyph" aria-hidden="true">🎬</span> ${automationStrong(automationGroupName(target.groupId))} <span class="automation-line-meta">${esc(automationSceneName(target.groupId,target.sceneId))}</span>`;
     const name=automationStrong(automationActionName(automationTargetRef(target)));
     if(!automationMappingMode(wizard))return`${name} ${automationPillHtml(automationTargetMode(target))}`;
-    const part=(labelKey,mode)=>`<span class="automation-line-when">${esc(t(labelKey))}</span> ${automationPillHtml(mode)}`;
     const sun=automationSunBoth(wizard);
-    const parts=[];
-    if(target.mapOn!=="none")parts.push(part(sun?"automationMapSunsetShort":"automationMapOnShort",target.mapOn));
-    if(target.mapOff!=="none")parts.push(part(sun?"automationMapSunriseShort":"automationMapOffShort",target.mapOff));
-    return`${name} ${parts.join(' <span class="automation-line-dot" aria-hidden="true">·</span> ')}`;
+    const pairs=[];
+    if(target.mapOn!=="none")pairs.push(automationMapPairHtml(sun?"sunset":"on",target.mapOn));
+    // "Bir şey yapma" seçilen yön hiç çizilmez: sessiz bir boşluk değil, o çift yok demektir.
+    if(target.mapOff!=="none")pairs.push(automationMapPairHtml(sun?"sunrise":"off",target.mapOff));
+    if(!pairs.length)return name;
+    return`${name} <span class="automation-map-pairs">${pairs.join("")}</span>`;
   };
   const automationAutoOffLineText=wizard=>{
     const target=wizard.targets.find(item=>automationTargetMode(item)==="on")||null;

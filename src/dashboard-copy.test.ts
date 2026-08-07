@@ -3187,7 +3187,9 @@ const automationExports = [
   "nextAutomationStep"
 ];
 
-function automationSandbox(dashboard: string, devices: unknown[], groups: unknown[] = []): AutomationSandbox {
+// `messages` boş bırakılırsa `t()` anahtarı olduğu gibi döndürür (çoğu test bunu bekler). Gerçek
+// katalog verilirse şablon yerleştirme de çalışır: çeviri metninin kendisini doğrulayan testler için.
+function automationSandbox(dashboard: string, devices: unknown[], groups: unknown[] = [], messages: Record<string, string> = {}): AutomationSandbox {
   const source = dashboardScripts(dashboard);
   const start = source.indexOf("const automationWeekDays=");
   // Kaydetme de dilime girer: kural → sihirbaz → kural dönüşünün ikinci yarısı orada.
@@ -3246,7 +3248,8 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
     auth: { user: { role: "admin" } }
   };
   const stubs: Record<string, unknown> = {
-    t: (key: string) => String(key),
+    t: (key: string, values: Record<string, unknown> = {}) => String(messages[key] ?? key)
+      .replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? "")),
     esc: (value: unknown) => String(value),
     state,
     isProtectedDevice: () => false,
@@ -3298,8 +3301,8 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
   };
 }
 
-function automationHelpers(dashboard: string, devices: unknown[], groups: unknown[] = []): Record<string, (...args: unknown[]) => unknown> {
-  return automationSandbox(dashboard, devices, groups).api;
+function automationHelpers(dashboard: string, devices: unknown[], groups: unknown[] = [], messages: Record<string, string> = {}): Record<string, (...args: unknown[]) => unknown> {
+  return automationSandbox(dashboard, devices, groups, messages).api;
 }
 
 // Sihirbazı gerçek olay akışıyla sürer: yeni kural yolu (düzenleme değil) baştan sona tıklanır ve
@@ -3449,6 +3452,135 @@ test("kayıtlı kuralın hedef pill'i ve sonrası satırı kayıtla aynı şeyi 
   assert.equal(harness.api.automationWizardReady(harness.wizard()), true);
   const target = (harness.wizard().targets as unknown[])[0];
   assert.match(String(harness.api.automationTargetLine(harness.wizard(), target)), /automation-pill act-on/);
+});
+
+// ————— eşleme satırı: iki ayrı çift. Eski biçim ("on Turns off · off Turns on") tek cümle gibi
+// akıyordu ve okuyan kişi bunun İKİ ayrı eşleme olduğunu göremiyordu. Yeni biçimde her çift kendi
+// kutusunda "kaynak → sonuç" durur. Aşağıdaki testler o biçimi sabitler.
+const mapPairSources = ["On", "Off", "Sunset", "Sunrise"];
+const mapPairModes = ["On", "Off", "Toggle"];
+const mapPairDevices = [{
+  id: "0x0011", name: "Mutfak led sağ", buttons: [], features: [], state: {},
+  controls: [{ id: "switch:state", property: "state", name: "Mutfak led sağ", kind: "switch", valueOn: "ON", valueOff: "OFF", valueToggle: "TOGGLE" }]
+}];
+const mapPairTarget = (mapOn: string, mapOff: string): Record<string, unknown> => ({
+  kind: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON", mapOn, mapOff
+});
+
+async function mapPairCatalogs(): Promise<{ dashboard: string; en: Record<string, string>; tr: Record<string, string> }> {
+  const [dashboard, english, turkish] = await Promise.all([
+    readFile(dashboardUrl, "utf8"),
+    readFile(englishLocaleUrl, "utf8"),
+    readFile(turkishLocaleUrl, "utf8")
+  ]);
+  return {
+    dashboard,
+    en: JSON.parse(english).translations as Record<string, string>,
+    tr: JSON.parse(turkish).translations as Record<string, string>
+  };
+}
+
+test("eşleme çiftinin tamamı tek çeviri anahtarıdır ve tr/en paritesi tam", async () => {
+  const { en, tr } = await mapPairCatalogs();
+
+  for (const source of mapPairSources) {
+    for (const mode of mapPairModes) {
+      const key = `automationMapPair${source}${mode}`;
+      for (const [language, catalog] of [["en", en], ["tr", tr]] as const) {
+        const value = catalog[key];
+        assert.equal(typeof value, "string", `${language} katalogunda eksik: ${key}`);
+        // Ok şablonun İÇİNDE durur: yerini çeviri seçer, kod değil. Böylece tr/en kelime sırası
+        // farklı olabilir ve hiçbir yerde parça birleştirmesi yapılmaz.
+        const halves = String(value).split("{arrow}");
+        assert.equal(halves.length, 2, `${language}/${key} tam olarak bir {arrow} taşımalı`);
+        assert.ok(halves[0].trim().length > 0, `${language}/${key} kaynak yarısı boş`);
+        assert.ok(halves[1].trim().length > 0, `${language}/${key} sonuç yarısı boş`);
+      }
+    }
+  }
+
+  // Parçadan cümle kuran eski kısa anahtarlar kalktı: yerlerini tam çift şablonları aldı.
+  for (const stale of ["automationMapOnShort", "automationMapOffShort", "automationMapSunsetShort", "automationMapSunriseShort"]) {
+    assert.equal(en[stale], undefined, `en'de kalmış eski anahtar: ${stale}`);
+    assert.equal(tr[stale], undefined, `tr'de kalmış eski anahtar: ${stale}`);
+  }
+});
+
+test("eşleme satırı iki ayrı çift çizer: her çift kendi kutusunda kaynak → sonuç", async () => {
+  const { dashboard, tr } = await mapPairCatalogs();
+  const api = automationHelpers(dashboard, mapPairDevices, [], tr);
+  const line = String(api.automationTargetLine({ triggerKind: "deviceState" }, mapPairTarget("off", "on")));
+
+  // İki ayrı öbek, tek bir sarmalayıcı içinde. Nokta ayracı kalktı: çiftler artık kutuyla ayrılıyor.
+  assert.equal(line.match(/class="automation-map-pair"/g)?.length, 2);
+  assert.match(line, /<span class="automation-map-pairs">/);
+  assert.doesNotMatch(line, /automation-line-dot/);
+
+  // Yön kaynaktan sonuca. Ok süstür: okuyucudan gizli, metin karşılığı çiftin aria-label'ında.
+  assert.equal(line.match(/<span class="automation-map-arrow" aria-hidden="true">→<\/span>/g)?.length, 2);
+  assert.match(line, /<span class="automation-map-pair" role="img" aria-label="açılınca kapanır">/);
+  assert.match(line, /<span class="automation-map-pair" role="img" aria-label="kapanınca açılır">/);
+
+  // Görünen yarımlar: kaynak sakin metin, sonuç kendi renginde pill.
+  assert.match(line, /<span class="automation-map-from">açılınca<\/span>.*<span class="automation-pill act-off">kapanır<\/span>/);
+  assert.match(line, /<span class="automation-map-from">kapanınca<\/span>.*<span class="automation-pill act-on">açılır<\/span>/);
+  // Cihaz adı yerinde kalır.
+  assert.match(line, /<strong>Mutfak led sağ<\/strong>/);
+});
+
+test("aynı eşleme satırı İngilizcede de iki ayrı çift olarak okunur", async () => {
+  const { dashboard, en } = await mapPairCatalogs();
+  const api = automationHelpers(dashboard, mapPairDevices, [], en);
+  const line = String(api.automationTargetLine({ triggerKind: "deviceState" }, mapPairTarget("off", "on")));
+
+  assert.equal(line.match(/class="automation-map-pair"/g)?.length, 2);
+  assert.match(line, /aria-label="when on turns off"/);
+  assert.match(line, /aria-label="when off turns on"/);
+  assert.match(line, /<span class="automation-map-from">when on<\/span>.*<span class="automation-pill act-off">turns off<\/span>/);
+  // Eski akıp giden biçim geri gelmesin.
+  assert.doesNotMatch(line, /on<\/span> <span class="automation-pill/);
+});
+
+test("güneş yolundaki eşleme de aynı çift dilini kullanır", async () => {
+  const { dashboard, tr } = await mapPairCatalogs();
+  const api = automationHelpers(dashboard, mapPairDevices, [], tr);
+  const line = String(api.automationTargetLine({ triggerKind: "sun" }, mapPairTarget("on", "off")));
+
+  assert.equal(line.match(/class="automation-map-pair"/g)?.length, 2);
+  assert.match(line, /aria-label="gün batınca açılır"/);
+  assert.match(line, /aria-label="gün doğunca kapanır"/);
+  assert.match(line, /<span class="automation-pill act-on">açılır<\/span>/);
+  assert.match(line, /<span class="automation-pill act-off">kapanır<\/span>/);
+});
+
+test("bir şey yapma seçilen yön için çift hiç çizilmez, sessiz boşluk kalmaz", async () => {
+  const { dashboard, tr } = await mapPairCatalogs();
+  const api = automationHelpers(dashboard, mapPairDevices, [], tr);
+
+  // Tek yön: yalnız bir çift kutusu, öbürü hiç yok.
+  const single = String(api.automationTargetLine({ triggerKind: "deviceState" }, mapPairTarget("off", "none")));
+  assert.equal(single.match(/class="automation-map-pair"/g)?.length, 1);
+  assert.match(single, /aria-label="açılınca kapanır"/);
+  assert.doesNotMatch(single, /kapanınca/);
+  assert.doesNotMatch(single, /Bir şey yapmayacak/);
+
+  // İki yön de boşsa satır cihaz adında biter: boş kutu sarmalayıcısı da çizilmez.
+  const empty = String(api.automationTargetLine({ triggerKind: "deviceState" }, mapPairTarget("none", "none")));
+  assert.doesNotMatch(empty, /automation-map-pair/);
+  assert.match(empty, /<strong>Mutfak led sağ<\/strong>/);
+});
+
+test("eşleme çifti sığmazsa kesilmez, alt satıra sarar", async () => {
+  const dashboard = await readFile(dashboardUrl, "utf8");
+
+  // Satır normalde tek satır + üç nokta; çift taşıyan satır ise sarar ve kırpmaz.
+  assert.match(dashboard, /\.automation-line:has\(\.automation-map-pairs\)\{display:flex;flex-wrap:wrap;[^}]*white-space:normal;overflow:visible;text-overflow:clip\}/);
+  assert.match(dashboard, /\.automation-map-pairs\{display:inline-flex;flex-wrap:wrap;[^}]*\}/);
+  // Çiftin kendi içi kırılmaz: "açılınca → kapanır" ikiye bölünmez.
+  assert.match(dashboard, /\.automation-map-pair\{[^}]*white-space:nowrap\}/);
+  // Ölçüler viewport'a bağlı, sabit px yok; renk karışımı yok.
+  assert.match(dashboard, /\.automation-map-pair\{[^}]*gap:clamp\([^)]*\);padding:clamp\(/);
+  assert.doesNotMatch(dashboard, /\.automation-map-(pairs|pair|from|arrow)[^}]*color-mix\(/);
 });
 
 // Aynı tur bütün kural biçimleri için: hiçbiri düzenlemeye açılıp kaydedilince değişmemeli.
