@@ -42,6 +42,10 @@ export interface AutomationSunTrigger {
  * `above`/`below` sayısal eşiktir ve **kenarda** tetikler: değer eşiğin öbür tarafından bu tarafa
  * geçtiği anda bir kez. 26,1 → 26,2 → 26,3 akışı tek tetikleme üretir. İkisi birden verilirse
  * "aralığa girdi" anlamına gelir. `equals` ile birlikte kullanılamaz.
+ *
+ * `forSeconds` verilirse tetikleyici **kenar olmaktan çıkar**: değer hedefte kesintisiz o kadar
+ * saniye kaldığında bir kez ateşler ("hareket bir dakikadır sürüyorsa"). Bu tetikleyici olay
+ * akışını dinlemez, motorun turunda değerlendirilir — ama cihaz kimliği yine vardır.
  */
 export interface AutomationDeviceStateTrigger {
   type: "deviceState";
@@ -55,6 +59,12 @@ export interface AutomationDeviceStateTrigger {
   above?: number;
   /** Değer bunun altına indiği anda. */
   below?: number;
+  /**
+   * Hedef değerin **kesintisiz** sürmesi gereken süre (saniye, 1..86400). Verilmesi için
+   * tetikleyicinin bir hedefi olmalıdır (`equals` ya da sayısal eşik): çıplak "her değişimde"
+   * ile süre birleşmez, süre sıfırdan sayılacak bir hedef durum olmadan anlamsızdır.
+   */
+  forSeconds?: number;
 }
 
 export type AutomationTrigger =
@@ -68,11 +78,37 @@ export type AutomationEventTrigger =
   | AutomationDeviceActionTrigger
   | AutomationDeviceStateTrigger;
 
-/** Zamana bağlı tetikleyiciler — olay akışına değil, 20 saniyelik tura bakarlar. */
+/**
+ * Zamana bağlı tetikleyiciler — olay akışına değil, 20 saniyelik tura bakarlar.
+ *
+ * **Bu yardımcı bilinçli olarak `time`/`sun` ile sınırlıdır ve süreli durum tetikleyicisini
+ * kapsamaz.** Çağrı yerlerinde asıl soru "tur yolunda mı" değil, **"cihaz kimliği taşımıyor mu"**:
+ * `automationTriggerDeviceIds()`, döngü koruması ve `removeDeviceFromAutomations()` bu anlama
+ * dayanıyor. Süreli tetikleyicinin cihaz kimliği **vardır** ve o üçünün de onu görmesi gerekir.
+ * "Olay akışını dinlemiyor" sorusu için `isAutomationEventTrigger()` kullanılır.
+ */
 export const isAutomationScheduleTrigger = (
   trigger: AutomationTrigger
 ): trigger is AutomationTimeTrigger | AutomationSunTrigger =>
   trigger.type === "time" || trigger.type === "sun";
+
+/**
+ * Süreli durum tetikleyicisi — "değer N saniyedir hedefte". Kenarda değil, motorun turunda
+ * değerlendirilir; buna rağmen cihaz kimliği taşır (döngü koruması ve cihaz silme ona bakar).
+ */
+export const isAutomationHeldStateTrigger = (
+  trigger: AutomationTrigger
+): trigger is AutomationDeviceStateTrigger =>
+  trigger.type === "deviceState" && trigger.forSeconds !== undefined;
+
+/**
+ * Olay akışından tetiklenen tetikleyiciler. Zaman/güneş tetikleyicileri ve süreli durum
+ * tetikleyicisi dışarıda kalır; ikisi de motorun turunda değerlendirilir.
+ */
+export const isAutomationEventTrigger = (
+  trigger: AutomationTrigger
+): trigger is AutomationEventTrigger =>
+  !isAutomationScheduleTrigger(trigger) && !isAutomationHeldStateTrigger(trigger);
 
 /**
  * §2.3 — zaman aralığının bir ucu: ya sabit saat ya güneşe göreli bir an. "Hava karanlıkken"
@@ -256,9 +292,9 @@ export const maxAutomationAutoOffSeconds = 86_400;
 /** Bekleyen kapatma sayısı; durum dosyası şişmesin. */
 export const maxAutomationAutoOffEntries = 128;
 /**
- * §2.1 — koşulun "şu kadar süredir böyleyse" tavanı. "Sonra kapat" ile aynı tavan (bir gün),
- * ama ayrı sabit: ikisi farklı kavramdır (biri koşul ölçütü, biri eylem sonucu) ve biri
- * değişince öbürü peşinden sürüklenmemelidir.
+ * §2.1 — "şu kadar süredir böyleyse" tavanı. Hem koşul hem **süreli tetikleyici** bunu paylaşır:
+ * ikisi aynı kavramdır, biri değişirse öbürü de değişmelidir. "Sonra kapat" ile aynı sayıdır ama
+ * ayrı sabittir: o farklı bir kavramdır (koşul ölçütü değil, eylem sonucu).
  */
 export const maxAutomationConditionForSeconds = 86_400;
 
@@ -305,6 +341,24 @@ const thresholdNumber = (value: unknown, message: string): number | undefined =>
  * Güneş kaydırması — tetikleyici ve `timeRange` ucu aynı sınırı paylaşır: tam sayı dakika,
  * `maxAutomationSunOffsetMinutes` içinde. Verilmezse 0.
  */
+/**
+ * §2.1 — "şu kadar süredir". Yokluk eski davranıştır ve **hiç yazılmaz**. Sıfır ve ondalık
+ * reddedilir: yarım saniyelik bir ölçüt cihaz raporlama aralığının altında kalır. Koşul ve
+ * tetikleyici aynı kuralı paylaşır, yalnızca hata metni farklıdır.
+ */
+const forSecondsValue = (value: unknown, message: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (
+    typeof value !== "number"
+    || !Number.isInteger(value)
+    || value < 1
+    || value > maxAutomationConditionForSeconds
+  ) {
+    throw new Error(message);
+  }
+  return value;
+};
+
 const sunOffsetMinutes = (value: unknown, message: string): number => {
   const offsetMinutes = value === undefined || value === null
     ? 0
@@ -418,6 +472,20 @@ const validateTriggers = (value: unknown): AutomationTrigger[] => {
       if (above !== undefined && below !== undefined && above >= below) {
         throw new Error("Otomasyon tetikleyicisinde üst eşik alt eşikten küçük olmalıdır.");
       }
+      // §2.1 — süreli tetikleyici. Hedefi olmayan ("her değişimde") bir tetikleyiciyle süre
+      // birleşmez: neyin kaç saniyedir sürdüğü tanımsız kalır, sessiz kabul etmek yerine reddedilir.
+      const forSeconds = forSecondsValue(
+        candidate.forSeconds,
+        "Otomasyon tetikleyicisi süresi geçersiz."
+      );
+      if (forSeconds !== undefined) {
+        if (trigger.equals === undefined && above === undefined && below === undefined) {
+          throw new Error(
+            "Süreli otomasyon tetikleyicisi için hedef değer ya da sayısal eşik gerekir."
+          );
+        }
+        trigger.forSeconds = forSeconds;
+      }
       return trigger;
     }
     if (candidate.type === "sun") {
@@ -457,23 +525,6 @@ const validateConditionMode = (value: unknown): "any" | undefined => {
   if (value === undefined || value === null || value === "all") return undefined;
   if (value === "any") return "any";
   throw new Error("Otomasyon koşul bağlama biçimi geçersiz.");
-};
-
-/**
- * §2.1 — "şu kadar süredir böyleyse". Yokluk eski davranıştır ve **hiç yazılmaz**. Sıfır ve
- * ondalık reddedilir: yarım saniyelik bir ölçüt cihaz raporlama aralığının altında kalır.
- */
-const validateConditionForSeconds = (value: unknown): number | undefined => {
-  if (value === undefined || value === null) return undefined;
-  if (
-    typeof value !== "number"
-    || !Number.isInteger(value)
-    || value < 1
-    || value > maxAutomationConditionForSeconds
-  ) {
-    throw new Error("Otomasyon koşulu süresi geçersiz.");
-  }
-  return value;
 };
 
 /** §5.3 — koşullar varsayılan olarak VE ile değerlendirilir; bilinmeyen tür reddedilir. */
@@ -522,7 +573,7 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
       );
     }
     // §2.1 — süre ölçütü üç değer ölçütünün de üstüne binebilir, o yüzden dallardan önce okunur.
-    const forSeconds = validateConditionForSeconds(candidate.forSeconds);
+    const forSeconds = forSecondsValue(candidate.forSeconds, "Otomasyon koşulu süresi geçersiz.");
     if (hasThreshold) {
       // İkisi birden verilmişse ölçüt "aralıkta"dır; ters aralık hiçbir zaman sağlanmaz.
       if (above !== undefined && below !== undefined && above >= below) {

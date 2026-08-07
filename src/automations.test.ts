@@ -952,3 +952,67 @@ test("geçersiz koşul süresi reddedilir", () => {
     conditions: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", forSeconds: 60 }]
   })]), /tam biri olmalıdır/);
 });
+
+test("süreli durum tetikleyicisi hedefiyle birlikte kabul edilir", () => {
+  const trigger = (overrides: Record<string, unknown>): Record<string, unknown> => ({
+    type: "deviceState", deviceId: sensorId, property: "occupancy", ...overrides
+  });
+  const first = (overrides: Record<string, unknown>): Record<string, unknown> =>
+    validateAutomations([automation({ triggers: [trigger(overrides)] })])[0]
+      ?.triggers[0] as unknown as Record<string, unknown>;
+
+  assert.equal(first({ equals: true, forSeconds: 60 }).forSeconds, 60);
+  assert.equal(first({ property: "temperature", above: 25, forSeconds: 300 }).forSeconds, 300);
+  assert.equal(first({ property: "temperature", below: 5, forSeconds: 1 }).forSeconds, 1);
+  assert.equal(first({ property: "temperature", above: 10, below: 20, forSeconds: 86_400 }).forSeconds, 86_400);
+
+  // Alan yoksa hiç yazılmaz: eski tetikleyiciler birebir aynı kalır.
+  assert.equal("forSeconds" in first({ equals: true }), false);
+  assert.equal("forSeconds" in first({ equals: true, forSeconds: null }), false);
+  assert.equal("forSeconds" in first({}), false);
+});
+
+test("hedefsiz ya da bozuk süreli tetikleyici reddedilir", () => {
+  const withFor = (overrides: Record<string, unknown>): unknown[] => [automation({
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", ...overrides }]
+  })];
+  // Çıplak "her değişimde" + süre anlamsızdır: neyin ne kadar sürdüğü tanımsız kalır.
+  assert.throws(() => validateAutomations(withFor({ forSeconds: 60 })), /hedef değer ya da sayısal eşik/);
+  assert.throws(() => validateAutomations(withFor({ equals: true, forSeconds: 0 })), /tetikleyicisi süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor({ equals: true, forSeconds: -60 })), /tetikleyicisi süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor({ equals: true, forSeconds: 60.5 })), /tetikleyicisi süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor({ equals: true, forSeconds: 86_401 })), /tetikleyicisi süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor({ equals: true, forSeconds: "60" })), /tetikleyicisi süresi geçersiz/);
+  assert.throws(() => validateAutomations(withFor({ equals: true, forSeconds: Number.NaN })), /tetikleyicisi süresi geçersiz/);
+});
+
+test("süreli tetikleyicinin cihazı döngü koruması ve cihaz silme tarafından görülür", () => {
+  const held = automation({
+    id: "tuvalet-fani",
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true, forSeconds: 60 }]
+  });
+  // Cihaz kimliği taşır: tur yolunda olması onu "zaman tetikleyicisi" yapmaz.
+  assert.deepEqual(automationTriggerDeviceIds(validateAutomations([held])[0] as Automation), [sensorId]);
+
+  // Döngü koruması: kendi yazdığı kanal tarafından tetiklenemez.
+  assert.throws(() => validateAutomations([automation({
+    triggers: [{ type: "deviceState", deviceId: lampId, property: "state_l1", equals: "ON", forSeconds: 60 }]
+  })]), /döngü oluşur/);
+
+  // Cihaz silinince süreli tetikleyici de düşer ve tetikleyicisiz kural kalmaz.
+  assert.deepEqual(
+    removeDeviceFromAutomations(validateAutomations([held]) as Automation[], sensorId),
+    []
+  );
+
+  // §9 — "hareket bitince kapat" süreli tetikleyiciyle de kurulabilir: `equals` taşıyor.
+  const idle = validateAutomations([automation({
+    id: "tuvalet-idle",
+    triggers: [{ type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true, forSeconds: 60 }],
+    actions: [{
+      type: "device", deviceId: lampId, property: "state_l1", value: "ON",
+      autoOff: { mode: "idle", seconds: 0, value: "OFF" }
+    }]
+  })]);
+  assert.equal((idle[0]?.actions[0] as AutomationDeviceAction).autoOff?.mode, "idle");
+});

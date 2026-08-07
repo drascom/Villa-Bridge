@@ -402,6 +402,11 @@
     .automation-name-field input{flex:1;min-width:0;padding:6px 0;border:0;background:none;color:var(--ink);font-size:17px;font-weight:700;line-height:1.3;appearance:none}
     .automation-name-field input:focus{outline:none}
     .automation-time-unit-label{color:var(--muted);font-size:15px;font-weight:750}
+    /* Süre sayacı: "−  s:dd  +". Kadran dili saat seçiciyle aynı, ama tek satır — 1024×640'ta
+       çip satırlarının yediği yeri geri verir. Ölçüler ekrana göre esner, sabit px yok. */
+    .automation-counter{display:flex;align-items:center;justify-content:center;gap:clamp(12px,2.4vw,24px);margin-top:clamp(10px,1.8vh,18px)}
+    .automation-counter .automation-time-step{width:clamp(64px,9vw,88px);min-height:clamp(46px,7.2vh,60px);border-radius:clamp(12px,1.6vw,16px);font-size:clamp(21px,2.8vw,27px)}
+    .automation-counter-value{min-width:clamp(104px,15vw,150px);font:800 clamp(30px,4.4vw,42px)/1 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}
     .automation-card-chip{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:11px;font-weight:800}.automation-card-chip.warn{color:var(--danger)}.automation-card.off{opacity:.62}.automation-card-actions{display:flex;align-items:center;gap:12px}.automation-card-menu{width:48px;height:48px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:15px;background:var(--surface-soft);color:var(--muted);font-size:23px;font-weight:800;line-height:1;cursor:pointer}.automation-card-menu:hover{border-color:var(--forest);color:var(--forest)}
     .automation-runs-toggle{display:block;min-height:44px;margin-top:6px;padding:8px 0;border:0;background:none;color:var(--forest);font-size:13px;font-weight:800;text-align:left;touch-action:manipulation}
     .automation-runs-toggle:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px;border-radius:6px}
@@ -4889,12 +4894,19 @@
     return null;
   };
   // §9.1 — gün batımı + gün doğumu tek kuralda: iki güneş tetikleyicisi, eşleşme değeri olay adı.
+  // Yuvalar tek olaylı eski kuralı da taşır: eksik olan yuva boş kalır, kayıt kaybolmaz.
+  const automationSunSlots=automation=>{
+    const all=(automation?.triggers||[]).filter(Boolean);
+    const triggers=all.filter(trigger=>trigger.type==="sun");
+    if(!triggers.length||triggers.length!==all.length)return null;
+    return{
+      sunset:triggers.find(trigger=>trigger.event==="sunset")||null,
+      sunrise:triggers.find(trigger=>trigger.event==="sunrise")||null
+    };
+  };
   const automationSunPairTriggers=automation=>{
-    const triggers=(automation?.triggers||[]).filter(Boolean);
-    if(triggers.length!==2||!triggers.every(trigger=>trigger.type==="sun"))return null;
-    const sunset=triggers.find(trigger=>trigger.event==="sunset")||null;
-    const sunrise=triggers.find(trigger=>trigger.event==="sunrise")||null;
-    return sunset&&sunrise?{sunset,sunrise}:null;
+    const slots=automationSunSlots(automation);
+    return slots?.sunset&&slots?.sunrise?slots:null;
   };
   // Güneş eşlemesinde yön adı olay adıdır: batış "açılınca" yerine geçer, doğuş "kapanınca".
   const automationSunWhenDirection=when=>when?.equals==="sunset"?"on":when?.equals==="sunrise"?"off":null;
@@ -4907,6 +4919,8 @@
     if(!pair){
       if(trigger?.type!=="deviceState")return null;
       if(trigger.equals!==undefined&&trigger.equals!==null)return null;
+      // §2.1 — süreli tetikleyici eşleme değildir: anahtarın iki yönü değil, tek bir tutma anı.
+      if(automationTriggerHeldSeconds(trigger)>0)return null;
     }
     if(!actions.length||!actions.every(action=>action.when))return null;
     const groups=[];
@@ -4965,10 +4979,17 @@
     if(!trigger.offsetMinutes)return word;
     return t(trigger.offsetMinutes<0?"automationSunBeforeShort":"automationSunAfterShort",{minutes:Math.abs(trigger.offsetMinutes),moment:word});
   };
+  // §2.1 — süreli tetikleyici kayıtta da tanınır: kartlar ve özet cümleleri süreyi söyler.
+  const automationTriggerHeldSeconds=trigger=>trigger?.type==="deviceState"
+    &&Number.isFinite(trigger.forSeconds)&&trigger.forSeconds>0?trigger.forSeconds:0;
   const automationThresholdSentenceEvent=trigger=>{
     const device=automationTriggerDevice(trigger);
     const above=trigger.above!==undefined&&trigger.above!==null;
-    return t(above?"automationThresholdAboveShort":"automationThresholdBelowShort",{
+    // Süreli eşikte fiil değişir: "üstüne çıkınca" değil, "üstünde kalınca".
+    const held=automationTriggerHeldSeconds(trigger)>0;
+    return t(above
+      ?(held?"automationThresholdAboveHeldShort":"automationThresholdAboveShort")
+      :(held?"automationThresholdBelowHeldShort":"automationThresholdBelowShort"),{
       reading:automationPropertyLabel(device,trigger.property),
       value:`${above?trigger.above:trigger.below}${automationPropertyUnit(device,trigger.property)}`
     });
@@ -4980,10 +5001,13 @@
       const values={...automationSentenceValues(trigger,action,actionKey),time:automationSunSentenceTime(trigger)};
       return t(automationEveryDay(trigger.days)?"automationSummaryTime":"automationSummaryTimeDays",values);
     }
+    // §2.1 — süre taşıyan durum tetikleyicisinin kendi tam şablonu var; parça birleştirme yok.
+    const held=automationTriggerHeldSeconds(trigger);
+    const duration=held?automationDurationTextShort(held):"";
     if(automationTriggerHasThreshold(trigger)){
-      return t("automationSummaryState",{...automationEventValues(trigger,action,actionKey),event:automationThresholdSentenceEvent(trigger)});
+      return t(held?"automationSummaryStateFor":"automationSummaryState",{...automationEventValues(trigger,action,actionKey),event:automationThresholdSentenceEvent(trigger),duration});
     }
-    if(trigger.type==="deviceState")return t("automationSummaryState",automationEventValues(trigger,action,actionKey));
+    if(trigger.type==="deviceState")return t(held?"automationSummaryStateFor":"automationSummaryState",{...automationEventValues(trigger,action,actionKey),duration});
     return t(
       automationEveryDay(trigger.days)?"automationSummaryTime":"automationSummaryTimeDays",
       automationSentenceValues(trigger,action,actionKey)
@@ -4996,10 +5020,12 @@
       const values={...automationSentenceValues(trigger,action,actionKey),time:automationSunSentenceTime(trigger)};
       return t(automationEveryDay(trigger.days)?"automationCardSummary":"automationCardSummaryDays",values);
     }
+    const held=automationTriggerHeldSeconds(trigger);
+    const duration=held?automationDurationTextShort(held):"";
     if(automationTriggerHasThreshold(trigger)){
-      return t("automationCardSummaryState",{...automationEventValues(trigger,action,actionKey),event:automationThresholdSentenceEvent(trigger)});
+      return t(held?"automationCardSummaryStateFor":"automationCardSummaryState",{...automationEventValues(trigger,action,actionKey),event:automationThresholdSentenceEvent(trigger),duration});
     }
-    if(trigger.type==="deviceState")return t("automationCardSummaryState",automationEventValues(trigger,action,actionKey));
+    if(trigger.type==="deviceState")return t(held?"automationCardSummaryStateFor":"automationCardSummaryState",{...automationEventValues(trigger,action,actionKey),duration});
     return t(
       automationEveryDay(trigger.days)?"automationCardSummary":"automationCardSummaryDays",
       automationSentenceValues(trigger,action,actionKey)
@@ -5010,6 +5036,11 @@
   const automationDurationText=seconds=>{
     const minutes=Math.max(1,Math.round(Number(seconds||0)/60));
     return minutes===1?t("automationDurationMinute"):t("automationDurationMinutes",{count:minutes});
+  };
+  // §2.1 — bir dakikanın altı saniye, üstü dakika. Süreli koşul ve süreli tetikleyici paylaşır.
+  const automationDurationTextShort=seconds=>{
+    const total=Math.max(1,Math.round(Number(seconds)||0));
+    return total<60?t("automationDurationSeconds",{count:total}):automationDurationText(total);
   };
   // Tam şablon anahtarı — cümle parça birleştirilerek kurulmuyor (TR/EN kelime sırası farklı).
   const automationAutoOffLine=action=>{
@@ -5254,25 +5285,32 @@
   const automationDeviceKinds=["button","sensor","deviceState"];
   const automationNewId=()=>`${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`.toLowerCase();
   const automationTimeText=wizard=>`${String(wizard.hour).padStart(2,"0")}:${String(wizard.minute).padStart(2,"0")}`;
-  // Güneş kaydırması dakika klavyesiyle değil hazır çiplerle girilir — duvar tableti için.
-  const automationSunOffsets=[-120,-60,-30,-15,0,15,30,60,120];
   const maxAutomationSunOffset=240;
-  // §9.1 — güneş yolunda iki olay birden seçilebilir; o zaman kural anahtar akışındaki eşleme
-  // formunu kullanır: iki `sun` tetikleyicisi + olay adına eşlenen iki eylem.
-  const automationSunBoth=wizard=>wizard?.triggerKind==="sun"&&Boolean(wizard?.sunBoth);
-  // İki olay ayrı kaydırma ve ayrı gün seçimi taşır; tek olaylı yolda eski alanlar aynen kalır.
-  const automationSunPart=(wizard,event)=>automationSunBoth(wizard)&&event==="sunrise"
-    ?{offset:wizard.sunriseOffset,custom:Boolean(wizard.sunriseCustom),days:wizard.sunriseDays}
-    :{offset:wizard.sunOffset,custom:Boolean(wizard.sunCustom),days:wizard.days};
+  // §9.1 — güneş yolu her zaman iki olayı taşır: kullanıcıya "batış mı doğuş mu" diye sorulmaz,
+  // ikisi de sorulur ve istemediği yöne "Bir şey yapma" der. Kural anahtar akışındaki eşleme
+  // formunu kullanır: iki `sun` tetikleyicisi + olay adına eşlenen eylemler.
+  const automationSunBoth=wizard=>wizard?.triggerKind==="sun";
+  // İki olay ayrı kaydırma ve ayrı gün seçimi taşır.
+  const automationSunPart=(wizard,event)=>event==="sunrise"
+    ?{offset:wizard.sunriseOffset,days:wizard.sunriseDays}
+    :{offset:wizard.sunOffset,days:wizard.days};
   // Anahtar/priz yolu eşleme formuyla kurulur: durum tetikleyicide değil, eylemlerin `when` alanında.
   const automationMappingMode=wizard=>wizard?.triggerKind==="deviceState"||automationSunBoth(wizard);
   // Sayısal eşik yolu: `equals` yerine `above`/`below` yazılır; ikisi birlikte olamaz (sunucu kuralı).
   const automationThresholdActive=wizard=>wizard?.triggerKind==="sensor"&&Boolean(wizard?.triggerNumeric);
+  // §2.1 — süreli tetikleyici: hedefi olan durum tetikleyicilerine biner. Kapalıyken alan hiç
+  // yazılmaz, eski davranış aynen kalır.
+  const automationTrigForApply=(wizard,trigger)=>{
+    if(!automationTrigForEligible(wizard))return trigger;
+    const seconds=Math.round(Number(wizard.triggerForSeconds));
+    if(Number.isFinite(seconds)&&seconds>0)trigger.forSeconds=Math.min(seconds,maxAutomationCondForSeconds);
+    return trigger;
+  };
   const automationThresholdTrigger=wizard=>{
     const trigger={type:"deviceState",deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty};
     if(wizard.thresholdDir==="below")trigger.below=wizard.thresholdValue;
     else trigger.above=wizard.thresholdValue;
-    return trigger;
+    return automationTrigForApply(wizard,trigger);
   };
   const automationSunTriggerFor=(wizard,event)=>{
     const part=automationSunPart(wizard,event);
@@ -5281,13 +5319,13 @@
   const automationWizardTrigger=wizard=>wizard.triggerKind==="button"
     ?{type:"deviceAction",deviceId:wizard.triggerDeviceId,action:wizard.triggerAction}
     :wizard.triggerKind==="sun"
-    ?automationSunTriggerFor(wizard,automationSunBoth(wizard)?"sunset":(wizard.sunEvent==="sunrise"?"sunrise":"sunset"))
+    ?automationSunTriggerFor(wizard,"sunset")
     :automationThresholdActive(wizard)
     ?automationThresholdTrigger(wizard)
     :automationMappingMode(wizard)
     ?{type:"deviceState",deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty}
     :automationDeviceKinds.includes(wizard.triggerKind)
-    ?{type:"deviceState",deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty,equals:wizard.triggerEquals}
+    ?automationTrigForApply(wizard,{type:"deviceState",deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty,equals:wizard.triggerEquals})
     :{type:"time",at:automationTimeText(wizard),days:[...wizard.days].sort((left,right)=>left-right)};
   // Kaydedilecek tetikleyici listesi: güneşin iki olaylı yolunda iki satır, öbür yollarda tek.
   const automationWizardTriggers=wizard=>automationSunBoth(wizard)
@@ -5379,9 +5417,20 @@
       mapOn:onMode,mapOff:offMode
     });
     if(map)return map.targets.map(entry=>asTarget(entry.target,entry.onMode,entry.offMode));
+    // §9.1 — tek `sun` tetikleyicisi taşıyan eski kural: eylemleri kendi olayının yönüne oturur,
+    // öbür yön "bir şey yapma" olur. Kural düzenlemeye kayıpsız açılır.
+    const slots=automationSunSlots(automation);
+    if(slots&&!(slots.sunset&&slots.sunrise)){
+      const actions=(automation?.actions||[]).filter(Boolean);
+      if(!actions.length||actions.some(action=>action.when||(action.type&&action.type!=="device")))return null;
+      const sunset=Boolean(slots.sunset);
+      return actions.map(action=>asTarget(action,sunset?automationActionMode(action):"none",sunset?"none":automationActionMode(action)));
+    }
     const trigger=automation?.triggers?.[0];
     const action=automation?.actions?.[0];
     if(trigger?.type!=="deviceState"||!action||automation.actions.length!==1||action.when)return null;
+    // §2.1 — süreli tetikleyici tek yönlü eşleme sayılmaz; yoksa düzenlemede süre sessizce düşerdi.
+    if(automationTriggerHeldSeconds(trigger)>0)return null;
     const direction=automationWhenDirection(trigger,{equals:trigger.equals});
     if(!direction)return null;
     const mode=automationActionMode(action);
@@ -5419,16 +5468,16 @@
     const actions=(existing?.actions||[]).filter(Boolean);
     const timed=trigger?.type==="time";
     const sunny=trigger?.type==="sun";
-    // §9.1 — iki güneş tetikleyicisi + `when` taşıyan eylemler: kural eşleme formuna geri açılır.
-    // Çözülemeyen bir kayıt (ör. araya bekleme girmiş) tek olaylı eski yolda kalır.
-    const sunPair=existing?automationSunPairTriggers(existing):null;
-    const sunSeed=sunPair?automationMapSeed(existing):null;
+    // §9.1 — güneş kuralı eşleme formuna geri açılır: iki olaylı kayıt olduğu gibi, tek olaylı
+    // kayıt da o olayın yönü dolu, öbür yön "bir şey yapma" olarak.
+    const sunSlots=sunny?automationSunSlots(existing):null;
+    const sunSeed=sunSlots?automationMapSeed(existing):null;
     // Eşleme tohumu yalnız anahtar/priz yolunda geçerlidir: o satırlar değer taşımaz, yön taşır.
     // Sensör kuralı da tek eylemli `deviceState` göründüğü için buraya düşüyordu ve hedefin
     // `value` alanı silinerek eylem tersine dönüyordu — ayrım tetikleyici türünden yapılır.
     const seed=sunSeed||(existing&&automationTriggerKind(trigger)==="deviceState"?automationMapSeed(existing):null);
-    const sunset=sunSeed?sunPair.sunset:(sunny?trigger:null);
-    const sunrise=sunSeed?sunPair.sunrise:null;
+    const sunset=sunSlots?.sunset||null;
+    const sunrise=sunSlots?.sunrise||null;
     const autoOff=actions.find(action=>action.autoOff)?.autoOff||null;
     const numeric=automationTriggerHasThreshold(trigger);
     state.automationWizard={
@@ -5441,15 +5490,11 @@
       minute:timed?Number(trigger.at.slice(3,5)):0,
       days:timed?[...(trigger.days||automationWeekDays)]
         :sunset?[...(sunset.days||automationWeekDays)]:[...automationWeekDays],
-      // Güneş yolu: olay + kaydırma. Kaydırma çip listesinde yoksa "başka" sayacı açılır.
-      // İki olaylı yolda `sunEvent` hangi olayın ayarlandığını söyler; tek olaylıda olayın kendisi.
-      sunBoth:Boolean(sunSeed),
-      sunEvent:sunny&&!sunSeed?trigger.event:"sunset",
+      // Güneş yolu: iki an, her biri kendi kaydırması ve günleriyle. `sunEvent` hangi anın
+      // ayarlandığını söyler, kaydedilen kuralı değil — kayıt her zaman iki olayı taşır.
+      sunEvent:"sunset",
       sunOffset:sunset?sunset.offsetMinutes:0,
-      sunCustom:sunset?!automationSunOffsets.includes(sunset.offsetMinutes):false,
-      // İkinci olayın kendi kaydırması ve günleri; yalnız iki olaylı yolda kullanılır.
       sunriseOffset:sunrise?sunrise.offsetMinutes:0,
-      sunriseCustom:sunrise?!automationSunOffsets.includes(sunrise.offsetMinutes):false,
       sunriseDays:[...((sunrise?.days)||automationWeekDays)],
       autoOffTouched:Boolean(existing),
       autoOffCustom:false,
@@ -5461,6 +5506,9 @@
       triggerNumeric:numeric,
       thresholdDir:numeric&&trigger.below!==undefined&&trigger.below!==null&&(trigger.above===undefined||trigger.above===null)?"below":"above",
       thresholdValue:numeric?Number(trigger.above??trigger.below??0):0,
+      // §2.1 — "… ve şu kadar süredir böyleyse". Alanı olmayan eski kurallarda kapalıdır ve
+      // düzenlemeye açılınca aynı ekran çıkar: davranış birebir korunur.
+      triggerForSeconds:trigger?.type==="deviceState"&&Number.isFinite(trigger.forSeconds)&&trigger.forSeconds>0?trigger.forSeconds:null,
       // Koşullar (§5.3): boş liste "her zaman çalışsın" demektir.
       conditions:(existing?.conditions||[]).map(condition=>({...condition})),
       // §2.4 — kural başına tek anahtar: hepsi mi, herhangi biri mi. Alan yoksa "hepsi".
@@ -5541,45 +5589,50 @@
   function automationTimeHtml(wizard){
     return`${automationClockHtml(wizard.hour,wizard.minute,"data-automation-time","automationTimeLabel")}${automationDaysHtml(wizard.days,"data-automation-day")}`;
   }
+  // ————— süre sayacı. Hazır çip satırları yerine tek dil: "−  s:dd  +". Değer hep dakikadır.
+  // Güneş kaydırması işaretlidir (eksi = önce, artı = sonra, 0:00 tam o an); süreler işaretsizdir.
+  // Adım sıfırın çevresinde ince, uzaklaştıkça kabalaşır: bir dokunuş bir dakika seçer, uzun
+  // aralıklar da az dokunuşla yakalanır. Kadran dili saat seçiciyle bilerek aynı.
+  const automationCounterStep=magnitude=>magnitude<5?1:magnitude<60?5:magnitude<240?15:30;
+  const automationCounterNext=(minutes,direction)=>{
+    const value=Math.round(Number(minutes)||0);
+    const away=direction>0===value>=0;
+    return value+direction*automationCounterStep(away?Math.abs(value):Math.abs(value)-1);
+  };
+  const automationCounterText=(minutes,signed)=>{
+    const value=Math.round(Number(minutes)||0);
+    const total=Math.abs(value);
+    const clock=`${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`;
+    return!signed||value===0?clock:`${value<0?"−":"+"}${clock}`;
+  };
+  const automationCounterHtml=(hook,minutes,signed,labelKey,downKey,upKey)=>{
+    const step=(direction,key,glyph)=>`<button class="automation-time-step" type="button" ${hook}="${direction}" aria-label="${esc(t(key))}">${glyph}</button>`;
+    return`<div class="automation-counter" role="group" aria-label="${esc(t(labelKey))}">${step(-1,downKey,"−")}<span class="automation-counter-value">${esc(automationCounterText(minutes,signed))}</span>${step(1,upKey,"+")}</div>`;
+  };
   // ————— güneş tetikleyicisi. Konum yoksa satır pasif kalır ve sebebi sunucudan gelen kodla yazılır.
   const automationSunReason=()=>{
     const sun=state.automationSun;
     if(state.homeLocation&&!sun?.reason)return null;
     return sun?.reason||"locationMissing";
   };
-  const automationSunOffsetText=offset=>offset===0
-    ?t("automationSunOffsetExact")
-    :t(offset<0?"automationSunOffsetBefore":"automationSunOffsetAfter",{minutes:Math.abs(offset)});
-  // İki olaylı yolda ayarlar tek tek girilir: hangi olayın ayarlandığı `sunEvent`te durur.
-  const automationSunEditing=wizard=>automationSunBoth(wizard)&&wizard.sunEvent==="sunrise"?"sunrise":wizard.sunEvent;
+  // Hangi anın ayarlandığı `sunEvent`te durur; kural her zaman iki anı da taşır.
+  const automationSunEditing=wizard=>wizard?.sunEvent==="sunrise"?"sunrise":"sunset";
   function automationSunHtml(wizard){
     const reason=automationSunReason();
-    const both=automationSunBoth(wizard);
-    const events=automationOptionsHtml([
-      {glyph:"🌄",title:t("automationSunrise"),sub:state.automationSun?.sunrise||"",on:!both&&wizard.sunEvent==="sunrise",hook:'data-automation-sun-event="sunrise"'},
-      {glyph:"🌇",title:t("automationSunset"),sub:state.automationSun?.sunset||"",on:!both&&wizard.sunEvent==="sunset",hook:'data-automation-sun-event="sunset"'},
-      // §9.1 — iki olay birden: ardından eşleme formu açılır, kullanıcı ikinci kural kurmaz.
-      {glyph:"🌗",title:t("automationSunBothTitle"),sub:t("automationSunBothSub"),on:both,hook:'data-automation-sun-event="both"'}
-    ]);
     const editing=automationSunEditing(wizard);
     const part=automationSunPart(wizard,editing);
-    // İki olay ayrı ayrı ayarlanır; hangisinin ayarlandığı bu satırda seçilir.
-    const picker=both
-      ?`<p class="automation-part-name">${esc(t("automationSunPartTitle"))}</p><div class="automation-choices">${automationChoiceHtml("on","automationSunset",editing==="sunset",'data-automation-sun-edit="sunset"')}${automationChoiceHtml("off","automationSunrise",editing==="sunrise",'data-automation-sun-edit="sunrise"')}</div>`
+    // Olay seçimi yok: iki an da kurulur, istenmeyen yöne eşleme formunda "Bir şey yapma" denir.
+    const picker=`<p class="automation-part-name">${esc(t("automationSunPartTitle"))}</p><div class="automation-choices">${automationChoiceHtml("on","automationSunset",editing==="sunset",'data-automation-sun-edit="sunset"')}${automationChoiceHtml("off","automationSunrise",editing==="sunrise",'data-automation-sun-edit="sunrise"')}</div>`;
+    // Bugünün saatleri seçim satırından kalktı; bilgi kaybolmasın diye ipucu satırında durur.
+    const today=state.automationSun?.sunset&&state.automationSun?.sunrise
+      ?`<p class="automation-hint">${esc(t("automationSunToday",{sunset:state.automationSun.sunset,sunrise:state.automationSun.sunrise}))}</p>`
       :"";
-    const custom=part.custom||!automationSunOffsets.includes(part.offset);
-    const chips=automationSunOffsets.map(offset=>{
-      const active=!custom&&part.offset===offset;
-      return`<button class="automation-day${active?" active":""}" type="button" data-automation-sun-offset="${offset}" aria-pressed="${active}">${esc(automationSunOffsetText(offset))}</button>`;
-    });
-    chips.push(`<button class="automation-day${custom?" active":""}" type="button" data-automation-sun-custom="1" aria-pressed="${custom}">${esc(t("automationAutoOffCustom"))}</button>`);
-    const step=(amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-sun-step="${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
-    const counter=custom?`<div class="automation-time" role="group" aria-label="${esc(t("automationSunOffsetLabel"))}"><div class="automation-time-unit">${step(15,"automationSunOffsetUp","+")}<span class="automation-time-value">${part.offset}</span>${step(-15,"automationSunOffsetDown","−")}</div><span class="automation-time-unit-label">${t("automationSunOffsetUnit")}</span></div>`:"";
+    const counter=automationCounterHtml("data-automation-sun-step",part.offset,true,"automationSunOffsetLabel","automationSunOffsetDown","automationSunOffsetUp");
     // Sessiz mekanizma yok: konum eksikse sebebi ve çıkış yolu aynı ekranda durur.
     const blocked=reason
       ?`<div class="automation-alt"><p>${esc(automationReasonText(reason))}</p>${automationAddHtml(t("automationOpenLocation"),'data-automation-open-location="1"')}</div>`
       :"";
-    return`${blocked}${events}${picker}<p class="automation-part-name">${esc(t("automationSunOffsetTitle"))}</p><div class="automation-days">${chips.join("")}</div>${counter}${automationDaysHtml(part.days,"data-automation-day")}`;
+    return`${blocked}${picker}${today}<p class="automation-part-name">${esc(t("automationSunOffsetTitle"))}</p>${counter}<p class="automation-hint">${esc(t("automationSunOffsetHint"))}</p>${automationDaysHtml(part.days,"data-automation-day")}`;
   }
   // ————— sayısal eşik. Yalnız sayısal bir özellik seçildiyse görünür.
   const automationNumericProperties=device=>{
@@ -5612,7 +5665,7 @@
     const choice=(value,key)=>automationChoiceHtml(value==="above"?"on":"off",key,wizard.thresholdDir===value,`data-automation-threshold-dir="${value}"`);
     const step=(amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-threshold-step="${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
     const size=automationThresholdStepFor(device,wizard.triggerProperty);
-    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(automationPropertyLabel(device,wizard.triggerProperty))}</p><div class="automation-choices">${choice("above","automationThresholdAbove")}${choice("below","automationThresholdBelow")}</div></div></div><div class="automation-time" role="group" aria-label="${esc(t("automationThresholdValueLabel"))}"><div class="automation-time-unit">${step(size,"automationThresholdUp","+")}<span class="automation-time-value">${esc(String(wizard.thresholdValue))}</span>${step(-size,"automationThresholdDown","−")}</div><span class="automation-time-unit-label">${esc(unit||t("automationThresholdValueLabel"))}</span></div><p class="automation-hint">${esc(t("automationThresholdHint"))}</p>`;
+    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(automationPropertyLabel(device,wizard.triggerProperty))}</p><div class="automation-choices">${choice("above","automationThresholdAbove")}${choice("below","automationThresholdBelow")}</div></div></div><div class="automation-time" role="group" aria-label="${esc(t("automationThresholdValueLabel"))}"><div class="automation-time-unit">${step(size,"automationThresholdUp","+")}<span class="automation-time-value">${esc(String(wizard.thresholdValue))}</span>${step(-size,"automationThresholdDown","−")}</div><span class="automation-time-unit-label">${esc(unit||t("automationThresholdValueLabel"))}</span></div><p class="automation-hint">${esc(t("automationThresholdHint"))}</p>${automationTrigForHtml(wizard)}`;
   }
   // ————— koşullar (§5.3). Yalnız VE; en fazla dört tane. Boşsa kural her zaman çalışır.
   const maxAutomationConditions=4;
@@ -5766,13 +5819,13 @@
         thresholdDir:above&&below?"between":below?"below":"above",
         above:Number(above?condition.above:condition.below),
         below:Number(below?condition.below:condition.above),
-        value:null,negate:false,forSeconds,forCustom:false,index:index??null
+        value:null,negate:false,forSeconds,index:index??null
       };
       return{
         type:"deviceState",deviceId:condition.deviceId,property:condition.property,numeric:false,
         thresholdDir:"above",above:0,below:0,
         value:condition.equals!==undefined?condition.equals:condition.not,
-        negate:condition.not!==undefined,forSeconds,forCustom:false,index:index??null
+        negate:condition.not!==undefined,forSeconds,index:index??null
       };
     }
     return null;
@@ -5869,27 +5922,34 @@
   // §9.2 — "şu kadar süredir böyleyse" satırı. Eylem adımındaki "sonra kapat"la aynı kelimeleri
   // kullandığı için karışıyordu: bu satır varsayılan olarak kapalı durur, kendi görsel dilini
   // (kesikli çerçeveli sessiz blok) taşır ve etiketi zaman yönünü "…dir/…dır" olarak söyler.
-  const automationCondForPresets=[30,60,120,300,600,1800];
-  const automationCondForText=seconds=>{
-    const total=Math.max(1,Math.round(Number(seconds)||0));
-    return total<60?t("automationDurationSeconds",{count:total}):automationDurationText(total);
-  };
-  const automationCondForCustom=draft=>Boolean(draft.forCustom)||(draft.forSeconds>0&&!automationCondForPresets.includes(draft.forSeconds));
+  // Süre sayacı dakika gösterir: sunucu tavanı 86400 saniye, yani 24:00.
+  const maxAutomationCondForMinutes=Math.floor(maxAutomationCondForSeconds/60);
+  const automationForMinutes=seconds=>Math.max(1,Math.min(maxAutomationCondForMinutes,Math.round((Number(seconds)||0)/60)));
   function automationCondForHtml(draft){
     const held=draft.forSeconds>0;
     // Kapalıyken tek bir sessiz düğme: ekran kalabalıklaşmasın, ama ölçüt görünür olsun.
     if(!held){
       return`<div class="automation-cond-for"><button class="automation-cond-for-open" type="button" data-automation-cond-for="1" aria-expanded="false">${esc(t("automationCondForOpen"))}</button></div>`;
     }
-    const custom=automationCondForCustom(draft);
-    const chips=automationCondForPresets.map(value=>{
-      const active=!custom&&draft.forSeconds===value;
-      return`<button class="automation-day${active?" active":""}" type="button" data-automation-cond-for-seconds="${value}" aria-pressed="${active}">${esc(automationCondForText(value))}</button>`;
-    });
-    chips.push(`<button class="automation-day${custom?" active":""}" type="button" data-automation-cond-for-custom="1" aria-pressed="${custom}">${esc(t("automationCondForCustom"))}</button>`);
-    const step=(amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-cond-for-step="${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
-    const counter=custom?`<div class="automation-time" role="group" aria-label="${esc(t("automationCondForTimeLabel"))}"><div class="automation-time-unit">${step(60,"automationCondForUp","+")}<span class="automation-time-value">${esc(String(Math.max(1,Math.round(draft.forSeconds/60))))}</span>${step(-60,"automationCondForDown","−")}</div><span class="automation-time-unit-label">${esc(t("automationCondForMinutesUnit"))}</span></div>`:"";
-    return`<div class="automation-cond-for is-on"><div class="automation-cond-for-head"><p class="automation-part-name">${esc(t("automationCondForLabel"))}</p><button class="automation-cond-for-clear" type="button" data-automation-cond-for="0">${esc(t("automationCondForClear"))}</button></div><div class="automation-days">${chips.join("")}</div>${counter}<p class="automation-hint">${esc(t("automationCondForHint"))}</p></div>`;
+    const counter=automationCounterHtml("data-automation-cond-for-step",automationForMinutes(draft.forSeconds),false,"automationCondForTimeLabel","automationCondForDown","automationCondForUp");
+    return`<div class="automation-cond-for is-on"><div class="automation-cond-for-head"><p class="automation-part-name">${esc(t("automationCondForLabel"))}</p><button class="automation-cond-for-clear" type="button" data-automation-cond-for="0">${esc(t("automationCondForClear"))}</button></div>${counter}<p class="automation-hint">${esc(t("automationCondForHint"))}</p></div>`;
+  }
+  // §2.1 — tetikleyicideki süre satırı. Kullanıcı süreyi **önce koşulda** aradı; tetikleyicide de
+  // aynı yerde, aynı görünümde bulmalı: bu yüzden koşulun görsel dili (`automation-cond-for`
+  // kesikli sessiz bloğu) bilerek aynen paylaşılır, yeni bir stil türetilmez.
+  // Süre yalnız hedefi olan tetikleyicide anlamlıdır: anahtar eşleme yolunda ("her değişimde")
+  // neyin kaç saniyedir sürdüğü tanımsızdır, sunucu da orada reddeder.
+  const automationTrigForEligible=wizard=>Boolean(wizard)
+    &&!automationMappingMode(wizard)
+    &&automationDeviceKinds.includes(wizard.triggerKind);
+  function automationTrigForHtml(wizard){
+    if(!automationTrigForEligible(wizard))return"";
+    const held=wizard.triggerForSeconds>0;
+    if(!held){
+      return`<div class="automation-cond-for"><button class="automation-cond-for-open" type="button" data-automation-trig-for="1" aria-expanded="false">${esc(t("automationTrigForOpen"))}</button></div>`;
+    }
+    const counter=automationCounterHtml("data-automation-trig-for-step",automationForMinutes(wizard.triggerForSeconds),false,"automationTrigForTimeLabel","automationTrigForDown","automationTrigForUp");
+    return`<div class="automation-cond-for is-on"><div class="automation-cond-for-head"><p class="automation-part-name">${esc(t("automationTrigForLabel"))}</p><button class="automation-cond-for-clear" type="button" data-automation-trig-for="0">${esc(t("automationTrigForClear"))}</button></div>${counter}<p class="automation-hint">${esc(t("automationTrigForHint"))}</p></div>`;
   }
   function automationConditionStateHtml(wizard){
     const draft=wizard.draftCondition;
@@ -6063,7 +6123,8 @@
       ?`<div class="automation-alt"><p>${esc(t("automationButtonStateAlternative"))}</p>${automationAddHtml(t("automationButtonStateAlternativeAction"),`data-automation-state-instead="${esc(device.id)}"`)}</div>`
       :"";
     const hint=wizard.triggerKind==="button"?`<p class="automation-hint">${esc(automationButtonHint(device))}</p>`:"";
-    return`${warning}${alternative}${events.length?list:""}${hint}`;
+    // §2.1 — süre satırı listenin altında, koşuldakiyle aynı yerde durur; varsayılan kapalıdır.
+    return`${warning}${alternative}${events.length?list:""}${hint}${automationTrigForHtml(wizard)}`;
   }
   // Hedef cihazın alt öğeleri: her kanal bir satır, satırın altında eylem pill'leri.
   function automationTargetPartsHtml(wizard,device){
@@ -6232,34 +6293,28 @@
         :t("automationLineTimeDays",{time,days:esc(automationDayList(wizard.days))});
     }
     if(wizard.triggerKind==="sun"){
-      // §9.1 — iki olaylı yolda tek satır iki anı da anlatır; her an kendi günlerini taşır.
-      if(automationSunBoth(wizard)){
-        const phrase=event=>{
-          const part=automationSunPart(wizard,event);
-          const moment=automationSunSentenceTime({event,offsetMinutes:part.offset});
-          return automationEveryDay(part.days)
-            ?moment
-            :t("automationLineSunPartDays",{moment,days:automationDayList(part.days)});
-        };
-        return t("automationLineSunBoth",{first:automationStrong(phrase("sunset")),second:automationStrong(phrase("sunrise"))});
-      }
-      const moment=automationStrong(wizard.sunOffset===0
-        ?t(wizard.sunEvent==="sunrise"?"automationLineSunriseExact":"automationLineSunsetExact")
-        :t(wizard.sunOffset<0
-          ?(wizard.sunEvent==="sunrise"?"automationLineSunriseBefore":"automationLineSunsetBefore")
-          :(wizard.sunEvent==="sunrise"?"automationLineSunriseAfter":"automationLineSunsetAfter"),
-        {minutes:Math.abs(wizard.sunOffset)}));
-      return automationEveryDay(wizard.days)
-        ?t("automationLineSun",{moment})
-        :t("automationLineSunDays",{moment,days:esc(automationDayList(wizard.days))});
+      // §9.1 — güneş satırı iki anı da anlatır; her an kendi günlerini taşır.
+      const phrase=event=>{
+        const part=automationSunPart(wizard,event);
+        const moment=automationSunSentenceTime({event,offsetMinutes:part.offset});
+        return automationEveryDay(part.days)
+          ?moment
+          :t("automationLineSunPartDays",{moment,days:automationDayList(part.days)});
+      };
+      return t("automationLineSunBoth",{first:automationStrong(phrase("sunset")),second:automationStrong(phrase("sunrise"))});
     }
     const device=automationStrong(automationTriggerLabelName(wizard));
+    // §2.1 — süre taşıyan tetikleyicinin kendi tam şablonu var; parça birleştirme yok.
+    const held=automationTrigForEligible(wizard)&&wizard.triggerForSeconds>0;
+    const duration=held?automationStrong(automationDurationTextShort(wizard.triggerForSeconds)):"";
+    const key=base=>held?`${base}For`:base;
     if(automationThresholdActive(wizard)){
       const sensor=state.devices.find(item=>item.id===wizard.triggerDeviceId)||null;
-      return t(wizard.thresholdDir==="below"?"automationLineBelow":"automationLineAbove",{
+      return t(key(wizard.thresholdDir==="below"?"automationLineBelow":"automationLineAbove"),{
         device,
         reading:esc(automationPropertyLabel(sensor,wizard.triggerProperty)),
-        value:automationStrong(`${wizard.thresholdValue}${automationPropertyUnit(sensor,wizard.triggerProperty)}`)
+        value:automationStrong(`${wizard.thresholdValue}${automationPropertyUnit(sensor,wizard.triggerProperty)}`),
+        duration
       });
     }
     if(automationMappingMode(wizard))return t("automationLineStateBoth",{device});
@@ -6267,9 +6322,10 @@
       device,
       button:esc(automationButtonLabel(automationTriggerDevice({deviceId:wizard.triggerDeviceId}),wizard.triggerAction))
     });
-    return t("automationLineEvent",{
+    return t(key("automationLineEvent"),{
       device,
-      event:esc(automationEventLabel({deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty,equals:wizard.triggerEquals}))
+      event:esc(automationEventLabel({deviceId:wizard.triggerDeviceId,property:wizard.triggerProperty,equals:wizard.triggerEquals})),
+      duration
     });
   };
   const automationGroupMode=target=>String(target?.value??"").toUpperCase()==="OFF"?"off":"on";
@@ -6503,6 +6559,34 @@
       return`<p class="automation-section">${esc(section.label)}</p><div class="automation-flow">${nodes.map(automationNodeHtml).join("")}</div>`;
     }).join("");
   }
+  // Sayaç düğmesi: tek dokunuş bir adım, basılı tutunca hızlanarak sürer. Tutuş boyunca ekran
+  // baştan çizilmez — çizilse düğme silinir, parmak kalkınca sayaç durmazdı; yalnız rakam tazelenir.
+  let automationHoldQuiet=false;
+  function automationBindCounter(button,run,read){
+    let timer=null;
+    let ticks=0;
+    let repeated=false;
+    const stop=()=>{
+      if(timer)clearTimeout(timer);
+      timer=null;
+      automationHoldQuiet=false;
+      if(ticks>0){ticks=0;repeated=true;automationRedraw()}
+    };
+    const tick=()=>{
+      ticks+=1;
+      automationHoldQuiet=true;
+      run();
+      const box=button.parentElement;
+      const label=box?box.querySelector(".automation-counter-value"):null;
+      if(label)label.textContent=read();
+      timer=setTimeout(tick,Math.max(70,300-ticks*20));
+    };
+    button.onclick=()=>{if(repeated){repeated=false;return}run()};
+    button.onpointerdown=()=>{if(!timer)timer=setTimeout(tick,420)};
+    button.onpointerup=stop;
+    button.onpointerleave=stop;
+    button.onpointercancel=stop;
+  }
   // Gövde her yeniden çizimde ve arama tazelemesinde aynı yerden bağlanır.
   function automationBindBody(){
     const wizard=state.automationWizard;
@@ -6532,14 +6616,25 @@
     $$("[data-automation-autooff-step]").forEach(button=>button.onclick=()=>stepAutomationAutoOff(Number(button.dataset.automationAutooffStep)));
     $$("[data-automation-autooff-minutes]").forEach(button=>button.onclick=()=>setAutomationAutoOffMinutes(Number(button.dataset.automationAutooffMinutes),false));
     $$("[data-automation-autooff-custom]").forEach(button=>button.onclick=()=>openAutomationAutoOffCustom());
-    $$("[data-automation-sun-event]").forEach(button=>button.onclick=()=>chooseAutomationSunEvent(button.dataset.automationSunEvent));
     $$("[data-automation-sun-edit]").forEach(button=>button.onclick=()=>chooseAutomationSunEdit(button.dataset.automationSunEdit));
-    $$("[data-automation-sun-offset]").forEach(button=>button.onclick=()=>setAutomationSunOffset(Number(button.dataset.automationSunOffset),false));
-    $$("[data-automation-sun-custom]").forEach(button=>button.onclick=()=>openAutomationSunCustom());
-    $$("[data-automation-sun-step]").forEach(button=>button.onclick=()=>setAutomationSunOffset(automationSunPart(wizard,automationSunEditing(wizard)).offset+Number(button.dataset.automationSunStep),true));
+    // Kaydırma sayacı: değer her adımda taze okunur, basılı tutuş sırasında ekran çizilmediği için.
+    const sunOffset=()=>automationSunPart(state.automationWizard,automationSunEditing(state.automationWizard)).offset;
+    $$("[data-automation-sun-step]").forEach(button=>automationBindCounter(
+      button,
+      ()=>setAutomationSunOffset(automationCounterNext(sunOffset(),Number(button.dataset.automationSunStep))),
+      ()=>automationCounterText(sunOffset(),true)
+    ));
     $$("[data-automation-open-location]").forEach(button=>button.onclick=()=>openHomeLocationSettings());
     $$("[data-automation-threshold-dir]").forEach(button=>button.onclick=()=>chooseAutomationThresholdDir(button.dataset.automationThresholdDir));
     $$("[data-automation-threshold-step]").forEach(button=>button.onclick=()=>stepAutomationThreshold(Number(button.dataset.automationThresholdStep)));
+    $$("[data-automation-trig-for]").forEach(button=>button.onclick=()=>toggleAutomationTrigFor(button.dataset.automationTrigFor));
+    // Sayaç dakika gösterir: değer dakikaya yuvarlanır, 0:01 altına inmez, 24:00 üstüne çıkmaz.
+    const trigForMinutes=()=>automationForMinutes(state.automationWizard?.triggerForSeconds);
+    $$("[data-automation-trig-for-step]").forEach(button=>automationBindCounter(
+      button,
+      ()=>setAutomationTrigForSeconds(automationCounterNext(trigForMinutes(),Number(button.dataset.automationTrigForStep))*60),
+      ()=>automationCounterText(trigForMinutes(),false)
+    ));
     $$("[data-automation-cond-kind]").forEach(button=>button.onclick=()=>chooseAutomationCondKind(button.dataset.automationCondKind));
     $$("[data-automation-cond-device]").forEach(button=>button.onclick=()=>chooseAutomationCondDevice(button.dataset.automationCondDevice));
     $$("[data-automation-cond-state]").forEach(button=>button.onclick=()=>chooseAutomationCondState(button.dataset.automationCondState));
@@ -6548,10 +6643,13 @@
     $$("[data-automation-cond-threshold-dir]").forEach(button=>button.onclick=()=>chooseAutomationCondThresholdDir(button.dataset.automationCondThresholdDir));
     $$("[data-automation-cond-threshold-step]").forEach(button=>button.onclick=()=>stepAutomationCondThreshold(button.dataset.automationCondThresholdStep));
     $$("[data-automation-cond-for]").forEach(button=>button.onclick=()=>toggleAutomationCondFor(button.dataset.automationCondFor));
-    $$("[data-automation-cond-for-seconds]").forEach(button=>button.onclick=()=>setAutomationCondForSeconds(Number(button.dataset.automationCondForSeconds),false));
-    $$("[data-automation-cond-for-custom]").forEach(button=>button.onclick=()=>openAutomationCondForCustom());
-    // Sayaç dakika gösterir: adım dakikanın altına inmesin, yoksa "1 dakika" yazıp 30 saniye tutardı.
-    $$("[data-automation-cond-for-step]").forEach(button=>button.onclick=()=>setAutomationCondForSeconds(Math.max(60,(state.automationWizard?.draftCondition?.forSeconds||60)+Number(button.dataset.automationCondForStep)),true));
+    // Sayaç dakika gösterir: değer dakikaya yuvarlanır, 0:01 altına inmez, 24:00 üstüne çıkmaz.
+    const condForMinutes=()=>automationForMinutes(state.automationWizard?.draftCondition?.forSeconds);
+    $$("[data-automation-cond-for-step]").forEach(button=>automationBindCounter(
+      button,
+      ()=>setAutomationCondForSeconds(automationCounterNext(condForMinutes(),Number(button.dataset.automationCondForStep))*60),
+      ()=>automationCounterText(condForMinutes(),false)
+    ));
     $$("[data-automation-cond-time]").forEach(button=>button.onclick=()=>stepAutomationCondTime(button.dataset.automationCondTime,"from"));
     $$("[data-automation-cond-time-to]").forEach(button=>button.onclick=()=>stepAutomationCondTime(button.dataset.automationCondTimeTo,"to"));
     $$("[data-automation-cond-point]").forEach(button=>button.onclick=()=>chooseAutomationCondPoint(button.dataset.automationCondPoint));
@@ -6601,6 +6699,8 @@
     automationAdvanceTimer=null;
   }
   function automationRedraw(){
+    // Sayaç basılı tutulurken ekran baştan çizilmez; basılan düğme yerinde kalsın diye.
+    if(automationHoldQuiet)return;
     automationAnimate=false;
     renderAutomationWizard();
   }
@@ -6778,9 +6878,8 @@
     automationAdvance(()=>{
       if(wizard.triggerKind!==kind){
         // Eşleme yolu ile normal yolun hedef biçimi farklıdır; yol değişince hedefler sıfırlanır.
-        if(automationMappingMode(wizard)!==(kind==="deviceState"))wizard.targets=[];
-        // Güneşin iki olaylı yolu yalnız güneşe aittir; tür değişince tek olaya döner.
-        wizard.sunBoth=false;
+        // Güneş de eşleme yoludur: iki an, iki yön.
+        if(automationMappingMode(wizard)!==(kind==="deviceState"||kind==="sun"))wizard.targets=[];
         automationClearTriggerDevice(wizard);
       }
       wizard.triggerKind=kind;
@@ -6890,6 +6989,14 @@
     if(!event)return;
     // Seçim engellenmez ama uyarı bir kez daha yüzeye çıkar: kullanıcı sonucu bilerek ilerlesin.
     if(automationButtonUnproven(wizard,device))showToast(t("automationButtonUnprovenWarning"),true);
+    // §2.1 — süre satırı açıkken adım hemen kapanmaz: kullanıcı süreyi de ayarlayacak,
+    // "Devam" ile geçer. Koşul adımındaki davranışın aynısı.
+    if(wizard.triggerForSeconds>0&&!event.numeric){
+      automationApplyEvent(wizard,event);
+      automationPruneTargets(wizard);
+      automationRedraw();
+      return;
+    }
     automationAdvance(()=>{
       automationApplyEvent(wizard,event);
       automationPruneTargets(wizard);
@@ -6911,55 +7018,20 @@
     wizard.thresholdValue=next;
     automationRedraw();
   }
-  function chooseAutomationSunEvent(event){
-    const wizard=state.automationWizard;
-    if(!wizard)return;
-    if(event==="both"){
-      // §9.1 — iki olay seçilince ikinci an ilkinin kopyasıyla başlar; kullanıcı ayrıştırabilir.
-      if(!automationSunBoth(wizard)){
-        wizard.sunriseOffset=wizard.sunOffset;
-        wizard.sunriseCustom=Boolean(wizard.sunCustom);
-        wizard.sunriseDays=[...wizard.days];
-        // Eşleme yolunun hedef biçimi farklıdır: yol değişince hedef satırları sıfırlanır.
-        wizard.targets=[];
-      }
-      wizard.sunBoth=true;
-      wizard.sunEvent="sunset";
-      automationRedraw();
-      return;
-    }
-    if(event!=="sunrise"&&event!=="sunset")return;
-    if(automationSunBoth(wizard))wizard.targets=[];
-    wizard.sunBoth=false;
-    wizard.sunEvent=event;
-    automationRedraw();
-  }
-  // İki olaylı yolda hangi anın ayarlandığını değiştirir; seçim silinmez, ayarlar ana özeldir.
+  // Hangi anın ayarlandığını değiştirir; seçim silinmez, ayarlar ana özeldir.
   function chooseAutomationSunEdit(event){
     const wizard=state.automationWizard;
-    if(!wizard||!automationSunBoth(wizard)||(event!=="sunrise"&&event!=="sunset"))return;
+    if(!wizard||(event!=="sunrise"&&event!=="sunset"))return;
     wizard.sunEvent=event;
     automationRedraw();
   }
-  function setAutomationSunOffset(value,custom){
+  function setAutomationSunOffset(value){
     const wizard=state.automationWizard;
     if(!wizard||!Number.isFinite(value))return;
     // Motor ±240 dakikayı reddeder; arayüz sınırı aşan bir değer hiç üretmez.
     const offset=Math.max(-maxAutomationSunOffset,Math.min(maxAutomationSunOffset,Math.round(value)));
-    if(automationSunEditing(wizard)==="sunrise"&&automationSunBoth(wizard)){
-      wizard.sunriseOffset=offset;
-      wizard.sunriseCustom=Boolean(custom);
-    }else{
-      wizard.sunOffset=offset;
-      wizard.sunCustom=Boolean(custom);
-    }
-    automationRedraw();
-  }
-  function openAutomationSunCustom(){
-    const wizard=state.automationWizard;
-    if(!wizard)return;
-    if(automationSunEditing(wizard)==="sunrise"&&automationSunBoth(wizard))wizard.sunriseCustom=true;
-    else wizard.sunCustom=true;
+    if(automationSunEditing(wizard)==="sunrise")wizard.sunriseOffset=offset;
+    else wizard.sunOffset=offset;
     automationRedraw();
   }
   function stepAutomationTime(unit,amount){
@@ -7160,20 +7232,26 @@
     const draft=state.automationWizard?.draftCondition;
     if(!draft)return;
     draft.forSeconds=value==="1"?60:null;
-    draft.forCustom=false;
     automationRedraw();
   }
-  function setAutomationCondForSeconds(seconds,custom){
+  // Sayaç 0:01 altına inmez, 24:00 üstüne çıkmaz; satır kapatılınca alan hiç yazılmaz.
+  function setAutomationCondForSeconds(seconds){
     const draft=state.automationWizard?.draftCondition;
     if(!draft||!Number.isFinite(seconds))return;
-    draft.forSeconds=Math.max(1,Math.min(maxAutomationCondForSeconds,Math.round(seconds)));
-    draft.forCustom=Boolean(custom);
+    draft.forSeconds=Math.max(60,Math.min(maxAutomationCondForSeconds,Math.round(seconds)));
     automationRedraw();
   }
-  function openAutomationCondForCustom(){
-    const draft=state.automationWizard?.draftCondition;
-    if(!draft)return;
-    draft.forCustom=true;
+  // §2.1 — tetikleyicideki süre ölçütü. Koşuldakiyle aynı davranış: açılışta bir dakika.
+  function toggleAutomationTrigFor(value){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    wizard.triggerForSeconds=value==="1"?60:null;
+    automationRedraw();
+  }
+  function setAutomationTrigForSeconds(seconds){
+    const wizard=state.automationWizard;
+    if(!wizard||!Number.isFinite(seconds))return;
+    wizard.triggerForSeconds=Math.max(60,Math.min(maxAutomationCondForSeconds,Math.round(seconds)));
     automationRedraw();
   }
   function chooseAutomationCondNegate(value){

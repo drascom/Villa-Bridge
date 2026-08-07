@@ -22,6 +22,11 @@ export interface AutomationRunTriggerInfo {
   deviceId?: string;
   property?: string;
   value?: JsonScalar;
+  /**
+   * §2.1 — süreli tetikleyici ateşlediyse, kanalın kaç saniyedir hedefte olduğu. Günlüğü okuyan
+   * insan "neden şimdi çalıştı" sorusunun cevabını burada görür ("63 saniyedir açık").
+   */
+  heldSeconds?: number;
 }
 
 export interface AutomationRunConditionResult {

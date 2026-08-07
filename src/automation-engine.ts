@@ -1,6 +1,6 @@
 import {
   isAutomationDeviceAction,
-  isAutomationScheduleTrigger,
+  isAutomationHeldStateTrigger,
   type Automation,
   type AutomationAction,
   type AutomationAutoOffEntry,
@@ -365,6 +365,20 @@ const thresholdSatisfied = (trigger: AutomationDeviceStateTrigger, value: number
 };
 
 /**
+ * §2.1 — süreli tetikleyicinin hedefi şu an tutuluyor mu. Doğrulama `equals` ya da sayısal eşikten
+ * birini şart koştuğu için üçüncü bir dal yoktur; hedefsiz süreli tetikleyici hiç kaydedilemez.
+ */
+export const automationHeldTriggerHolds = (
+  trigger: AutomationDeviceStateTrigger,
+  value: JsonScalar | undefined
+): boolean => {
+  if (value === undefined) return false;
+  if (trigger.equals !== undefined) return value === trigger.equals;
+  const current = numericValue(value);
+  return current !== null && thresholdSatisfied(trigger, current);
+};
+
+/**
  * Eşleşmedi ise **neden** eşleşmediği: sayısal olmayan değer ya da karşılaştırılacak önceki
  * değerin olmaması sessizce yutulmaz, çalışma günlüğüne düşer.
  */
@@ -396,6 +410,9 @@ export const automationEventMatch = (
       continue;
     }
     if (trigger.type !== "deviceState") continue;
+    // §2.1 — süreli tetikleyici olay akışını dinlemez: kenar değil, turdaki süre ölçer ateşler.
+    // (Tür koruyucusu burada `trigger`'ı `never`'a daraltacağı için alan doğrudan okunuyor.)
+    if (trigger.forSeconds !== undefined) continue;
     if (trigger.deviceId !== event.deviceId || trigger.property !== event.property) continue;
     if (trigger.above === undefined && trigger.below === undefined) {
       if (trigger.equals === undefined || trigger.equals === event.value) return { matched: true };
@@ -505,6 +522,12 @@ export class AutomationEngine {
   private readonly lastStateValues = new Map<string, JsonScalar>();
   /** `automationId|deviceId|property` → bekleyen "sonra kapat"; otomasyon+kanal başına tekil. */
   private readonly autoOff = new Map<string, PendingAutoOff>();
+  /**
+   * §2.1 — süreli tetikleyicinin tek atış kilidi: `automationId|deviceId|property`. Aynı tutma
+   * dönemi için yalnız bir kez ateşlenir; kanal hedeften çıkınca kilit düşer ve bir sonraki
+   * seri sıfırdan sayılır.
+   */
+  private readonly heldFired = new Set<string>();
   /** Durum dosyası yazımları sıraya girer; son yazan kazansın diye zincirlenir. */
   private autoOffWrite: Promise<void> = Promise.resolve();
   /** Bekleyen `delay` sayaçları — motor durunca serbest bırakılır, kalıcı değildir. */
@@ -680,6 +703,8 @@ export class AutomationEngine {
     const sun = this.resolveSun(date);
     for (const automation of automations) {
       if (!automation.enabled) continue;
+      // §2.1 — süreli tetikleyiciler dakika kilidine tabi değildir: kendi tek atış kilitleri var.
+      await this.tickHeldTriggers(automation, date);
       if (this.firedMinutes.get(automation.id) === stamp) continue;
       if (sun.reason && automation.triggers.some((trigger) => trigger.type === "sun")) {
         this.noteSunProblem(automation, date, sun.reason);
@@ -692,6 +717,57 @@ export class AutomationEngine {
         automation,
         undefined,
         trigger.type === "sun" ? { kind: "sun", value: trigger.event } : { kind: "time" }
+      );
+    }
+  }
+
+  /** §2.1 — süreli tetikleyicinin tek atış kilidi: otomasyon + IEEE adresi + kanal. */
+  private heldKey(automationId: string, deviceId: string, property: string): string {
+    return `${automationId}|${deviceId}|${property}`;
+  }
+
+  /**
+   * §2.1 — "değer N saniyedir hedefte" tetikleyicileri. Olay akışı değil, motorun turu değerlendirir.
+   *
+   * **Tur granülerliği:** tura 20 saniyede bir bakılır, o yüzden "60 saniye" pratikte 60–80 saniye
+   * arasında ateşler. Bilinçli: ayrı bir zamanlayıcı açmak yerine mevcut tura binmek, DST ve
+   * yeniden başlatma davranışını tek yerde tutuyor.
+   *
+   * **Yeniden başlatma (§2.5):** defter bellektedir; `since` yoksa ateşleme yok — kapalı taraf.
+   * Süreç dönünce ilk taze değişimden itibaren sayılır.
+   */
+  private async tickHeldTriggers(automation: Automation, date: Date): Promise<void> {
+    for (const trigger of automation.triggers) {
+      if (!isAutomationHeldStateTrigger(trigger)) continue;
+      const key = this.heldKey(automation.id, trigger.deviceId, trigger.property);
+      const value = this.options.deviceState?.(trigger.deviceId, trigger.property);
+      if (!automationHeldTriggerHolds(trigger, value)) {
+        // Kanal hedeften çıktı: kilit düşer, bir sonraki hareket serisi yeniden sayılır.
+        this.heldFired.delete(key);
+        continue;
+      }
+      if (this.heldFired.has(key)) continue;
+      const since = this.options.stateSince?.(trigger.deviceId, trigger.property) ?? null;
+      if (since === null) continue;
+      const elapsed = Math.floor((date.getTime() - since.getTime()) / 1_000);
+      if (elapsed < (trigger.forSeconds ?? 0)) continue;
+      this.heldFired.add(key);
+      const detail = `${trigger.deviceId} "${trigger.property}" değeri`
+        + ` ${JSON.stringify(value)} ve ${elapsed} saniyedir böyle;`
+        + ` ${trigger.forSeconds} saniye isteniyordu.`;
+      this.note(`Otomasyon "${automation.name}" süreli tetikleyiciyle çalıştı: ${detail}`);
+      // Olay nesnesi verilir ki §5.4 `when` eşlemesi kanalın **o anki değerine** baksın ve
+      // "hareket bitince kapat" izlemesi bu tetikleyiciden kurulabilsin.
+      await this.dispatch(
+        automation,
+        { deviceId: trigger.deviceId, property: trigger.property, value: value as JsonScalar },
+        {
+          kind: "device",
+          deviceId: trigger.deviceId,
+          property: trigger.property,
+          value: value as JsonScalar,
+          heldSeconds: elapsed
+        }
       );
     }
   }

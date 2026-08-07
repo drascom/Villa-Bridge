@@ -1588,12 +1588,16 @@ test("saat kuralı sihirbazı akış rayında cihaz+özellik çiftini kaydeder",
   assert.match(dashboard, /automationDaysHtml\(wizard\.days,"data-automation-day"\)/);
   // Gün listesi kayıttan gelir: saat kuralında tetikleyiciden, güneş kuralında batış anından.
   assert.match(dashboard, /days:timed\?\[\.\.\.\(trigger\.days\|\|automationWeekDays\)\]\s*:sunset\?\[\.\.\.\(sunset\.days\|\|automationWeekDays\)\]:\[\.\.\.automationWeekDays\]/);
-  // §9.1 — güneşin üçüncü yolu ve eşleme dili; geliştirici sözlüğü geçmez, iki dil birlikte.
-  assert.match(dashboard, /data-automation-sun-event="both"/);
-  assert.match(dashboard, /automationSunBothTitle:"İkisi de"/);
-  assert.match(dashboard, /automationSunBothTitle:"Both of them"/);
-  assert.match(dashboard, /automationSunBothSub:"Gün batımında bir şey, gün doğumunda başka bir şey"/);
-  assert.match(dashboard, /automationSunBothSub:"One thing at sunset, another at sunrise"/);
+  // §9.1 — güneş yolu her zaman iki an: olay seçimi de "ikisi de" satırı da kalktı.
+  assert.doesNotMatch(dashboard, /data-automation-sun-event/);
+  assert.doesNotMatch(dashboard, /automationSunBothTitle/);
+  assert.doesNotMatch(dashboard, /automationSunBothSub/);
+  assert.match(dashboard, /const automationSunBoth=wizard=>wizard\?\.triggerKind==="sun";/);
+  // Bugünün saatleri seçim satırından ipucu satırına taşındı; bilgi kaybolmadı.
+  assert.match(dashboard, /automationSunToday:"Bugün gün batımı \{sunset\}, gün doğumu \{sunrise\}\."/);
+  assert.match(dashboard, /automationSunToday:"Today sunset \{sunset\}, sunrise \{sunrise\}\."/);
+  assert.match(dashboard, /automationSunOffsetHint:"Eksi önce, artı sonra demek\. 0:00 tam o an\."/);
+  assert.match(dashboard, /automationSunOffsetHint:"Minus is before, plus is after\. 0:00 means exactly then\."/);
   assert.match(dashboard, /automationMapWhenSunset:"Gün batımında"/);
   assert.match(dashboard, /automationMapWhenSunrise:"At sunrise"/);
   assert.match(dashboard, /automationSummarySunMap:"Gün batımında \{target\} \{onAction\}, gün doğumunda \{offAction\}\."/);
@@ -1822,9 +1826,10 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
 
   // Ekran 3 ve liste ekranı: tam şablon anahtarı, parça birleştirme yok.
   assert.match(dashboard, /if\(trigger\.type==="deviceAction"\)return t\("automationSummaryButton",automationEventValues\(trigger,action,actionKey\)\)/);
-  assert.match(dashboard, /if\(trigger\.type==="deviceState"\)return t\("automationSummaryState",automationEventValues\(trigger,action,actionKey\)\)/);
+  // §2.1 — süreli tetikleyici ayrı bir tam şablona düşer; süresiz yol eskisiyle birebir aynıdır.
+  assert.match(dashboard, /if\(trigger\.type==="deviceState"\)return t\(held\?"automationSummaryStateFor":"automationSummaryState",\{\.\.\.automationEventValues\(trigger,action,actionKey\),duration\}\)/);
   assert.match(dashboard, /if\(trigger\.type==="deviceAction"\)return t\("automationCardSummaryButton",automationEventValues\(trigger,action,actionKey\)\)/);
-  assert.match(dashboard, /if\(trigger\.type==="deviceState"\)return t\("automationCardSummaryState",automationEventValues\(trigger,action,actionKey\)\)/);
+  assert.match(dashboard, /if\(trigger\.type==="deviceState"\)return t\(held\?"automationCardSummaryStateFor":"automationCardSummaryState",\{\.\.\.automationEventValues\(trigger,action,actionKey\),duration\}\)/);
   assert.match(dashboard, /automationSummaryButton:"\{device\} \{button\} olduğunda \{target\} \{action\}\."/);
   assert.match(dashboard, /automationSummaryButton:"When \{button\} on \{device\}, \{target\} will \{action\}\."/);
   assert.match(dashboard, /automationSummaryState:"\{device\} \{event\} \{target\} \{action\}\."/);
@@ -2781,8 +2786,11 @@ const automationExports = [
   "goToAutomationStage", "addAutomationTarget", "editAutomationTarget", "removeAutomationTarget",
   "chooseAutomationChannel", "chooseAutomationTarget", "chooseAutomationMap", "automationWizardReady",
   "setAutomationAutoOffMinutes", "openAutomationAutoOffCustom", "automationBlockedReason",
-  "automationStageAdvanceable", "chooseAutomationSunEvent", "chooseAutomationSunEdit",
-  "setAutomationSunOffset", "openAutomationSunCustom", "automationWizardTriggers", "toggleAutomationDay",
+  "automationStageAdvanceable", "chooseAutomationSunEdit",
+  "setAutomationSunOffset", "automationCounterNext", "automationCounterText",
+  "toggleAutomationCondFor", "setAutomationCondForSeconds",
+  "toggleAutomationTrigFor", "setAutomationTrigForSeconds",
+  "automationWizardTriggers", "toggleAutomationDay",
   "chooseAutomationThresholdDir", "stepAutomationThreshold", "addAutomationCondition", "chooseAutomationCondKind",
   "chooseAutomationCondDevice", "chooseAutomationCondState", "chooseAutomationCondNegate",
   "chooseAutomationCondThresholdDir", "stepAutomationCondThreshold", "chooseAutomationCondMode",
@@ -3093,11 +3101,6 @@ test("her kural biçimi düzenlemeden geçip aynen geri yazılır", async () => 
         { type: "device", deviceId: "0x0055", property: "state_l2", value: "ON", controlId: "l2", autoOff: { mode: "idle", seconds: 120, value: "OFF" } }
       ]
     },
-    // Güneş tetikleyicisi.
-    "güneş": {
-      triggers: [{ type: "sun", event: "sunset", offsetMinutes: -15, days: [1, 2, 3, 4, 5, 6, 7] }],
-      actions: [{ type: "device", deviceId: light, property: "state", value: "ON", controlId: "main" }]
-    },
     // Saat tetikleyicisi, seçili günlerle.
     "saat": {
       triggers: [{ type: "time", at: "19:30", days: [1, 2, 3, 4, 5] }],
@@ -3115,7 +3118,7 @@ test("her kural biçimi düzenlemeden geçip aynen geri yazılır", async () => 
     },
     // Sahne eylemi.
     "sahne": {
-      triggers: [{ type: "sun", event: "sunrise", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }],
+      triggers: [{ type: "deviceState", deviceId: detector, property: "presence", equals: true }],
       actions: [{ type: "scene", groupId: "group-7", sceneId: 4 }]
     },
     // Koşullu kural: koşullar da olduğu gibi korunur.
@@ -3384,8 +3387,8 @@ test("kayıtlı kuralın bekleme, grup ve sahne eylemleri sihirbazda görünür"
   assert.match(body, /Akşam/);
 });
 
-// Güneş tetikleyicisi: olay + hazır kaydırma çipleri; dakika klavyesi yok, ±240 dk aşılmaz.
-test("güneş tetikleyicisi kaydırma çipleriyle kurulur ve konum yoksa sebebini yazar", async () => {
+// Güneş tetikleyicisi: olay seçimi yok (her zaman iki an), kaydırma −/+ sayacıyla; ±240 dk aşılmaz.
+test("güneş tetikleyicisi kaydırma sayacıyla kurulur ve konum yoksa sebebini yazar", async () => {
   const harness = await automationWizardHarness();
   const { api } = harness;
   api.openAutomationWizard(null);
@@ -3393,27 +3396,49 @@ test("güneş tetikleyicisi kaydırma çipleriyle kurulur ve konum yoksa sebebin
   api.chooseAutomationTrigger("sun");
   assert.equal(harness.wizard().stage, "sun");
   const body = harness.body();
-  assert.match(body, /data-automation-sun-event="sunrise"/);
-  assert.match(body, /data-automation-sun-event="sunset"/);
-  assert.match(body, /data-automation-sun-offset="-30"/);
-  assert.match(body, /data-automation-sun-offset="120"/);
-  assert.doesNotMatch(body, /data-automation-sun-offset="-240"/);
+  // Üç satırlık "gün doğumu / gün batımı / ikisi de" seçimi kalktı.
+  assert.doesNotMatch(body, /data-automation-sun-event=/);
+  // Hazır kaydırma çipleri yerine tek sayaç: değeri "0:00", iki yönlü düğmesi var.
+  assert.doesNotMatch(body, /data-automation-sun-offset=/);
+  assert.match(body, /data-automation-sun-step="-1"/);
+  assert.match(body, /data-automation-sun-step="1"/);
+  assert.match(body, /<span class="automation-counter-value">0:00<\/span>/);
+  // Ayarlanan an burada seçilir; kural yine iki anı da taşır.
+  assert.match(body, /data-automation-sun-edit="sunset"/);
+  assert.match(body, /data-automation-sun-edit="sunrise"/);
   // Gün çipleri saat tetikleyicisiyle aynı bileşenden gelir.
   assert.match(body, /data-automation-day="all"/);
 
-  api.chooseAutomationSunEvent("sunset");
   api.setAutomationSunOffset(-30, false);
   assert.equal(harness.wizard().sunOffset, -30);
+  // Negatif değer işaretiyle okunur; sıfırda işaret yazılmaz.
+  assert.match(harness.body(), /<span class="automation-counter-value">−0:30<\/span>/);
   // Sunucu şeması: sun / event / offsetMinutes / days.
   const trigger = api.automationWizardTrigger(harness.wizard()) as Record<string, unknown>;
   assert.equal(trigger.type, "sun");
   assert.equal(trigger.event, "sunset");
   assert.equal(trigger.offsetMinutes, -30);
   assert.deepEqual(trigger.days, [1, 2, 3, 4, 5, 6, 7]);
-  // Motor sınırı aşılmaz.
+  // Motor sınırı aşılmaz: sayaç ±240 dakikada durur, yani −4:00 … +4:00.
   api.setAutomationSunOffset(-9000, true);
   assert.equal(harness.wizard().sunOffset, -240);
+  assert.match(harness.body(), /<span class="automation-counter-value">−4:00<\/span>/);
+  api.setAutomationSunOffset(api.automationCounterNext(-240, -1));
+  assert.equal(harness.wizard().sunOffset, -240);
+  api.setAutomationSunOffset(9000);
+  assert.equal(harness.wizard().sunOffset, 240);
+  assert.match(harness.body(), /<span class="automation-counter-value">\+4:00<\/span>/);
+  api.setAutomationSunOffset(api.automationCounterNext(240, 1));
+  assert.equal(harness.wizard().sunOffset, 240);
+  // Adım şeması: sıfırın çevresinde bir dakika, uzaklaştıkça kabalaşır.
+  assert.equal(api.automationCounterNext(0, 1), 1);
+  assert.equal(api.automationCounterNext(0, -1), -1);
+  assert.equal(api.automationCounterNext(5, -1), 4);
+  assert.equal(api.automationCounterNext(5, 1), 10);
+  assert.equal(api.automationCounterNext(-5, 1), -4);
+  assert.equal(api.automationCounterNext(60, 1), 75);
   // Özet satırı akışın dilinde.
+  api.setAutomationSunOffset(-30);
   assert.match(String(api.automationTriggerLine(harness.wizard())), /automationLineSun/);
 
   // Konum yoksa satır pasif kalır, sebebi sunucudan gelen kodla yazılır ve çıkış yolu görünür.
@@ -3433,10 +3458,7 @@ test("güneşin iki olayı tek kuralda eşleme formuyla kurulur", async () => {
   api.openAutomationWizard(null);
   api.chooseAutomationPath("rule");
   api.chooseAutomationTrigger("sun");
-  // Üçüncü yol: iki olay birden. Tek olaylı eski yol yerinde duruyor.
-  assert.match(harness.body(), /data-automation-sun-event="both"/);
-  api.chooseAutomationSunEvent("both");
-  assert.equal(harness.wizard().sunBoth, true);
+  // Seçim sorulmaz: güneş yolu her zaman iki anı kurar.
 
   // Kaydırma ve gün seçimi olay başına ayrı; varsayılan ikisi de aynı.
   assert.match(harness.body(), /data-automation-sun-edit="sunset"/);
@@ -3487,14 +3509,56 @@ test("güneşin iki olayı tek kuralda eşleme formuyla kurulur", async () => {
     { type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "OFF", when: { equals: "sunrise" } }
   ]);
 
-  // Tek olaylı yola dönülünce iki olaylı biçim de hedefler de kalmaz.
+  // Ayarlanan an değişse de kayıt iki olayı taşımayı sürdürür.
   api.goToAutomationStage("sun");
-  api.chooseAutomationSunEvent("sunset");
-  assert.equal(harness.wizard().sunBoth, false);
-  assert.deepEqual(harness.wizard().targets, []);
+  api.chooseAutomationSunEdit("sunset");
   assert.deepEqual(api.automationWizardTriggers(harness.wizard()), [
-    { type: "sun", event: "sunset", offsetMinutes: -30, days: [1, 2, 3, 4, 5, 6, 7] }
+    { type: "sun", event: "sunset", offsetMinutes: -30, days: [1, 2, 3, 4, 5, 6, 7] },
+    { type: "sun", event: "sunrise", offsetMinutes: 15, days: [1] }
   ]);
+});
+
+// Tek `sun` tetikleyicisi taşıyan eski kural yeni ekrana kayıpsız düşer: kendi yönü dolu,
+// öbür yön "bir şey yapma". Canlıda böyle kurallar var, düzenlemede sessizce bozulmamalı.
+test("tek olaylı eski güneş kuralı iki olaylı ekrana kayıpsız açılır", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  (harness.state.automations as unknown[]).push({
+    id: "sun-single",
+    name: "Test Light sunrise",
+    enabled: true,
+    triggers: [{ type: "sun", event: "sunrise", offsetMinutes: -15, days: [1, 2, 3, 4, 5, 6, 7] }],
+    conditions: [],
+    actions: [{ type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON" }]
+  });
+  api.openAutomationWizard("sun-single");
+  // Kayıtlı olay kendi yuvasına oturdu; öbür an dokunulmamış varsayılanla geldi.
+  assert.equal(harness.wizard().sunriseOffset, -15);
+  assert.equal(harness.wizard().sunOffset, 0);
+  assert.deepEqual(harness.wizard().sunriseDays, [1, 2, 3, 4, 5, 6, 7]);
+  // Eylem gün doğumu yönünde; gün batımı yönü "bir şey yapma".
+  assert.deepEqual(harness.wizard().targets, [
+    { deviceId: "0x0011", property: "state", controlId: "switch:state", mapOn: "none", mapOff: "on" }
+  ]);
+
+  await api.saveAutomationWizard();
+  const saved = harness.saved().find((item) => item.id === "sun-single") as Record<string, unknown>;
+  assert.deepEqual(saved.triggers, [
+    { type: "sun", event: "sunset", offsetMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+    { type: "sun", event: "sunrise", offsetMinutes: -15, days: [1, 2, 3, 4, 5, 6, 7] }
+  ]);
+  // Boş yönün eylemi yazılmaz: kural hâlâ yalnız gün doğumunda bir şey yapar.
+  assert.deepEqual(saved.actions, [
+    { type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON", when: { equals: "sunrise" } }
+  ]);
+
+  // İkinci turda kayıt aynen korunur: göç bir kez olur, sonra kural sabit kalır.
+  (harness.state.automations as unknown[])[0] = JSON.parse(JSON.stringify(saved));
+  api.openAutomationWizard("sun-single");
+  await api.saveAutomationWizard();
+  const again = harness.saved().find((item) => item.id === "sun-single") as Record<string, unknown>;
+  assert.deepEqual(again.triggers, saved.triggers);
+  assert.deepEqual(again.actions, saved.actions);
 });
 
 // Sayısal özellikte eşik sorulur; sayısal olmayan özellikte alan hiç görünmez.
@@ -4217,16 +4281,20 @@ test("koşul adımı 'şu kadar süredir böyleyse' ölçütünü ayrı bir dill
 
   // §9.2 — satır varsayılan kapalı: tek bir sessiz düğme, sunucudaki tavanla aynı sınır.
   assert.match(dashboard, /const maxAutomationCondForSeconds=86400;/);
-  assert.match(dashboard, /const automationCondForPresets=\[30,60,120,300,600,1800\];/);
   assert.match(
     dashboard,
     /<button class="automation-cond-for-open" type="button" data-automation-cond-for="1" aria-expanded="false">/
   );
-  assert.match(dashboard, /data-automation-cond-for-seconds="\$\{value\}"/);
-  assert.match(dashboard, /data-automation-cond-for-custom="1"/);
-  assert.match(dashboard, /data-automation-cond-for-step="\$\{amount\}"/);
-  // Sayaç dakika gösterir; adım dakikanın altına inmez.
-  assert.match(dashboard, /setAutomationCondForSeconds\(Math\.max\(60,\(state\.automationWizard\?\.draftCondition\?\.forSeconds\|\|60\)\+Number\(button\.dataset\.automationCondForStep\)\),true\)/);
+  // Hazır süre çipleri kalktı: yerine "−  s:dd  +" sayacı geldi.
+  assert.doesNotMatch(dashboard, /data-automation-cond-for-seconds=/);
+  assert.doesNotMatch(dashboard, /data-automation-cond-for-custom=/);
+  assert.match(
+    dashboard,
+    /const counter=automationCounterHtml\("data-automation-cond-for-step",automationForMinutes\(draft\.forSeconds\),false,"automationCondForTimeLabel","automationCondForDown","automationCondForUp"\);/
+  );
+  // Sayaç dakika gösterir; 0:01 altına inmez, 24:00 üstüne çıkmaz.
+  assert.match(dashboard, /const maxAutomationCondForMinutes=Math\.floor\(maxAutomationCondForSeconds\/60\);/);
+  assert.match(dashboard, /draft\.forSeconds=Math\.max\(60,Math\.min\(maxAutomationCondForSeconds,Math\.round\(seconds\)\)\);/);
 
   // Süre ölçütü hem boolean hem sayısal eşik ekranının altına biner.
   assert.match(dashboard, /if\(draft\.numeric\)return`\$\{automationCondThresholdHtml\(draft,device\)\}\$\{automationCondForHtml\(draft\)\}`;/);
@@ -4258,6 +4326,163 @@ test("koşul adımı 'şu kadar süredir böyleyse' ölçütünü ayrı bir dill
   assert.match(dashboard, /automationCondBetweenForLine:"Yalnız \{device\} \{reading\} \{duration\} boyunca \{from\} ile \{to\} arasındaysa"/);
   assert.match(dashboard, /automationDurationSeconds:"\{count\} saniye"/);
   assert.match(dashboard, /automationDurationSeconds:"\{count\} seconds"/);
+});
+
+test("tetikleyici adımı süreyi koşuldakiyle aynı yerde ve aynı görünümde sorar", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // §2.1 — koşulun görsel dili bilerek paylaşılır: aynı kesikli sessiz blok, yeni stil yok.
+  assert.match(
+    dashboard,
+    /<button class="automation-cond-for-open" type="button" data-automation-trig-for="1" aria-expanded="false">/
+  );
+  // Hazır süre çipleri burada da kalktı; sayaç koşuldakiyle aynı bileşenden gelir.
+  assert.doesNotMatch(dashboard, /data-automation-trig-for-seconds=/);
+  assert.doesNotMatch(dashboard, /data-automation-trig-for-custom=/);
+  assert.match(
+    dashboard,
+    /const counter=automationCounterHtml\("data-automation-trig-for-step",automationForMinutes\(wizard\.triggerForSeconds\),false,"automationTrigForTimeLabel","automationTrigForDown","automationTrigForUp"\);/
+  );
+  assert.match(dashboard, /wizard\.triggerForSeconds=value==="1"\?60:null;/);
+  assert.match(dashboard, /wizard\.triggerForSeconds=Math\.max\(60,Math\.min\(maxAutomationCondForSeconds,Math\.round\(seconds\)\)\);/);
+
+  // Satır hem olay listesinin hem sayısal eşik ekranının altına biner.
+  assert.match(dashboard, /\$\{events\.length\?list:""\}\$\{hint\}\$\{automationTrigForHtml\(wizard\)\}`;/);
+  assert.match(dashboard, /esc\(t\("automationThresholdHint"\)\)\}<\/p>\$\{automationTrigForHtml\(wizard\)\}`;/);
+
+  // Süre yalnız hedefi olan tetikleyicide sorulur: anahtar eşleme yolunda hiç görünmez.
+  assert.match(
+    dashboard,
+    /const automationTrigForEligible=wizard=>Boolean\(wizard\)\s*&&!automationMappingMode\(wizard\)\s*&&automationDeviceKinds\.includes\(wizard\.triggerKind\);/
+  );
+
+  // Etiketler zaman yönünü taşır ve "sonra kapansın" ile farkı ipucunda yazar.
+  assert.match(dashboard, /automationTrigForOpen:"… ve şu kadar süredir böyleyse"/);
+  assert.match(dashboard, /automationTrigForOpen:"… and it has been this way for a while"/);
+  assert.match(dashboard, /automationTrigForHint:"[^"]*sonra kapansın[^"]*"/);
+  assert.match(dashboard, /automationTrigForHint:"[^"]*turn off afterwards[^"]*"/);
+  // §2.5 — yeniden başlatma penceresi ipucunda söylenir.
+  assert.match(dashboard, /automationTrigForHint:"[^"]*yeniden başlarsa süre sıfırdan sayılır\./);
+
+  // Özet cümlesi tam şablon anahtarıyla kurulur — parça birleştirme yok.
+  assert.match(dashboard, /const key=base=>held\?`\$\{base\}For`:base;/);
+  assert.match(dashboard, /automationLineEventFor:"\{device\} \{duration\} boyunca \{event\} sürerse"/);
+  assert.match(dashboard, /automationLineEventFor:"When \{device\} \{event\} for \{duration\}"/);
+  assert.match(dashboard, /automationLineAboveFor:"\{device\} \{reading\} \{duration\} boyunca \{value\} üstünde kalırsa"/);
+  assert.match(dashboard, /automationLineBelowFor:"When \{device\} \{reading\} stays below \{value\} for \{duration\}"/);
+  assert.match(dashboard, /automationSummaryStateFor:"\{device\} \{duration\} boyunca \{event\} sürerse \{target\} \{action\}\."/);
+  assert.match(dashboard, /automationCardSummaryStateFor:"\{device\} \{event\} for \{duration\} → \{target\} \{action\}"/);
+  // Süreli eşikte fiil değişir: "üstüne çıkınca" değil, "üstünde kalınca".
+  assert.match(dashboard, /automationThresholdAboveHeldShort:"\{reading\} \{value\} üstünde kalınca"/);
+  assert.match(dashboard, /automationThresholdBelowHeldShort:"\{reading\} stays below \{value\}"/);
+});
+
+// Üç süre/kaydırma seçicisi de tek dile indi: "−  s:dd  +". Hazır çip satırı hiçbirinde kalmadı.
+test("süre ve kaydırma seçicileri tek bir sayaç bileşeninden gelir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Tek bileşen, üç çağrı: güneş kaydırması, koşul süresi, tetikleyici süresi.
+  assert.match(dashboard, /const automationCounterHtml=\(hook,minutes,signed,labelKey,downKey,upKey\)=>\{/);
+  assert.equal(dashboard.match(/automationCounterHtml\("data-automation-/g)?.length, 3);
+  assert.match(dashboard, /automationCounterHtml\("data-automation-sun-step",part\.offset,true,/);
+  // Değer hep dakikadır ve "s:dd" olarak yazılır; işaret yalnız güneş kaydırmasında görünür.
+  assert.match(dashboard, /const clock=`\$\{Math\.floor\(total\/60\)\}:\$\{String\(total%60\)\.padStart\(2,"0"\)\}`;/);
+  assert.match(dashboard, /return!signed\|\|value===0\?clock:`\$\{value<0\?"−":"\+"\}\$\{clock\}`;/);
+  // Adım şeması: sıfırın çevresinde bir dakika, uzaklaştıkça kabalaşır.
+  assert.match(dashboard, /const automationCounterStep=magnitude=>magnitude<5\?1:magnitude<60\?5:magnitude<240\?15:30;/);
+  // Basılı tutunca hızlanır; tutuş boyunca ekran çizilmez, yoksa basılan düğme silinirdi.
+  assert.match(dashboard, /function automationBindCounter\(button,run,read\)\{/);
+  assert.match(dashboard, /timer=setTimeout\(tick,Math\.max\(70,300-ticks\*20\)\);/);
+  assert.match(dashboard, /button\.onpointerdown=\(\)=>\{if\(!timer\)timer=setTimeout\(tick,420\)\};/);
+  assert.match(dashboard, /if\(automationHoldQuiet\)return;/);
+
+  // Dokunma hedefi mevcut kadran dilinden gelir; ölçüler ekrana göre esner, sabit px yok.
+  assert.match(dashboard, /\.automation-counter\{display:flex;align-items:center;justify-content:center;gap:clamp\(12px,2\.4vw,24px\)/);
+  assert.match(dashboard, /\.automation-counter \.automation-time-step\{width:clamp\(64px,9vw,88px\);min-height:clamp\(46px,7\.2vh,60px\)/);
+  assert.match(dashboard, /\.automation-counter-value\{min-width:clamp\(104px,15vw,150px\);font:800 clamp\(30px,4\.4vw,42px\)/);
+  assert.doesNotMatch(dashboard, /color-mix\(/);
+});
+
+// Sayaç sınırları: süre 0:01 altına inmez, 24:00 üstüne çıkmaz. Satır kapatılınca alan yazılmaz.
+test("süre sayacı bir dakika ile yirmi dört saat arasında kalır", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sensor");
+  api.chooseAutomationTriggerDevice("0x0022");
+
+  // Tetikleyicideki süre: kapalıyken sessiz düğme, açılınca sayaç bir dakikada başlar.
+  assert.match(harness.body(), /data-automation-trig-for="1"/);
+  api.toggleAutomationTrigFor("1");
+  assert.equal(harness.wizard().triggerForSeconds, 60);
+  assert.match(harness.body(), /<span class="automation-counter-value">0:01<\/span>/);
+  assert.match(harness.body(), /data-automation-trig-for-step="-1"/);
+  // Bir dakikanın altına inmez.
+  api.setAutomationTrigForSeconds(Number(api.automationCounterNext(1, -1)) * 60);
+  assert.equal(harness.wizard().triggerForSeconds, 60);
+  // Yukarı doğru adım ladderı: 1 → 2 dakika.
+  api.setAutomationTrigForSeconds(Number(api.automationCounterNext(1, 1)) * 60);
+  assert.equal(harness.wizard().triggerForSeconds, 120);
+  assert.match(harness.body(), /<span class="automation-counter-value">0:02<\/span>/);
+  // Tavan 24:00; üstüne çıkılmaz.
+  api.setAutomationTrigForSeconds(999999);
+  assert.equal(harness.wizard().triggerForSeconds, 86400);
+  assert.match(harness.body(), /<span class="automation-counter-value">24:00<\/span>/);
+  api.setAutomationTrigForSeconds(Number(api.automationCounterNext(1440, 1)) * 60);
+  assert.equal(harness.wizard().triggerForSeconds, 86400);
+  // Satır kapatılınca alan hiç yazılmaz: tetikleyici eski hâline döner.
+  api.toggleAutomationTrigFor("0");
+  assert.equal(harness.wizard().triggerForSeconds, null);
+
+  // Koşuldaki süre aynı sayacı ve aynı sınırları taşır.
+  api.chooseAutomationEvent("occupancy=true");
+  api.chooseAutomationTargetDevice("0x0011");
+  api.chooseAutomationAction("0x0011|switch:state|on");
+  api.chooseAutomationAutoOff("none");
+  api.goToAutomationStage("cond");
+  api.chooseAutomationCondKind("deviceState");
+  api.chooseAutomationCondDevice("0x0011");
+  assert.match(harness.body(), /data-automation-cond-for="1"/);
+  api.toggleAutomationCondFor("1");
+  assert.match(harness.body(), /<span class="automation-counter-value">0:01<\/span>/);
+  assert.doesNotMatch(harness.body(), /data-automation-cond-for-seconds=/);
+  api.setAutomationCondForSeconds(Number(api.automationCounterNext(1, -1)) * 60);
+  assert.equal((harness.wizard().draftCondition as Record<string, unknown>).forSeconds, 60);
+  api.setAutomationCondForSeconds(Number(api.automationCounterNext(60, 1)) * 60);
+  assert.equal((harness.wizard().draftCondition as Record<string, unknown>).forSeconds, 4500);
+  assert.match(harness.body(), /<span class="automation-counter-value">1:15<\/span>/);
+});
+
+// Tek yönü boş bırakmak kuralı tek yönlü yapar; iki yön de boşsa kural kaydedilemez.
+test("güneş eşlemesinde bir yöne 'bir şey yapma' denebilir, iki yöne birden denemez", async () => {
+  const harness = await automationWizardHarness();
+  const { api } = harness;
+  api.openAutomationWizard(null);
+  api.chooseAutomationPath("rule");
+  api.chooseAutomationTrigger("sun");
+  api.chooseAutomationTargetDevice("0x0011");
+  assert.equal(harness.wizard().stage, "map");
+  // "Bir şey yapma" iki yönde de sunulur.
+  assert.match(harness.body(), /data-automation-map="on\|none"/);
+  assert.match(harness.body(), /data-automation-map="off\|none"/);
+
+  // İki yön de boşsa ileri gidilmez ve sebebi yazılır.
+  api.chooseAutomationMap("on|none");
+  api.chooseAutomationMap("off|none");
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), false);
+  assert.equal(api.automationBlockedReason(harness.wizard()), "automationNeedMap");
+
+  // Gün doğumuna "bir şey yapma" denince kural tek yönlü kaydedilir.
+  api.chooseAutomationMap("on|on");
+  assert.equal(api.automationStageAdvanceable(harness.wizard()), true);
+  await api.nextAutomationStep();
+  await api.saveAutomationWizard();
+  const saved = harness.saved()[harness.saved().length - 1] as Record<string, unknown>;
+  assert.equal((saved.triggers as unknown[]).length, 2);
+  assert.deepEqual(saved.actions, [
+    { type: "device", deviceId: "0x0011", property: "state", controlId: "switch:state", value: "ON", when: { equals: "sunset" } }
+  ]);
 });
 
 test("koşul adımındaki cihaz listesi neyi neden listelediğini söyler", async () => {

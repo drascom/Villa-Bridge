@@ -147,6 +147,8 @@ const harness = async (
   const runs: AutomationRunRecord[] = [];
   /** Koşulların okuduğu anlık cihaz durumu — `DeviceStore` yerine sahte harita. */
   const states = new Map<string, JsonScalar>();
+  /** §4.1 — değişim defteri; süreli koşul ve süreli tetikleyici buradan okur. */
+  const sinces = new Map<string, Date>();
   let location: HomeLocation | null = engineOptions.location ?? null;
   let clock = new Date(engineOptions.start ?? "2026-08-03T19:00:05");
   const timers = new FakeTimers(() => clock.getTime());
@@ -160,6 +162,7 @@ const harness = async (
     logger: { error: (message) => logs.push(message), info: (message) => notes.push(message) },
     location: () => location,
     deviceState: (deviceId, property) => states.get(`${deviceId}|${property}`),
+    stateSince: (deviceId, property) => sinces.get(`${deviceId}|${property}`) ?? null,
     runLog: { append: (record) => runs.push(record) },
     ...(engineOptions.actionTimeoutMs === undefined
       ? {}
@@ -178,6 +181,12 @@ const harness = async (
     directory,
     setState: (deviceId: string, property: string, value: JsonScalar) => {
       states.set(`${deviceId}|${property}`, value);
+    },
+    /** Defteri elle kurar; `null` "yeniden başlatmadan beri kayıt yok" demektir (§2.5). */
+    setSince: (deviceId: string, property: string, value: Date | null) => {
+      const key = `${deviceId}|${property}`;
+      if (value === null) sinces.delete(key);
+      else sinces.set(key, value);
     },
     setLocation: (value: HomeLocation | null) => {
       location = value;
@@ -1592,4 +1601,188 @@ test("süre alanı olmayan koşullar defterden etkilenmez", () => {
   );
   assert.equal(result.ok, true);
   assert.equal(asked, false);
+});
+
+/** §2.1 — "hareket bir dakikadır sürüyorsa" kuralı: süreli tetikleyici + tek eylem. */
+const heldAutomation = (overrides: Record<string, unknown> = {}): Record<string, unknown> =>
+  automation({
+    id: "tuvalet-fani",
+    name: "Tuvalet fanı",
+    triggers: [
+      { type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true, forSeconds: 60 }
+    ],
+    ...overrides
+  });
+
+test("süreli tetikleyici süre dolunca bir kez ateşler, aynı tutma döneminde tekrarlamaz", async (context) => {
+  const { engine, source, setState, setSince, setClock, notes, runs } = await harness(
+    context,
+    [heldAutomation()],
+    { start: "2026-08-07T12:00:00" }
+  );
+  setState(sensorId, "occupancy", true);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T11:59:40"));
+
+  // 20 saniyedir açık: henüz yetmez.
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+
+  // Tur granülerliği: 20 saniyede bir bakıldığı için 60 saniyelik ölçüt 60–80 sn arası ateşler.
+  setClock("2026-08-07T12:00:43");
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+  assert.equal(notes.some((note) => /63 saniyedir/.test(note)), true);
+  assert.equal(runs.some((run) => run.trigger?.heldSeconds === 63), true);
+
+  // Tek atış kilidi: hareket sürdüğü sürece bir daha ateşlenmez.
+  setClock("2026-08-07T12:05:00");
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+});
+
+test("süreli tetikleyicinin kilidi değer hedeften çıkınca sıfırlanır", async (context) => {
+  const { engine, source, setState, setSince, setClock } = await harness(
+    context,
+    [heldAutomation()],
+    { start: "2026-08-07T12:00:00" }
+  );
+  setState(sensorId, "occupancy", true);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T11:58:00"));
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+
+  // Hareket bitti: kilit düşer ama değer hedefte olmadığı için ateşleme de yok.
+  setClock("2026-08-07T12:10:00");
+  setState(sensorId, "occupancy", false);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T12:10:00"));
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+
+  // Yeni hareket serisi baştan sayılır ve süre dolunca yeniden ateşler.
+  setClock("2026-08-07T12:20:00");
+  setState(sensorId, "occupancy", true);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T12:18:30"));
+  await engine.tick();
+  assert.equal(source.calls.length, 2);
+});
+
+test("süreli tetikleyici defter boşken ve değer hedefi tutmazken ateşlemez", async (context) => {
+  const { engine, source, setState, setSince, setClock } = await harness(
+    context,
+    [heldAutomation()],
+    { start: "2026-08-07T12:00:00" }
+  );
+  // §2.5 — yeniden başlatmadan beri kayıt yok: kapalı tarafa düşülür.
+  setState(sensorId, "occupancy", true);
+  setSince(sensorId, "occupancy", null);
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+
+  // Defter dolu ama değer hedefte değil: süre okunsa bile ateşleme yok.
+  setClock("2026-08-07T12:01:00");
+  setState(sensorId, "occupancy", false);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T11:00:00"));
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+});
+
+test("süreli tetikleyici olay akışından tetiklenmez", async (context) => {
+  const { engine, source, setState, setSince } = await harness(
+    context,
+    [heldAutomation()],
+    { start: "2026-08-07T12:00:00" }
+  );
+  setState(sensorId, "occupancy", true);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T11:00:00"));
+
+  // Kenar olayı gelir ama süreli tetikleyici olay akışını dinlemez.
+  await engine.handleDeviceEvents([
+    { deviceId: sensorId, property: "occupancy", value: true }
+  ]);
+  await settle();
+  assert.equal(source.calls.length, 0);
+
+  // Aynı durum turda değerlendirilince ateşler.
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+});
+
+test("süreli tetikleyici eşleşme değeri olarak kanalın o anki değerini verir", async (context) => {
+  const { engine, source, setState, setSince } = await harness(
+    context,
+    [
+      heldAutomation({
+        triggers: [
+          { type: "deviceState", deviceId: sensorId, property: "occupancy", equals: true, forSeconds: 60 }
+        ],
+        actions: [
+          { type: "device", deviceId: lampId, property: "state_l1", value: "ON", when: { equals: true } },
+          { type: "device", deviceId: lampId, property: "state_l2", value: "ON", when: { equals: false } }
+        ]
+      })
+    ],
+    { start: "2026-08-07T12:00:00" }
+  );
+  setState(sensorId, "occupancy", true);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T11:00:00"));
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+});
+
+test("süreli sayısal eşik tetikleyicisi değer eşikte kaldığı sürece bir kez ateşler", async (context) => {
+  const { engine, source, setState, setSince, setClock } = await harness(
+    context,
+    [
+      heldAutomation({
+        id: "salon-sicak",
+        triggers: [
+          { type: "deviceState", deviceId: sensorId, property: "temperature", above: 25, forSeconds: 300 }
+        ]
+      })
+    ],
+    { start: "2026-08-07T12:00:00" }
+  );
+  setState(sensorId, "temperature", 26.4);
+  setSince(sensorId, "temperature", new Date("2026-08-07T11:58:00"));
+  await engine.tick();
+  assert.equal(source.calls.length, 0);
+
+  setClock("2026-08-07T12:03:20");
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+
+  setClock("2026-08-07T12:10:00");
+  await engine.tick();
+  assert.equal(source.calls.length, 1);
+});
+
+test("süreli tetikleyici 'hareket bitince kapat' sözünü kurabilir", async (context) => {
+  const { engine, source, setState, setSince, timers } = await harness(
+    context,
+    [
+      heldAutomation({
+        actions: [{
+          type: "device",
+          deviceId: lampId,
+          property: "state_l1",
+          value: "ON",
+          autoOff: { mode: "idle", seconds: 0, value: "OFF" }
+        }]
+      })
+    ],
+    { start: "2026-08-07T12:00:00" }
+  );
+  setState(sensorId, "occupancy", true);
+  setSince(sensorId, "occupancy", new Date("2026-08-07T11:00:00"));
+  await engine.tick();
+  assert.deepEqual(source.calls, [{ id: lampId, command: { state_l1: "ON" } }]);
+
+  // İzleme süreli tetikleyiciden kuruldu: hareket bitince sayaç başlar ve hedef geri alınır.
+  await engine.handleDeviceEvents([
+    { deviceId: sensorId, property: "occupancy", value: false }
+  ]);
+  await settle();
+  timers.fire();
+  await settle();
+  assert.deepEqual(source.calls[1], { id: lampId, command: { state_l1: "OFF" } });
 });

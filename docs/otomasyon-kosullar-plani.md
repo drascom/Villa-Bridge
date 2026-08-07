@@ -202,9 +202,9 @@ Sihirbazın koşul kolu bugün üç aşama: `cond` (tür seçimi) → `condTime`
 
 ## 6. Uygulama sırası
 
-**Durum (2026-08-07):** beş adımın **beşi de yazıldı**, `npm test` 485/485 + runtime 47/47 yeşil.
-Adım 1–2 canlıda (`1b5269d`); Adım 3–5 commit bekliyor. Kalan tek şey kullanıcının **1024×640'ta
-göz testi** (§9.4) ve ardından sunucu + tablet deploy'u.
+**Durum (2026-08-07):** Adım 1–5 canlıda (`7fa9af7`). Adım 6 (süreli tetikleyici, §10'un ilk
+satırının kapsama alınması) yazıldı ve commit bekliyor; `npm test` 496/496 + runtime 47/47 yeşil.
+Kalan tek şey kullanıcının **1024×640'ta göz testi** (§9.4) ve ardından sunucu + tablet deploy'u.
 
 Her adım kendi testleriyle kapanır; `npm test` tek kapı. Adımlar birbirine sırayla bağlı
 (hepsi `automations.ts` + `automation-engine.ts` + `index.html` dosyalarına dokunuyor) —
@@ -333,7 +333,7 @@ Yapılacak (Adım 4 turuyla birlikte):
 
 | Fikir | Neden |
 |---|---|
-| **Süreyi tetikleyici yapmak** ("10 dakikadır hareket yoksa **kendiliğinden** kapat") | Bu koşul değil, zamanlayıcı tetikleyicisi — ayrı bir tur bekler. Aynı ihtiyacın bugünkü karşılığı `autoOff: { mode: "idle" }` (§9) ve zaten çalışıyor. |
+| ~~**Süreyi tetikleyici yapmak**~~ | **Artık kapsamda (Adım 6).** `AutomationDeviceStateTrigger.forSeconds` ile ifade edilir: hedefi olan durum tetikleyicisi, değer kesintisiz o kadar sürerse motorun turunda bir kez ateşler. Tek atış kilidi kanal hedeften çıkınca sıfırlanır; `autoOff: { mode: "idle" }` (§9) yerini almaz, üstüne binebilir. |
 | Koşul başına VE/VEYA (iç içe mantık) | Dallanma demek; `docs/otomasyon-plani.md` §2.4 sınırını aşar. |
 | Süre bilgisini diske yazmak | Her durum değişiminde dosya yazımı; kazanç yeniden başlatma sonrası tek bir pencere. §2.5. |
 | Zigbee dışı koşullar (telefon konumu, hava durumu, takvim) | `docs/otomasyon-plani.md` §2.1–2.2 kapsam kararı. |
