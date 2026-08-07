@@ -1070,7 +1070,11 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /id="weatherLocationSearch"/);
   assert.match(dashboard, /function chooseWeatherLocation\(location\)/);
   assert.match(dashboard, /https:\/\/api\.open-meteo\.com\/v1\/forecast\?\$\{params\}/);
-  assert.match(dashboard, /navigator\.geolocation\.getCurrentPosition/);
+  // Panel düz HTTP ile servis ediliyor: `navigator.geolocation` güvenli köken şartını karşılamıyor,
+  // "mevcut konumu kullan" her zaman sessizce "izin verilmedi"ye düşüyordu. Ölü düğme kaldırıldı.
+  assert.doesNotMatch(dashboard, /navigator\.geolocation/);
+  assert.doesNotMatch(dashboard, /useCurrentWeatherLocation|requestWeatherLocation/);
+  assert.doesNotMatch(dashboard, /weatherUseLocation|weatherCurrentLocation|weatherLocationDenied/);
   assert.doesNotMatch(dashboard, /setInterval\(renderWorldClock,60000\)/);
   assert.match(dashboard, /function scheduleWorldClockTick\(\)\{\s*setTimeout\(\(\)=>\{tickWorldClock\(\);scheduleWorldClockTick\(\)\},1000-new Date\(\)\.getMilliseconds\(\)\+20\)/);
   assert.match(dashboard, /const localTimeZone=\(\(\)=>\{try\{return Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone\|\|"UTC"\}catch\{return "UTC"\}\}\)\(\)/);
@@ -4273,37 +4277,101 @@ test("hava konumu penceresinde tik yalnız seçili konumda çıkar ve pencere ta
   const dashboard = await readDashboardBundle();
 
   // Hata: eylem ikonu koşulsuz onay işaretiydi, her sonuç seçili görünüyordu.
-  assert.match(dashboard, /const chosenKey=kind==="weather"&&weatherState\.location\?locationKey\(weatherState\.location\):null/);
-  assert.match(dashboard, /const selected=chosenKey!==null&&key===chosenKey/);
+  assert.match(dashboard, /const chosen=kind==="weather"\?weatherState\.location:kind==="home"\?state\.homeLocation:null/);
+  assert.match(dashboard, /const chosenKey=chosen\?locationSelectionKey\(kind,chosen\):null/);
+  assert.match(dashboard, /const selected=chosenKey!==null&&locationSelectionKey\(kind,location\)===chosenKey/);
   assert.match(dashboard, /const glyph=kind==="clock"\?'<path d="M12 5v14M5 12h14"\/>':selected\?'<path d="m5 12 4 4L19 6"\/>':'<path d="M12 21s6\.5-5\.4 6\.5-10\.5/);
   // Seçili öğe yalnız ikonla değil, metin ve renkle de belli olur.
   assert.match(dashboard, /<div class="location-result\$\{selected\?" is-selected":""\}"\$\{selected\?' aria-current="true"':""\}/);
   assert.match(dashboard, /\$\{selected\?`<em class="location-selected-tag">\$\{esc\(t\("locationSelected"\)\)\}<\/em>`:""\}/);
   assert.match(dashboard, /\.location-result\.is-selected\{border-color:var\(--forest\);background:var\(--forest-soft\)\}/);
   // Küçük tablette saat, hava ve konum pencereleri tam ekran: yalnız gövde kayar, alt eylemler kesilmez.
-  assert.match(dashboard, /dialog#clockDialog,dialog#weatherDialog,dialog#weatherLocationDialog\{height:100dvh;max-height:100dvh\}/);
+  assert.match(dashboard, /dialog#clockDialog,dialog#weatherDialog,dialog#weatherLocationDialog,dialog#homeLocationDialog\{height:100dvh;max-height:100dvh\}/);
   assert.match(
     dashboard,
-    /dialog#clockDialog>\.modal,dialog#weatherDialog>\.modal,dialog#weatherLocationDialog>\.modal\{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:clamp\(14px,3vh,26px\);padding-bottom:calc\(20px \+ env\(safe-area-inset-bottom\)\)\}/
+    /dialog#clockDialog>\.modal,dialog#weatherDialog>\.modal,dialog#weatherLocationDialog>\.modal,dialog#homeLocationDialog>\.modal\{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:clamp\(14px,3vh,26px\);padding-bottom:calc\(20px \+ env\(safe-area-inset-bottom\)\)\}/
   );
   assert.match(
     dashboard,
-    /dialog#clockDialog \.hub-columns,dialog#weatherDialog #weatherDialogBody,dialog#weatherLocationDialog #weatherSearchResults\{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain\}/
+    /dialog#clockDialog \.hub-columns,dialog#weatherDialog #weatherDialogBody,dialog#weatherLocationDialog #weatherSearchResults,dialog#homeLocationDialog #homeSearchResults\{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain\}/
   );
   assert.match(
     dashboard,
-    /dialog#clockDialog \.modal-actions,dialog#weatherDialog \.modal-actions,dialog#weatherLocationDialog \.modal-actions\{flex:none;margin-top:14px\}/
+    /dialog#clockDialog \.modal-actions,dialog#weatherDialog \.modal-actions,dialog#weatherLocationDialog \.modal-actions,dialog#homeLocationDialog \.modal-actions\{flex:none;margin-top:14px\}/
   );
   // Konum listesi ve arama alanı pencerenin yarısı kadar; ölçü orantılı, sabit px değil.
   assert.match(
     dashboard,
-    /dialog#weatherLocationDialog \.location-current,dialog#weatherLocationDialog \.location-search-field,dialog#weatherLocationDialog \.location-search-status,dialog#weatherLocationDialog #weatherSearchResults\{width:min\(100%,max\(52vw,320px\)\);margin-left:auto;margin-right:auto\}/
+    /dialog#weatherLocationDialog \.location-search-field,dialog#weatherLocationDialog \.location-search-status,dialog#weatherLocationDialog #weatherSearchResults,dialog#homeLocationDialog \.location-current,dialog#homeLocationDialog \.location-search-field,dialog#homeLocationDialog \.location-search-status,dialog#homeLocationDialog #homeSearchResults,dialog#homeLocationDialog \.location-manual\{width:min\(100%,max\(52vw,320px\)\);margin-left:auto;margin-right:auto\}/
   );
+  // Ev konumu aynı pencereyi üçüncü bir "kind" ile kullanır; koordinat karşılaştırması kimliksizdir.
+  assert.match(dashboard, /home:\{query:"",results:\[\],loading:false,error:null,requestId:0,timer:null\}/);
+  assert.match(dashboard, /const locationSearchInputs=\{clock:"#clockCitySearch",weather:"#weatherLocationSearch",home:"#homeLocationSearch"\}/);
+  assert.match(dashboard, /const locationSelectionKey=\(kind,location\)=>kind==="home"\?locationCoordKey\(location\):locationKey\(location\)/);
+  assert.match(dashboard, /else if\(kind==="home"\)chooseHomeLocation\(location\)/);
   // Rozet satırın içinde kalır: ızgara satırı yalnız min-height kadar ölçülüp satırlar üst üste biniyordu.
   assert.match(dashboard, /\.location-results,\.selected-locations\{display:flex;flex-direction:column;gap:8px\}/);
   assert.match(dashboard, /\.location-result,\.selected-location\{flex:none;display:grid/);
   // Dokunma hedefleri kaba işaretçide 44 px'e çıkar.
   assert.match(dashboard, /@media\(pointer:coarse\)\{\.location-result,\.selected-location\{min-height:56px\}\.location-result button,\.selected-location button\{width:44px;height:44px\}\}/);
+});
+
+// §3 — ev konumu koordinat olarak sorulmuyor: kart yerin adını gösterir, seçim aynı arama penceresinde.
+test("evin konumu ad olarak seçilir, koordinat yalnız elle giriş bölümünde kalır", async () => {
+  const dashboard = await readDashboardBundle();
+  const [english, turkish] = await Promise.all([
+    readFile(englishLocaleUrl, "utf8").then((source) => JSON.parse(source).translations),
+    readFile(turkishLocaleUrl, "utf8").then((source) => JSON.parse(source).translations)
+  ]);
+
+  // Ayarlardaki kart: yerin adı + güneş satırı + tek düğme. İki sayı kutusu karttan çıktı.
+  const card = dashboard.slice(dashboard.indexOf('id="homeLocationForm"'), dashboard.indexOf('id="settingsForm"'));
+  assert.match(card, /id="homeLocationName"/);
+  assert.match(card, /id="homeLocationSun" class="location-sun"/);
+  assert.match(card, /id="chooseHomeLocation" class="secondary" type="button" data-i18n="chooseHomeLocation"/);
+  assert.doesNotMatch(card, /homeLatitude|homeLongitude|data-i18n="latitude"|data-i18n="longitude"/);
+  assert.match(dashboard, /const label=String\(state\.homeLocation\.label\|\|""\)\.trim\(\)/);
+
+  // Pencere üç katmanlı ve sıralı: hava durumu konumu → arama → kapalı `<details>` içinde koordinat.
+  const dialog = dashboard.slice(dashboard.indexOf('<dialog id="homeLocationDialog">'));
+  const modal = dialog.slice(0, dialog.indexOf("</dialog>"));
+  const reuse = modal.indexOf('id="useWeatherLocationForHome"');
+  const search = modal.indexOf('id="homeLocationSearch"');
+  const manual = modal.indexOf('class="location-manual"');
+  assert.ok(reuse >= 0 && reuse < search && search < manual);
+  assert.match(modal, /<details class="location-manual"><summary data-i18n="enterCoordinates">/);
+  assert.match(modal, /id="homeLocationManualForm" class="location-fields"/);
+  assert.match(modal, /id="homeLatitude"[\s\S]*id="homeLongitude"[\s\S]*id="saveHomeLocation"/);
+  assert.match(modal, /id="homeSearchStatus"[\s\S]*id="homeSearchResults"/);
+  assert.doesNotMatch(modal, /open>/);
+
+  // Hava durumu konumu tarayıcıda saklı: çevrimdışı kurulumda tek dokunuşla evin konumu olur.
+  assert.match(dashboard, /function useWeatherLocationForHome\(\)\{\s*const weather=weatherState\.location/);
+  assert.match(dashboard, /reuse\.textContent=weather\?t\("useWeatherLocationNamed",\{name:locationName\(weather\)\}\):t\("useWeatherLocation"\)/);
+  assert.match(dashboard, /\$\("#useWeatherLocationForHome"\)\.onclick=useWeatherLocationForHome/);
+  assert.match(dashboard, /\$\("#chooseHomeLocation"\)\.onclick=openHomeLocationManager/);
+  assert.match(dashboard, /\$\("#homeLocationManualForm"\)\.onsubmit=saveHomeLocationForm/);
+  assert.match(dashboard, /\$\("#homeLocationSearch"\)\.oninput=\(\)=>scheduleLocationSearch\("home"\)/);
+
+  // Seçilen yerin adı sunucuya gider; ad yoksa alan hiç gönderilmez.
+  assert.match(dashboard, /JSON\.stringify\(name\?\{latitude,longitude,label:name\}:\{latitude,longitude\}\)/);
+  assert.match(dashboard, /const saved=await persistHomeLocation\(\{latitude:Number\(location\?\.latitude\),longitude:Number\(location\?\.longitude\),label:location\?\.name\}\)/);
+
+  // Ev sakini oturumu: alanlar salt-okunur, yeni düğme de kapalı.
+  assert.match(dashboard, /if\(choose\)\{choose\.disabled=readOnly;choose\.hidden=readOnly\}/);
+  assert.match(dashboard, /function openHomeLocationManager\(\)\{\s*if\(isResidentSession\(\)\)return/);
+  assert.match(dashboard, /if\(isResidentSession\(\)\)return false/);
+
+  // Kullanıcı "enlem/boylam" sözcüğünü yalnız elle giriş bölümünde görür: kart metni artık koordinat demiyor.
+  assert.doesNotMatch(turkish.homeLocationLead, /koordinat/i);
+  assert.doesNotMatch(english.homeLocationLead, /coordinate/i);
+  for (const catalog of [english, turkish]) {
+    for (const key of ["chooseHomeLocation", "chooseHomeLocationTitle", "chooseHomeLocationLead", "useWeatherLocation", "useWeatherLocationNamed", "enterCoordinates", "homeLocationNotChosen"]) {
+      assert.equal(typeof catalog[key], "string");
+    }
+  }
+  assert.match(String(english.useWeatherLocationNamed), /\{name\}/);
+  assert.match(String(turkish.useWeatherLocationNamed), /\{name\}/);
 });
 
 test("boş çalışma günlüğü kartın 'son çalışma' bilgisiyle çelişmez", async () => {

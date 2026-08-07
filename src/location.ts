@@ -10,7 +10,17 @@ import { isValidLatitude, isValidLongitude } from "./sun.js";
 export interface HomeLocation {
   latitude: number;
   longitude: number;
+  /** Kullanıcının seçtiği yerin adı — panelde koordinat yerine bu gösterilir. */
+  label?: string;
 }
+
+/** Yer adı sunum verisidir: kırpılır, 80 karakterle sınırlanır, boşsa hiç yazılmaz. */
+const normalizeLabel = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") throw new Error("Konum adı metin olmalıdır.");
+  const label = value.trim().slice(0, 80);
+  return label || undefined;
+};
 
 /** Kullanıcı girdisini sayıya çevirir; ikisi birden verilmek zorunda. */
 export const validateLocation = (value: unknown): HomeLocation => {
@@ -19,7 +29,7 @@ export const validateLocation = (value: unknown): HomeLocation => {
   }
   const candidate = value as Record<string, unknown>;
   for (const key of Object.keys(candidate)) {
-    if (key !== "latitude" && key !== "longitude") {
+    if (key !== "latitude" && key !== "longitude" && key !== "label") {
       throw new Error("Konumda bilinmeyen alan var.");
     }
   }
@@ -31,10 +41,12 @@ export const validateLocation = (value: unknown): HomeLocation => {
     : candidate.longitude;
   if (!isValidLatitude(latitude)) throw new Error("Enlem -90 ile 90 arasında olmalıdır.");
   if (!isValidLongitude(longitude)) throw new Error("Boylam -180 ile 180 arasında olmalıdır.");
+  const label = normalizeLabel(candidate.label);
   // Altı ondalık ≈ 11 cm; daha fazlası gürültü.
   return {
     latitude: Number(latitude.toFixed(6)),
-    longitude: Number(longitude.toFixed(6))
+    longitude: Number(longitude.toFixed(6)),
+    ...(label ? { label } : {})
   };
 };
 

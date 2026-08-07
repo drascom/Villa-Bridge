@@ -90,6 +90,31 @@ test("konum doğrulanır, kaydedilir ve geri okunur", async (context) => {
   assert.deepEqual(await store.get(), saved);
 });
 
+// Kullanıcı koordinat değil yer adı seçiyor: ad sunucuda durur, koordinat perde arkasında aynı kalır.
+test("konumun adı saklanır, eski koordinat dosyası sorunsuz okunur", async (context) => {
+  const path = join(await directory(context), "location.json");
+  const store = new LocationStore(path);
+
+  const named = await store.save({ latitude: 36.8969, longitude: 30.7133, label: "  Antalya  " });
+  assert.deepEqual(named, { latitude: 36.8969, longitude: 30.7133, label: "Antalya" });
+  assert.deepEqual(await store.get(), named);
+
+  // Elle koordinat girildiğinde ad yoktur: alan hiç yazılmaz, boş dize de yazılmaz.
+  assert.deepEqual(await store.save({ latitude: 36.8969, longitude: 30.7133, label: "   " }), {
+    latitude: 36.8969,
+    longitude: 30.7133
+  });
+  assert.equal("label" in (await store.get() ?? {}), false);
+
+  // Yer adı sunum verisi: 80 karakterle sınırlanır.
+  const long = await store.save({ latitude: 36.8969, longitude: 30.7133, label: "a".repeat(120) });
+  assert.equal(long.label?.length, 80);
+
+  // Alansız eski dosya (yalnız enlem/boylam) hâlâ okunur.
+  await writeFile(path, JSON.stringify({ latitude: 41, longitude: 29 }), "utf8");
+  assert.deepEqual(await store.get(), { latitude: 41, longitude: 29 });
+});
+
 test("eksik ya da sınır dışı konum reddedilir", () => {
   assert.throws(() => validateLocation({ latitude: 41 }), /Boylam/);
   assert.throws(() => validateLocation({ longitude: 29 }), /Enlem/);
@@ -97,4 +122,12 @@ test("eksik ya da sınır dışı konum reddedilir", () => {
   assert.throws(() => validateLocation({ latitude: 41, longitude: -181 }), /Boylam/);
   assert.throws(() => validateLocation({ latitude: 41, longitude: 29, zoom: 3 }), /bilinmeyen/);
   assert.throws(() => validateLocation(null));
+  // `label` bilinen tek yeni alan; metin olmayan ad reddedilir, bilinmeyen alan reddi sürer.
+  assert.throws(() => validateLocation({ latitude: 41, longitude: 29, label: 5 }), /metin/);
+  assert.throws(() => validateLocation({ latitude: 41, longitude: 29, label: "Ev", zoom: 3 }), /bilinmeyen/);
+  assert.deepEqual(validateLocation({ latitude: 41, longitude: 29, label: "İstanbul" }), {
+    latitude: 41,
+    longitude: 29,
+    label: "İstanbul"
+  });
 });

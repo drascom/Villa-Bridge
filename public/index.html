@@ -427,6 +427,15 @@
     .location-fields{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
     .location-fields .setting-field{flex:1 1 150px;min-width:0}
     .location-sun{margin:10px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+    /* Ayarlardaki konum kartı artık iki sayı kutusu değil: kayıtlı yerin adı, güneş satırı ve tek düğme. */
+    .home-location-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:clamp(10px,1.6vw,18px);margin-top:clamp(10px,1.6vh,16px)}
+    .home-location-place{flex:1 1 clamp(180px,26vw,320px);min-width:0}
+    .home-location-place strong{display:block;font-size:clamp(15px,2vh,18px);overflow-wrap:anywhere}
+    .home-location-row button{flex:none}
+    /* Koordinat girişi kaçış kapısı: varsayılan kapalı, arama çalışmayan çevrimdışı evde açılır. */
+    .location-manual{margin-top:clamp(12px,2vh,20px)}
+    .location-manual summary{padding:clamp(6px,1vh,10px) 0;color:var(--muted);font-size:clamp(12px,1.6vh,13.5px);cursor:pointer}
+    .location-manual .location-fields{margin-top:clamp(8px,1.2vh,14px)}
     @media(max-width:560px){.simple-link-choices{grid-template-columns:1fr}.automation-card{grid-template-columns:46px minmax(0,1fr);row-gap:12px}.automation-card .danger-button{grid-column:1/-1}.automation-card-actions{grid-column:1/-1;justify-content:flex-end}}
     @media(max-width:900px){.toast{bottom:calc(24px + env(safe-area-inset-bottom))}}@media(orientation:landscape) and (max-width:900px) and (max-height:700px){.toast{bottom:24px}}
     /* Tablet yatay duruyor: dokunmatik ekranda her diyalog ekranı doldurur. Tek tek diyaloğa kural
@@ -441,14 +450,14 @@
       dialog.automation-dialog>.modal{height:100dvh;max-height:100dvh;overflow:hidden;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
       /* Saat, hava ve konum pencereleri tam ekran: dış kutu taşmaz, yalnız gövde kayar,
          alt eylem şeridi ("Kapat", "Hava durumu konumunu seç") ilk açılışta bile görünür kalır. */
-      dialog#clockDialog,dialog#weatherDialog,dialog#weatherLocationDialog{height:100dvh;max-height:100dvh}
-      dialog#clockDialog>.modal,dialog#weatherDialog>.modal,dialog#weatherLocationDialog>.modal{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:clamp(14px,3vh,26px);padding-bottom:calc(20px + env(safe-area-inset-bottom))}
-      dialog#clockDialog>.modal>*,dialog#weatherDialog>.modal>*,dialog#weatherLocationDialog>.modal>*{flex:none}
-      dialog#clockDialog .hub-columns,dialog#weatherDialog #weatherDialogBody,dialog#weatherLocationDialog #weatherSearchResults{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain}
-      dialog#clockDialog .modal-actions,dialog#weatherDialog .modal-actions,dialog#weatherLocationDialog .modal-actions{flex:none;margin-top:14px}
-      dialog#clockDialog>.modal>h2,dialog#weatherDialog>.modal>h2,dialog#weatherLocationDialog>.modal>h2{font-size:clamp(20px,3.4vh,28px)}
+      dialog#clockDialog,dialog#weatherDialog,dialog#weatherLocationDialog,dialog#homeLocationDialog{height:100dvh;max-height:100dvh}
+      dialog#clockDialog>.modal,dialog#weatherDialog>.modal,dialog#weatherLocationDialog>.modal,dialog#homeLocationDialog>.modal{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:clamp(14px,3vh,26px);padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+      dialog#clockDialog>.modal>*,dialog#weatherDialog>.modal>*,dialog#weatherLocationDialog>.modal>*,dialog#homeLocationDialog>.modal>*{flex:none}
+      dialog#clockDialog .hub-columns,dialog#weatherDialog #weatherDialogBody,dialog#weatherLocationDialog #weatherSearchResults,dialog#homeLocationDialog #homeSearchResults{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain}
+      dialog#clockDialog .modal-actions,dialog#weatherDialog .modal-actions,dialog#weatherLocationDialog .modal-actions,dialog#homeLocationDialog .modal-actions{flex:none;margin-top:14px}
+      dialog#clockDialog>.modal>h2,dialog#weatherDialog>.modal>h2,dialog#weatherLocationDialog>.modal>h2,dialog#homeLocationDialog>.modal>h2{font-size:clamp(20px,3.4vh,28px)}
       /* Konum listesi ve arama alanı pencerenin yaklaşık yarısı; dar ekranda oran kendiliğinden büyür. */
-      dialog#weatherLocationDialog .location-current,dialog#weatherLocationDialog .location-search-field,dialog#weatherLocationDialog .location-search-status,dialog#weatherLocationDialog #weatherSearchResults{width:min(100%,max(52vw,320px));margin-left:auto;margin-right:auto}
+      dialog#weatherLocationDialog .location-search-field,dialog#weatherLocationDialog .location-search-status,dialog#weatherLocationDialog #weatherSearchResults,dialog#homeLocationDialog .location-current,dialog#homeLocationDialog .location-search-field,dialog#homeLocationDialog .location-search-status,dialog#homeLocationDialog #homeSearchResults,dialog#homeLocationDialog .location-manual{width:min(100%,max(52vw,320px));margin-left:auto;margin-right:auto}
       /* Villa menüsü de tam ekran: ızgara ortada durur, taşarsa yalnız ızgara kayar; tema, dil,
          bağlantı durumu ve "Kapat" alt sırada her zaman görünür kalır. */
       dialog#appMenuDialog{height:100dvh;max-height:100dvh}
@@ -570,7 +579,7 @@
         <article class="setting-card security-card"><div><h2 data-i18n="accessControl">Access control</h2><p data-i18n="accessControlLead">Admin protects setup while the home account keeps daily controls simple.</p><div class="auth-account-meta"><strong id="authAccountName">—</strong><span id="authRoleBadge" class="auth-role-badge">Admin</span></div></div><form id="residentPinForm" class="auth-account-actions"><input id="residentPinInput" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" data-i18n-placeholder="newResidentPin" placeholder="New 6-digit home PIN" required><button class="secondary" type="submit" data-i18n="changePin">Change PIN</button><button class="quiet" type="button" data-auth-logout data-i18n="signOut">Sign out</button></form></article>
         <article class="setting-card security-card"><div><h2 data-i18n="adminPassword">Admin passphrase</h2><p data-i18n="changeAdminPasswordLead">Choose and confirm a new admin passphrase. You will sign in again afterward.</p></div><form id="adminPasswordForm" class="admin-password-form"><div class="admin-password-fields"><input id="newAdminPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" data-i18n-placeholder="newAdminPassword" placeholder="New admin passphrase" required><input id="confirmAdminPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" data-i18n-placeholder="confirmAdminPassword" placeholder="Confirm new passphrase" required></div><div id="adminPasswordError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button class="secondary" type="submit" data-i18n="changeAdminPassword">Change password</button></form></article>
       </div>
-      <form id="homeLocationForm" class="setting-card location-card"><div><h2 data-i18n="homeLocationTitle">Home location</h2><p data-i18n="homeLocationLead">Sunrise and sunset triggers need the coordinates of the house. Nothing is sent anywhere; the times are worked out on this device.</p></div><div class="location-fields"><div class="setting-field"><label for="homeLatitude" data-i18n="latitude">Latitude</label><input id="homeLatitude" name="latitude" type="number" step="0.000001" min="-90" max="90" inputmode="decimal" placeholder="36.8969"></div><div class="setting-field"><label for="homeLongitude" data-i18n="longitude">Longitude</label><input id="homeLongitude" name="longitude" type="number" step="0.000001" min="-180" max="180" inputmode="decimal" placeholder="30.7133"></div><button id="saveHomeLocation" class="primary" type="submit" data-i18n="save">Save</button></div><p id="homeLocationSun" class="location-sun"></p></form>
+      <article id="homeLocationForm" class="setting-card location-card"><div><h2 data-i18n="homeLocationTitle">Home location</h2><p data-i18n="homeLocationLead">Sunrise and sunset triggers need to know where the house is. Nothing is sent anywhere; the times are worked out on this device.</p></div><div class="home-location-row"><div class="home-location-place"><strong id="homeLocationName">—</strong><p id="homeLocationSun" class="location-sun"></p></div><button id="chooseHomeLocation" class="secondary" type="button" data-i18n="chooseHomeLocation">Choose location</button></div></article>
       <form id="settingsForm" class="setting-card connection-settings-card">
         <div class="connection-settings-grid">
           <section class="connection-settings-section"><h2>Zigbee2MQTT</h2><p data-i18n="zigbeeSettingsLead">Connection to the Zigbee coordinator used as the device source.</p><div class="setting-field"><label for="zigbeeAdapterUrl" data-i18n="adapterUrl">Coordinator URL</label><input id="zigbeeAdapterUrl" name="zigbeeAdapterUrl" type="url" placeholder="tcp://192.168.0.248:6638" required></div><div class="setting-field"><label for="zigbeeChannel" data-i18n="zigbeeChannel">Zigbee channel</label><select id="zigbeeChannel"><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option></select><small data-i18n="zigbeeChannelLead">Changing the channel can disconnect devices and requires a service restart.</small></div><div class="setting-field"><label for="lowBatteryThreshold" data-i18n="lowBatteryThreshold">Low battery warning</label><input id="lowBatteryThreshold" type="number" min="5" max="50" step="1" required><small data-i18n="lowBatteryThresholdLead">Create an alert when a battery reaches this percentage.</small></div><div class="setting-field"><label for="selfHealingEnabled" data-i18n="selfHealing">Automatic repair</label><select id="selfHealingEnabled"><option value="true" data-i18n="enabled">Enabled</option><option value="false" data-i18n="disabled">Disabled</option></select><small data-i18n="selfHealingLead">When a device announces itself again, refresh its reporting setup automatically. Unreachable devices are never polled.</small></div></section>
@@ -634,7 +643,8 @@
 <dialog id="deviceActionDialog"><div class="modal device-action-modal"><div class="device-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h18M12 3v18"/><circle cx="12" cy="12" r="8"/></svg></div><h2 id="deviceActionName">Device</h2><p id="deviceActionLead" data-i18n="deviceLongPressLead">Choose what you want to do with this device.</p><div class="modal-actions"><button id="closeDeviceActions" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="showDeviceDetails" class="primary" type="button" data-i18n="showDetails">Show Details</button><button id="confirmDeviceAction" class="danger-button" type="button" data-i18n="confirmAction" hidden>Yes, continue</button></div></div></dialog>
 <dialog id="clockDialog" class="hub-modal" aria-labelledby="clockDialogTitle"><div class="modal"><h2 id="clockDialogTitle" data-i18n="hubClockTitle">World clock and alarms</h2><p data-i18n="hubClockLead">See your cities side by side and keep the list tidy.</p><div class="hub-columns"><section class="hub-section"><h3 data-i18n="selectedCities">Selected cities</h3><div id="clockDialogRows" class="hub-rows"></div></section><section class="hub-section"><h3 data-i18n="hubAddCity">Add a city</h3><div class="location-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="clockCitySearch" type="search" autocomplete="off" data-i18n-placeholder="searchCity" placeholder="Search city…"></div><div id="clockSearchStatus" class="location-search-status"></div><div id="clockSearchResults" class="location-results"></div><h3 class="hub-alarm-heading" data-i18n="hubAlarms">Alarms</h3><div class="hub-alarm-empty"><strong><span aria-hidden="true">⏰</span><span data-i18n="hubAlarms">Alarms</span><em class="hub-soon" data-i18n="comingSoon">Coming soon</em></strong><span data-i18n="hubAlarmsLead">Alarms are not part of the dashboard yet. They arrive with their own screen.</span></div></section></div><div class="modal-actions"><button id="closeClockDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
 <dialog id="weatherDialog" class="hub-modal" aria-labelledby="weatherDialogTitle"><div class="modal"><h2 id="weatherDialogTitle" data-i18n="weather">Weather</h2><p id="weatherDialogMeta"></p><div id="weatherDialogBody"></div><div class="modal-actions"><button id="changeWeatherLocation" class="secondary" type="button" data-i18n="chooseWeatherLocation">Choose weather location</button><button id="closeWeatherDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
-<dialog id="weatherLocationDialog"><div class="modal location-modal"><h2 data-i18n="chooseWeatherLocation">Choose weather location</h2><p data-i18n="chooseWeatherLocationLead">Search for a city or use this tablet’s current location.</p><button id="useCurrentWeatherLocation" class="secondary location-current" type="button" data-i18n="weatherUseLocation">Use current location</button><div class="location-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="weatherLocationSearch" type="search" autocomplete="off" data-i18n-placeholder="searchCity" placeholder="Search city…"></div><div id="weatherSearchStatus" class="location-search-status"></div><div id="weatherSearchResults" class="location-results"></div><div class="modal-actions"><button id="closeWeatherLocationDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
+<dialog id="weatherLocationDialog"><div class="modal location-modal"><h2 data-i18n="chooseWeatherLocation">Choose weather location</h2><p data-i18n="chooseWeatherLocationLead">Search for the city whose weather you want to see.</p><div class="location-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="weatherLocationSearch" type="search" autocomplete="off" data-i18n-placeholder="searchCity" placeholder="Search city…"></div><div id="weatherSearchStatus" class="location-search-status"></div><div id="weatherSearchResults" class="location-results"></div><div class="modal-actions"><button id="closeWeatherLocationDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
+<dialog id="homeLocationDialog"><div class="modal location-modal"><h2 data-i18n="chooseHomeLocationTitle">Where is your home?</h2><p data-i18n="chooseHomeLocationLead">Pick the town your home is in. It is used only to work out sunrise and sunset here on this device.</p><button id="useWeatherLocationForHome" class="secondary location-current" type="button" data-i18n="useWeatherLocation">Use the weather location</button><div class="location-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="homeLocationSearch" type="search" autocomplete="off" data-i18n-placeholder="searchCity" placeholder="Search city…"></div><div id="homeSearchStatus" class="location-search-status"></div><div id="homeSearchResults" class="location-results"></div><details class="location-manual"><summary data-i18n="enterCoordinates">Enter coordinates by hand</summary><form id="homeLocationManualForm" class="location-fields"><div class="setting-field"><label for="homeLatitude" data-i18n="latitude">Latitude</label><input id="homeLatitude" name="latitude" type="number" step="0.000001" min="-90" max="90" inputmode="decimal" placeholder="36.8969"></div><div class="setting-field"><label for="homeLongitude" data-i18n="longitude">Longitude</label><input id="homeLongitude" name="longitude" type="number" step="0.000001" min="-180" max="180" inputmode="decimal" placeholder="30.7133"></div><button id="saveHomeLocation" class="primary" type="submit" data-i18n="save">Save</button></form></details><div class="modal-actions"><button id="closeHomeLocationDialog" class="quiet" type="button" data-i18n="close">Close</button></div></div></dialog>
 <dialog id="widgetDialog"><div class="modal add-modal"><h2 data-i18n="addToDashboard">Add to dashboard</h2><div class="modal-tabs" role="tablist" data-i18n-aria="addToDashboard" aria-label="Add to dashboard"><button id="addTabWidgets" class="modal-tab" type="button" role="tab" aria-selected="true" aria-controls="addPanelWidgets" data-add-tab="widgets" data-i18n="addWidgetsTab">Widgets</button><button id="addTabGroups" class="modal-tab" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="groupForm" data-add-tab="groups" data-i18n="addGroupsTab">Device groups</button></div><section id="addPanelWidgets" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabWidgets" tabindex="0"><p data-i18n="addWidgetLead">Choose compact widgets for the information you want to see at a glance.</p><div id="widgetCatalog" class="widget-catalog"></div><div class="modal-actions"><button id="closeWidgetDialog" class="quiet" type="button" data-i18n="close">Close</button></div></section><form id="groupForm" class="modal-tab-panel" role="tabpanel" aria-labelledby="addTabGroups" tabindex="0" hidden><h2 id="groupDialogTitle" data-i18n="createDeviceGroup">Create device group</h2><p data-i18n="groupDialogLead">Give the widget a simple name, then choose its controls.</p><div class="field"><label for="groupName" data-i18n="groupName">Group name</label><input id="groupName" minlength="2" maxlength="32" autocomplete="off" required data-i18n-placeholder="groupNamePlaceholder" placeholder="Living room"><span class="room-suggest-hint" data-i18n="roomSuggestHint">Pick a suggestion or type your own name.</span><div id="roomSuggestions" class="room-suggestions"></div></div><div id="groupOrderRow" class="group-order-row" hidden><span data-i18n="groupOrder">Order</span><div class="group-order-actions"><button id="groupMoveLeft" class="secondary" type="button" data-i18n-aria="moveGroupEarlier" aria-label="Move earlier">←</button><span id="groupOrderPosition" class="group-order-position"></span><button id="groupMoveRight" class="secondary" type="button" data-i18n-aria="moveGroupLater" aria-label="Move later">→</button></div></div><div class="group-picker-head"><strong data-i18n="groupDevices">Devices and controls</strong><span id="groupSelectionCount"></span></div><div id="groupDeviceChoices" class="group-device-choices"></div><div class="modal-actions group-modal-actions"><button id="deleteGroup" class="danger-button" type="button" data-i18n="deleteGroup" hidden>Delete group</button><div><button id="cancelGroup" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="saveGroup" class="primary" type="submit" data-i18n="saveGroup">Save group</button></div></div></form></div></dialog>
 <dialog id="groupDeleteDialog"><div class="modal"><h2 data-i18n="deleteGroupTitle">Delete this room?</h2><p id="groupDeleteLead" class="danger-copy"></p><p class="group-delete-note" data-i18n="deleteGroupNote">The devices themselves stay untouched — only the room disappears.</p><div class="modal-actions"><button id="cancelGroupDelete" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="confirmGroupDelete" class="danger-button" type="button" data-i18n="deleteGroup">Delete group</button></div></div></dialog>
 <dialog id="automationDialog" class="automation-dialog"><div class="modal automation-modal"><div class="automation-head"><h2 id="automationTitle" data-i18n="automationWhenTitle">When should it run?</h2><p id="automationLead" data-i18n="automationWhenLead">Pick the moment that starts it.</p></div><div id="automationBody" class="automation-body"></div><div class="modal-actions automation-actions"><p id="automationNextHint" class="automation-next-hint" hidden></p><button id="automationBack" class="secondary" type="button" data-i18n="back">Back</button><button id="automationNext" class="primary" type="button" data-i18n="next">Next</button></div></div></dialog>
@@ -781,8 +791,10 @@
   let worldClockZones=savedWorldClockZones??defaultWorldClockZones;
   const locationSearchState={
     clock:{query:"",results:[],loading:false,error:null,requestId:0,timer:null},
-    weather:{query:"",results:[],loading:false,error:null,requestId:0,timer:null}
+    weather:{query:"",results:[],loading:false,error:null,requestId:0,timer:null},
+    home:{query:"",results:[],loading:false,error:null,requestId:0,timer:null}
   };
+  const locationSearchInputs={clock:"#clockCitySearch",weather:"#weatherLocationSearch",home:"#homeLocationSearch"};
   const longPressDelay=560;
   const $=selector=>document.querySelector(selector);
   const $$=selector=>[...document.querySelectorAll(selector)];
@@ -2097,6 +2109,9 @@
     const values=[location?.admin1,location?.country].filter((value,index,array)=>value&&array.indexOf(value)===index);
     return values.join(", ")||location?.timeZone||"";
   };
+  // Kabaca 11 metrelik yuvarlama: aynı yer iki kaynaktan gelse de tek satır "seçili" görünür.
+  const locationCoordKey=location=>`${Number(location?.latitude).toFixed(4)},${Number(location?.longitude).toFixed(4)}`;
+  const locationSelectionKey=(kind,location)=>kind==="home"?locationCoordKey(location):locationKey(location);
   function normalizeLocationResult(result){
     const latitude=Number(result?.latitude);
     const longitude=Number(result?.longitude);
@@ -2136,11 +2151,13 @@
     status.textContent=search.loading?t("locationSearching"):search.error||(!search.loading&&search.query.length>=2&&!search.results.length?t("locationNoResults"):"");
     // Hata: hava listesinde eylem ikonu bir onay işaretiydi, her satırda basıldığı için beş sonuç da
     // "seçili" görünüyordu. Onay işareti artık yalnız gerçekten seçili konumda; diğerleri harita iğnesi.
-    const chosenKey=kind==="weather"&&weatherState.location?locationKey(weatherState.location):null;
+    // Evin konumu sunucuda yalnız koordinat olarak durur; kimliği olmadığı için karşılaştırma koordinattan.
+    const chosen=kind==="weather"?weatherState.location:kind==="home"?state.homeLocation:null;
+    const chosenKey=chosen?locationSelectionKey(kind,chosen):null;
     results.innerHTML=search.results.map((location,index)=>{
       const key=locationKey(location);
       const alreadyAdded=kind==="clock"&&worldClockZones.some(city=>locationKey(city)===key);
-      const selected=chosenKey!==null&&key===chosenKey;
+      const selected=chosenKey!==null&&locationSelectionKey(kind,location)===chosenKey;
       const glyph=kind==="clock"?'<path d="M12 5v14M5 12h14"/>':selected?'<path d="m5 12 4 4L19 6"/>':'<path d="M12 21s6.5-5.4 6.5-10.5a6.5 6.5 0 1 0-13 0C5.5 15.6 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/>';
       return`<div class="location-result${selected?" is-selected":""}"${selected?' aria-current="true"':""}><div><strong>${esc(location.name)}</strong><small>${esc(locationDetails(location))}</small>${selected?`<em class="location-selected-tag">${esc(t("locationSelected"))}</em>`:""}</div><button type="button" data-location-result="${index}" aria-label="${esc(t(kind==="clock"?"addCity":selected?"locationSelected":"chooseLocation",{name:location.name}))}"${alreadyAdded?" disabled":""}><svg class="location-action-icon" viewBox="0 0 24 24" aria-hidden="true">${glyph}</svg></button></div>`;
     }).join("");
@@ -2148,6 +2165,7 @@
       const location=search.results[Number(button.dataset.locationResult)];
       if(!location)return;
       if(kind==="clock")addWorldClockCity(location);
+      else if(kind==="home")chooseHomeLocation(location);
       else chooseWeatherLocation(location);
     });
   }
@@ -2176,7 +2194,7 @@
     }
   }
   function scheduleLocationSearch(kind){
-    const input=$(kind==="clock"?"#clockCitySearch":"#weatherLocationSearch");
+    const input=$(locationSearchInputs[kind]);
     const search=locationSearchState[kind];
     const query=input.value.trim();
     clearTimeout(search.timer);
@@ -2201,7 +2219,7 @@
     search.loading=false;
     search.error=null;
     search.requestId++;
-    const input=$(kind==="clock"?"#clockCitySearch":"#weatherLocationSearch");
+    const input=$(locationSearchInputs[kind]);
     if(input)input.value="";
     renderLocationSearchResults(kind);
   }
@@ -2383,30 +2401,8 @@
       renderWeather();
     }
   }
-  function requestWeatherLocation(){
-    if(!navigator.geolocation){
-      weatherState.error=t("weatherLocationUnavailable");
-      renderWeather();
-      return;
-    }
-    weatherState.loading=true;
-    weatherState.error=null;
-    renderWeather();
-    navigator.geolocation.getCurrentPosition(position=>{
-      weatherState.location={id:"current-location",name:t("weatherCurrentLocation"),country:"",admin1:"",latitude:position.coords.latitude,longitude:position.coords.longitude};
-      weatherState.data=null;
-      weatherState.updatedAt=0;
-      weatherState.loading=false;
-      saveWeatherLocation();
-      saveWeatherSnapshot();
-      if($("#weatherLocationDialog").open)$("#weatherLocationDialog").close();
-      loadWeather();
-    },()=>{
-      weatherState.loading=false;
-      weatherState.error=t("weatherLocationDenied");
-      renderWeather();
-    },{enableHighAccuracy:false,timeout:12000,maximumAge:21600000});
-  }
+  // "Mevcut konumu kullan" kaldırıldı: panel düz HTTP ile servis edildiği için tarayıcının konum
+  // servisi güvenli köken şartını karşılamıyor, düğme her zaman sessizce "izin verilmedi"ye düşüyordu.
   function refreshWeatherIfNeeded(){
     if(!weatherState.location||weatherState.loading)return;
     if(!weatherState.data||Date.now()-weatherState.updatedAt>1800000)loadWeather();
@@ -5192,15 +5188,26 @@
     state.automationSun=data.sun||null;
     renderHomeLocation();
   }
+  // Kayıtlı yerin adı; ad yoksa (elle girilmiş koordinat) sayılar gösterilir, "enlem/boylam" denmez.
+  const homeLocationName=()=>{
+    if(!state.homeLocation)return t("homeLocationNotChosen");
+    const label=String(state.homeLocation.label||"").trim();
+    return label||`${state.homeLocation.latitude}, ${state.homeLocation.longitude}`;
+  };
   function renderHomeLocation(){
+    const readOnly=isResidentSession();
+    const name=$("#homeLocationName");
+    if(name)name.textContent=homeLocationName();
+    const choose=$("#chooseHomeLocation");
+    if(choose){choose.disabled=readOnly;choose.hidden=readOnly}
     const latitude=$("#homeLatitude");
     const longitude=$("#homeLongitude");
-    if(!latitude||!longitude)return;
-    const readOnly=isResidentSession();
-    if(document.activeElement!==latitude)latitude.value=state.homeLocation?String(state.homeLocation.latitude):"";
-    if(document.activeElement!==longitude)longitude.value=state.homeLocation?String(state.homeLocation.longitude):"";
-    latitude.readOnly=readOnly;
-    longitude.readOnly=readOnly;
+    if(latitude&&longitude){
+      if(document.activeElement!==latitude)latitude.value=state.homeLocation?String(state.homeLocation.latitude):"";
+      if(document.activeElement!==longitude)longitude.value=state.homeLocation?String(state.homeLocation.longitude):"";
+      latitude.readOnly=readOnly;
+      longitude.readOnly=readOnly;
+    }
     const save=$("#saveHomeLocation");
     if(save){save.disabled=readOnly;save.hidden=readOnly}
     const note=$("#homeLocationSun");
@@ -5213,30 +5220,60 @@
     else note.textContent=readOnly?t("homeLocationReadOnly"):"";
     if(readOnly&&state.homeLocation)note.textContent=`${note.textContent} ${t("homeLocationReadOnly")}`.trim();
   }
-  async function saveHomeLocationForm(event){
-    event?.preventDefault?.();
-    if(isResidentSession())return;
-    const latitude=Number($("#homeLatitude").value);
-    const longitude=Number($("#homeLongitude").value);
-    if(!Number.isFinite(latitude)||latitude<-90||latitude>90){showToast(t("latitudeInvalid"),true);return}
-    if(!Number.isFinite(longitude)||longitude<-180||longitude>180){showToast(t("longitudeInvalid"),true);return}
+  // Tek yazma yolu: seçilen yer de elle girilen koordinat da buradan geçer. Ad varsa sunucuya yazılır.
+  async function persistHomeLocation({latitude,longitude,label}){
+    if(isResidentSession())return false;
+    if(!Number.isFinite(latitude)||latitude<-90||latitude>90){showToast(t("latitudeInvalid"),true);return false}
+    if(!Number.isFinite(longitude)||longitude<-180||longitude>180){showToast(t("longitudeInvalid"),true);return false}
+    const name=String(label??"").trim().slice(0,80);
     try{
-      const data=await api("/api/settings/location",{method:"PUT",body:JSON.stringify({latitude,longitude})});
+      const data=await api("/api/settings/location",{method:"PUT",body:JSON.stringify(name?{latitude,longitude,label:name}:{latitude,longitude})});
       state.homeLocation=data.location||null;
       state.homeLocationSource=data.source||null;
       state.automationSun=data.sun||null;
       renderHomeLocation();
       renderAutomations();
+      renderLocationSearchResults("home");
       showToast(t("homeLocationSaved"));
-    }catch(error){showToast(error.message,true)}
+      return true;
+    }catch(error){showToast(error.message,true);return false}
   }
-  // Güneş satırı pasifken kullanıcı çıkmaza düşmesin: doğrudan konum alanına götürür.
+  async function saveHomeLocationForm(event){
+    event?.preventDefault?.();
+    await persistHomeLocation({latitude:Number($("#homeLatitude").value),longitude:Number($("#homeLongitude").value)});
+  }
+  async function chooseHomeLocation(location){
+    const saved=await persistHomeLocation({latitude:Number(location?.latitude),longitude:Number(location?.longitude),label:location?.name});
+    if(saved)$("#homeLocationDialog")?.close();
+  }
+  function openHomeLocationManager(){
+    if(isResidentSession())return;
+    resetLocationSearch("home");
+    renderHomeLocationDialog();
+    const dialog=$("#homeLocationDialog");
+    if(dialog&&!dialog.open)dialog.showModal();
+  }
+  // Hava durumu konumu tarayıcıda saklıdır: ağ yokken de tek dokunuşla evin konumu olabilir.
+  function renderHomeLocationDialog(){
+    const reuse=$("#useWeatherLocationForHome");
+    if(!reuse)return;
+    const weather=weatherState.location;
+    reuse.hidden=!weather;
+    reuse.disabled=!weather;
+    reuse.textContent=weather?t("useWeatherLocationNamed",{name:locationName(weather)}):t("useWeatherLocation");
+  }
+  function useWeatherLocationForHome(){
+    const weather=weatherState.location;
+    if(!weather)return;
+    chooseHomeLocation({latitude:weather.latitude,longitude:weather.longitude,name:locationName(weather)});
+  }
+  // Güneş satırı pasifken kullanıcı çıkmaza düşmesin: doğrudan konum kartına götürür.
   function openHomeLocationSettings(){
     const dialog=$("#automationDialog");
     if(dialog?.open)dialog.close();
     activateView("settings");
-    const field=$("#homeLatitude");
-    if(field){field.scrollIntoView({block:"center"});field.focus()}
+    const button=$("#chooseHomeLocation");
+    if(button){button.scrollIntoView({block:"center"});if(!button.hidden)button.focus()}
   }
   // Sunucu sebep kodları çeviri tablosundan geçer; bilinmeyen kod ham gösterilir, boşluk kalmaz.
   const automationReasonKeys={
@@ -8052,6 +8089,7 @@
     if($("#clockDialog").open){renderClockDialogRows();renderLocationSearchResults("clock")}
     if($("#weatherDialog").open)renderWeatherDialog();
     if($("#weatherLocationDialog").open)renderLocationSearchResults("weather");
+    if($("#homeLocationDialog").open){renderHomeLocationDialog();renderLocationSearchResults("home")}
     if($("#simpleLinkDialog").open)renderSimpleLink();
     if($("#automationDialog").open)renderAutomationWizard();
     renderHomeLocation();
@@ -8315,7 +8353,7 @@
   $("#deleteAutomation").onclick=deleteAutomation;
   $("#automationActionDialog").onclose=()=>{state.automationContext=null};
   window.addEventListener("resize",()=>{if(state.coach)positionCoach();updateWidgetScrollHint()});
-  $$(".add-device").forEach(button=>button.onclick=()=>startPairing(true));$("#stopPairing").onclick=()=>startPairing(false);$("#refreshButton").onclick=refresh;$("#search").oninput=()=>{syncSearchClear();filterDevices();bindCards()};$("#removeConfirmation").oninput=()=>{const disabled=!state.removing||!validRemovalConfirmation($("#removeConfirmation").value);$("#confirmRemove").disabled=disabled;$("#forceRemove").disabled=disabled};$("#cancelRemove").onclick=()=>{$("#removeDialog").close();state.removing=null};$("#confirmRemove").onclick=()=>confirmDeviceRemoval(false);$("#forceRemove").onclick=()=>confirmDeviceRemoval(true);$("#openMatter").onclick=()=>loadMatter(true);$("#closeMatter").onclick=closeMatterDialog;$("#closeLight").onclick=()=>$("#lightDialog").close();$("#lightDialog").addEventListener("close",()=>{state.lightPointerDown=false});$("#lightControls").addEventListener("pointerdown",()=>{state.lightPointerDown=true},{passive:true});["pointerup","pointercancel"].forEach(type=>$("#lightControls").addEventListener(type,()=>{state.lightPointerDown=false},{passive:true}));$("#closeDeviceDetail").onclick=closeDeviceDetail;$("#deviceDetailDialog").addEventListener("close",()=>{state.detailDevice=null;state.detailFromPairing=false;state.detailPointerDown=false});$("#deviceDetailBody").addEventListener("pointerdown",()=>{state.detailPointerDown=true},{passive:true});["pointerup","pointercancel"].forEach(type=>$("#deviceDetailBody").addEventListener(type,()=>{state.detailPointerDown=false},{passive:true}));$("#showLightDevice").onclick=()=>{const id=state.lightDevice;$("#lightDialog").close();if(id)showDevice(id)};$("#settingsForm").onsubmit=saveSettings;$("#homeLocationForm").onsubmit=saveHomeLocationForm;$("#toggleHaSetup").onclick=toggleHomeAssistantSetup;$("#toggleHaDiscovery").onclick=toggleHomeAssistantDiscovery;$("#toggleHaPassword").onclick=()=>{state.mqttPasswordVisible=!state.mqttPasswordVisible;renderHomeAssistant()};$("#toggleDebug").onclick=toggleDebugMode;$("#refreshDebugErrors").onclick=loadDebugErrors;$("#clearDebugErrors").onclick=clearDebugErrors;$("#openWifiSettings").onclick=openWifiSettings;$("#stopRuntime").onclick=stopAndroidRuntime;$("#cancelRuntimeStop").onclick=()=>$("#runtimeStopDialog").close();$("#confirmRuntimeStop").onclick=confirmAndroidRuntimeStop;$("#addWidget").onclick=openWidgetCatalog;$("#editDashboard").onclick=()=>setDashboardEditing(!state.dashboardEditing);$("#closeWidgetDialog").onclick=closeAddDialog;$("#hubClockZone").onclick=openClockManager;$("#hubWeatherZone").onclick=openWeatherDialog;$("#closeClockDialog").onclick=()=>$("#clockDialog").close();$("#closeWeatherDialog").onclick=()=>$("#weatherDialog").close();$("#changeWeatherLocation").onclick=()=>{$("#weatherDialog").close();openWeatherLocationManager()};$("#closeWeatherLocationDialog").onclick=()=>$("#weatherLocationDialog").close();$("#clockCitySearch").oninput=()=>scheduleLocationSearch("clock");$("#weatherLocationSearch").oninput=()=>scheduleLocationSearch("weather");$("#useCurrentWeatherLocation").onclick=requestWeatherLocation;$("#widgetScrollLeft").onclick=()=>scrollWidgetRail(-1);$("#widgetScrollHint").onclick=scrollWidgetRailForward;$("#quickScrollLeft").onclick=()=>scrollHomeTabs(-1);$("#quickScrollRight").onclick=()=>scrollHomeTabs(1);$("#widgetBoard").addEventListener("pointerdown",touchDashboardEditing,{passive:true});$("#widgetRail").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$("#homeTabs").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$("#homeTabs").addEventListener("keydown",event=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;event.preventDefault();moveHomeTabFocus(event.key)});$$("[data-open-widget-catalog]").forEach(button=>button.onclick=openWidgetCatalog);$$("[data-add-tab]").forEach(button=>button.onclick=()=>setAddDialogTab(button.dataset.addTab));$(".modal-tabs").addEventListener("keydown",event=>{const steps={ArrowRight:1,ArrowLeft:-1,ArrowDown:1,ArrowUp:-1};if(!(event.key in steps))return;event.preventDefault();focusAddDialogTab(steps[event.key])});$("#widgetDialog").addEventListener("close",resetAddDialog);
+  $$(".add-device").forEach(button=>button.onclick=()=>startPairing(true));$("#stopPairing").onclick=()=>startPairing(false);$("#refreshButton").onclick=refresh;$("#search").oninput=()=>{syncSearchClear();filterDevices();bindCards()};$("#removeConfirmation").oninput=()=>{const disabled=!state.removing||!validRemovalConfirmation($("#removeConfirmation").value);$("#confirmRemove").disabled=disabled;$("#forceRemove").disabled=disabled};$("#cancelRemove").onclick=()=>{$("#removeDialog").close();state.removing=null};$("#confirmRemove").onclick=()=>confirmDeviceRemoval(false);$("#forceRemove").onclick=()=>confirmDeviceRemoval(true);$("#openMatter").onclick=()=>loadMatter(true);$("#closeMatter").onclick=closeMatterDialog;$("#closeLight").onclick=()=>$("#lightDialog").close();$("#lightDialog").addEventListener("close",()=>{state.lightPointerDown=false});$("#lightControls").addEventListener("pointerdown",()=>{state.lightPointerDown=true},{passive:true});["pointerup","pointercancel"].forEach(type=>$("#lightControls").addEventListener(type,()=>{state.lightPointerDown=false},{passive:true}));$("#closeDeviceDetail").onclick=closeDeviceDetail;$("#deviceDetailDialog").addEventListener("close",()=>{state.detailDevice=null;state.detailFromPairing=false;state.detailPointerDown=false});$("#deviceDetailBody").addEventListener("pointerdown",()=>{state.detailPointerDown=true},{passive:true});["pointerup","pointercancel"].forEach(type=>$("#deviceDetailBody").addEventListener(type,()=>{state.detailPointerDown=false},{passive:true}));$("#showLightDevice").onclick=()=>{const id=state.lightDevice;$("#lightDialog").close();if(id)showDevice(id)};$("#settingsForm").onsubmit=saveSettings;$("#homeLocationManualForm").onsubmit=saveHomeLocationForm;$("#chooseHomeLocation").onclick=openHomeLocationManager;$("#closeHomeLocationDialog").onclick=()=>$("#homeLocationDialog").close();$("#homeLocationSearch").oninput=()=>scheduleLocationSearch("home");$("#useWeatherLocationForHome").onclick=useWeatherLocationForHome;$("#toggleHaSetup").onclick=toggleHomeAssistantSetup;$("#toggleHaDiscovery").onclick=toggleHomeAssistantDiscovery;$("#toggleHaPassword").onclick=()=>{state.mqttPasswordVisible=!state.mqttPasswordVisible;renderHomeAssistant()};$("#toggleDebug").onclick=toggleDebugMode;$("#refreshDebugErrors").onclick=loadDebugErrors;$("#clearDebugErrors").onclick=clearDebugErrors;$("#openWifiSettings").onclick=openWifiSettings;$("#stopRuntime").onclick=stopAndroidRuntime;$("#cancelRuntimeStop").onclick=()=>$("#runtimeStopDialog").close();$("#confirmRuntimeStop").onclick=confirmAndroidRuntimeStop;$("#addWidget").onclick=openWidgetCatalog;$("#editDashboard").onclick=()=>setDashboardEditing(!state.dashboardEditing);$("#closeWidgetDialog").onclick=closeAddDialog;$("#hubClockZone").onclick=openClockManager;$("#hubWeatherZone").onclick=openWeatherDialog;$("#closeClockDialog").onclick=()=>$("#clockDialog").close();$("#closeWeatherDialog").onclick=()=>$("#weatherDialog").close();$("#changeWeatherLocation").onclick=()=>{$("#weatherDialog").close();openWeatherLocationManager()};$("#closeWeatherLocationDialog").onclick=()=>$("#weatherLocationDialog").close();$("#clockCitySearch").oninput=()=>scheduleLocationSearch("clock");$("#weatherLocationSearch").oninput=()=>scheduleLocationSearch("weather");$("#widgetScrollLeft").onclick=()=>scrollWidgetRail(-1);$("#widgetScrollHint").onclick=scrollWidgetRailForward;$("#quickScrollLeft").onclick=()=>scrollHomeTabs(-1);$("#quickScrollRight").onclick=()=>scrollHomeTabs(1);$("#widgetBoard").addEventListener("pointerdown",touchDashboardEditing,{passive:true});$("#widgetRail").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$("#homeTabs").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$("#homeTabs").addEventListener("keydown",event=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;event.preventDefault();moveHomeTabFocus(event.key)});$$("[data-open-widget-catalog]").forEach(button=>button.onclick=openWidgetCatalog);$$("[data-add-tab]").forEach(button=>button.onclick=()=>setAddDialogTab(button.dataset.addTab));$(".modal-tabs").addEventListener("keydown",event=>{const steps={ArrowRight:1,ArrowLeft:-1,ArrowDown:1,ArrowUp:-1};if(!(event.key in steps))return;event.preventDefault();focusAddDialogTab(steps[event.key])});$("#widgetDialog").addEventListener("close",resetAddDialog);
   async function closeMatterDialog(){
     try{await api("/api/matter/commissioning",{method:"POST",body:JSON.stringify({open:false})})}catch{}
     $("#matterDialog").close();

@@ -881,12 +881,12 @@ app.get("/api/settings/location", async () => ({
   sun: automationEngine.sunSummary()
 }));
 
-app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown } }>(
+app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown; label?: unknown } }>(
   "/api/settings/location",
   async (request, reply) => {
     try {
       const body = request.body ?? {};
-      const raw = body.location ?? { latitude: body.latitude, longitude: body.longitude };
+      const raw = body.location ?? { latitude: body.latitude, longitude: body.longitude, label: body.label };
       const location = await locationStore.save(raw);
       homeLocation = location;
       homeLocationSource = "file";
