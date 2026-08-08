@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readPanelSource } from "./panel-source.js";
 
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
 const englishLocaleUrl = new URL("../public/locales/en.json", import.meta.url);
 const turkishLocaleUrl = new URL("../public/locales/tr.json", import.meta.url);
-
-const readDashboard = (): Promise<string> => readFile(dashboardUrl, "utf8");
 
 async function readCatalog(url: URL): Promise<Record<string, string>> {
   return JSON.parse(await readFile(url, "utf8")).translations as Record<string, string>;
@@ -39,7 +37,7 @@ interface LostRun {
 }
 
 async function runFlow(script: string, initialState: Record<string, unknown>): Promise<LostRun> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const result: LostRun = {
     state: { departures: [], deviceLost: null, devices: [], ...initialState },
     elements: {},
@@ -278,7 +276,7 @@ test("isimsiz cihaz kurulum akışına tek düğmeyle geri sokulur", async () =>
 
 test("kurulumu tamamlama düğmesi yalnız adsız cihazda çizilir", async () => {
   const [dashboard, english, turkish] = await Promise.all([
-    readDashboard(),
+    readPanelSource(),
     readCatalog(englishLocaleUrl),
     readCatalog(turkishLocaleUrl)
   ]);
@@ -299,7 +297,7 @@ test("kurulumu tamamlama düğmesi yalnız adsız cihazda çizilir", async () =>
 
 test("kayıp cihaz metinleri iki dilde de var ve panel sunucunun kodlarını okuyor", async () => {
   const [dashboard, english, turkish] = await Promise.all([
-    readDashboard(),
+    readPanelSource(),
     readCatalog(englishLocaleUrl),
     readCatalog(turkishLocaleUrl)
   ]);

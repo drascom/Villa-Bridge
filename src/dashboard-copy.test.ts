@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { panelMarkup, panelScripts, readPanelSource } from "./panel-source.js";
 
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
 const dashboardBackgroundUrl = new URL("../public/assets/dashboard-landscape.jpg", import.meta.url);
 const serverUrl = new URL("./index.js", import.meta.url);
 const englishLocaleUrl = new URL("../public/locales/en.json", import.meta.url);
@@ -10,7 +10,7 @@ const turkishLocaleUrl = new URL("../public/locales/tr.json", import.meta.url);
 
 async function readDashboardBundle(): Promise<string> {
   const [dashboard, englishSource, turkishSource] = await Promise.all([
-    readFile(dashboardUrl, "utf8"),
+    readPanelSource(),
     readFile(englishLocaleUrl, "utf8"),
     readFile(turkishLocaleUrl, "utf8")
   ]);
@@ -19,12 +19,6 @@ async function readDashboardBundle(): Promise<string> {
     .flatMap((catalog) => Object.entries(catalog).map(([key, value]) => `${key}:${JSON.stringify(value)}`))
     .join(",");
   return `${dashboard}\n${searchableTranslations}`;
-}
-
-function dashboardScripts(dashboard: string): string {
-  return [...dashboard.matchAll(/<script>([\s\S]*?)<\/script>/g)]
-    .map((match) => match[1])
-    .join("\n");
 }
 
 test("bağlantılar ekranı yalnız Matter sistemlerini tarif eder", async () => {
@@ -151,7 +145,7 @@ test("alt sayfa yüzeyleri ana ekranla aynı cam belirteçlerine bağlı, pencer
   );
   // `<dialog>` içeriği hariç: cam kuralları `.view` ile sınırlı ve bütün dialoglar `.view` dışında.
   assert.doesNotMatch(dashboard, /body:not\(\[data-active-view="home"\]\)[^{]*dialog/);
-  const markup = await readFile(dashboardUrl, "utf8");
+  const markup = await panelMarkup();
   const firstDialog = markup.indexOf('<dialog id="');
   const viewSections = [...markup.matchAll(/<section id="[a-z]+" class="view/g)];
   assert.ok(firstDialog > 0);
@@ -212,9 +206,8 @@ test("Home Assistant kartı LAN IP ve EN/TR sabitleme rehberi sunar", async () =
   assert.match(dashboard, /MQTT adresini düzenlemekten farklıdır/);
   assert.match(dashboard, /VillaAndroid\.openWifiSettings\(\)/);
   assert.match(dashboard, /button\.hidden=!available/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("aç/kapat komutları sonuçlanana kadar kontrolü kilitler ve spinner gösterir", async () => {
@@ -466,9 +459,8 @@ test("Devices görünümü mobil pull-to-refresh hareketi sunar", async () => {
   assert.match(dashboard, /window\.scrollY>0/);
   assert.match(dashboard, /pullRefreshState\.distance>=pullRefreshThreshold/);
   assert.match(dashboard, /await refresh\(\)/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü sunar", async () => {
@@ -622,9 +614,8 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.doesNotMatch(dashboard, /details\.style\.gridColumn/);
   assert.match(dashboard, /\.device-image-stage\{position:relative;width:100%;max-width:100%/);
   assert.match(dashboard, /\.device-grid\{display:grid;grid-template-columns:repeat\(var\(--device-columns,3\),minmax\(0,1fr\)\)/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async () => {
@@ -645,9 +636,8 @@ test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async 
   assert.match(dashboard, /editing\?\.afterPairing/);
   assert.match(dashboard, /finishPairingFlow\(editing\.id\)/);
   assert.match(dashboard, /\$\("#cancelName"\)\.textContent=t\(afterPairing\?"skip":"cancel"\)/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 /* Eşleştirmenin son penceresi cihaz detayı: kullanıcı orada "bitti" diyebilmeli. Düğme tehlike
@@ -677,9 +667,8 @@ test("cihaz detayında bitirme düğmesi tehlike satırının altında ve tam ge
   // Metin kurulum sihirbazının `finishSetup` anahtarıyla ortak: aynı cümle iki kez yazılmaz.
   assert.match(dashboard, /finishSetup:"Finish setup"/);
   assert.match(dashboard, /finishSetup:"Kurulumu tamamla"/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("belirsiz cihaz görseli eşleştirme sonrasında kullanıcıya seçtirilir", async () => {
@@ -693,14 +682,13 @@ test("belirsiz cihaz görseli eşleştirme sonrasında kullanıcıya seçtirilir
   assert.match(dashboard, /data-change-image=/);
   assert.match(dashboard, /applyToModel:\$\("#applyImageToModel"\)\.checked/);
   assert.match(dashboard, /imageModel:editing\.selected/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("diller ayrı ve genişletilebilir JSON paketlerinden yüklenir", async () => {
   const [dashboard, englishSource, turkishSource] = await Promise.all([
-    readFile(dashboardUrl, "utf8"),
+    readPanelSource(),
     readFile(englishLocaleUrl, "utf8"),
     readFile(turkishLocaleUrl, "utf8")
   ]);
@@ -890,9 +878,8 @@ test("tema seçimi açık, koyu ve sistem modlarını kalıcı ve canlı destekl
   assert.match(dashboard, /addEventListener\("change",handleSystemThemeChange\)/);
   assert.match(dashboard, /document\.documentElement\.dataset\.theme=resolved/);
   assert.match(dashboard, /:root\[data-theme="dark"\]/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif bir düzen kullanır", async () => {
@@ -935,9 +922,8 @@ test("Android ayarları tüm çalışma sistemini durdurur ve yatay Home hafif b
   assert.match(dashboard, /signature!==state\.overviewSignature/);
   assert.match(dashboard, /if\(!document\.hidden&&state\.auth\.authenticated\)refresh\(\)/);
   assert.match(dashboard, /setInterval\(\(\)=>\{if\(!document\.hidden&&state\.auth\.authenticated\)refresh\(\)\},8000\)/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("Settings debug modu son API hatalarını güvenli ve isteğe bağlı gösterir", async () => {
@@ -957,9 +943,8 @@ test("Settings debug modu son API hatalarını güvenli ve isteğe bağlı göst
   assert.match(dashboard, /debugMode:"Debug modu"/);
   assert.match(dashboard, /debugLogPanel"\)\.hidden=!enabled/);
   assert.match(dashboard, /if\(state\.auth\.user\?\.role==="admin"\)startup\.push\(loadSettings\(\)\)/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async () => {
@@ -1484,9 +1469,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /addToDashboard:"Add to dashboard"/);
   assert.match(dashboard, /addToDashboard:"Panoya ekle"/);
   assert.doesNotMatch(dashboard, /draggable="true"/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("perde, iklim, kilit, fan ve siren günlük kullanıcıya görsel kontrollerle sunulur", async () => {
@@ -1586,9 +1570,8 @@ test("Zigbee ağı hafif SVG grafiği ve açıklayıcı grup araçlarıyla göst
   assert.match(dashboard, /groupMembers:"\{count\} cihaz"/);
   assert.match(dashboard, /\.setting-field input,\.setting-field select\{/);
   assert.match(dashboard, /\.zigbee-tool input,\.zigbee-tool select/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("günlük cihaz tipleri göster/gizle, Quick Control ve dashboard gruplarında kullanılabilir", async () => {
@@ -1617,9 +1600,8 @@ test("günlük cihaz tipleri göster/gizle, Quick Control ve dashboard grupları
   assert.match(dashboard, /function checkOta\(id\)/);
   assert.match(dashboard, /\/ota-check`/);
   assert.doesNotMatch(dashboard, /const controllable=devices\.filter\(device=>device\.controls\.some\(control=>control\.kind==="switch"\)\)/);
-  assert.doesNotThrow(() => new Function(
-    dashboardScripts(dashboard)
-  ));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yatay bloktadır", async () => {
@@ -1894,7 +1876,8 @@ test("Otomasyon sekmesi ev diliyle basit bağlantı yolunu sunar", async () => {
   assert.doesNotMatch(dashboard, /simpleLink[A-Za-z]*:"[^"]*(?:tetikleyici|senaryo|cluster|endpoint)/i);
   assert.doesNotMatch(dashboard, /automations?[A-Za-z]*:"[^"]*(?:tetikleyici|senaryo|cluster|endpoint)/i);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("saat kuralı sihirbazı akış rayında cihaz+özellik çiftini kaydeder", async () => {
@@ -2064,7 +2047,8 @@ test("saat kuralı sihirbazı akış rayında cihaz+özellik çiftini kaydeder",
   assert.match(dashboard, /:wizard\.targets\.map\(asAction\);/);
   assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:senaryo|tetikleyici|property|endpoint)/i);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("sihirbaz akışı dikey bir rayda okunur, cevaplanan soru tek satıra iner", async () => {
@@ -2123,7 +2107,8 @@ test("sihirbaz akışı dikey bir rayda okunur, cevaplanan soru tek satıra iner
   // Eski Android WebView: `color-mix\(\)` kullanılmaz.
   assert.doesNotMatch(dashboard, /color-mix\(/);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () => {
@@ -2247,7 +2232,8 @@ test("sihirbaz düğme ve sensör tetikleyicilerini ev diliyle kurar", async () 
   // Arayüz dili: yeni metinlerde geliştirici sözlüğü yok.
   assert.doesNotMatch(dashboard, /automation[A-Za-z]*:"[^"]*(?:tetikleyici|senaryo|kural kur|cluster|endpoint|property)/i);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla gösterir", async () => {
@@ -2319,7 +2305,8 @@ test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla göste
   // Düğmelerde eleme kanonik `action` üzerinden; aynı ada sahip iki düğme birbirini yutmaz.
   assert.match(dashboard, /const key=kind==="button"\?row\.token:row\.label;/);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 interface PickDevice {
@@ -2348,8 +2335,7 @@ interface PickApi {
 }
 
 /** Kanıt ölçütünü ve kümelemeyi sayfadan çıkarıp çalıştırır — sıralama metinle değil koşarak kanıtlanır. */
-function pickGrouping(dashboard: string): (events: Array<{ sourceName: string; property: string }>) => PickApi {
-  const scripts = dashboardScripts(dashboard);
+function pickGrouping(scripts: string): (events: Array<{ sourceName: string; property: string }>) => PickApi {
   const seen = /const deviceSeenPress=device=>[\s\S]*?item\.property==="action"\);/.exec(scripts);
   const groups = /const automationPickGroups=\(devices,kind\)=>[\s\S]*?:\[\{devices,proven:true\}\];/.exec(scripts);
   assert.ok(seen, "kanıt ölçütü bulunamadı");
@@ -2369,10 +2355,9 @@ interface PickerApi {
 
 /** Sekme türetmeyi ve aramayı sayfadan çıkarıp çalıştırır — davranış metinle değil koşarak kanıtlanır. */
 function pickerApi(
-  dashboard: string,
+  scripts: string,
   groups: Array<{ id: string; name: string; items: Array<{ deviceId: string }> }> = []
 ): PickerApi {
-  const scripts = dashboardScripts(dashboard);
   const sensors = /const automationSensorEvents=\{[\s\S]*?\n {2}\};/.exec(scripts);
   const order = /const automationTabOrder=\[[^\n]*\];/.exec(scripts);
   const tabs = /const automationDeviceTabs=device=>\{[\s\S]*?\n {2}\};/.exec(scripts);
@@ -2468,7 +2453,8 @@ test("düğme tetikleyicisi cihazın gerçekten basış yayıp yaymadığına da
   // §3.1 — yeni metinlerde geliştirici sözlüğü yok.
   assert.doesNotMatch(dashboard, /automationButton(?:Unproven|Proven|StateAlternative)[A-Za-z]*:"[^"]*(?:router|payload|cluster|endpoint|IEEE)/i);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("basış yaymamış cihaz listede geride kalır, yayan cihaz uyarısız öne geçer", async () => {
@@ -2477,7 +2463,7 @@ test("basış yaymamış cihaz listede geride kalır, yayan cihaz uyarısız ön
   const dimmer: PickDevice = { id: "0xdimmer", name: "Garden 3 Way Switch", sourceName: "garden", lastAction: null };
   const fresh: PickDevice = { id: "0xfresh", name: "New remote", sourceName: "fresh" };
 
-  const withoutEvents = pickGrouping(dashboard)([]);
+  const withoutEvents = pickGrouping(await panelScripts())([]);
   assert.equal(withoutEvents.deviceSeenPress(remote), true);
   assert.equal(withoutEvents.deviceSeenPress(dimmer), false);
   assert.equal(withoutEvents.deviceSeenPress(fresh), false);
@@ -2493,11 +2479,11 @@ test("basış yaymamış cihaz listede geride kalır, yayan cihaz uyarısız ön
   );
 
   // Olay akışında bir basış görülmesi de kanıt sayılır: cihaz hemen öne geçer.
-  const afterPress = pickGrouping(dashboard)([{ sourceName: "fresh", property: "action" }]);
+  const afterPress = pickGrouping(await panelScripts())([{ sourceName: "fresh", property: "action" }]);
   assert.equal(afterPress.deviceSeenPress(fresh), true);
   assert.equal(afterPress.deviceSeenPress(dimmer), false);
   // Durum bildirimi (`state`) kanıt değildir; yalnız `action` sayılır.
-  assert.equal(pickGrouping(dashboard)([{ sourceName: "garden", property: "state" }]).deviceSeenPress(dimmer), false);
+  assert.equal(pickGrouping(await panelScripts())([{ sourceName: "garden", property: "state" }]).deviceSeenPress(dimmer), false);
 
   // Sensör yolunda ayrım yok: liste tek küme kalır.
   const sensors = withoutEvents.automationPickGroups([remote, dimmer], "sensor");
@@ -2527,7 +2513,7 @@ test("anahtar yolunda sınıflandırma sunucudan gelir, eve özel kural kalmaz",
   // Tanımı bilinmeyen cihaz belirsiz kalır: elenmez, üst kümede seçilebilir durur.
   const unknown = shape("0xa4c1380000000001", "Unknown module", "unknown");
 
-  const picker = pickerApi(dashboard);
+  const picker = pickerApi(await panelScripts());
   assert.deepEqual(picker.automationDeviceTabs(balcony), ["light"]);
   assert.deepEqual(picker.automationDeviceTabs(ikeaBulb), ["light"]);
   assert.deepEqual(picker.automationDeviceTabs(garden), ["switch"]);
@@ -2562,7 +2548,7 @@ test("anahtar yolunda sınıflandırma sunucudan gelir, eve özel kural kalmaz",
   }
   assert.equal(picker.automationTabMatches(balcony, "switch"), false);
 
-  const groups = pickGrouping(dashboard)([]).automationPickGroups([garden, relay, unknown, balcony, ikeaBulb], "deviceState");
+  const groups = pickGrouping(await panelScripts())([]).automationPickGroups([garden, relay, unknown, balcony, ikeaBulb], "deviceState");
   // Anahtar yolunda artık ikinci küme yok: hiçbir cihaz katlanmıyor, hepsi tek listede.
   assert.deepEqual(
     groups.map((group) => [Boolean(group.extra), group.devices.map((device) => device.name)]),
@@ -2612,7 +2598,7 @@ test("sihirbaz cihazı elemek yerine sekme ve aramayla buldurur", async () => {
 
   // Arama ad, oda ve kullanıcının verdiği kanal/düğme adlarında birlikte çalışır.
   const rooms = [{ id: "salon", name: "Oturma Odası", items: [{ deviceId: "0xlight" }] }];
-  const picker = pickerApi(dashboard, rooms);
+  const picker = pickerApi(await panelScripts(), rooms);
   const light: PickDevice = {
     id: "0xlight",
     name: "Balkon lambası",
@@ -2657,7 +2643,8 @@ test("sihirbaz cihazı elemek yerine sekme ve aramayla buldurur", async () => {
   assert.match(dashboard, /targetControls\(device\)\.length>0&&device\.id!==starter/);
   assert.doesNotMatch(dashboard, /deviceInRoom\(device,wizard\.room\)/);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("cihaz rolü eşleştirmede sorulur ve cihaz kartındaki özellik listesinden değiştirilir", async () => {
@@ -2723,7 +2710,8 @@ test("cihaz rolü eşleştirmede sorulur ve cihaz kartındaki özellik listesind
   assert.match(dashboard, /deviceRoleSwitch:"Switch or plug"/);
   assert.match(dashboard, /deviceRoleSwitch:"Anahtar veya priz"/);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 interface PressEntry {
@@ -2732,9 +2720,9 @@ interface PressEntry {
 }
 
 /** Basış eleme yardımcısını sayfadan çıkarıp gerçekten çalıştırır — davranış metinle değil koşarak kanıtlanır. */
-function pressFilter(dashboard: string): (entries: PressEntry[], keep?: string | null) => PressEntry[] {
+function pressFilter(scripts: string): (entries: PressEntry[], keep?: string | null) => PressEntry[] {
   const source = /const hiddenPressKinds=new Set\(\[[\s\S]*?const visiblePresses=\(entries,keep\)=>\{[\s\S]*?\n {2}\};/
-    .exec(dashboardScripts(dashboard));
+    .exec(scripts);
   assert.ok(source, "basış eleme kaynağı bulunamadı");
   return new Function(`${source[0]}\nreturn visiblePresses;`)() as (entries: PressEntry[], keep?: string | null) => PressEntry[];
 }
@@ -2765,7 +2753,7 @@ test("kurulum sırasında yalnız kısa basış ve basılı tutma sunulur", asyn
   // Kayıtlı kuralın özeti elenmemiş ham listeden okunur; `1_double` kuralı doğru cümleyi verir.
   assert.match(dashboard, /const entry=button\.actions\.find\(item=>item\.action===action\);/);
 
-  const visiblePresses = pressFilter(dashboard);
+  const visiblePresses = pressFilter(await panelScripts());
   const remote: PressEntry[] = [
     { action: "1_single", press: "single" },
     { action: "1_double", press: "double" },
@@ -2786,7 +2774,8 @@ test("kurulum sırasında yalnız kısa basış ve basılı tutma sunulur", asyn
   assert.deepEqual(visiblePresses(releaseOnly).map((entry) => entry.press), ["press", "release"]);
   assert.deepEqual(visiblePresses(undefined as unknown as PressEntry[]), []);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("otomasyon kartı tek dokunuşla düzenlemeyi açar, çalıştır ve sil görünür düğmede durur", async () => {
@@ -2816,7 +2805,8 @@ test("otomasyon kartı tek dokunuşla düzenlemeyi açar, çalıştır ve sil g�
   // Arayüz dili: teknik kelime yok.
   assert.doesNotMatch(dashboard, /automationCardMenu:"[^"]*(?:menü|menu|aksiyon|action)/i);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("sihirbazda tek birincil eylem var ve pasifken nedenini söylüyor", async () => {
@@ -2853,7 +2843,8 @@ test("sihirbazda tek birincil eylem var ve pasifken nedenini söylüyor", async 
   assert.match(dashboard, /<button id="automationBack" class="secondary" type="button" data-i18n="back">Back<\/button>/);
   assert.match(dashboard, /\$\("#automationBack"\)\.onclick=stepBackAutomation;/);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 // Kuralı düz cümleyle anlatan özet serbest metin gibi duruyordu. Panelin kendi bilgi kutusu dili
@@ -2918,7 +2909,8 @@ test("Matter modalı eşleştirmenin bittiğini kendisi fark eder", async () => 
   assert.match(dashboard, /matterEcosystemHint:"Each ecosystem needs its own code/);
   assert.match(dashboard, /matterEcosystemHint:"Her ekosistem için ayrı kod gerekir/);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("Ayarlar'da yedek al ve geri yükle kartı onay adımı atlanmadan çalışır", async () => {
@@ -2978,12 +2970,13 @@ test("Ayarlar'da yedek al ve geri yükle kartı onay adımı atlanmadan çalış
   assert.match(dashboard, /api\("\/api\/backup\/restore",\{method:"POST",body:JSON\.stringify\(\{backup:pendingHomeBackup,mode:selectedHomeBackupMode\(\)\}\)\}/);
   assert.match(dashboard, /await Promise\.allSettled\(\[refresh\(\),loadHomeGroups\(\),loadHomeVisibility\(\),loadAutomations\(\)\]\);\s*render\(\)/);
 
-  assert.doesNotThrow(() => new Function(dashboardScripts(dashboard)));
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
 });
 
 test("tek kanallı cihazda kanal kalemi çıkmaz, çok kanallıda her kanal ayrı adlandırılır", async () => {
   const dashboard = await readDashboardBundle();
-  const source = dashboardScripts(dashboard);
+  const source = await panelScripts();
   const start = source.indexOf("const renameGlyph=");
   const end = source.indexOf("const controlHtml=");
   assert.ok(start > 0 && end > start);
@@ -3088,7 +3081,7 @@ test("sihirbaz tek kuralda 'sonra kapat' sorar", async () => {
 
 test("sonra kapat yükü hedefin kendi kapatma değerinden üretilir", async () => {
   const dashboard = await readDashboardBundle();
-  const helpers = automationHelpers(dashboard, [
+  const helpers = automationHelpers(await panelScripts(), [
     {
       id: "0x00124b0011cc22dd",
       name: "Koridor lambası",
@@ -3221,8 +3214,7 @@ const automationExports = [
 
 // `messages` boş bırakılırsa `t()` anahtarı olduğu gibi döndürür (çoğu test bunu bekler). Gerçek
 // katalog verilirse şablon yerleştirme de çalışır: çeviri metninin kendisini doğrulayan testler için.
-function automationSandbox(dashboard: string, devices: unknown[], groups: unknown[] = [], messages: Record<string, string> = {}): AutomationSandbox {
-  const source = dashboardScripts(dashboard);
+function automationSandbox(source: string, devices: unknown[], groups: unknown[] = [], messages: Record<string, string> = {}): AutomationSandbox {
   const start = source.indexOf("const automationWeekDays=");
   // Kaydetme de dilime girer: kural → sihirbaz → kural dönüşünün ikinci yarısı orada.
   const end = source.indexOf("async function removeSimpleLink(");
@@ -3335,8 +3327,8 @@ function automationSandbox(dashboard: string, devices: unknown[], groups: unknow
   };
 }
 
-function automationHelpers(dashboard: string, devices: unknown[], groups: unknown[] = [], messages: Record<string, string> = {}): Record<string, (...args: unknown[]) => unknown> {
-  return automationSandbox(dashboard, devices, groups, messages).api;
+function automationHelpers(source: string, devices: unknown[], groups: unknown[] = [], messages: Record<string, string> = {}): Record<string, (...args: unknown[]) => unknown> {
+  return automationSandbox(source, devices, groups, messages).api;
 }
 
 // Sihirbazı gerçek olay akışıyla sürer: yeni kural yolu (düzenleme değil) baştan sona tıklanır ve
@@ -3347,9 +3339,9 @@ type WizardHarness = AutomationSandbox & {
 };
 
 async function automationWizardHarness(): Promise<WizardHarness> {
-  const dashboard = await readFile(dashboardUrl, "utf8");
+  const scripts = await panelScripts();
   const sandbox = automationSandbox(
-    dashboard,
+    scripts,
     [
       {
         id: "0x0011", name: "Corridor light", buttons: [], features: [], state: {},
@@ -3371,9 +3363,9 @@ async function automationWizardHarness(): Promise<WizardHarness> {
 // Kayıtlı kural → sihirbaz → kayıtlı kural turu. Diskteki kaydın birebir aynısı geri yazılmalı:
 // düzenlemeye açıp hiçbir şeye dokunmadan Kaydet demek kuralı DEĞİŞTİRMEZ.
 async function automationRoundTripHarness(): Promise<WizardHarness> {
-  const dashboard = await readFile(dashboardUrl, "utf8");
+  const scripts = await panelScripts();
   const sandbox = automationSandbox(
-    dashboard,
+    scripts,
     [
       {
         id: "0xa4c138b950918de3", name: "Corridor light", buttons: [], features: [], state: {},
@@ -3503,7 +3495,7 @@ const mapPairTarget = (mapOn: string, mapOff: string): Record<string, unknown> =
 
 async function mapPairCatalogs(): Promise<{ dashboard: string; en: Record<string, string>; tr: Record<string, string> }> {
   const [dashboard, english, turkish] = await Promise.all([
-    readFile(dashboardUrl, "utf8"),
+    readPanelSource(),
     readFile(englishLocaleUrl, "utf8"),
     readFile(turkishLocaleUrl, "utf8")
   ]);
@@ -3542,7 +3534,7 @@ test("eşleme çiftinin tamamı tek çeviri anahtarıdır ve tr/en paritesi tam"
 
 test("eşleme satırı iki ayrı çift çizer: her çift kendi kutusunda kaynak → sonuç", async () => {
   const { dashboard, tr } = await mapPairCatalogs();
-  const api = automationHelpers(dashboard, mapPairDevices, [], tr);
+  const api = automationHelpers(await panelScripts(), mapPairDevices, [], tr);
   const line = String(api.automationTargetLine({ triggerKind: "deviceState" }, mapPairTarget("off", "on")));
 
   // İki ayrı öbek, tek bir sarmalayıcı içinde. Nokta ayracı kalktı: çiftler artık kutuyla ayrılıyor.
@@ -3564,7 +3556,7 @@ test("eşleme satırı iki ayrı çift çizer: her çift kendi kutusunda kaynak 
 
 test("aynı eşleme satırı İngilizcede de iki ayrı çift olarak okunur", async () => {
   const { dashboard, en } = await mapPairCatalogs();
-  const api = automationHelpers(dashboard, mapPairDevices, [], en);
+  const api = automationHelpers(await panelScripts(), mapPairDevices, [], en);
   const line = String(api.automationTargetLine({ triggerKind: "deviceState" }, mapPairTarget("off", "on")));
 
   assert.equal(line.match(/class="automation-map-pair"/g)?.length, 2);
@@ -3577,7 +3569,7 @@ test("aynı eşleme satırı İngilizcede de iki ayrı çift olarak okunur", asy
 
 test("güneş yolundaki eşleme de aynı çift dilini kullanır", async () => {
   const { dashboard, tr } = await mapPairCatalogs();
-  const api = automationHelpers(dashboard, mapPairDevices, [], tr);
+  const api = automationHelpers(await panelScripts(), mapPairDevices, [], tr);
   const line = String(api.automationTargetLine({ triggerKind: "sun" }, mapPairTarget("on", "off")));
 
   assert.equal(line.match(/class="automation-map-pair"/g)?.length, 2);
@@ -3589,7 +3581,7 @@ test("güneş yolundaki eşleme de aynı çift dilini kullanır", async () => {
 
 test("bir şey yapma seçilen yön için çift hiç çizilmez, sessiz boşluk kalmaz", async () => {
   const { dashboard, tr } = await mapPairCatalogs();
-  const api = automationHelpers(dashboard, mapPairDevices, [], tr);
+  const api = automationHelpers(await panelScripts(), mapPairDevices, [], tr);
 
   // Tek yön: yalnız bir çift kutusu, öbürü hiç yok.
   const single = String(api.automationTargetLine({ triggerKind: "deviceState" }, mapPairTarget("off", "none")));
@@ -3605,7 +3597,7 @@ test("bir şey yapma seçilen yön için çift hiç çizilmez, sessiz boşluk ka
 });
 
 test("eşleme çifti sığmazsa kesilmez, alt satıra sarar", async () => {
-  const dashboard = await readFile(dashboardUrl, "utf8");
+  const dashboard = await readPanelSource();
 
   // Satır normalde tek satır + üç nokta; çift taşıyan satır ise sarar ve kırpmaz.
   assert.match(dashboard, /\.automation-line:has\(\.automation-map-pairs\)\{display:flex;flex-wrap:wrap;[^}]*white-space:normal;overflow:visible;text-overflow:clip\}/);
@@ -5043,7 +5035,7 @@ test("sayısal koşul üstünde/altında/arasında ölçütü yazar", async () =
 // Çalışma geçmişi satırı: renk tek başına yeterli değil, işaret de var.
 test("çalışma geçmişi satırı sonucu ve sebebini birlikte yazar", async () => {
   const dashboard = await readDashboardBundle();
-  const helpers = automationHelpers(dashboard, []);
+  const helpers = automationHelpers(await panelScripts(), []);
   const row = String(helpers.automationRunRowHtml({
     at: "2026-08-05T10:00:00.000Z",
     outcome: "blocked",
@@ -5062,7 +5054,7 @@ test("çalışma geçmişi satırı sonucu ve sebebini birlikte yazar", async ()
 
 test("cihaz sınıfı ayar niteliğindeki aç/kapa alanlarını saymaz", async () => {
   const dashboard = await readDashboardBundle();
-  const source = dashboardScripts(dashboard);
+  const source = await panelScripts();
   const start = source.indexOf("const deviceCategoryLabels=");
   const end = source.indexOf("const deviceIconKind=");
   assert.ok(start > 0 && end > start);
@@ -6213,9 +6205,9 @@ test("göz kumandanın içine taşındı ve aç/kapa satırı yalnız gözü ta�
 // ————— değer eylemleri: parlaklık, ışık sıcaklığı ve renk. Sihirbaz cihazın SUNDUĞU kumandalara
 // göre çizer; yüzde↔ham dönüşümü kumandanın kendi `min`/`max`/`step` alanından çıkar.
 async function automationValueHarness(messages: Record<string, string> = {}): Promise<WizardHarness> {
-  const dashboard = await readFile(dashboardUrl, "utf8");
+  const scripts = await panelScripts();
   const sandbox = automationSandbox(
-    dashboard,
+    scripts,
     [
       {
         // Kısılabilir, renkli lamba: üç değer kumandası da sunuluyor.
@@ -6410,7 +6402,7 @@ test("kayıtlı değer eylemi düzenlemeye ayarlayıcısı açık gelir", async 
 
 test("değer eylemlerinin cümlesi tam şablon anahtarıdır ve tr/en paritesi tam", async () => {
   const [dashboard, englishSource, turkishSource] = await Promise.all([
-    readFile(dashboardUrl, "utf8"),
+    readPanelSource(),
     readFile(englishLocaleUrl, "utf8"),
     readFile(turkishLocaleUrl, "utf8")
   ]);

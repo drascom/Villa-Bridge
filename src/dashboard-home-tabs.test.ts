@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readPanelSource } from "./panel-source.js";
 
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
 const englishLocaleUrl = new URL("../public/locales/en.json", import.meta.url);
 const turkishLocaleUrl = new URL("../public/locales/tr.json", import.meta.url);
-
-const readDashboard = (): Promise<string> => readFile(dashboardUrl, "utf8");
 
 async function readCatalog(url: URL): Promise<Record<string, string>> {
   return JSON.parse(await readFile(url, "utf8")).translations as Record<string, string>;
@@ -44,7 +42,7 @@ async function runVisibilityLoad(options: {
   loadFails?: boolean;
   saveFails?: boolean;
 }): Promise<VisibilityRun> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const result: VisibilityRun = {
     hiddenTiles: [],
     hiddenGroups: [],
@@ -107,7 +105,7 @@ async function runVisibilityLoad(options: {
 type Entry = { device: { id: string }; control: { id: string } | null };
 
 async function pickOverviewEntries(entries: Entry[], hidden: string[]): Promise<{ entries: Entry[]; hidden: number }> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const run = new Function(
     "entries",
     "hidden",
@@ -142,7 +140,7 @@ test("Genel görünüm kartı varsayılan olarak her cihazı gösterir, yalnız 
 });
 
 test("görünürlük kararı sunucuda durur, yerel kayıt yalnız göç ve çevrimdışı yansıdır", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const tileVisibilityKey=\(deviceId,controlId\)=>`\$\{deviceId\}::\$\{controlId\|\|groupDeviceControlId\}`/);
   // Kayıt yalnız gizlenenleri tutar: listede olmayan her şey görünür.
@@ -157,7 +155,7 @@ test("görünürlük kararı sunucuda durur, yerel kayıt yalnız göç ve çevr
 });
 
 test("eski yerel görünürlük kaydı bir kez sunucuya taşınır, sonra silinir", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const hiddenTilesStorageKey="villa-hidden-tiles"/);
   // Grup görünürlüğü eskiden kart sırasının içindeydi; göç onu `group:` önekinden toplar.
@@ -246,7 +244,7 @@ test("çevrimdışıyken panel son bilinen değerle çalışmayı sürdürüyor"
 });
 
 test("gizli cihaz sayısı kartın altında duyurulur ve Cihazlar görünümüne götürür", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const hiddenNote=overview&&!state\.dashboardEditing&&picked\.hidden/);
   assert.match(dashboard, /<button class="ov-hidden-note" type="button" data-hidden-room="\$\{esc\(group\.id\)\}">\$\{esc\(t\("hiddenDevicesNote",\{count:picked\.hidden\}\)\)\}<\/button>/);
@@ -259,7 +257,7 @@ test("gizli cihaz sayısı kartın altında duyurulur ve Cihazlar görünümüne
 });
 
 test("odasız cihazlar için türetilmiş kart var, boşsa hiç çıkmaz", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const noRoomGroupId="auto:noroom"/);
   assert.match(dashboard, /const deviceHasRoom=device=>state\.groups\.some\(group=>group\.items\.some\(item=>item\.deviceId===device\.id\)\)/);
@@ -270,7 +268,7 @@ test("odasız cihazlar için türetilmiş kart var, boşsa hiç çıkmaz", async
 });
 
 test("eşleştirme akışının son adımı oda seçimi", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   // Ad → görsel → rol → oda. Rol atlanınca da oda adımı gelir.
   assert.match(dashboard, /if\(!deviceRoleAskable\(device\)\)\{if\(afterPairing\)askDeviceRoom\(id,true\);return\}/);
@@ -316,13 +314,13 @@ function runGroupWidgets(source: string, editing: boolean): string[] {
 }
 
 test("cihazı olmayan grup Genel görünümde kart basmaz, sekmesi durur", async () => {
-  const source = await readDashboard();
+  const source = await readPanelSource();
 
   assert.deepEqual(runGroupWidgets(source, false), ["salon"]);
 });
 
 test("tüm cihazları gizlenmiş grup kart basmaz, düzenleme kipinde görünür kalır", async () => {
-  const source = await readDashboard();
+  const source = await readPanelSource();
 
   // Normal görünümde "gizli" grubunun tek cihazı gizli → kart hiç basılmaz.
   assert.deepEqual(runGroupWidgets(source, false), ["salon"]);
@@ -340,7 +338,7 @@ test("tüm cihazları gizlenmiş grup kart basmaz, düzenleme kipinde görünür
 /* Görünürlük artık kart sırasından ayrı: anahtar `hiddenGroups`'a yazar ve sunucuya gider,
    `state.widgets` (sıra) hiç değişmez. */
 test("grup görünürlüğü kart sırasına dokunmadan sunucuya yazılır", async () => {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const calls: string[] = [];
   const state = { widgets: ["summary", "group:salon"], hiddenGroups: new Set<string>() };
   const run = new Function(
@@ -367,7 +365,7 @@ test("grup görünürlüğü kart sırasına dokunmadan sunucuya yazılır", asy
 });
 
 test("oda kartında kaldır düğmesi sırayı değil görünürlüğü değiştirir", async () => {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   interface RemoveState {
     widgets: string[];
     removedWidgets: Set<string>;
@@ -403,7 +401,7 @@ test("oda kartında kaldır düğmesi sırayı değil görünürlüğü değişt
 });
 
 test("alt şerit sekme çubuğu: Genel görünüm ilk ve kilitli, yeni grup düğmesi tablist dışında", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /<div id="homeTabs" class="device-grid quick-grid grid-view" role="tablist"/);
   // "+ yeni grup" tablist'in kardeşi: erişilebilirlik için sekme listesinin içine girmemeli.
@@ -425,7 +423,7 @@ test("alt şerit sekme çubuğu: Genel görünüm ilk ve kilitli, yeni grup dü�
 });
 
 test("sekme seçimi widget düzeninden ayrı bir kayıtta durur", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const homeTabStorageKey="villa-home-tab"/);
   assert.match(dashboard, /localStorage\.setItem\(homeTabStorageKey,state\.homeTab\)/);
@@ -438,7 +436,7 @@ test("sekme seçimi widget düzeninden ayrı bir kayıtta durur", async () => {
 });
 
 test("Işıklar grubu jenerik türetilir ve silinemez", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const lightsGroupId="auto:lights"/);
   // Sabit oda/isim listesi yok: sunucunun kategori çıkarımına dayanır.
@@ -451,7 +449,7 @@ test("Işıklar grubu jenerik türetilir ve silinemez", async () => {
 });
 
 test("iki seviyeli filtre yalnız düzenleme kipinde görünür ve cihazı tetiklemez", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   // Grup seviyesi: anahtar. Cihazsız grupta pasif ve sebebi yazılı.
   assert.match(dashboard, /class="ov-switch" type="button" role="switch" aria-checked="\$\{active\?"true":"false"\}"/);
@@ -478,7 +476,7 @@ test("iki seviyeli filtre yalnız düzenleme kipinde görünür ve cihazı tetik
 /* Kullanıcı isteği: grup içinde bir cihaz açıkken kartın ZEMİNİ değişmesin. Döşemenin kendi
    "açık" rengi kalır — kaldırılan yalnız kartın geneline yayılan sarımsı görünüm. */
 test("grup kartının zemini cihaz açıkken değişmez, döşemenin açık rengi kalır", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   // Kart seviyesindeki "on" kuralı ve onu besleyen hesap tamamen kalktı: ölü CSS bırakılmadı.
   assert.doesNotMatch(dashboard, /\.group-widget\.on\{/);
@@ -494,7 +492,7 @@ test("grup kartının zemini cihaz açıkken değişmez, döşemenin açık reng
 });
 
 test("grup sekmesi tek kart, Genel görünüm rayı yerini alır ve şeridin üstünde biter", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /<section id="groupPanel" class="widget-card group-widget group-panel" role="tabpanel" tabindex="-1" hidden>/);
   assert.match(dashboard, /rail\.hidden=Boolean\(group\);\s*panel\.hidden=!group;/);
@@ -515,7 +513,7 @@ test("grup sekmesi tek kart, Genel görünüm rayı yerini alır ve şeridin üs
 });
 
 test("Genel görünümde widget ekleme, taşıma ve kaldırma yolları duruyor", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /function moveDashboardWidget\(id,direction\)\{/);
   assert.match(dashboard, /function reconcileWidgetLayout\(\)\{/);
@@ -534,7 +532,7 @@ test("Genel görünümde widget ekleme, taşıma ve kaldırma yolları duruyor",
    `board.insertBefore(quick,rail)` şeridi taşıyan bölümü DOM'dan çıkarıp geri koyuyor ve
    tarayıcı `scrollLeft`i sıfırlıyor. Düğüm zaten yerindeyse artık taşınmıyor. */
 test("düzen turu yerinde duran kartı taşımıyor", async () => {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const run = new Function(
     "moves",
     `
@@ -554,7 +552,7 @@ test("düzen turu yerinde duran kartı taşımıyor", async () => {
 });
 
 test("kaydırma konumları düzen turu boyunca korunuyor", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const scrollPositions=captureScrollPositions\(\);\s*reconcileWidgetLayout\(\);/);
   assert.match(dashboard, /restoreScrollPositions\(scrollPositions\);\s*requestAnimationFrame\(updateWidgetScrollHint\)/);

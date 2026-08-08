@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
-
-const readDashboard = (): Promise<string> => readFile(dashboardUrl, "utf8");
+import { readPanelSource } from "./panel-source.js";
 
 /*
  * Gönderilen kodun kendisi sınanıyor: `deviceDetailBodyHtml` bildirimi `public/index.html` içinden
@@ -39,7 +35,7 @@ interface DetailDevice {
 const panelMarkup = '<div class="light-panel" data-light-panel="lamp"><div class="light-readout"></div><div class="light-column"></div><div class="light-actions"></div></div>';
 
 async function loadDetailBody(): Promise<(device: DetailDevice, light: boolean) => string> {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
   const declaration = extractDeclaration(dashboard, "deviceDetailBodyHtml");
   const factory = new Function(
     "deps",
@@ -144,7 +140,7 @@ test("kumanda hiç kontrolü olmayan ışıkta boş-durum metnini bastırmaya de
 });
 
 test("dar sütunda kumandanın ölçüleri clamp ile tabanlanır, sabit px yok", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /\.device-detail-controls>\.light-panel\{margin:0 0 clamp\(12px,2vh,18px\)\}/);
   assert.match(

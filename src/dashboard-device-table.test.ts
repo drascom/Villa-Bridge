@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readPanelSource } from "./panel-source.js";
 
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
 const englishLocaleUrl = new URL("../public/locales/en.json", import.meta.url);
 const turkishLocaleUrl = new URL("../public/locales/tr.json", import.meta.url);
-
-const readDashboard = (): Promise<string> => readFile(dashboardUrl, "utf8");
 
 async function readCatalog(url: URL): Promise<Record<string, string>> {
   return JSON.parse(await readFile(url, "utf8")).translations as Record<string, string>;
@@ -53,7 +51,7 @@ async function renderDeviceTable(
   devices: TableDevice[],
   sort: { key: string; direction: string } = { key: "name", direction: "asc" }
 ): Promise<string> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const declarations = [
     "esc",
     "ago",
@@ -203,7 +201,7 @@ test("tablo ad, LQI, durum ve son görülmeye göre sıralanır", async () => {
 });
 
 test("sıralanabilir başlıklar yönü hem aria-sort hem okla bildirir", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
   const html = await renderDeviceTable([fullDevice], { key: "lqi", direction: "desc" });
 
   assert.match(html, /<th scope="col" aria-sort="descending"><button class="device-table-sort" type="button" data-device-sort="lqi" data-sort="descending"/);
@@ -252,7 +250,7 @@ async function runFilterDevices(
   devices: TableDevice[],
   options: { layout: string; query?: string; roomFilter?: string | null; groups?: unknown[] }
 ): Promise<LayoutRun> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const result: LayoutRun = { containers: {}, tableCalls: [], cardCalls: [] };
   const factory = new Function("input", "result", `
     const state={
@@ -337,7 +335,7 @@ test("oda çipi tabloyu da süzer", async () => {
 });
 
 test("tablo kabı kendi içinde yatay kayar, sayfa yana kaymaz", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /\.device-table-wrap\{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain/);
   assert.match(dashboard, /\.device-grid\.devices-list-view>\.device-table-panel\{width:100%;min-width:0\}/);

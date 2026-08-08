@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
-
-const readDashboard = (): Promise<string> => readFile(dashboardUrl, "utf8");
+import { readPanelSource } from "./panel-source.js";
 
 /* Gönderilen kodun kendisi sınanıyor: ilgili işlev `public/index.html` içinden çıkarılıp
    sahte bağımlılıklarla çalıştırılıyor, kopya mantık yazılmıyor. */
@@ -40,7 +36,7 @@ interface HoldRun {
 }
 
 async function runFlow(script: string, initialState: Record<string, unknown> = {}): Promise<HoldRun> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const holdMatch = extractHold(source).match(/\d+/);
   const result: HoldRun = {
     state: { devices: [], pairing: null, pairingSession: null, pairingNetworkClose: null, overviewLoaded: true, ...initialState },
@@ -219,7 +215,7 @@ test("ikinci eşleştirme oturumu eskisinin bekleyen kapatmasından etkilenmez",
 });
 
 test("panel ağın kapanmasını tek yerden yönetiyor", async () => {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   // Interview bitince doğrudan kapatma çağrısı kalmamalı; kapatma ertelenmiş yoldan geçmeli.
   assert.match(source, /schedulePairingNetworkClose\(\);/);
   assert.match(source, /void closePairingNetworkIfIdle\(\);if\(signature/);

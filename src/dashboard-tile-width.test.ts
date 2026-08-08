@@ -1,21 +1,17 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readPanelSource } from "./panel-source.js";
 
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
 const englishLocaleUrl = new URL("../public/locales/en.json", import.meta.url);
 const turkishLocaleUrl = new URL("../public/locales/tr.json", import.meta.url);
-
-async function readDashboard(): Promise<string> {
-  return readFile(dashboardUrl, "utf8");
-}
 
 async function readCatalog(url: URL): Promise<Record<string, string>> {
   return JSON.parse(await readFile(url, "utf8")).translations as Record<string, string>;
 }
 
 test("kart içi cihaz butonu iki genişlik kademesine sahip", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /\.group-control-grid\{--group-tile-span:2;display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(dashboard, /\.group-control-slot\{position:relative;min-width:0;display:grid\}/);
@@ -27,7 +23,7 @@ test("kart içi cihaz butonu iki genişlik kademesine sahip", async () => {
 });
 
 test("boyut simgesi yalnız düzenleme kipinde görünür", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /\.tile-width-toggle\{position:absolute;[^}]*width:44px;height:44px;display:none/);
   assert.match(dashboard, /\.widget-board\.editing \.tile-width-toggle\{display:grid\}/);
@@ -39,7 +35,7 @@ test("boyut simgesi yalnız düzenleme kipinde görünür", async () => {
 });
 
 test("boyut simgesi gerçek buton ve cihazı tetiklemiyor", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /<button class="tile-width-toggle" type="button" data-tile-width-toggle="\$\{esc\(key\)\}" aria-pressed=/);
   assert.match(
@@ -53,7 +49,7 @@ test("boyut simgesi gerçek buton ve cihazı tetiklemiyor", async () => {
 });
 
 test("uzun ad ölçülerek geniş kademeye geçiyor", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /label\.scrollWidth>label\.clientWidth\+1/);
   assert.match(dashboard, /const auto=slots\.filter\(slot=>slot\.dataset\.tileWidth==="auto"\)/);
@@ -65,7 +61,7 @@ test("uzun ad ölçülerek geniş kademeye geçiyor", async () => {
 });
 
 test("elle seçim otomatiği eziyor ve kalıcı saklanıyor", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /const tileWidthStorageKey="villa-tile-widths"/);
   assert.match(dashboard, /const tileWidthModes=new Set\(\["auto","narrow","wide"\]\)/);
@@ -80,7 +76,7 @@ test("elle seçim otomatiği eziyor ve kalıcı saklanıyor", async () => {
 });
 
 test("geniş buton kart içinde akıyor, kart kendi içinde kayabiliyor", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /#home \.widget-rail \.group-widget\{grid-column:span 2;display:grid;grid-template-rows:auto minmax\(0,1fr\)\}/);
   assert.match(dashboard, /#home \.widget-rail \.group-control-grid,#home \.group-panel \.group-control-grid\{min-height:0;overflow-y:auto/);
@@ -90,7 +86,7 @@ test("geniş buton kart içinde akıyor, kart kendi içinde kayabiliyor", async 
 /* Genişlik kademesi asıl detay ekranında da gerekiyordu: grup sekmesindeki kart artık
    düzenlenebilir bir yüzey — uzun basış orada da düzenleme kipini açıyor. */
 test("grup sekmesindeki kartta da genişlik simgesi var", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   // Döşeme kabuğu tek yerde üretiliyor: Genel görünüm kartı da grup sekmesi paneli de aynı satırı kullanır.
   const groupWidget = dashboard.slice(dashboard.indexOf("function groupWidgetHtml("), dashboard.indexOf("function renderGroupWidgets("));

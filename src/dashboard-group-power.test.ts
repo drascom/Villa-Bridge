@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readPanelSource } from "./panel-source.js";
 
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
 const englishLocaleUrl = new URL("../public/locales/en.json", import.meta.url);
 const turkishLocaleUrl = new URL("../public/locales/tr.json", import.meta.url);
-
-const readDashboard = (): Promise<string> => readFile(dashboardUrl, "utf8");
 
 async function readCatalog(url: URL): Promise<Record<string, string>> {
   return JSON.parse(await readFile(url, "utf8")).translations as Record<string, string>;
@@ -17,7 +15,7 @@ async function readCatalog(url: URL): Promise<Record<string, string>> {
    sızarsa testler düşer. Tek döşeme komutu bundan etkilenmez, o yol yerinde kalır. */
 
 test("grup kartında toplu güç düğmesi yok", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   // Düğmenin kendisi, işaretçisi ve simgesi.
   assert.doesNotMatch(dashboard, /data-group-power/);
@@ -33,7 +31,7 @@ test("grup kartında toplu güç düğmesi yok", async () => {
 });
 
 test("toplu güç ile gelen onay ve komut kodu tamamen silindi", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   for (const symbol of [
     "confirmGroupPower",
@@ -57,7 +55,7 @@ test("toplu güç ile gelen onay ve komut kodu tamamen silindi", async () => {
 });
 
 test("tek döşemeye dokunma yolu ve onay dili yerinde", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /\$\$\("\[data-group-device\]"\)\.forEach\(button=>button\.onclick=\(\)=>runDashboardCommand\(button,/);
   assert.match(dashboard, /function confirmDashboardCommand\(deviceId,property,value,messageKey\)/);

@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const dashboardUrl = new URL("../public/index.html", import.meta.url);
-
-async function readDashboard(): Promise<string> {
-  return readFile(dashboardUrl, "utf8");
-}
+import { readPanelSource } from "./panel-source.js";
 
 /* Panoyu tarayıcıda çalıştırmadan sınamak için ilgili işlevlerin kaynağı `public/index.html`
    içinden alınıp sahte bağımlılıklarla çalıştırılıyor: kopya mantık yok, gönderilen kod sınanıyor. */
@@ -29,7 +23,7 @@ type LayoutState = { widgets: string[]; removedWidgets: Set<string>; groups: { i
 type Harness = { state: LayoutState; reconcile: () => boolean; saves: () => { layout: number; removed: number } };
 
 async function layoutHarness(state: LayoutState): Promise<Harness> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const factory = new Function(
     "state",
     `
@@ -51,7 +45,7 @@ async function layoutHarness(state: LayoutState): Promise<Harness> {
 type MoveButton = { direction: "left" | "right"; widget: string; disabled: boolean };
 
 async function moveButtons(railOrder: string[], widgets: string[]): Promise<MoveButton[]> {
-  const source = await readDashboard();
+  const source = await readPanelSource();
   const start = source.indexOf("const railOrder=railWidgets()");
   assert.notEqual(start, -1, "ok düğmesi bloğu bulunamadı");
   const end = source.indexOf("\n    });", start);
@@ -175,7 +169,7 @@ test("sabit kart taşınamaz kalıyor", async () => {
 /* "Ev hareketleri" olay satırları sıkışıyordu: rayda bir kademe (bir sütun) daha geniş.
    Diğer özet kartları kendi genişliğinde kalır, ray hâlâ kayar. */
 test("ev hareketleri kartı rayda bir kademe geniş", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
   // Ölçü oransal: sütun genişliği viewport'tan türer, sabit px değil.
@@ -187,7 +181,7 @@ test("ev hareketleri kartı rayda bir kademe geniş", async () => {
 });
 
 test("gizli kart görünmüyor ve sıralama onarımı düzene bağlanıyor", async () => {
-  const dashboard = await readDashboard();
+  const dashboard = await readPanelSource();
 
   // Ray içindeki grup kartı `display:grid` aldığı için `hidden` özniteliği eziliyordu:
   // panodan kaldırılan grup ekranda kalıyor, sıralamada yer almadığı için de taşınamıyordu.

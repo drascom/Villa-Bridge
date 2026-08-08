@@ -262,8 +262,15 @@ await registerAccessControl(app, authStore, {
 registerRecentErrorApi(app, recentErrors);
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
+// Panel stilleri de açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
+// geçiş noktası servis yeniden başlatması olarak kalır.
+const dashboardStyles = await readFile(resolve(moduleDir, "../public/css/panel.css"), "utf8");
 const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
 const localesDirectory = resolve(moduleDir, "../public/locales");
+
+app.get("/css/panel.css", async (_request, reply) => reply
+  .type("text/css; charset=utf-8")
+  .send(dashboardStyles));
 
 app.get("/assets/dashboard-landscape.jpg", async (_request, reply) => reply
   .header("Cache-Control", "public, max-age=31536000, immutable")
