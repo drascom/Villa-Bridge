@@ -3,6 +3,9 @@
       --paper:#edf0f2;--surface:#fbfcfc;--surface-soft:#f3f5f6;--ink:#17211d;--muted:#66716c;--line:#dde2e4;
       --forest:#184d3b;--forest-soft:#e6f0eb;--on-forest:#fff;--sun:#e9a23b;--danger:#b83a35;--danger-soft:#f8e9e7;--shadow:0 12px 30px rgba(35,45,41,.07);--card-shadow:0 2px 8px rgba(35,45,41,.055);
       --home-glass:rgba(247,250,248,.22);--home-control:rgba(251,252,252,.82);--home-border:rgba(255,255,255,.48);--home-float-shadow:0 8px 20px rgba(24,39,32,.14);
+      /* Ana ekranın saydam eylem düğmeleri: dolgu yerine ince çerçeve + ters renkli hale taşır.
+         Aydınlık temada kenar koyu, hale beyaz — fotoğrafın koyu bölgesinde de ayakta kalır. */
+      --home-action-line:rgba(23,33,29,.42);--home-action-halo:0 0 0 1px rgba(255,255,255,.62);--home-action-glyph-shadow:drop-shadow(0 1px 2px rgba(255,255,255,.78));
       /* Başlıktaki eylem düğmeleri (ekle · düzenle · menü) parmak hedefi: yükseklik en az 60px,
          genişlik ekranla orantılı. Üst sınır masaüstünde şişmeyi keser. */
       --head-action-h:clamp(60px,9.4vh,64px);--head-action-w:clamp(72px,8.6vw,96px);--head-action-gap:clamp(12px,1.6vw,20px);
@@ -16,6 +19,8 @@
       --paper:#101514;--surface:#1b2320;--surface-soft:#232d29;--ink:#edf5f0;--muted:#a6b6ad;--line:#33433b;
       --forest:#71c6a2;--forest-soft:#203d32;--on-forest:#0b1c15;--sun:#f0b65c;--danger:#f07a72;--danger-soft:#40211f;--shadow:0 18px 54px rgba(0,0,0,.28);--card-shadow:0 2px 10px rgba(0,0,0,.18);
       --home-glass:rgba(16,26,22,.28);--home-control:rgba(22,31,27,.82);--home-border:rgba(226,239,232,.22);--home-float-shadow:0 9px 24px rgba(0,0,0,.28);
+      /* Karanlık temada ikizi ters çevrilir: kenar açık, hale koyu. */
+      --home-action-line:rgba(237,245,240,.5);--home-action-halo:0 0 0 1px rgba(0,0,0,.52);--home-action-glyph-shadow:drop-shadow(0 1px 3px rgba(0,0,0,.72));
       --hub-muted:#cddcd4;
       --hub-text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.72),0 2px 18px rgba(0,0,0,.58);
     }
@@ -660,4 +665,24 @@
       #home .widget-value{margin-top:clamp(10px,2vh,16px)}
       .page-head-title h1{font-size:clamp(19px,5.4vw,26px)}
       .section-head h2{font-size:clamp(18px,5vw,22px)}
+    }
+    /* ANA EKRAN EYLEM DÜĞMELERİ — saydam hap.
+       Pano düğmesi ekle · düzenle · otomasyon (`#home .home-actions`): dolgu kalktı, ikonu
+       fotoğrafın üstünde ince bir çerçeve ve ters renkli hale ayakta tutar — aydınlıkta koyu
+       kenar + beyaz hale, karanlıkta açık kenar + koyu hale; ikonun kendi gölgesi de tema
+       başına yazılı — renk karıştıran işlev kullanılmaz, ölçüler clamp ile verilir.
+       Dokunma hedefi küçülmez: 44px taban her kırılma noktasında korunur, yalnız görünüm
+       hafifler. Odak halkası yukarıdaki `:focus-visible` kurallarına ait — burada hiçbir
+       outline sıfırlanmaz.
+       DIŞARIDA KALANLAR (bilerek): soldaki `.app-menu-button` — koyu temada kaybolduğu için
+       dolgulu bırakıldı; alt sayfaların `.page-action-tile` döşemeleri ve `#refreshButton`. */
+    #home .home-actions button,
+    body[data-active-view="home"] #home .home-actions button{min-width:44px;min-height:44px;border:1px solid var(--home-action-line);border-radius:999px;color:var(--forest);background:transparent;box-shadow:var(--home-action-halo)}
+    #home .home-action-glyph{width:clamp(28px,3.4vh,32px);height:clamp(28px,3.4vh,32px);filter:var(--home-action-glyph-shadow)}
+    /* Hover/aktif: çerçeve yeşile döner ve cam dolgu geri gelir — durum değişimi görünür kalır. */
+    #home .home-actions button:hover,
+    body[data-active-view="home"] #home .home-actions button:hover{border-color:var(--forest);color:var(--forest);background:var(--home-control)}
+    /* Telefonda ikon genişlikle ölçülür: yükseklik tabanlı clamp dikey ekranda yanlış büyür. */
+    @media(orientation:portrait) and (max-width:560px){
+      #home .home-action-glyph{width:clamp(24px,6.6vw,28px);height:clamp(24px,6.6vw,28px)}
     }
