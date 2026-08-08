@@ -21,7 +21,30 @@ const setupApp = async (context: { after: (callback: () => Promise<void>) => voi
   app.get("/api/overview", async () => ({ ok: true }));
   app.post("/api/devices/:id/command", async () => ({ ok: true }));
   app.get("/api/settings", async () => ({ ok: true }));
+  app.post("/api/groups", async () => ({ ok: true }));
+  app.put("/api/groups/:id", async () => ({ ok: true }));
+  app.delete("/api/groups/:id", async () => ({ ok: true }));
+  app.put("/api/groups/:id/member", async () => ({ ok: true }));
+  app.post("/api/groups/:id/command", async () => ({ ok: true }));
+  app.post("/api/groups/:id/scene", async () => ({ ok: true }));
+  app.post("/api/pairing/start", async () => ({ ok: true }));
+  app.post("/api/zigbee/install-code", async () => ({ ok: true }));
+  app.post("/api/zigbee/touchlink/scan", async () => ({ ok: true }));
+  app.post("/api/zigbee/touchlink/reset", async () => ({ ok: true }));
+  app.get("/api/zigbee/network-map", async () => ({ ok: true }));
+  app.post("/api/zigbee/bind", async () => ({ ok: true }));
+  app.post("/api/devices/:id/reconfigure", async () => ({ ok: true }));
+  app.put("/api/devices/:id/options", async () => ({ ok: true }));
+  app.put("/api/devices/:id/ota-schedule", async () => ({ ok: true }));
+  app.post("/api/devices/:id/ota-check", async () => ({ ok: true }));
+  app.get("/api/zigbee/backup", async () => ({ ok: true }));
+  app.post("/api/zigbee/restore", async () => ({ ok: true }));
   app.put("/api/favorites", async () => ({ ok: true }));
+  app.get("/api/home-visibility", async () => ({ ok: true }));
+  app.put("/api/home-visibility", async () => ({ ok: true }));
+  app.get("/api/backup", async () => ({ ok: true }));
+  app.post("/api/backup/preview", async () => ({ ok: true }));
+  app.post("/api/backup/restore", async () => ({ ok: true }));
   return { app };
 };
 
@@ -81,9 +104,107 @@ test("ev kullanıcısı günlük kontrolleri kullanır fakat ayarlara erişemez"
     url: "/api/devices/test/command",
     headers: { cookie, "x-villa-csrf": csrfToken }
   })).statusCode, 200);
+  assert.equal((await app.inject({
+    method: "POST",
+    url: "/api/groups/1/command",
+    headers: { cookie, "x-villa-csrf": csrfToken }
+  })).statusCode, 200);
+  // Göster/gizle günlük bir tercih: ev sakini okuyabildiği gibi yazabilir de.
+  assert.equal((await app.inject({
+    method: "GET",
+    url: "/api/home-visibility",
+    headers: { cookie }
+  })).statusCode, 200);
+  assert.equal((await app.inject({
+    method: "PUT",
+    url: "/api/home-visibility",
+    headers: { cookie, "x-villa-csrf": csrfToken }
+  })).statusCode, 200);
+  // CSRF başlığı olmadan yazma yine reddedilir.
+  assert.equal((await app.inject({
+    method: "PUT",
+    url: "/api/home-visibility",
+    headers: { cookie }
+  })).statusCode, 403);
   const settings = await app.inject({ method: "GET", url: "/api/settings", headers: { cookie } });
   assert.equal(settings.statusCode, 403);
   assert.equal(settings.json().code, "ADMIN_REQUIRED");
+  for (const url of [
+    "/api/groups",
+    "/api/pairing/start",
+    "/api/zigbee/install-code",
+    "/api/zigbee/touchlink/scan",
+    "/api/zigbee/touchlink/reset",
+    "/api/devices/test/reconfigure",
+    "/api/devices/test/ota-check",
+    "/api/groups/1/scene"
+  ]) {
+    const response = await app.inject({
+      method: "POST",
+      url,
+      headers: { cookie, "x-villa-csrf": csrfToken }
+    });
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.json().code, "ADMIN_REQUIRED");
+  }
+  for (const [method, url] of [
+    ["GET", "/api/zigbee/network-map"],
+    ["POST", "/api/zigbee/bind"],
+    ["PUT", "/api/groups/1"],
+    ["DELETE", "/api/groups/1"],
+    ["PUT", "/api/groups/1/member"],
+    ["PUT", "/api/devices/test/options"],
+    ["PUT", "/api/devices/test/ota-schedule"],
+    ["GET", "/api/zigbee/backup"],
+    ["POST", "/api/zigbee/restore"],
+    ["GET", "/api/backup"],
+    ["POST", "/api/backup/preview"],
+    ["POST", "/api/backup/restore"],
+    ["PUT", "/api/auth/admin-password"]
+  ] as const) {
+    const response = await app.inject({
+      method,
+      url,
+      headers: { cookie, "x-villa-csrf": csrfToken }
+    });
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.json().code, "ADMIN_REQUIRED");
+  }
+});
+
+test("oturum açmış yönetici parolayı değiştirir ve yeniden giriş yapar", async (context) => {
+  const { app } = await setupApp(context);
+  const setup = await app.inject({
+    method: "POST",
+    url: "/api/auth/setup",
+    payload: { username: "owner", password: "correct horse battery", residentPin: "638251" }
+  });
+  const cookie = cookieFrom(setup);
+  const headers = { cookie, "x-villa-csrf": setup.json().csrfToken };
+
+  const changed = await app.inject({
+    method: "PUT",
+    url: "/api/auth/admin-password",
+    headers,
+    payload: { newPassword: "new secure passphrase" }
+  });
+  assert.equal(changed.statusCode, 200);
+  assert.equal(changed.json().reauthenticationRequired, true);
+  assert.equal((await app.inject({
+    method: "GET",
+    url: "/api/settings",
+    headers: { cookie }
+  })).statusCode, 401);
+  assert.equal((await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { mode: "admin", username: "owner", secret: "correct horse battery" }
+  })).statusCode, 401);
+  assert.equal((await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: { mode: "admin", username: "owner", secret: "new secure passphrase" }
+  })).statusCode, 200);
 });
 
 test("durum değiştiren API geçerli oturum yanında CSRF doğrulaması ister", async (context) => {

@@ -2,11 +2,18 @@ import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AuthRole, AuthSession, AuthStore, CreatedAuthSession } from "./auth-store.js";
 
+declare module "fastify" {
+  interface FastifyRequest {
+    villaSession: AuthSession | null;
+  }
+}
+
 const sessionCookieName = "villa_session";
 const stateChangingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 const publicRoutes = new Set([
   "/api/health",
+  "/api/discovery",
   "/api/locales",
   "/api/auth/session",
   "/api/auth/setup",
@@ -21,7 +28,30 @@ const residentRoutes = new Set([
   "GET /api/onboarding",
   "GET /api/favorites",
   "PUT /api/favorites",
+  "GET /api/home-groups",
+  "PUT /api/home-groups",
+  // Görünürlük ("bu lambayı oda kartında gösterme", "bu oda Genel görünümde çıkmasın") günlük
+  // bir tercihtir, kurulum ayarı değil: paneli kullanan ev sakini kendi ekranını düzenleyebilmeli.
+  // Yazma da resident, çünkü aksi hâlde her düzeltme için yönetici çağırmak gerekirdi. Açtığı
+  // veri ev sakininin zaten gördüğü cihaz ve oda listesinden fazlası değil.
+  "GET /api/home-visibility",
+  "PUT /api/home-visibility",
+  "GET /api/automations",
+  // Çalışma günlüğü, ev sakininin zaten gördüğü kural ve cihaz verisinden fazlasını açmaz;
+  // "neden çalışmadı" sorusunu soran da odur. Yazma yolu yok, salt okunur.
+  "GET /api/automation-runs",
+  "GET /api/automations/:id/runs",
+  // Konum okuması güneş kuralının saatini göstermek için gerekir; **yazma** listelenmez,
+  // dolayısıyla yönetici ister (evin koordinatı kurulum ayarıdır).
+  "GET /api/settings/location",
+  "GET /api/device-image/:model",
+  "GET /api/devices/:id/note",
+  "PUT /api/devices/:id/note",
+  // Rol yalnız arayüzdeki sunumu değiştirir (lamba mı anahtar mı) — ev sakini de düzeltebilir.
+  "GET /api/devices/:id/role",
+  "PUT /api/devices/:id/role",
   "POST /api/devices/:id/command",
+  "POST /api/groups/:id/command",
   "POST /api/auth/logout"
 ]);
 
@@ -121,6 +151,7 @@ export const registerAccessControl = async (
   const secureCookies = options.secureCookies === true;
   const throttle = options.throttle ?? new LoginThrottle();
   let configured = await authStore.configured();
+  app.decorateRequest("villaSession", null);
 
   const requestToken = (request: FastifyRequest): string | undefined =>
     parseCookie(request.headers.cookie, sessionCookieName);
@@ -145,6 +176,7 @@ export const registerAccessControl = async (
         error: "Oturum açmanız gerekiyor."
       });
     }
+    request.villaSession = session;
     if (
       stateChangingMethods.has(request.method)
       && !constantTimeStringEqual(request.headers["x-villa-csrf"] as string | undefined, session.csrfToken)
@@ -241,6 +273,25 @@ export const registerAccessControl = async (
     return reply
       .header("Set-Cookie", expiredSessionCookie(secureCookies))
       .send({ ok: true });
+  });
+
+  app.put<{
+    Body?: { newPassword?: unknown };
+  }>("/api/auth/admin-password", async (request, reply) => {
+    try {
+      await authStore.updateAdminPassword(
+        request.villaSession?.username ?? "",
+        request.body?.newPassword
+      );
+      return reply
+        .header("Set-Cookie", expiredSessionCookie(secureCookies))
+        .send({ ok: true, reauthenticationRequired: true });
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
   });
 
   app.put<{ Body?: { pin?: unknown } }>("/api/auth/resident-pin", async (request, reply) => {

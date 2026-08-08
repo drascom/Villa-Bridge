@@ -1,9 +1,23 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 
 export interface HomeFavorite {
   deviceId: string;
   controlId: string;
 }
+
+const homeFavoriteControlKinds = new Set([
+  "switch",
+  "fan",
+  "siren",
+  "cover",
+  "position",
+  "lock",
+  "climate"
+]);
+
+export const isHomeFavoriteControlKind = (kind: string): boolean =>
+  homeFavoriteControlKinds.has(kind);
 
 export const validateHomeFavorites = (value: unknown): HomeFavorite[] => {
   if (!Array.isArray(value) || value.length > 64) throw new Error("Ana ekran favorileri geçersiz.");
@@ -41,9 +55,7 @@ export class HomeFavoritesStore {
 
   async save(value: unknown): Promise<HomeFavorite[]> {
     const favorites = validateHomeFavorites(value);
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(favorites, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, favorites, { mode: 0o600 });
     return favorites;
   }
 

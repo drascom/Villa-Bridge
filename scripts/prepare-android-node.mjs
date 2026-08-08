@@ -13,9 +13,11 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { create as createTar } from "tar";
+import { assertPanelGraph, panelDigest } from "./panel-graph.mjs";
+import { assertRuntimeFileList, assertRuntimeModuleGraph } from "./runtime-module-graph.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const runtimeSource = path.join(projectRoot, "apps", "android", "node-runtime");
+const runtimeSource = path.join(projectRoot, "apps", "runtime");
 const generatedRoot = path.join(projectRoot, "apps", "android", "app", "build", "generated", "node-assets");
 const stagingRoot = `${generatedRoot}.staging-${process.pid}`;
 const stagedProject = path.join(stagingRoot, "nodejs-project");
@@ -31,8 +33,11 @@ const lazySerialPortPatch = path.join(
 
 const requiredFiles = [
   "dashboard.html",
+  "lan-discovery.cjs",
   "main.cjs",
+  "matter-bigint-guard.cjs",
   "orchestration.cjs",
+  "peer-watch.cjs",
   "package-lock.json",
   "package.json"
 ];
@@ -107,6 +112,15 @@ async function prepare() {
   }
   await access(path.join(projectRoot, "public", "index.html"));
   await access(lazySerialPortPatch);
+  // Panel parcalari eksik/bozuksa APK'ya yarim panel girmesin.
+  await assertPanelGraph(projectRoot);
+  // Yeni bir runtime modulu eklenip listeye yazilmadiysa paketleme burada durur.
+  const sourceGraph = await assertRuntimeFileList(runtimeSource, requiredFiles);
+  if (sourceGraph.dynamic.length > 0) {
+    console.warn(
+      `Uyari: dinamik require iceren runtime modulleri statik olarak dogrulanamadi: ${sourceGraph.dynamic.join(", ")}`
+    );
+  }
 
   await rm(stagingRoot, { recursive: true, force: true });
   await mkdir(stagedProject, { recursive: true });
@@ -223,8 +237,13 @@ async function prepare() {
       { cwd: stagedProject }
     );
     await run(process.execPath, ["--check", path.join(stagedProject, "main.cjs")]);
+    // `--check` yalnizca sozdizimi bakar; paketin modul grafigi de cozulebilmeli.
+    await assertRuntimeModuleGraph(stagedProject);
 
     const packageJson = JSON.parse(await readFile(path.join(stagedProject, "package.json"), "utf8"));
+    // Panel tek dosya degil: index.html + public/css + public/js. Ozet hepsini kapsar,
+    // dosya sirasi alfabetik goreli yol oldugu icin sonuc platformdan bagimsiz deterministiktir.
+    const panel = await panelDigest(bundledCore);
     const manifest = {
       format: 1,
       runtime: packageJson.name,
@@ -238,9 +257,8 @@ async function prepare() {
         path.join(bundledCore, "dist", "index.js")
       ),
       dashboard: "villa-bridge/public/index.html",
-      dashboardSha256: await sha256(
-        path.join(bundledCore, "public", "index.html")
-      )
+      dashboardFiles: panel.files.map((file) => `villa-bridge/public/${file}`),
+      dashboardSha256: panel.sha256
     };
     await writeFile(
       path.join(stagedProject, "asset-manifest.json"),

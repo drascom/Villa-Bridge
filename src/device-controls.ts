@@ -1,4 +1,21 @@
-import type { DeviceControlView, JsonObject } from "./types.js";
+import type { DeviceControlView, JsonObject, JsonScalar } from "./types.js";
+
+export interface WritableFeature {
+  property: string;
+  name: string;
+  type: string;
+  parentType?: string;
+  parentName?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  values?: JsonScalar[];
+  valueOn?: JsonScalar;
+  valueOff?: JsonScalar;
+  valueToggle?: JsonScalar;
+  category?: string;
+}
 
 const onOff = (value: unknown): boolean | null => {
   if (value === "ON" || value === true) return true;
@@ -13,6 +30,26 @@ const defaultChannelName = (deviceName: string, channel: string): string => {
   if (channel === "main") return deviceName;
   const number = channel.match(/\d+/)?.[0];
   return number ? `Kanal ${number}` : channel.toUpperCase();
+};
+
+/**
+ * Ayrı adı olan tek şey aç/kapa kanalıdır: `state` / `state_lN` kanalları `<ieee>:<kanal>` takma adını
+ * okur ve kimlikleri o kanaldır ("main", "l1"). Perde, kilit, fan, siren ve cihazın yayımladığı ikili
+ * ayarlar `cover:...`, `switch:child_lock` gibi kimlik taşır; adlarını cihazın kendi etiketinden alır,
+ * takma ad okunmaz.
+ */
+export const isNamedChannelControl = (control: Pick<DeviceControlView, "id" | "kind">): boolean =>
+  control.kind === "switch" && !control.id.includes(":");
+
+/**
+ * Cihazın tek aç/kapa kanalı varsa o kanalın kimliği, yoksa `null`. Tek kanallı cihazda kanal adı diye
+ * ayrı bir kavram yoktur — cihaz adı kanalın da adıdır; birden çok kanalda her kanal kendi adını taşır.
+ */
+export const soleSwitchChannelId = (
+  controls: Array<Pick<DeviceControlView, "id" | "kind">>
+): string | null => {
+  const channels = controls.filter(isNamedChannelControl);
+  return channels.length === 1 ? channels[0].id : null;
 };
 
 const clampByte = (value: number): number => Math.round(Math.max(0, Math.min(255, value)));
@@ -59,7 +96,11 @@ const hsToHex = (hue: number, saturation: number): string => {
   return rgbToHex((red + match) * 255, (green + match) * 255, (blue + match) * 255);
 };
 
-const colorHex = (value: unknown): string => {
+/**
+ * Rengin `#rrggbb` karşılığı. Zigbee2MQTT rengi nesne olarak bildirir (`{x,y}`, `{hue,saturation}`);
+ * panelin ve otomasyonun paylaştığı tek renk dili ise hex'tir, o yüzden dönüşüm dışarı da açıktır.
+ */
+export const colorHex = (value: unknown): string => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return "#ffffff";
   const color = value as Record<string, unknown>;
   if (typeof color.hex === "string" && /^#[0-9a-f]{6}$/i.test(color.hex)) return color.hex.toLowerCase();
@@ -90,27 +131,222 @@ export const hexToXy = (hex: string): { x: number; y: number } => {
   };
 };
 
+/** `#rrggbb` — panelin, otomasyonun ve kaydetme doğrulamasının paylaştığı tek renk biçimi. */
+export const hexColorPattern = /^#[0-9a-f]{6}$/i;
+export const isHexColor = (value: unknown): value is string =>
+  typeof value === "string" && hexColorPattern.test(value);
+
+/** Kumandaya yazılabilir değer: skaler ya da rengin xy karşılığı. */
+export type ControlCommandValue = JsonScalar | { x: number; y: number };
+
+export interface ControlValueOptions {
+  /**
+   * Panel aç/kapat değerini `boolean` yollar ve başka bir şey kabul edilmez; otomasyon kuralı ise
+   * kumandanın kendi değerini (`valueOn`/`valueOff`/`valueToggle`) taşır. Tek fark budur.
+   */
+  booleanSwitch?: boolean;
+}
+
+const switchLikeKinds = new Set(["switch", "fan", "siren"]);
+const listKinds = new Set(["cover", "lock", "select"]);
+
+/**
+ * Kumandaya yazılacak değerin **tek** doğrulama/dönüştürme yolu. Panelin `/api/devices/:id/command`
+ * rotası da, otomasyon motoru da buradan geçer: renk `#rrggbb` olarak doğrulanıp xy'ye çevrilir,
+ * sayısal değer `min`/`max`'a kırpılıp `step`'e yuvarlanır, liste kumandaları kendi değer listesine
+ * denetlenir. Kabul edilmeyen değer anlaşılır bir hata fırlatır; hata metinleri rotanın bugünkü
+ * yanıtlarıyla birebir aynıdır.
+ */
+export const normalizeControlValue = (
+  control: Pick<
+    DeviceControlView,
+    "kind" | "min" | "max" | "step" | "values" | "valueOn" | "valueOff" | "valueToggle"
+  >,
+  value: unknown,
+  options: ControlValueOptions = {}
+): ControlCommandValue => {
+  if (switchLikeKinds.has(control.kind)) {
+    const valueOn = control.valueOn ?? "ON";
+    const valueOff = control.valueOff ?? "OFF";
+    if (typeof value === "boolean") return value ? valueOn : valueOff;
+    if (options.booleanSwitch) throw new Error("Aç/kapat değeri geçersiz.");
+    if (value === valueOn) return valueOn;
+    if (value === valueOff) return valueOff;
+    if (control.valueToggle !== undefined && value === control.valueToggle) return control.valueToggle;
+    throw new Error("Aç/kapat değeri geçersiz.");
+  }
+  if (control.kind === "color") {
+    if (!isHexColor(value)) throw new Error("Renk değeri geçersiz.");
+    return hexToXy(value);
+  }
+  if (listKinds.has(control.kind)) {
+    if (
+      (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
+      || (control.values?.length && !control.values.includes(value))
+    ) {
+      throw new Error("Seçilen cihaz komutu geçersiz.");
+    }
+    return value;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("Sayısal denetim değeri geçersiz.");
+  }
+  const clamped = Math.min(control.max ?? value, Math.max(control.min ?? value, value));
+  const step = control.step;
+  return step && step > 0
+    ? Number((Math.round((clamped - (control.min ?? 0)) / step) * step + (control.min ?? 0)).toFixed(6))
+    : clamped;
+};
+
+/** Sayısal kumandalar — oranlı eşleme ve kaydetme doğrulaması aynı kümeyi paylaşır. */
+export const numericControlKinds: ReadonlySet<string> = new Set([
+  "level",
+  "temperature",
+  "number",
+  "position",
+  "climate"
+]);
+
+type RangeControl = Pick<DeviceControlView, "min" | "max">;
+
+/**
+ * Kumandanın kendi ölçeği. `min`/`max` bildirmeyen kumanda 0–100 sayılır (panelde de aynı kural);
+ * ölçek çökmüşse (max ≤ min) bir birimlik yapay aralık kurulur ki bölme sıfıra düşmesin.
+ */
+export const controlValueRange = (control: RangeControl): { min: number; max: number } => {
+  const min = typeof control.min === "number" && Number.isFinite(control.min) ? control.min : 0;
+  const max = typeof control.max === "number" && Number.isFinite(control.max) ? control.max : 100;
+  return max > min ? { min, max } : { min, max: min + 1 };
+};
+
+/**
+ * Ham değerin kendi aralığındaki yüzdesi (0–100). Sayıya çevrilemeyen değerde `null` döner.
+ * Panelin gösterdiği yüzdenin aynısıdır; tek fark burada tam sayıya yuvarlanmamasıdır — canlı
+ * takipte ara değerler kaybolmasın diye kesir korunur, yuvarlama hedefin `step`'inde yapılır.
+ */
+export const controlValuePercent = (control: RangeControl, value: unknown): number | null => {
+  const numeric = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== "" ? Number(value) : Number.NaN;
+  if (!Number.isFinite(numeric)) return null;
+  const { min, max } = controlValueRange(control);
+  const clamped = Math.min(max, Math.max(min, numeric));
+  return ((clamped - min) / (max - min)) * 100;
+};
+
+/**
+ * Yüzdenin hedef kumandadaki ham karşılığı. Kırpma ve `step` yuvarlaması ortak normalizasyondan
+ * geçer; adım bildirmeyen kumandada değer tam sayıya oturur (panelin `automationValueRaw`'ıyla
+ * aynı kural — iki cihazın ölçeği farklı olduğu için ham değer asla kopyalanmaz).
+ */
+export const controlValueFromPercent = (
+  control: Parameters<typeof normalizeControlValue>[0],
+  percent: number
+): number => {
+  const { min, max } = controlValueRange(control);
+  const clamped = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
+  const exact = min + (max - min) * clamped / 100;
+  const step = control.step;
+  const snapped = step && step > 0 ? exact : Math.round(exact);
+  const normalized = normalizeControlValue(control, snapped);
+  return typeof normalized === "number" ? normalized : snapped;
+};
+
+/**
+ * Otomasyon yolu için hoşgörülü sarmalayıcı: normalize edilebilen değer panelinkiyle aynı yoldan
+ * geçer, edilemeyen değer olduğu gibi gider. Diskteki eski kurallar bir doğrulama sıkılaşmasıyla
+ * sessizce çalışmaz hâle gelmesin diye eylem burada reddedilmez.
+ */
+export const normalizeControlValueOrRaw = (
+  control: Parameters<typeof normalizeControlValue>[0],
+  value: unknown
+): unknown => {
+  try {
+    return normalizeControlValue(control, value);
+  } catch {
+    return value;
+  }
+};
+
 export function deviceControls(
   id: string,
   deviceName: string,
-  writableFeatures: string[],
+  writableFeatures: Array<string | WritableFeature>,
   state: JsonObject,
   aliases: Map<string, string>
 ): DeviceControlView[] {
-  const writable = new Set(writableFeatures);
-  const available = new Set([...writableFeatures, ...Object.keys(state)]);
+  const descriptors = writableFeatures.map((feature): WritableFeature =>
+    typeof feature === "string"
+      ? { property: feature, name: feature, type: "" }
+      : feature
+  );
+  const writable = new Set(descriptors.map((feature) => feature.property));
+  const descriptorByProperty = new Map(descriptors.map((feature) => [feature.property, feature]));
+  const available = new Set([...writable, ...Object.keys(state)]);
   const controls: DeviceControlView[] = [];
+  const added = new Set<string>();
+  const add = (control: DeviceControlView): void => {
+    if (added.has(control.property)) return;
+    added.add(control.property);
+    controls.push(control);
+  };
+  const descriptorKind = (feature: WritableFeature | undefined): string =>
+    `${feature?.parentType ?? ""} ${feature?.parentName ?? ""}`.toLowerCase();
+  const isSpecial = (feature: WritableFeature | undefined): boolean =>
+    /\b(cover|climate|lock|fan|siren)\b/.test(descriptorKind(feature));
+  const isPrimaryContext = (feature: WritableFeature | undefined): boolean =>
+    /\b(light|switch|cover|climate|lock|fan|siren)\b/.test(descriptorKind(feature));
+  /**
+   * Ayar mı, asıl işlev mi? Ölçüt tanım verisidir, özellik adı değil:
+   *
+   * 1. Expose açıkça `category: "config" | "diagnostic"` diyorsa ayardır.
+   * 2. Zigbee tanım sözleşmesinde cihazın asıl işlevi **tipli** bir expose'un içinde yayımlanır
+   *    (`light`, `switch`, `cover`, `lock`, `fan`, `climate`, `siren`). Üst düzeyde tek başına
+   *    duran jenerik expose'lar (`binary`, `numeric`, `enum`, `text`) cihaz ayarı ya da
+   *    tanılamasıdır: hassasiyet, algılama mesafesi, çocuk kilidi, "cihazı bul" düğmesi… Birçok
+   *    tanım `category` alanını doldurmaz; sarmalayan tipli expose'un yokluğu ölçütün kendisidir.
+   *
+   * Ayar kaybolmaz — yalnız ana kontrol olmaktan çıkar, listenin ayar bölümüne iner.
+   * `state`/`brightness`/`color_temp` kanalları bu kuralın dışındadır: onlar sözleşme gereği
+   * zaten asıl işlevdir, tanım onları sarmalamamış olsa bile.
+   */
+  const isDeviceSetting = (feature: WritableFeature | undefined): boolean =>
+    feature?.category === "config"
+    || feature?.category === "diagnostic"
+    || !isPrimaryContext(feature);
+  const isSettingCategory = (category: string | undefined): boolean =>
+    category === "config" || category === "diagnostic";
+  const labelFor = (feature: WritableFeature, fallback: string): string =>
+    feature.name && feature.name !== feature.property
+      ? feature.name.replaceAll("_", " ")
+      : fallback;
+  const scalarValue = (property: string): string | number | boolean | null => {
+    const value = state[property];
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? value
+      : null;
+  };
 
   for (const property of [...available].filter((key) => key === "state" || key.startsWith("state_")).sort()) {
+    const descriptor = descriptorByProperty.get(property);
+    if (isSpecial(descriptor)) continue;
     const value = onOff(state[property]);
     if (value === null && !writable.has(property)) continue;
     const channel = suffixOf(property, "state");
-    controls.push({
+    const valueOn = descriptor?.valueOn ?? "ON";
+    const valueOff = descriptor?.valueOff ?? "OFF";
+    // Zigbee2MQTT sözleşmesi: ON/OFF kullanan yazılabilir bir durum TOGGLE komutunu da kabul eder.
+    const canToggle = writable.has(property) && valueOn === "ON" && valueOff === "OFF";
+    add({
       id: channel,
       property,
       name: aliases.get(`${id}:${channel}`) ?? defaultChannelName(deviceName, channel),
       kind: "switch",
-      value
+      value,
+      valueOn,
+      valueOff,
+      valueToggle: descriptor?.valueToggle ?? (canToggle ? "TOGGLE" : undefined),
+      adminOnly: isSettingCategory(descriptor?.category)
     });
   }
 
@@ -118,14 +354,20 @@ export function deviceControls(
     const raw = state[property];
     if (typeof raw !== "number" && !writable.has(property)) continue;
     const channel = suffixOf(property, "brightness");
-    controls.push({
+    const descriptor = descriptorByProperty.get(property);
+    add({
       id: `${channel}:brightness`,
       property,
-      name: channel === "main" ? "Parlaklık" : `${aliases.get(`${id}:${channel}`) ?? defaultChannelName(deviceName, channel)} parlaklığı`,
+      name: channel === "main"
+        ? labelFor(descriptor ?? { property, name: property, type: "" }, "Parlaklık")
+        : `${aliases.get(`${id}:${channel}`) ?? defaultChannelName(deviceName, channel)} parlaklığı`,
       kind: "level",
       value: typeof raw === "number" ? raw : null,
-      min: 1,
-      max: 254
+      min: descriptor?.min ?? 1,
+      max: descriptor?.max ?? 254,
+      step: descriptor?.step,
+      unit: descriptor?.unit,
+      adminOnly: isSettingCategory(descriptor?.category)
     });
   }
 
@@ -133,19 +375,23 @@ export function deviceControls(
     const raw = state[property];
     if (typeof raw !== "number" && !writable.has(property)) continue;
     const channel = suffixOf(property, "color_temp");
-    controls.push({
+    const descriptor = descriptorByProperty.get(property);
+    add({
       id: `${channel}:temperature`,
       property,
       name: channel === "main" ? "Işık sıcaklığı" : `${aliases.get(`${id}:${channel}`) ?? defaultChannelName(deviceName, channel)} sıcaklığı`,
       kind: "temperature",
       value: typeof raw === "number" ? raw : null,
-      min: 153,
-      max: 500
+      min: descriptor?.min ?? 153,
+      max: descriptor?.max ?? 500,
+      step: descriptor?.step,
+      unit: descriptor?.unit,
+      adminOnly: isSettingCategory(descriptor?.category)
     });
   }
 
-  if (writableFeatures.some((feature) => feature === "color" || feature === "color_xy" || feature === "color_hs")) {
-    controls.push({
+  if (descriptors.some((feature) => ["color", "color_xy", "color_hs"].includes(feature.property))) {
+    add({
       id: "main:color",
       property: "color",
       name: "Renk",
@@ -154,5 +400,105 @@ export function deviceControls(
     });
   }
 
-  return controls;
+  for (const feature of descriptors) {
+    const property = feature.property;
+    if (added.has(property) || ["color_xy", "color_hs"].includes(property)) continue;
+    const context = descriptorKind(feature);
+    const raw = scalarValue(property);
+    const common = {
+      property,
+      name: labelFor(feature, property.replaceAll("_", " ")),
+      value: raw,
+      min: feature.min,
+      max: feature.max,
+      step: feature.step,
+      unit: feature.unit,
+      values: feature.values,
+      valueOn: feature.valueOn,
+      valueOff: feature.valueOff,
+      valueToggle: feature.valueToggle,
+      adminOnly: isDeviceSetting(feature)
+    };
+    if (/\bcover\b/.test(context)) {
+      add({
+        ...common,
+        id: `cover:${property}`,
+        kind: property.includes("position") ? "position" : "cover",
+        min: feature.min ?? (property.includes("position") ? 0 : undefined),
+        max: feature.max ?? (property.includes("position") ? 100 : undefined),
+        values: feature.values ?? (property.includes("state") ? ["OPEN", "STOP", "CLOSE"] : undefined)
+      });
+      continue;
+    }
+    if (/\bclimate\b/.test(context)) {
+      const setpoint = /setpoint|target_temperature/.test(property);
+      add({
+        ...common,
+        id: `climate:${property}`,
+        kind: setpoint ? "climate" : feature.values?.length ? "select" : "number"
+      });
+      continue;
+    }
+    if (/\block\b/.test(context)) {
+      add({
+        ...common,
+        id: `lock:${property}`,
+        kind: "lock",
+        values: feature.values ?? ["LOCK", "UNLOCK"]
+      });
+      continue;
+    }
+    if (/\bfan\b/.test(context)) {
+      add({
+        ...common,
+        id: `fan:${property}`,
+        kind: property === "state" || property.startsWith("state_") || property.endsWith("_state")
+          ? "fan"
+          : feature.values?.length ? "select" : "number"
+      });
+      continue;
+    }
+    if (/\bsiren\b/.test(context)) {
+      add({
+        ...common,
+        id: `siren:${property}`,
+        kind: "siren",
+        value: onOff(raw),
+        valueOn: feature.valueOn ?? "ON",
+        valueOff: feature.valueOff ?? "OFF"
+      });
+      continue;
+    }
+    if (feature.values?.length) {
+      add({ ...common, id: `select:${property}`, kind: "select" });
+      continue;
+    }
+    if (feature.type === "numeric" || feature.min !== undefined || feature.max !== undefined) {
+      add({ ...common, id: `number:${property}`, kind: "number" });
+      continue;
+    }
+    if (feature.type === "binary") {
+      add({
+        ...common,
+        id: `switch:${property}`,
+        kind: "switch",
+        value: onOff(raw),
+        valueOn: feature.valueOn ?? "ON",
+        valueOff: feature.valueOff ?? "OFF"
+      });
+    }
+  }
+
+  const priority = (control: DeviceControlView): number => {
+    const base = control.kind === "switch" || control.kind === "cover" ? 0
+      : control.kind === "level" || control.kind === "position" ? 1
+      : control.kind === "temperature" || control.kind === "climate" ? 2
+      : control.kind === "color" || control.id.startsWith("climate:") ? 3
+      : control.kind === "lock" ? 4
+      : control.kind === "fan" ? 5
+      : control.kind === "siren" ? 6
+      : 10;
+    return base + (control.adminOnly ? 100 : 0);
+  };
+  return controls.sort((left, right) => priority(left) - priority(right));
 }

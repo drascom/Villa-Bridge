@@ -34,6 +34,10 @@ touch-friendly mobile view.
 > TCP Zigbee core, and Matterbridge/Matter. It does not require a Raspberry Pi.
 > See the [Android alpha guide](apps/android/README.md) for its tested scope,
 > installation steps, and current limitations.
+>
+> **Linux/Pi alpha:** Debian 12 and 64-bit Raspberry Pi hosts use the same
+> core and standalone runtime under `systemd`. See the
+> [Linux and Raspberry Pi guide](apps/linux/README.md).
 
 ## What makes it useful
 
@@ -58,7 +62,7 @@ flowchart LR
         C -->|"Shadow mode"| Z2M["Zigbee2MQTT"]
     end
 
-    subgraph Android["Android tablet — standalone alpha"]
+    subgraph Android["Android tablet — standalone or monitor"]
         AND["Native Android host"]
         AMQTT["Embedded MQTT"]
         AMB["Matterbridge / Matter"]
@@ -80,6 +84,7 @@ flowchart LR
         L["Node.js service"]
     end
     L <--> V
+    L -. "LAN discovery: Android uses remote dashboard" .-> AND
 
     C -->|"Direct mode"| V
     Z2M <--> MQTT["MQTT broker"]
@@ -100,6 +105,10 @@ discovery stays optional.
 Zigbee remains the source of truth in both modes. Low-level actions use
 immutable device UIDs; friendly names are presentation data and can change
 safely.
+
+Android, Linux, and Raspberry Pi are built from one `main` branch. The shared
+runtime lives in `apps/runtime`; platform folders contain only host-specific
+launching, packaging, and lifecycle code.
 
 ## Try it locally
 
@@ -144,9 +153,10 @@ back up Zigbee network data first.
 
 The Android build is an alpha validated on a Nokia T10. It can host the local
 MQTT broker, direct TCP Zigbee core, Matterbridge/Matter services, and dashboard
-without a separate server. This validation is device-specific and is not yet a
-general production-readiness claim. Linux and Raspberry Pi remain supported
-deployment targets.
+without a separate server. If a Villa Bridge Linux/Raspberry Pi host is found
+and verified on the LAN, Android automatically becomes a dashboard-only monitor
+and leaves the service stack disabled. This validation is device-specific and
+is not yet a general production-readiness claim.
 
 ## Contributing
 

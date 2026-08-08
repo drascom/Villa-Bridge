@@ -12,6 +12,17 @@ matterbridge:
   wsUrl: ws://127.0.0.1:8283
 homeAssistant:
   discoveryEnabled: false
+alerts:
+  lowBatteryThreshold: 15
+# Gün doğumu / gün batımı tetikleyicisi için evin konumu. Ürün çok evli olduğundan varsayılan
+# koordinat yoktur; buradan ya da VILLA_BRIDGE_LATITUDE / VILLA_BRIDGE_LONGITUDE ile verilir.
+# Panelden girilen değer yapılandırmanın yanındaki location.json'a yazılır ve bunun önüne geçer.
+# location:
+#   latitude: 41.0082
+#   longitude: 28.9784
+selfHealing:
+  enabled: true
+  probeOffline: true
 debug:
   enabled: true
 http:

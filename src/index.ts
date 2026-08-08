@@ -1,74 +1,328 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyReply } from "fastify";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerAccessControl } from "./access-control.js";
 import { loadAliases, saveAliases } from "./aliases.js";
+import { AutomationEngine } from "./automation-engine.js";
+import { AutomationRunLog } from "./automation-runs.js";
+import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
-import { hexToXy } from "./device-controls.js";
+import { normalizeControlValue, soleSwitchChannelId } from "./device-controls.js";
+import { deviceMissingResponse } from "./device-departures.js";
+import { DeviceNetworkEventLog } from "./device-network-events.js";
+import { DeviceImageCache } from "./device-image-cache.js";
 import { DeviceImagesStore } from "./device-images.js";
+import { DeviceEventsStore } from "./device-events.js";
+import { DeviceNotesStore } from "./device-notes.js";
+import { loadDeviceRoles, removeDeviceRole, setDeviceRole } from "./device-roles.js";
 import { DeviceStore } from "./device-store.js";
-import { HomeFavoritesStore, validateHomeFavorites } from "./home-favorites.js";
+import {
+  HomeFavoritesStore,
+  isHomeFavoriteControlKind,
+  validateHomeFavorites
+} from "./home-favorites.js";
+import { HomeGroupsStore, homeGroupDeviceControlId, validateHomeGroups } from "./home-groups.js";
+import { HomeVisibilityStore, validateHomeVisibility } from "./home-visibility.js";
+import { HomeBackupService, type HomeBackupMode } from "./home-backup.js";
 import { InstallationStateStore } from "./installation-state.js";
+import { LocationStore, type HomeLocation } from "./location.js";
+import {
+  applyCoordinatorOwnership,
+  createVillaBridgeDiscoveryRecord,
+  resolveVillaBridgeNodeId,
+  resolveVillaBridgeNodeRole,
+  startLanDiscoveryResponder,
+  villaBridgeCoordinatorId,
+  villaBridgeDiscoveryPort,
+  type VillaBridgeCoordinatorStatus
+} from "./lan-discovery.js";
+import { createPeerProbe, createPeerWatcher, type PeerWatcher } from "./peer-watch.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { MqttShadowSource } from "./mqtt-source.js";
 import { getNetworkInfo } from "./network-info.js";
 import { isDeviceRemovalConfirmation } from "./removal-confirmation.js";
 import { registerRecentErrorApi } from "./recent-error-api.js";
 import { RecentErrorLog } from "./recent-error-log.js";
+import { SelfHealStateStore } from "./self-heal.js";
 import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
+import {
+  applyPendingZigbeeNetworkRestore,
+  createZigbeeNetworkBackup,
+  stageZigbeeNetworkRestore
+} from "./zigbee-backup.js";
 
 const config = await loadConfig();
+if (config.zigbee && await applyPendingZigbeeNetworkRestore(config.zigbee.dataDir)) {
+  console.log("Doğrulanmış Zigbee ağ yedeği geri yüklendi.");
+}
 const aliases = await loadAliases(config.aliasesFile);
 const configPath = resolve(process.env.VILLA_BRIDGE_CONFIG ?? "config/default.yaml");
 const imagesStore = new DeviceImagesStore(resolve(dirname(configPath), "device-images.json"));
+const imageCache = new DeviceImageCache(resolve(dirname(configPath), "device-image-cache"));
 let imagePreferences = await imagesStore.get();
-const store = new DeviceStore(aliases, imagePreferences);
+const deviceEventsStore = new DeviceEventsStore(resolve(dirname(configPath), "device-events.json"));
+// Kullanıcının seçtiği cihaz rolleri — IEEE adresine göre, yapılandırmanın yanındaki JSON'da.
+const deviceRolesPath = resolve(dirname(configPath), "device-roles.json");
+const deviceRoles = await loadDeviceRoles(deviceRolesPath);
+const store = new DeviceStore(
+  aliases,
+  imagePreferences,
+  await deviceEventsStore.get(),
+  (events) => {
+    void deviceEventsStore.save(events).catch((error) => {
+      console.error(`Cihaz olay geçmişi kaydedilemedi: ${String(error)}`);
+    });
+  },
+  deviceRoles
+);
+// §6 — otomasyon tetikleyicileri olay akışına takılır, poll yok. Motorun yolu cihaz etkinlik
+// listesinden **ayrıdır**: orası dar kümeyle sınırlıdır, burası cihazın bildirdiği her skaler
+// değişimi görür (parlaklık, ışık sıcaklığı, sıcaklık…). Liste gürültülenmez.
+store.setAutomationEventListener((events) => {
+  const deviceEvents = events.flatMap((event) => {
+    const deviceId = store.getDeviceIdBySourceName(event.sourceName);
+    return deviceId ? [{ deviceId, property: event.property, value: event.value }] : [];
+  });
+  if (deviceEvents.length === 0) return;
+  void automationEngine.handleDeviceEvents(deviceEvents).catch((error) => {
+    console.error(`Otomasyon olayı işlenemedi: ${String(error)}`);
+  });
+});
+store.setLowBatteryThreshold(config.alerts.lowBatteryThreshold);
 const matterbridge = new MatterbridgeClient(config.matterbridge.wsUrl);
 const favoritesStore = new HomeFavoritesStore(resolve(dirname(configPath), "home-favorites.json"));
+const homeGroupsStore = new HomeGroupsStore(resolve(dirname(configPath), "home-groups.json"));
+// Görünürlük ev genelinde tek doğru: tablette gizlenen cihaz sunucudaki panelde de gizli.
+const homeVisibilityStore = new HomeVisibilityStore(
+  resolve(dirname(configPath), "home-visibility.json")
+);
+const automationGroupLookup = (groupId: string): { memberIds: string[] } | undefined =>
+  store.getGroups().find((group) => group.id === groupId);
+const automationsStore = new AutomationsStore(
+  resolve(dirname(configPath), "automations.json"),
+  (deviceId) => store.getDevice(deviceId),
+  () => store.topologyRevision,
+  automationGroupLookup
+);
+// Konum yalnız güneş tetikleyicisi için; panelden girilen değer yapılandırmanın önüne geçer.
+const locationStore = new LocationStore(resolve(dirname(configPath), "location.json"));
+let homeLocation: HomeLocation | null = null;
+let homeLocationSource: "file" | "config" | null = null;
+try {
+  homeLocation = await locationStore.get();
+  homeLocationSource = homeLocation ? "file" : null;
+} catch (error) {
+  console.error(`Konum dosyası okunamadı: ${String(error)}`);
+}
+if (!homeLocation && config.location) {
+  homeLocation = config.location;
+  homeLocationSource = "config";
+}
+const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
 const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
 );
 const authStore = new AuthStore(resolve(dirname(configPath), "auth.json"));
+// Yedek yalnızca ev yapılandırmasını kapsar: parola özetleri, ağ anahtarı ve kuruluma
+// özel durum dosyaları bilerek dışarıda bırakılmıştır.
+const homeBackupService = new HomeBackupService({
+  paths: {
+    automations: resolve(dirname(configPath), "automations.json"),
+    aliases: config.aliasesFile,
+    homeGroups: resolve(dirname(configPath), "home-groups.json"),
+    favorites: resolve(dirname(configPath), "home-favorites.json"),
+    homeVisibility: resolve(dirname(configPath), "home-visibility.json"),
+    deviceNotes: resolve(dirname(configPath), "device-notes.json"),
+    deviceImages: resolve(dirname(configPath), "device-images.json")
+  },
+  aliases,
+  knownDeviceIds: () => store.getDevices().map((device) => device.id),
+  automationLookup: (deviceId) => store.getDevice(deviceId),
+  automationGroupLookup: (groupId) => automationGroupLookup(groupId)
+});
 const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
   config.zigbee.configurationFile,
   {
-    zigbee: { adapterUrl: config.zigbee.serial.path },
+    zigbee: { adapterUrl: config.zigbee.serial.path, channel: config.zigbee.network.channel },
     mqtt: { url: config.mqtt.url, baseTopic: config.mqtt.baseTopic },
     matter: { wsUrl: config.matterbridge.wsUrl },
     homeAssistant: { discoveryEnabled: config.homeAssistant.discoveryEnabled },
+    alerts: { lowBatteryThreshold: config.alerts.lowBatteryThreshold },
+    selfHealing: {
+      enabled: config.selfHealing.enabled,
+      probeOffline: config.selfHealing.probeOffline
+    },
     debug: { enabled: config.debug.enabled }
   }
 ) : null;
 const recentErrors = new RecentErrorLog(50, config.debug.enabled);
+const nodeRole = resolveVillaBridgeNodeRole();
+const nodeId = resolveVillaBridgeNodeId(nodeRole);
+const discoveryRecord = createVillaBridgeDiscoveryRecord(
+  nodeRole,
+  config.mode,
+  config.http.port,
+  {
+    nodeId,
+    state: "standby",
+    coordinatorId: villaBridgeCoordinatorId(config.zigbee?.serial.path)
+  }
+);
+/** Koordinatör oturumunun durumu; `source.start()` sonucuna göre güncellenir. */
+let coordinatorStatus: VillaBridgeCoordinatorStatus = "starting";
+let coordinatorError: string | null = null;
+let peerWatcher: PeerWatcher | null = null;
+/** `state` rolden değil koordinatör sahipliğinden türetilir (tablet-failover-plani.md §3.2). */
+const applyCoordinatorStatus = (status: VillaBridgeCoordinatorStatus): void => {
+  coordinatorStatus = status;
+  applyCoordinatorOwnership(discoveryRecord, status);
+};
+const nodeStatus = (): JsonObject => ({
+  nodeId,
+  role: nodeRole,
+  state: discoveryRecord.state,
+  epoch: discoveryRecord.epoch,
+  priority: discoveryRecord.priority,
+  coordinatorStatus,
+  coordinatorError,
+  peerWatch: (peerWatcher?.status() ?? null) as JsonObject | null
+});
 store.setMode(config.mode);
+/**
+ * Cihaz ağ üyeliği günlüğü — katıldı/düştü/silindi. Hata ayıklama anahtarından **bağımsız**
+ * olarak hep yazılır: "dün gece ne oldu" sorusu, sorun yaşandıktan sonra sorulur.
+ */
+const deviceNetworkEventLog = new DeviceNetworkEventLog(
+  resolve(dirname(configPath), "device-network-events.jsonl"),
+  {
+    onError: (message) => {
+      console.error(message);
+      recentErrors.record({ operation: "device-network-events", statusCode: 500, message });
+    }
+  }
+);
 let source: ZigbeeSource;
 if (config.mode === "direct") {
   if (!config.zigbee) throw new Error("Doğrudan Zigbee ayarları bulunamadı.");
   const { DirectZigbeeSource } = await import("./direct-zigbee-source.js");
+  const selfHealStateStore = new SelfHealStateStore(
+    resolve(dirname(configPath), "self-heal-state.json")
+  );
   source = new DirectZigbeeSource(
     config.zigbee,
     config.mqtt,
     store,
     config.homeAssistant.discoveryEnabled,
-    aliases
+    aliases,
+    undefined,
+    {
+      enabled: config.selfHealing.enabled,
+      probeOffline: config.selfHealing.probeOffline,
+      state: await selfHealStateStore.get(),
+      persist: (state) => {
+        void selfHealStateStore.save(state).catch((error) => {
+          console.error(`Otomatik onarım durumu kaydedilemedi: ${String(error)}`);
+        });
+      },
+      recordFailure: (deviceId, message) => {
+        recentErrors.record({ operation: "self-heal", statusCode: 503, message: `${deviceId}: ${message}` });
+      }
+    },
+    deviceNetworkEventLog
   );
 } else {
+  // Shadow modda koordinatör Zigbee2MQTT'nin; ağ üyeliği olayları için karşılık yok, günlük
+  // sessizce boş kalır — kaynak kırılmaz.
   source = new MqttShadowSource(config.mqtt, store);
 }
-const app = Fastify({ logger: true });
+// Çalışma günlüğü JSONL: olay başına ekleme, tam JSON yeniden yazma yok (HANDOFF 2026-08-04 §6).
+const automationRunLog = new AutomationRunLog(
+  resolve(dirname(configPath), "automation-runs.jsonl"),
+  {
+    // Kalıcılık hatası sessiz kalmasın (HANDOFF §7).
+    onError: (message) => {
+      console.error(message);
+      recentErrors.record({ operation: "automation-runs", statusCode: 500, message });
+    }
+  }
+);
+const automationEngine = new AutomationEngine({
+  store: automationsStore,
+  source,
+  // Bekleyen "sonra kapat" kayıtları yeniden başlatmayı atlatır (§9).
+  autoOffStore: new AutomationAutoOffStore(
+    resolve(dirname(configPath), "automation-auto-off.json")
+  ),
+  location: () => homeLocation,
+  deviceState: (deviceId, property) => {
+    const value = store.getDevice(deviceId)?.state[property];
+    return typeof value === "string" || typeof value === "boolean"
+      || (typeof value === "number" && Number.isFinite(value))
+      ? value
+      : undefined;
+  },
+  // §4.1 — "şu kadar süredir böyleyse" koşulunun okuduğu değişim defteri.
+  stateSince: (deviceId, property) => store.stateSince(deviceId, property),
+  // Eylem değeri panelin geçtiği normalizasyondan geçsin diye aynı kumanda arayıcısı.
+  controls: (deviceId) => store.getDevice(deviceId),
+  runLog: automationRunLog
+});
+const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
   secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true"
 });
 registerRecentErrorApi(app, recentErrors);
+
+/**
+ * Cihaz ağ olayları — en yeniden eskiye. Hata ayıklama ekranının ikinci listesi; yetkisi
+ * `/api/debug/errors` ile aynıdır: yetki tablolarında listelenmediği için yönetici ister.
+ */
+app.get<{ Querystring: { limit?: string } }>("/api/debug/network-events", async (request, reply) => {
+  try {
+    const limit = Number(request.query.limit ?? 200);
+    return {
+      ok: true,
+      events: await deviceNetworkEventLog.read({ limit: Number.isFinite(limit) ? limit : 200 })
+    };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
 const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
 const localesDirectory = resolve(moduleDir, "../public/locales");
+
+// Panel parçaları da açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
+// geçiş noktası servis yeniden başlatması olarak kalır. Yeni bir panel dosyası çıktığında yalnız
+// bu listeye satır eklenir; sıra, `index.html`'deki `<script src>` sırasıdır.
+const panelAssetRoutes = [
+  "/css/panel.css",
+  "/js/10-core.js",
+  "/js/20-auth.js",
+  "/js/30-device-view.js",
+  "/js/40-home.js",
+  "/js/45-clock-weather.js",
+  "/js/50-widgets.js",
+  "/js/60-pairing.js",
+  "/js/70-settings.js",
+  "/js/80-zigbee-tools.js",
+  "/js/88-simple-link.js",
+  "/js/90-shell.js",
+  "/js/panel-automation.js",
+  "/js/99-bind.js"
+];
+
+for (const route of panelAssetRoutes) {
+  const body = await readFile(resolve(moduleDir, `../public${route}`), "utf8");
+  const contentType = route.endsWith(".css") ? "text/css; charset=utf-8" : "text/javascript; charset=utf-8";
+  app.get(route, async (_request, reply) => reply.type(contentType).send(body));
+}
 
 app.get("/assets/dashboard-landscape.jpg", async (_request, reply) => reply
   .header("Cache-Control", "public, max-age=31536000, immutable")
@@ -108,19 +362,270 @@ app.get("/api/locales", async (_request, reply) => {
   }
 });
 
-app.get("/api/health", async () => store.getHealth());
-app.get("/api/devices", async () => ({ devices: store.getDevices() }));
+app.get("/api/health", async () => ({ ...store.getHealth(), node: nodeStatus() }));
+app.get("/api/discovery", async () => ({ ...discoveryRecord, sentAt: Date.now() }));
+const visibleDevices = (role: "admin" | "resident" | undefined) => store.getDevices().map((device) => ({
+  ...device,
+  controls: role === "resident"
+    ? device.controls.filter((control) => control.adminOnly !== true)
+    : device.controls
+}));
+
+/**
+ * Kurulum sırasında cihaz saniyeler içinde ağdan düşebiliyor; o an gelen "Kaydet" isteği düz 404
+ * dönünce kullanıcı ekranda hiçbir sebep göremiyordu. Ortak yanıt, "hiç tanımadım" ile "az önce
+ * ayrıldı/kaldırıldı" arasındaki farkı makine koduyla panele taşır.
+ */
+const replyDeviceMissing = (reply: FastifyReply, id: string): FastifyReply =>
+  reply.code(404).send(deviceMissingResponse(source.recentDeparture?.(id)));
+
+app.get("/api/devices", async (request) => ({
+  devices: visibleDevices(request.villaSession?.role)
+}));
+app.get<{ Params: { id: string } }>("/api/devices/:id/note", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
+  return { ok: true, note: await deviceNotesStore.get(id) };
+});
+app.put<{ Params: { id: string }; Body?: { note?: unknown } }>("/api/devices/:id/note", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
+  try {
+    return { ok: true, note: await deviceNotesStore.set(id, request.body?.note) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+// Rol yalnız Villa Bridge arayüzünü etkiler: sihirbaz kümeleri, kart etiketi ve simgesi.
+// Matter, Alexa, Apple Home ve Home Assistant tarafına bilerek yansıtılmaz.
+app.get<{ Params: { id: string } }>("/api/devices/:id/role", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  const device = store.getDevice(id);
+  if (!device) return replyDeviceMissing(reply, id);
+  return {
+    ok: true,
+    role: device.role,
+    category: device.category,
+    detectedCategory: device.detectedCategory,
+    // Rol kanal başınadır; cihaz seviyesi alanlar kanallardan türetilmiş özettir.
+    channels: device.controls
+      .filter((control) => control.kind === "switch")
+      .map((control) => ({
+        channel: control.id,
+        name: control.name,
+        role: control.role ?? "auto",
+        category: control.category ?? device.detectedCategory,
+        detectedCategory: control.detectedCategory ?? device.detectedCategory
+      }))
+  };
+});
+app.put<{ Params: { id: string }; Body?: { role?: unknown; channel?: unknown } }>(
+  "/api/devices/:id/role",
+  async (request, reply) => {
+    const id = request.params.id.toLowerCase();
+    const device = store.getDevice(id);
+    if (!device) return replyDeviceMissing(reply, id);
+    const requestedChannel = request.body?.channel;
+    if (requestedChannel !== undefined && requestedChannel !== null && typeof requestedChannel !== "string") {
+      return reply.code(400).send({ ok: false, error: "Kanal kimliği geçersiz." });
+    }
+    // Kanal kimliği cihazın gerçek aç/kapa kanallarından biri olmalı: uydurma anahtar yazılmaz.
+    if (requestedChannel) {
+      const known = device.controls.some(
+        (control) => control.kind === "switch" && control.id === requestedChannel.toLowerCase()
+      );
+      if (!known) return reply.code(400).send({ ok: false, error: "Kanal bulunamadı." });
+    }
+    try {
+      await setDeviceRole(deviceRolesPath, deviceRoles, id, request.body?.role, requestedChannel ?? null);
+      const updated = store.getDevice(id);
+      const channelControl = requestedChannel
+        ? updated?.controls.find((control) => control.kind === "switch" && control.id === requestedChannel.toLowerCase())
+        : undefined;
+      return {
+        ok: true,
+        channel: requestedChannel ?? null,
+        role: channelControl ? channelControl.role ?? "auto" : updated?.role ?? "auto",
+        category: channelControl
+          ? channelControl.category ?? "unknown"
+          : updated?.category ?? "unknown",
+        detectedCategory: updated?.detectedCategory ?? "unknown",
+        deviceCategory: updated?.category ?? "unknown"
+      };
+    } catch (error) {
+      return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
+app.get<{ Params: { model: string } }>("/api/device-image/:model", async (request, reply) => {
+  const image = await imageCache.get(request.params.model);
+  if (!image) {
+    return reply.code(404).send({ ok: false, code: "DEVICE_IMAGE_NOT_FOUND" });
+  }
+  return reply
+    .header("Cache-Control", "public, max-age=604800, immutable")
+    .type(image.contentType)
+    .send(image.body);
+});
 app.get("/api/groups", async () => ({ groups: store.getGroups() }));
+app.post<{ Body?: { name?: unknown } }>("/api/groups", async (request, reply) => {
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+  if (name.length < 2 || name.length > 64) {
+    return reply.code(400).send({ ok: false, error: "Grup adı 2-64 karakter olmalıdır." });
+  }
+  try {
+    await source.createGroup(name);
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.put<{ Params: { id: string }; Body?: { name?: unknown } }>("/api/groups/:id", async (request, reply) => {
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+  if (name.length < 2 || name.length > 64) {
+    return reply.code(400).send({ ok: false, error: "Grup adı 2-64 karakter olmalıdır." });
+  }
+  try {
+    await source.renameGroup(request.params.id, name);
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.delete<{ Params: { id: string }; Querystring: { force?: string } }>("/api/groups/:id", async (request, reply) => {
+  try {
+    await source.removeGroup(request.params.id, request.query.force === "true");
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.put<{
+  Params: { id: string };
+  Body?: { deviceId?: unknown; add?: unknown; endpoint?: unknown };
+}>("/api/groups/:id/member", async (request, reply) => {
+  const deviceId = typeof request.body?.deviceId === "string" ? request.body.deviceId.toLowerCase() : "";
+  const endpoint = request.body?.endpoint;
+  if (
+    !/^0x[0-9a-f]{16}$/.test(deviceId) ||
+    typeof request.body?.add !== "boolean" ||
+    (endpoint !== undefined && (!Number.isInteger(endpoint) || Number(endpoint) < 1 || Number(endpoint) > 240))
+  ) {
+    return reply.code(400).send({ ok: false, error: "Grup üyeliği isteği geçersiz." });
+  }
+  try {
+    await source.setGroupMember(request.params.id, deviceId, request.body.add, endpoint === undefined ? undefined : Number(endpoint));
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.post<{
+  Params: { id: string };
+  Body?: { property?: unknown; value?: unknown };
+}>("/api/groups/:id/command", async (request, reply) => {
+  if (
+    request.body?.property !== "state"
+    || typeof request.body.value !== "boolean"
+  ) {
+    return reply.code(400).send({ ok: false, error: "Grup aç/kapat komutu geçersiz." });
+  }
+  try {
+    await source.setGroup(request.params.id, {
+      state: request.body.value ? "ON" : "OFF"
+    });
+    return { ok: true };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+app.post<{
+  Body?: {
+    fromId?: unknown;
+    toId?: unknown;
+    bind?: unknown;
+    clusters?: unknown;
+    fromEndpoint?: unknown;
+    toEndpoint?: unknown;
+  };
+}>("/api/zigbee/bind", async (request, reply) => {
+  const fromId = typeof request.body?.fromId === "string" ? request.body.fromId.toLowerCase() : "";
+  const toId = typeof request.body?.toId === "string" ? request.body.toId.toLowerCase() : "";
+  const clusters = Array.isArray(request.body?.clusters)
+    ? request.body.clusters.filter((value): value is string => typeof value === "string").slice(0, 32)
+    : undefined;
+  const fromEndpoint = request.body?.fromEndpoint;
+  const toEndpoint = request.body?.toEndpoint;
+  const validEndpoint = (value: unknown): boolean =>
+    value === undefined || (Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 240);
+  if (
+    !/^0x[0-9a-f]{16}$/.test(fromId)
+    || !toId
+    || typeof request.body?.bind !== "boolean"
+    || !validEndpoint(fromEndpoint)
+    || !validEndpoint(toEndpoint)
+  ) {
+    return reply.code(400).send({ ok: false, error: "Bağlama isteği geçersiz." });
+  }
+  try {
+    await source.bindDevice(
+      fromId,
+      toId,
+      request.body.bind,
+      clusters,
+      fromEndpoint === undefined ? undefined : Number(fromEndpoint),
+      toEndpoint === undefined ? undefined : Number(toEndpoint)
+    );
+    return { ok: true, devices: visibleDevices(request.villaSession?.role) };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.post<{
+  Params: { id: string };
+  Body?: { sceneId?: unknown; action?: unknown; name?: unknown };
+}>("/api/groups/:id/scene", async (request, reply) => {
+  const sceneId = Number(request.body?.sceneId);
+  const action = request.body?.action;
+  const name = typeof request.body?.name === "string" ? request.body.name.trim() : undefined;
+  if (
+    !Number.isInteger(sceneId)
+    || sceneId < 1
+    || sceneId > 255
+    || !["store", "recall", "remove"].includes(String(action))
+    || (name !== undefined && (name.length < 1 || name.length > 64))
+  ) {
+    return reply.code(400).send({ ok: false, error: "Sahne isteği geçersiz." });
+  }
+  try {
+    await source.groupScene(
+      request.params.id,
+      sceneId,
+      action as "store" | "recall" | "remove",
+      name
+    );
+    return { ok: true, groups: store.getGroups() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
 app.get("/api/pairing", async () => store.getPairing());
-app.post<{ Body?: { seconds?: number } }>("/api/pairing/start", async (request, reply) => {
+app.post<{ Body?: { seconds?: number; routerId?: string } }>("/api/pairing/start", async (request, reply) => {
   if (!config.pairingControl) {
     return reply.code(403).send({ ok: false, error: "Cihaz ekleme denetimi kapalı." });
   }
   const requested = request.body?.seconds ?? 180;
   const seconds = Number.isInteger(requested) ? Math.min(254, Math.max(10, requested)) : 180;
+  const routerId =
+    typeof request.body?.routerId === "string" && /^0x[0-9a-f]{16}$/i.test(request.body.routerId)
+      ? request.body.routerId.toLowerCase()
+      : undefined;
   store.pairingRequested(seconds);
   try {
-    await source.permitJoin(seconds);
+    await source.permitJoin(seconds, routerId);
     return { ok: true, pairing: store.getPairing() };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -128,6 +633,127 @@ app.post<{ Body?: { seconds?: number } }>("/api/pairing/start", async (request, 
     return reply.code(503).send({ ok: false, error: message });
   }
 });
+
+app.post<{ Body?: { value?: unknown } }>("/api/zigbee/install-code", async (request, reply) => {
+  const value = typeof request.body?.value === "string" ? request.body.value.trim() : "";
+  // Herdsman accepts several vendor QR formats containing "$", "|" and spaces.
+  if (value.length < 16 || value.length > 512 || !/^[\x20-\x7e]+$/.test(value)) {
+    return reply.code(400).send({ ok: false, error: "Install code veya Zigbee QR değeri geçersiz." });
+  }
+  try {
+    await source.addInstallCode(value);
+    return { ok: true };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post<{ Params: { id: string } }>("/api/devices/:id/reconfigure", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
+  try {
+    await source.reconfigureDevice(id);
+    return { ok: true, device: store.getDevice(id) };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post("/api/zigbee/touchlink/scan", async (_request, reply) => {
+  try {
+    return { ok: true, devices: await source.scanTouchlink() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.get("/api/zigbee/network-map", async (_request, reply) => {
+  try {
+    return { ok: true, map: await source.networkMap() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.put<{ Params: { id: string }; Body?: { enabled?: unknown } }>(
+  "/api/devices/:id/ota-schedule",
+  async (request, reply) => {
+    const id = request.params.id.toLowerCase();
+    if (!store.getDevice(id) || typeof request.body?.enabled !== "boolean") {
+      return reply.code(400).send({ ok: false, error: "Yazılım güncelleme isteği geçersiz." });
+    }
+    try {
+      await source.scheduleOta(id, request.body.enabled);
+      return { ok: true, scheduled: request.body.enabled };
+    } catch (error) {
+      return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
+app.post<{ Params: { id: string } }>("/api/devices/:id/ota-check", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) {
+    return replyDeviceMissing(reply, id);
+  }
+  try {
+    return { ok: true, ota: await source.checkOta(id) };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+app.put<{
+  Params: { id: string };
+  Body?: { transition?: unknown; debounce?: unknown; retain?: unknown };
+}>("/api/devices/:id/options", async (request, reply) => {
+  const id = request.params.id.toLowerCase();
+  if (!store.getDevice(id)) return replyDeviceMissing(reply, id);
+  const transition = request.body?.transition === undefined ? undefined : Number(request.body.transition);
+  const debounce = request.body?.debounce === undefined ? undefined : Number(request.body.debounce);
+  const retain = request.body?.retain;
+  if (
+    (transition !== undefined && (!Number.isFinite(transition) || transition < 0 || transition > 60)) ||
+    (debounce !== undefined && (!Number.isFinite(debounce) || debounce < 0 || debounce > 60)) ||
+    (retain !== undefined && typeof retain !== "boolean")
+  ) {
+    return reply.code(400).send({ ok: false, error: "Cihaz seçenekleri geçersiz." });
+  }
+  try {
+    const options = {
+      ...(transition !== undefined ? { transition } : {}),
+      ...(debounce !== undefined ? { debounce } : {}),
+      ...(retain !== undefined ? { retain } : {})
+    };
+    await source.setDeviceOptions(id, options);
+    return { ok: true, options };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post<{ Body?: { ieeeAddress?: unknown; channel?: unknown; confirmation?: unknown } }>(
+  "/api/zigbee/touchlink/reset",
+  async (request, reply) => {
+    const ieeeAddress =
+      typeof request.body?.ieeeAddress === "string" ? request.body.ieeeAddress.toLowerCase() : "";
+    const channel = request.body?.channel;
+    if (
+      request.body?.confirmation !== "RESET" ||
+      !/^0x[0-9a-f]{16}$/.test(ieeeAddress) ||
+      !Number.isInteger(channel) ||
+      Number(channel) < 11 ||
+      Number(channel) > 26
+    ) {
+      return reply.code(400).send({ ok: false, error: "Touchlink sıfırlama isteği geçersiz." });
+    }
+    try {
+      await source.resetTouchlink(ieeeAddress, Number(channel));
+      return { ok: true };
+    } catch (error) {
+      return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
 app.post("/api/pairing/stop", async (_request, reply) => {
   if (!config.pairingControl) {
     return reply.code(403).send({ ok: false, error: "Cihaz ekleme denetimi kapalı." });
@@ -141,11 +767,14 @@ app.post("/api/pairing/stop", async (_request, reply) => {
     return reply.code(503).send({ ok: false, error: message });
   }
 });
-app.get("/api/overview", async () => ({
-  health: store.getHealth(),
-  devices: store.getDevices(),
+app.get("/api/overview", async (request) => ({
+  health: { ...store.getHealth(), node: nodeStatus() },
+  devices: visibleDevices(request.villaSession?.role),
   groups: store.getGroups(),
-  pairing: store.getPairing()
+  pairing: store.getPairing(),
+  events: store.getEvents(20),
+  // Panel kurulum akışında cihazın neden kaybolduğunu buradan öğrenir; shadow modda boş kalır.
+  departures: source.recentDepartures?.() ?? []
 }));
 
 app.get("/api/onboarding", async (_request, reply) => {
@@ -190,8 +819,12 @@ app.put<{ Body?: { favorites?: unknown } }>("/api/favorites", async (request, re
     const devices = store.getDevices();
     for (const favorite of favorites) {
       const device = devices.find((item) => item.id === favorite.deviceId);
-      const control = device?.controls.find((item) => item.id === favorite.controlId && item.kind === "switch");
-      if (!device || !control) return reply.code(400).send({ ok: false, error: "Favori cihaz veya anahtar bulunamadı." });
+      const control = device?.controls.find((item) =>
+        item.id === favorite.controlId && isHomeFavoriteControlKind(item.kind)
+      );
+      if (!device || !control) {
+        return reply.code(400).send({ ok: false, error: "Favori cihaz veya kontrol bulunamadı." });
+      }
     }
     return { ok: true, favorites: await favoritesStore.save(favorites) };
   } catch (error) {
@@ -199,13 +832,230 @@ app.put<{ Body?: { favorites?: unknown } }>("/api/favorites", async (request, re
   }
 });
 
+app.get("/api/home-groups", async (_request, reply) => {
+  try {
+    return { ok: true, groups: await homeGroupsStore.get() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{ Body?: { groups?: unknown } }>("/api/home-groups", async (request, reply) => {
+  try {
+    const groups = validateHomeGroups(request.body?.groups);
+    const devices = store.getDevices();
+    for (const group of groups) {
+      for (const groupItem of group.items) {
+        const device = devices.find((item) => item.id === groupItem.deviceId);
+        if (!device) {
+          return reply.code(400).send({ ok: false, error: "Grup cihazı veya kontrolü bulunamadı." });
+        }
+        if (groupItem.controlId === homeGroupDeviceControlId) continue;
+        const control = device.controls.find((item) =>
+          item.id === groupItem.controlId && isHomeFavoriteControlKind(item.kind)
+        );
+        if (!control) {
+          return reply.code(400).send({ ok: false, error: "Grup cihazı veya kontrolü bulunamadı." });
+        }
+      }
+    }
+    const saved = await homeGroupsStore.save(groups);
+    // Oda silmek bu uç noktadan geçer (liste komple yazılır): kalmayan odanın gizleme kaydı düşer.
+    await homeVisibilityStore.pruneGroups(saved.map((group) => group.id)).catch((error) => {
+      console.error(`Görünürlük kaydından silinen oda düşürülemedi: ${String(error)}`);
+    });
+    return { ok: true, groups: saved };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/**
+ * Görünürlük tercihleri — cihaz/oda gösterme kararı ev genelinde tektir, tarayıcıya bağlı
+ * değildir. Yerleşim tercihleri (döşeme genişliği, kart sırası, seçili sekme) burada durmaz.
+ */
+app.get("/api/home-visibility", async (_request, reply) => {
+  try {
+    return { ok: true, visibility: await homeVisibilityStore.get() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{ Body?: { visibility?: unknown } }>("/api/home-visibility", async (request, reply) => {
+  let visibility;
+  try {
+    // Kayıt canlı cihaz listesine karşı doğrulanmaz: açılışta liste henüz boşken gelen bir
+    // yazma tüm tercihleri reddederdi. Ölü kayıtları cihaz silme ve oda kaydı temizler.
+    visibility = validateHomeVisibility(request.body?.visibility);
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+  try {
+    return { ok: true, visibility: await homeVisibilityStore.save(visibility) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    recentErrors.record({ operation: "home-visibility", statusCode: 503, message });
+    return reply.code(503).send({ ok: false, error: `Görünürlük tercihleri kaydedilemedi: ${message}` });
+  }
+});
+
+app.get("/api/automations", async (_request, reply) => {
+  try {
+    const automations = await automationsStore.get();
+    return {
+      ok: true,
+      // Kuralın neden pasif olduğu yanıtta görünür: konum yok / kutup günü (UI sonraki turda okur).
+      automations: automations.map((automation) => ({
+        ...automation,
+        inactiveReason: automationEngine.inactiveReason(automation)
+      })),
+      sun: automationEngine.sunSummary(),
+      location: homeLocation
+    };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/** Çalışma günlüğü — "neden çalıştı / neden çalışmadı"; en yeniden eskiye. */
+app.get<{ Querystring: { limit?: string } }>("/api/automation-runs", async (request, reply) => {
+  try {
+    const limit = Number(request.query.limit ?? 100);
+    return {
+      ok: true,
+      runs: await automationRunLog.read({ limit: Number.isFinite(limit) ? limit : 100 })
+    };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.get<{ Params: { id: string }; Querystring: { limit?: string } }>(
+  "/api/automations/:id/runs",
+  async (request, reply) => {
+    try {
+      const limit = Number(request.query.limit ?? 50);
+      return {
+        ok: true,
+        runs: await automationRunLog.read({
+          limit: Number.isFinite(limit) ? limit : 50,
+          automationId: request.params.id
+        })
+      };
+    } catch (error) {
+      return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
+
+/** Evin konumu — okuma ev sakinine açık, yazma yönetici işi (yetki tablosunda bilinçli). */
+app.get("/api/settings/location", async () => ({
+  ok: true,
+  location: homeLocation,
+  source: homeLocationSource,
+  sun: automationEngine.sunSummary()
+}));
+
+app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown; label?: unknown } }>(
+  "/api/settings/location",
+  async (request, reply) => {
+    try {
+      const body = request.body ?? {};
+      const raw = body.location ?? { latitude: body.latitude, longitude: body.longitude, label: body.label };
+      const location = await locationStore.save(raw);
+      homeLocation = location;
+      homeLocationSource = "file";
+      return { ok: true, location, source: homeLocationSource, sun: automationEngine.sunSummary() };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
+
+app.put<{ Body?: { automations?: unknown } }>("/api/automations", async (request, reply) => {
+  try {
+    return { ok: true, automations: await automationsStore.save(request.body?.automations) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.post<{ Params: { id: string } }>("/api/automations/:id/run", async (request, reply) => {
+  const result = await automationEngine.run(request.params.id);
+  if (result === "missing") return reply.code(404).send({ ok: false, error: "Otomasyon bulunamadı." });
+  if (result === "busy") {
+    return reply.code(503).send({ ok: false, error: "Otomasyon şu anda çalışıyor. Birazdan yeniden deneyin." });
+  }
+  if (result === "failed") {
+    return reply.code(503).send({ ok: false, error: "Otomasyon çalıştırılamadı." });
+  }
+  // Elle çalıştırmada tetikleyen olay yoktur; `when` taşıyan eylemler atlanır — hata değildir.
+  if (result === "skipped") return { ok: true, skipped: true };
+  // Koşullar sağlanmadı: hata değil, bilinçli atlama. Sebep çalışma günlüğünde.
+  if (result === "blocked") {
+    return { ok: true, blocked: true, error: "Kuralın koşulları şu anda sağlanmıyor." };
+  }
+  return { ok: true };
+});
+
+app.get("/api/backup", async (_request, reply) => {
+  try {
+    return { ok: true, backup: await homeBackupService.create() };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post<{ Body?: { backup?: unknown; mode?: unknown } }>(
+  "/api/backup/preview",
+  async (request, reply) => {
+    const mode = request.body?.mode === "merge" ? "merge" : "replace";
+    try {
+      return { ok: true, summary: await homeBackupService.preview(request.body?.backup, mode) };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
+
+app.post<{ Body?: { backup?: unknown; mode?: unknown } }>(
+  "/api/backup/restore",
+  async (request, reply) => {
+    if (request.body?.mode !== "merge" && request.body?.mode !== "replace") {
+      return reply.code(400).send({ ok: false, error: "Geri yükleme biçimi geçersiz." });
+    }
+    const mode: HomeBackupMode = request.body.mode;
+    try {
+      const summary = await homeBackupService.restore(request.body?.backup, mode);
+      imagePreferences = await imagesStore.get();
+      store.setImagePreferences(imagePreferences);
+      return { ok: true, summary };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
+
 app.put<{
   Params: { id: string };
   Body?: { imageModel?: unknown; applyToModel?: unknown };
 }>("/api/devices/:id/image", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   const imageModel = request.body?.imageModel;
   if (imageModel !== null && typeof imageModel !== "string") {
     return reply.code(400).send({ ok: false, error: "Görsel seçimi geçersiz." });
@@ -240,23 +1090,29 @@ app.post<{
 }>("/api/devices/:id/command", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
+  if (device.preparing) {
+    return reply.code(409).send({
+      ok: false,
+      code: "DEVICE_PREPARING",
+      error: "Cihaz kurulumu tamamlanıyor. Lütfen hazır olmasını bekleyin."
+    });
+  }
   const control = device.controls.find((item) => item.property === request.body?.property);
   if (!control) return reply.code(400).send({ ok: false, error: "Bu denetim cihaz tarafından sunulmuyor." });
-  let value: unknown = request.body?.value;
-  if (control.kind === "switch") {
-    if (typeof value !== "boolean") return reply.code(400).send({ ok: false, error: "Aç/kapat değeri geçersiz." });
-    value = value ? "ON" : "OFF";
-  } else if (control.kind === "color") {
-    if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value)) {
-      return reply.code(400).send({ ok: false, error: "Renk değeri geçersiz." });
-    }
-    value = hexToXy(value);
-  } else {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return reply.code(400).send({ ok: false, error: "Sayısal denetim değeri geçersiz." });
-    }
-    value = Math.round(Math.min(control.max ?? value, Math.max(control.min ?? value, value)));
+  if (control.adminOnly && request.villaSession?.role !== "admin") {
+    return reply.code(403).send({ ok: false, error: "Bu cihaz ayarı için yönetici yetkisi gerekiyor." });
+  }
+  // Değer dönüşümü/doğrulaması panelle otomasyonun paylaştığı tek fonksiyondadır; burada yalnız
+  // hatanın HTTP karşılığı verilir. Panel aç/kapat değerini `boolean` yollar, otomasyon yollamaz.
+  let value: unknown;
+  try {
+    value = normalizeControlValue(control, request.body?.value, { booleanSwitch: true });
+  } catch (error) {
+    return reply.code(400).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
   try {
     await source.setDevice(id, { [control.property]: value } satisfies JsonObject);
@@ -272,25 +1128,44 @@ app.put<{
 }>("/api/devices/:id/name", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   const name = request.body?.name?.trim() ?? "";
   if (name.length < 2 || Buffer.byteLength(name, "utf8") > 32) {
     return reply.code(400).send({ ok: false, error: "İsim 2–32 bayt arasında olmalı." });
   }
   const channel = request.body?.channel?.trim().toLowerCase();
-  if (channel && !device.controls.some((control) => control.id === channel || control.id.startsWith(`${channel}:`))) {
+  // Kanal anahtarı hem kumanda kanallarını hem türetilmiş düğme alt varlıklarını (`button:1`) kapsar.
+  const knownChannel = channel !== undefined && (
+    device.controls.some((control) => control.id === channel || control.id.startsWith(`${channel}:`))
+    || (device.buttons ?? []).some((button) => button.id === channel)
+  );
+  if (channel && !knownChannel) {
     return reply.code(400).send({ ok: false, error: "Kanal bulunamadı." });
   }
   const aliasKey = channel ? `${id}:${channel}` : id;
-  const previousAlias = aliases.get(aliasKey);
+  // Tek aç/kapa kanallı cihazda kanalın ayrı bir adı yoktur; panelde kanal kalemi de çıkmaz. Bu yüzden
+  // cihaz adı değişince tek kanalın adı onunla birlikte gider, yoksa dışarıya (Matter/Alexa/Home
+  // Assistant) eski kanal adı sızmaya devam eder ve düzeltmenin yolu kalmaz. "main" kanalında takma ad
+  // silinir — varsayılanı zaten cihaz adıdır; başka kanalda yeni ad yazılır, yoksa "Kanal 1"e düşerdi.
+  const soleChannelId = channel ? null : soleSwitchChannelId(device.controls);
+  const soleChannelKey = soleChannelId ? `${id}:${soleChannelId}` : null;
+  const previousAliases = new Map(
+    (soleChannelKey ? [aliasKey, soleChannelKey] : [aliasKey]).map((key) => [key, aliases.get(key)])
+  );
   aliases.set(aliasKey, name);
+  if (soleChannelKey) {
+    if (soleChannelId === "main") aliases.delete(soleChannelKey);
+    else aliases.set(soleChannelKey, name);
+  }
   try {
     await saveAliases(config.aliasesFile, aliases);
     if (!channel) await source.renameDevice(id, name);
     return { ok: true, id, channel: channel ?? null, name, matterSyncRequired: true };
   } catch (error) {
-    if (previousAlias === undefined) aliases.delete(aliasKey);
-    else aliases.set(aliasKey, previousAlias);
+    for (const [key, value] of previousAliases) {
+      if (value === undefined) aliases.delete(key);
+      else aliases.set(key, value);
+    }
     await saveAliases(config.aliasesFile, aliases).catch(() => undefined);
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -302,7 +1177,7 @@ app.delete<{
 }>("/api/devices/:id", async (request, reply) => {
   const id = request.params.id.toLowerCase();
   const device = store.getDevice(id);
-  if (!device) return reply.code(404).send({ ok: false, error: "Cihaz bulunamadı." });
+  if (!device) return replyDeviceMissing(reply, id);
   if (!isDeviceRemovalConfirmation(request.body?.confirmation)) {
     return reply.code(400).send({ ok: false, error: "Silmek için küçük harflerle yes veya evet yazın." });
   }
@@ -316,7 +1191,19 @@ app.delete<{
     imagePreferences = await imagesStore.removeDevice(imagePreferences, id).catch(() => imagePreferences);
     store.setImagePreferences(imagePreferences);
     const favorites = await favoritesStore.removeDevice(id);
-    return { ok: true, force, favorites };
+    const groups = await homeGroupsStore.removeDevice(id);
+    const visibility = await homeVisibilityStore.removeDevice(id).catch((error) => {
+      console.error(`Görünürlük kaydından cihaz düşürülemedi: ${String(error)}`);
+      return null;
+    });
+    await automationsStore.removeDevice(id).catch((error) => {
+      console.error(`Otomasyonlardan cihaz düşürülemedi: ${String(error)}`);
+    });
+    await deviceNotesStore.removeDevice(id);
+    await removeDeviceRole(deviceRolesPath, deviceRoles, id).catch((error) => {
+      console.error(`Cihaz rolü silinemedi: ${String(error)}`);
+    });
+    return { ok: true, force, favorites, groups, visibility };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -356,8 +1243,23 @@ app.get("/api/settings", async (_request, reply) => {
 app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
   if (!settingsStore) return reply.code(503).send({ ok: false, error: "Bağlantı ayarları bu çalışma modunda kullanılamıyor." });
   try {
-    const settings = await settingsStore.save(request.body);
+    const confirmation =
+      typeof request.body === "object"
+      && request.body !== null
+      && !Array.isArray(request.body)
+      && "zigbeeChannelConfirmation" in request.body
+        ? (request.body as { zigbeeChannelConfirmation?: unknown }).zigbeeChannelConfirmation
+        : undefined;
+    const settings = await settingsStore.save(request.body, {
+      confirmZigbeeChannelChange: confirmation === "CHANGE"
+    });
+    store.setLowBatteryThreshold(settings.alerts.lowBatteryThreshold);
     recentErrors.setEnabled(settings.debug.enabled);
+    // Otomatik onarım yeniden başlatma beklemeden açılıp kapanır; kuyruk anında boşalır.
+    config.selfHealing.enabled = settings.selfHealing.enabled;
+    config.selfHealing.probeOffline = settings.selfHealing.probeOffline;
+    source.setSelfHealingEnabled?.(settings.selfHealing.enabled);
+    source.setSelfHealProbeEnabled?.(settings.selfHealing.probeOffline);
     return { ok: true, settings, restartRequired: true };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
@@ -408,6 +1310,53 @@ app.post<{ Body?: { open?: boolean } }>("/api/matter/commissioning", async (requ
   }
 });
 
+app.get("/api/zigbee/backup", async (_request, reply) => {
+  try {
+    const prepared = await source.prepareNetworkBackup();
+    const date = new Date().toISOString().slice(0, 10);
+    if (prepared) {
+      return reply
+        .header("Content-Disposition", `attachment; filename="villa-bridge-zigbee-${date}.${prepared.extension}"`)
+        .type(prepared.contentType)
+        .send(prepared.body);
+    }
+    if (!config.zigbee) throw new Error("Yerel Zigbee veri dizini bulunamadı.");
+    const backup = await createZigbeeNetworkBackup(config.zigbee.dataDir);
+    return reply
+      .header("Content-Disposition", `attachment; filename="villa-bridge-zigbee-${date}.json"`)
+      .type("application/json; charset=utf-8")
+      .send(`${JSON.stringify(backup, null, 2)}\n`);
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post<{ Body?: { confirmation?: unknown; backup?: unknown } }>(
+  "/api/zigbee/restore",
+  async (request, reply) => {
+    if (!config.zigbee) {
+      return reply.code(503).send({ ok: false, error: "Yerel Zigbee ağı bu çalışma modunda kullanılmıyor." });
+    }
+    if (request.body?.confirmation !== "RESTORE") {
+      return reply.code(400).send({ ok: false, error: "Geri yükleme onayı geçersiz." });
+    }
+    try {
+      await stageZigbeeNetworkRestore(config.zigbee.dataDir, request.body.backup);
+      const timer = setTimeout(() => process.kill(process.pid, "SIGTERM"), 750);
+      timer.unref();
+      return { ok: true, restarting: true };
+    } catch (error) {
+      return reply.code(400).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
+
 app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(dashboard));
 
 type EmbeddedVillaBridgeGlobal = typeof globalThis & {
@@ -417,9 +1366,18 @@ type EmbeddedVillaBridgeGlobal = typeof globalThis & {
 
 const embeddedRuntime = process.env.VILLA_BRIDGE_EMBEDDED === "true";
 const embeddedGlobal = globalThis as EmbeddedVillaBridgeGlobal;
+let discoveryResponder: Awaited<ReturnType<typeof startLanDiscoveryResponder>> = null;
 const shutdown = async (): Promise<void> => {
   if (!embeddedGlobal.__villaBridgeReady) return;
   embeddedGlobal.__villaBridgeReady = false;
+  clearInterval(imageWarmTimer);
+  clearTimeout(imageWarmStartTimer);
+  automationEngine.stop();
+  // Bekleyen `delay`'ler durdu; son günlük satırları yine de diske insin.
+  await automationEngine.settle();
+  await automationRunLog.flush();
+  peerWatcher?.stop();
+  await discoveryResponder?.close();
   await source.stop();
   await app.close();
   if (!embeddedRuntime) process.exit(0);
@@ -430,7 +1388,69 @@ if (!embeddedRuntime) {
   process.on("SIGTERM", shutdown);
 }
 
-await source.start();
+// Sıra önemli: düğüm koordinatöre bağlanmadan ÖNCE ağda görünür olmalı (§1.5/5).
 await app.listen({ host: config.http.host, port: config.http.port });
+try {
+  discoveryResponder = await startLanDiscoveryResponder(discoveryRecord);
+  if (discoveryResponder) {
+    console.log(
+      `Villa Bridge LAN keşfi UDP ${villaBridgeDiscoveryPort} portunda hazır (düğüm ${nodeId}).`
+    );
+  }
+} catch (error) {
+  console.warn(`Villa Bridge LAN keşfi başlatılamadı: ${String(error)}`);
+}
+
+// Üç kanallı karşı düğüm izlemesi (§4.2): yalnızca gözlem, hiçbir devralma yok.
+if (nodeRole !== "disabled") {
+  const mqttPort = (() => {
+    try {
+      const port = Number(new URL(config.mqtt.url).port);
+      return Number.isInteger(port) && port > 0 ? port : 1883;
+    } catch {
+      return 1883;
+    }
+  })();
+  peerWatcher = createPeerWatcher({
+    probe: createPeerProbe({ selfNodeId: nodeId, mqttPort }),
+    logger: (message) => console.log(message)
+  });
+  peerWatcher.start();
+}
+
+try {
+  await source.start();
+  applyCoordinatorStatus("ready");
+  coordinatorError = null;
+  automationEngine.start();
+  // Kaynak ayaktayken: süresi geçmiş kapatmalar hemen uygulanır, kalanlar kaldığı yerden sürer.
+  await automationEngine.restoreAutoOff();
+} catch (error) {
+  // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
+  applyCoordinatorStatus("coordinator-unavailable");
+  coordinatorError = error instanceof Error ? error.message : String(error);
+  recentErrors.record({
+    operation: "source.start",
+    statusCode: 503,
+    message: coordinatorError
+  });
+  console.error(
+    `Zigbee kaynağı başlatılamadı, düğüm koordinatörsüz sürüyor: ${coordinatorError}`
+  );
+}
+const warmDeviceImages = (): void => {
+  const models = store.getDevices()
+    .map((device) => device.image.model?.trim())
+    .filter((model): model is string => Boolean(model));
+  if (models.length === 0) return;
+  void imageCache.warm(models).catch((error) => {
+    console.error(`Cihaz görselleri önden indirilemedi: ${String(error)}`);
+  });
+};
+const imageWarmTimer = setInterval(warmDeviceImages, 5 * 60_000);
+imageWarmTimer.unref();
+const imageWarmStartTimer = setTimeout(warmDeviceImages, 5_000);
+imageWarmStartTimer.unref();
+
 embeddedGlobal.__villaBridgeReady = true;
 console.log(`Villa Bridge paneli ${config.http.host}:${config.http.port} adresinde hazır.`);

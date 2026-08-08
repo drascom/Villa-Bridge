@@ -1,4 +1,5 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { writeJsonAtomic } from "./atomic-file.js";
 import type { DeviceImageCandidate, DeviceImageView } from "./types.js";
 
 export interface DeviceImagePreferences {
@@ -15,6 +16,28 @@ const genericCandidates = new Map<string, DeviceImageCandidate[]>([
     { model: "TS0001_switch_module_1", label: "switchModule" },
     { model: "TS0001_switch_1_gang", label: "wallSwitch" },
     { model: "TS0001", label: "otherSwitch" }
+  ]],
+  ["TS0002", [
+    { model: "TS0002_basic", label: "switchModule" },
+    { model: "TS0002", label: "wallSwitch" },
+    { model: "TS0002_power", label: "otherSwitch" }
+  ]],
+  ["TS0003", [
+    { model: "TS0003_switch_module_1", label: "switchModule" },
+    { model: "TS0003", label: "wallSwitch" },
+    { model: "TS0003_switch_3_gang", label: "otherSwitch" }
+  ]],
+  ["TS0011", [
+    { model: "TS0011_switch_module", label: "switchModule" },
+    { model: "TS0011", label: "wallSwitch" }
+  ]],
+  ["TS0012", [
+    { model: "TS0012_switch_module", label: "switchModule" },
+    { model: "TS0012", label: "wallSwitch" }
+  ]],
+  ["TS0013", [
+    { model: "TS0013_switch_module", label: "switchModule" },
+    { model: "TS0013", label: "wallSwitch" }
   ]]
 ]);
 
@@ -94,9 +117,7 @@ export class DeviceImagesStore {
 
   async save(preferences: DeviceImagePreferences): Promise<DeviceImagePreferences> {
     const validated = validateDeviceImagePreferences(preferences);
-    const temporary = `${this.path}.tmp-${process.pid}`;
-    await writeFile(temporary, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    await writeJsonAtomic(this.path, validated, { mode: 0o600 });
     return validated;
   }
 

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import YAML from "yaml";
+import { isValidLatitude, isValidLongitude } from "./sun.js";
 
 interface FileConfig {
   mode?: string;
@@ -22,6 +23,17 @@ interface FileConfig {
   };
   homeAssistant?: {
     discoveryEnabled?: boolean;
+  };
+  alerts?: {
+    lowBatteryThreshold?: number;
+  };
+  location?: {
+    latitude?: number;
+    longitude?: number;
+  };
+  selfHealing?: {
+    enabled?: boolean;
+    probeOffline?: boolean;
   };
   debug?: {
     enabled?: boolean;
@@ -112,6 +124,27 @@ export interface AppConfig {
   homeAssistant: {
     discoveryEnabled: boolean;
   };
+  alerts: {
+    lowBatteryThreshold: number;
+  };
+  /**
+   * Evin koordinatları — yalnızca gün doğumu/batımı tetikleyicisi için. Ürün çok evli olduğu
+   * için varsayılan yoktur; verilmezse güneş kuralları çalışmaz ve sebebi günlüğe yazılır.
+   * Kullanıcı panelden girerse değer `location.json`'a yazılır ve bunun önüne geçer.
+   */
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  /**
+   * Otomatik onarım. Faz 1: cihaz kendini ilan edince raporlama ayarları yeniden yazılır.
+   * Faz 2 (`probeOffline`): çevrimdışı görünen şebeke beslemeli yönlendiriciler tek ucuz
+   * okumayla yoklanır; yanıt verirse erişilebilirlik geri alınır.
+   */
+  selfHealing: {
+    enabled: boolean;
+    probeOffline: boolean;
+  };
   debug: {
     enabled: boolean;
   };
@@ -169,6 +202,21 @@ export async function loadConfig(): Promise<AppConfig> {
         ? process.env.VILLA_BRIDGE_HOME_ASSISTANT_DISCOVERY === "true"
         : file.homeAssistant?.discoveryEnabled === true
     },
+    alerts: {
+      lowBatteryThreshold: Number(
+        process.env.VILLA_BRIDGE_LOW_BATTERY_THRESHOLD
+        ?? file.alerts?.lowBatteryThreshold
+        ?? 15
+      )
+    },
+    selfHealing: {
+      enabled: process.env.VILLA_BRIDGE_SELF_HEALING
+        ? process.env.VILLA_BRIDGE_SELF_HEALING === "true"
+        : file.selfHealing?.enabled !== false,
+      probeOffline: process.env.VILLA_BRIDGE_SELF_HEALING_PROBE_OFFLINE
+        ? process.env.VILLA_BRIDGE_SELF_HEALING_PROBE_OFFLINE === "true"
+        : file.selfHealing?.probeOffline !== false
+    },
     debug: {
       enabled: process.env.VILLA_BRIDGE_DEBUG
         ? process.env.VILLA_BRIDGE_DEBUG === "true"
@@ -179,6 +227,25 @@ export async function loadConfig(): Promise<AppConfig> {
       port
     }
   };
+  const latitude = process.env.VILLA_BRIDGE_LATITUDE !== undefined
+    ? Number(process.env.VILLA_BRIDGE_LATITUDE)
+    : file.location?.latitude;
+  const longitude = process.env.VILLA_BRIDGE_LONGITUDE !== undefined
+    ? Number(process.env.VILLA_BRIDGE_LONGITUDE)
+    : file.location?.longitude;
+  if (latitude !== undefined || longitude !== undefined) {
+    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+      throw new Error("Konum için enlem (-90..90) ve boylam (-180..180) birlikte verilmelidir.");
+    }
+    result.location = { latitude, longitude };
+  }
+  if (
+    !Number.isInteger(result.alerts.lowBatteryThreshold)
+    || result.alerts.lowBatteryThreshold < 5
+    || result.alerts.lowBatteryThreshold > 50
+  ) {
+    throw new Error("Düşük pil eşiği 5-50 arasında olmalıdır.");
+  }
   if (requestedMode === "direct") {
     const serial = z2m.serial;
     const advanced = z2m.advanced;

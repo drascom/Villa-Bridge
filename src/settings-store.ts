@@ -1,11 +1,13 @@
 import { copyFile, readFile, rename, stat, writeFile } from "node:fs/promises";
 import YAML from "yaml";
+import { atomicTemporaryPath } from "./atomic-file.js";
 
 type YamlObject = Record<string, unknown>;
 
 export interface ConnectionSettings {
   zigbee: {
     adapterUrl: string;
+    channel: number;
   };
   mqtt: {
     url: string;
@@ -16,6 +18,14 @@ export interface ConnectionSettings {
   };
   homeAssistant: {
     discoveryEnabled: boolean;
+  };
+  alerts: {
+    lowBatteryThreshold: number;
+  };
+  /** `probeOffline` Faz 2: çevrimdışı yönlendiricinin ucuz yoklaması; varsayılan açık. */
+  selfHealing: {
+    enabled: boolean;
+    probeOffline: boolean;
   };
   debug: {
     enabled: boolean;
@@ -47,14 +57,29 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
   const mqtt = objectValue(input.mqtt);
   const matter = objectValue(input.matter);
   const homeAssistant = objectValue(input.homeAssistant);
+  const alerts = objectValue(input.alerts);
+  const selfHealing = objectValue(input.selfHealing);
   const debug = objectValue(input.debug);
   const baseTopic = typeof mqtt.baseTopic === "string" ? mqtt.baseTopic.trim() : "";
+  const channel = Number(zigbee.channel);
+  if (!Number.isInteger(channel) || channel < 11 || channel > 26) {
+    throw new Error("Zigbee kanalı 11-26 arasında olmalıdır.");
+  }
   if (!/^[A-Za-z0-9][A-Za-z0-9/_-]{0,79}$/.test(baseTopic) || baseTopic.includes("//")) {
     throw new Error("MQTT temel konusu geçersiz.");
   }
+  const lowBatteryThreshold = Number(alerts.lowBatteryThreshold ?? 15);
+  if (
+    !Number.isInteger(lowBatteryThreshold)
+    || lowBatteryThreshold < 5
+    || lowBatteryThreshold > 50
+  ) {
+    throw new Error("Düşük pil eşiği 5-50 arasında olmalıdır.");
+  }
   return {
     zigbee: {
-      adapterUrl: endpoint(zigbee.adapterUrl, ["tcp:"], "Zigbee adaptörü")
+      adapterUrl: endpoint(zigbee.adapterUrl, ["tcp:"], "Zigbee adaptörü"),
+      channel
     },
     mqtt: {
       url: endpoint(mqtt.url, ["mqtt:", "mqtts:"], "MQTT sunucusu"),
@@ -66,6 +91,13 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
     homeAssistant: {
       discoveryEnabled: homeAssistant.discoveryEnabled === true
     },
+    alerts: {
+      lowBatteryThreshold
+    },
+    selfHealing: {
+      enabled: selfHealing.enabled !== false,
+      probeOffline: selfHealing.probeOffline !== false
+    },
     debug: {
       enabled: debug.enabled !== false
     }
@@ -76,7 +108,7 @@ const readYaml = async (path: string): Promise<YamlObject> =>
   objectValue(YAML.parse(await readFile(path, "utf8")));
 
 const writeYamlTemporary = async (path: string, value: YamlObject): Promise<string> => {
-  const temporary = `${path}.tmp-${process.pid}`;
+  const temporary = atomicTemporaryPath(path);
   const current = await stat(path);
   await writeFile(temporary, YAML.stringify(value), { mode: current.mode });
   return temporary;
@@ -94,12 +126,16 @@ export class SettingsStore {
     const fileMqtt = objectValue(file.mqtt);
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
+    const fileAlerts = objectValue(file.alerts);
+    const fileSelfHealing = objectValue(file.selfHealing);
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
+    const z2mAdvanced = objectValue(z2m.advanced);
     return validateConnectionSettings({
       zigbee: {
-        adapterUrl: z2mSerial.port ?? this.fallback.zigbee.adapterUrl
+        adapterUrl: z2mSerial.port ?? this.fallback.zigbee.adapterUrl,
+        channel: z2mAdvanced.channel ?? this.fallback.zigbee.channel
       },
       mqtt: {
         url: fileMqtt.url ?? z2mMqtt.server ?? this.fallback.mqtt.url,
@@ -111,28 +147,66 @@ export class SettingsStore {
       homeAssistant: {
         discoveryEnabled: fileHomeAssistant.discoveryEnabled ?? this.fallback.homeAssistant.discoveryEnabled
       },
+      alerts: {
+        lowBatteryThreshold:
+          fileAlerts.lowBatteryThreshold
+          ?? this.fallback.alerts.lowBatteryThreshold
+      },
+      selfHealing: {
+        enabled: fileSelfHealing.enabled ?? this.fallback.selfHealing.enabled,
+        probeOffline: fileSelfHealing.probeOffline ?? this.fallback.selfHealing.probeOffline
+      },
       debug: {
         enabled: fileDebug.enabled ?? this.fallback.debug.enabled
       }
     });
   }
 
-  async save(value: unknown): Promise<ConnectionSettings> {
+  async save(
+    value: unknown,
+    options: { confirmZigbeeChannelChange?: boolean } = {}
+  ): Promise<ConnectionSettings> {
     const settings = validateConnectionSettings(value);
     const [file, z2m] = await Promise.all([readYaml(this.configPath), readYaml(this.z2mPath)]);
     const fileMqtt = objectValue(file.mqtt);
     const fileMatter = objectValue(file.matterbridge);
     const fileHomeAssistant = objectValue(file.homeAssistant);
+    const fileAlerts = objectValue(file.alerts);
+    const fileSelfHealing = objectValue(file.selfHealing);
     const fileDebug = objectValue(file.debug);
     const z2mMqtt = objectValue(z2m.mqtt);
     const z2mSerial = objectValue(z2m.serial);
+    const z2mAdvanced = objectValue(z2m.advanced);
+    const currentChannel = Number(
+      z2mAdvanced.channel
+      ?? this.fallback.zigbee.channel
+    );
+    if (
+      Number.isInteger(currentChannel)
+      && currentChannel !== settings.zigbee.channel
+      && options.confirmZigbeeChannelChange !== true
+    ) {
+      throw new Error(
+        "Zigbee kanal değişikliği açık onay gerektirir; cihazlar bağlantısını kaybedebilir."
+      );
+    }
 
     file.mqtt = { ...fileMqtt, url: settings.mqtt.url, baseTopic: settings.mqtt.baseTopic };
     file.matterbridge = { ...fileMatter, wsUrl: settings.matter.wsUrl };
     file.homeAssistant = { ...fileHomeAssistant, discoveryEnabled: settings.homeAssistant.discoveryEnabled };
+    file.alerts = {
+      ...fileAlerts,
+      lowBatteryThreshold: settings.alerts.lowBatteryThreshold
+    };
+    file.selfHealing = {
+      ...fileSelfHealing,
+      enabled: settings.selfHealing.enabled,
+      probeOffline: settings.selfHealing.probeOffline
+    };
     file.debug = { ...fileDebug, enabled: settings.debug.enabled };
     z2m.mqtt = { ...z2mMqtt, server: settings.mqtt.url, base_topic: settings.mqtt.baseTopic };
     z2m.serial = { ...z2mSerial, port: settings.zigbee.adapterUrl };
+    z2m.advanced = { ...z2mAdvanced, channel: settings.zigbee.channel };
 
     const [fileTemporary, z2mTemporary] = await Promise.all([
       writeYamlTemporary(this.configPath, file),

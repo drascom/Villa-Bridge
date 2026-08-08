@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import mqtt, { type MqttClient } from "mqtt";
 import YAML from "yaml";
 import { Controller, setLogger as setHerdsmanLogger, type Events } from "zigbee-herdsman";
@@ -9,13 +9,29 @@ import {
   setLogger as setConverterLogger,
   type Definition
 } from "zigbee-herdsman-converters";
+import { writeFileAtomic, writeJsonAtomic } from "./atomic-file.js";
 import type { DirectZigbeeConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
-import { DeviceStore } from "./device-store.js";
+import {
+  DEVICE_DEPARTURE_TTL_MS,
+  DeviceDepartureLog,
+  type DeviceDeparture
+} from "./device-departures.js";
+import type { DeviceNetworkEventSink } from "./device-network-events.js";
+import { DeviceStore, featureValues } from "./device-store.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
-import type { ZigbeeSource } from "./source.js";
+import {
+  SelfHealScheduler,
+  selfHealProbeTimeoutMs,
+  type SelfHealDeviceState,
+  type SelfHealOutcome,
+  type SelfHealProbeResult
+} from "./self-heal.js";
+import type { OtaCheckResult, ZigbeeNetworkMap, ZigbeeSource } from "./source.js";
+import { decodeTuyaButtonFrame } from "./tuya-button-frames.js";
 import type { BridgeDevice, BridgeGroup, JsonObject } from "./types.js";
+import { hasPendingZigbeeNetworkRestore } from "./zigbee-backup.js";
 
 function messageText(value: string | (() => string)): string {
   return typeof value === "function" ? value() : value;
@@ -34,6 +50,94 @@ export function parsePermitJoinSeconds(payload: Buffer): number {
   const parsed = JSON.parse(payload.toString("utf8")) as { time?: number; value?: boolean };
   const requested = parsed.time ?? (parsed.value === true ? 180 : 0);
   return Math.min(254, Math.max(0, requested));
+}
+
+export function zigbeeAvailabilityState(
+  lastSeen: number | undefined,
+  device: { type: string; powerSource?: string },
+  now = Date.now()
+): "online" | "offline" {
+  const power = device.powerSource?.toLowerCase() ?? "";
+  const timeout =
+    device.type === "EndDevice" || power.includes("battery")
+      ? 36 * 60 * 60 * 1_000
+      : 15 * 60 * 1_000;
+  return typeof lastSeen === "number" && now - lastSeen <= timeout ? "online" : "offline";
+}
+
+/**
+ * Çevrimdışı yoklama yalnız şebeke beslemeli yönlendiricilere yapılır. Ayrım herdsman'in
+ * kendi `type`/`powerSource` alanlarından gelir; model ya da satıcı listesi yoktur.
+ * Pilli cihaz uyur — uzun sessizlik onda normaldir, yoklamak pil harcamaktan başka işe yaramaz.
+ */
+export function isSelfHealProbeTarget(device: { type: string; powerSource?: string }): boolean {
+  if (device.type !== "Router") return false;
+  return !(device.powerSource?.toLowerCase() ?? "").includes("battery");
+}
+
+export interface DeviceStatePublication {
+  payload: string;
+  at: number;
+}
+
+/** `applyEndpointSuffix` için yeterli olan tanım parçası — tam `Definition` gerekmez. */
+export interface EndpointSuffixDefinition {
+  meta?: { multiEndpoint?: boolean; multiEndpointSkip?: string[] };
+}
+
+/**
+ * Zigbee2MQTT ile birebir davranış: çok uç noktalı bir cihaza uç nokta üzerinden komut
+ * yazıldığında dönüştürücünün ürettiği iyimser durum anahtarları `${key}_${endpointName}`
+ * olarak yazılır. Eksik olduğunda `state_l2` yazımı ana `state`'i eziyor, `state_l2` ise hiç
+ * güncellenmiyordu. `meta.multiEndpointSkip` listesindeki anahtarlar cihaz geneli sayılır ve
+ * ek almaz.
+ */
+export function applyEndpointSuffix(
+  update: JsonObject,
+  endpointName: string | undefined,
+  definition: EndpointSuffixDefinition
+): JsonObject {
+  if (!endpointName || definition.meta?.multiEndpoint !== true) return update;
+  const suffix = `_${endpointName}`;
+  const skip = definition.meta?.multiEndpointSkip ?? [];
+  return Object.fromEntries(Object.entries(update).map(([key, value]) =>
+    skip.includes(key) || key.endsWith(suffix)
+      ? [key, value]
+      : [`${key}${suffix}`, value]));
+}
+
+export function isUnresolvedActionMessage(
+  message: Pick<Events.MessagePayload, "cluster" | "type">,
+  matchingConverterCount: number,
+  convertedPropertyCount: number
+): boolean {
+  return message.cluster === "genOnOff"
+    && typeof message.type === "string"
+    && message.type.startsWith("command")
+    && (matchingConverterCount === 0 || convertedPropertyCount === 0);
+}
+
+/**
+ * `zigbee-herdsman` çözemediği ZCL çerçevelerini `type: "raw"` olarak yollar. Tuya sahne
+ * anahtarlarının buton olayları tam olarak bu yoldan gelir, bu yüzden ham `genOnOff`
+ * çerçeveleri ayrıca ele alınır.
+ */
+export function isRawGenOnOffFrame(
+  message: Pick<Events.MessagePayload, "cluster" | "type">
+): boolean {
+  return message.cluster === "genOnOff" && message.type === "raw";
+}
+
+export function shouldPublishDeviceState(
+  previous: DeviceStatePublication | undefined,
+  payload: string,
+  debounceSeconds: number,
+  now = Date.now(),
+  eventPayload = false
+): boolean {
+  if (eventPayload) return true;
+  if (!previous || previous.payload !== payload) return true;
+  return debounceSeconds <= 0 || now - previous.at >= debounceSeconds * 1_000;
 }
 
 export interface RemovableZigbeeDevice {
@@ -77,6 +181,24 @@ export function endpointNamesForDevice(
   );
 }
 
+/**
+ * Otomatik onarımın kurulumu. Mekanizma bilerek yalnız bu sınıfın içinde yaşar: shadow modda
+ * hiç kurulmaz, Android izleyici modunda çekirdek hiç başlamaz — devir sırasında iki koordinatör
+ * sahibinin aynı anda yapılandırma yazması yapısal olarak imkânsız.
+ */
+export interface DirectSelfHealingSetup {
+  enabled: boolean;
+  /** Faz 2: çevrimdışı yönlendiricileri ucuz okumayla yoklama. */
+  probeOffline?: boolean;
+  state?: Map<string, SelfHealDeviceState>;
+  persist?: (state: Map<string, SelfHealDeviceState>) => void;
+  recordFailure?: (deviceId: string, message: string) => void;
+  /** Testler için; üretimde varsayılan zamanlayıcı kullanılır. */
+  spacingMs?: number;
+  wait?: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+
 export class DirectZigbeeSource implements ZigbeeSource {
   private controller: Controller | null = null;
   private readonly definitions = new Map<string, Definition>();
@@ -88,14 +210,160 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private homeAssistantDiscoveryTopics = new Set<string>();
   private pairingState = { permitted: false, time: 0 };
   private statePersistTimer: NodeJS.Timeout | null = null;
+  private availabilityTimer: NodeJS.Timeout | null = null;
+  private readonly deviceAvailability = new Map<string, "online" | "offline">();
+  private readonly lastDevicePublications = new Map<string, DeviceStatePublication>();
+  private readonly otaUpdates = new Set<string>();
+  /** Tuya tuş çerçevelerinin son ZCL sıra numarası; cihazın tekrarlarını eler. */
+  private readonly lastButtonSequences = new Map<string, number>();
+  /** Az önce ağdan düşen/kaldırılan cihazlar; kurulum uçları sebebi buradan okur. */
+  private readonly departures: DeviceDepartureLog;
+  private readonly selfHeal: SelfHealScheduler;
 
   constructor(
     private readonly config: DirectZigbeeConfig,
     private readonly mqttConfig: AppConfig["mqtt"],
     private readonly store: DeviceStore,
     private homeAssistantDiscoveryEnabled = false,
-    private readonly aliases: ReadonlyMap<string, string> = new Map()
-  ) {}
+    private readonly aliases: ReadonlyMap<string, string> = new Map(),
+    private readonly definitionResolver: typeof findByDevice = findByDevice,
+    selfHealing: DirectSelfHealingSetup = { enabled: false },
+    /**
+     * Kalıcı ağ üyeliği günlüğü. İsteğe bağlıdır: verilmezse kaynak eskisi gibi yalnız kısa
+     * ömürlü bellek kaydını tutar.
+     */
+    private readonly networkEvents?: DeviceNetworkEventSink
+  ) {
+    // Bellekteki kayıt ile kalıcı günlük aynı olaydan beslenir; "sildim, sonra düştü"yü
+    // bastıran kural tek yerde kalsın diye kalıcı yazma da bu kancadan geçer.
+    this.departures = new DeviceDepartureLog(
+      DEVICE_DEPARTURE_TTL_MS,
+      64,
+      (entry) => {
+        this.networkEvents?.record({
+          id: entry.id,
+          reason: entry.reason,
+          ...(entry.name ? { name: entry.name } : {})
+        });
+      }
+    );
+    this.selfHeal = new SelfHealScheduler({
+      enabled: selfHealing.enabled,
+      probeEnabled: selfHealing.probeOffline === true,
+      initialState: selfHealing.state,
+      persist: selfHealing.persist,
+      blockedReason: (deviceId) => this.selfHealBlockedReason(deviceId),
+      prepare: (deviceId) => this.selfHealPrepare(deviceId),
+      probe: (deviceId) => this.selfHealProbe(deviceId),
+      onOutcome: (deviceId, outcome) => this.recordSelfHealEvent(deviceId, outcome),
+      onFailure: selfHealing.recordFailure,
+      ...(selfHealing.spacingMs === undefined ? {} : { spacingMs: selfHealing.spacingMs }),
+      ...(selfHealing.wait ? { wait: selfHealing.wait } : {}),
+      ...(selfHealing.now ? { now: selfHealing.now } : {})
+    });
+  }
+
+  setSelfHealingEnabled(enabled: boolean): void {
+    this.selfHeal.setEnabled(enabled);
+  }
+
+  setSelfHealProbeEnabled(enabled: boolean): void {
+    this.selfHeal.setProbeEnabled(enabled);
+  }
+
+  /**
+   * Otomatik onarımın asla denenmemesi gereken durumlar. Her biri var olan bir duruma bakar;
+   * yeni bayrak icat edilmez.
+   */
+  private async selfHealBlockedReason(deviceId: string): Promise<string | null> {
+    const controller = this.controller;
+    if (!controller) return "Zigbee koordinatörü hazır değil.";
+    if (this.pairingState.permitted) return "Eşleştirme açık.";
+    if (this.otaUpdates.size > 0) return "Kablosuz yazılım güncellemesi sürüyor.";
+    const device = controller.getDeviceByIeeeAddr(deviceId);
+    if (!device) return "Cihaz bulunamadı.";
+    if (device.scheduledOta) return "Cihaz için yazılım güncellemesi planlı.";
+    if (await hasPendingZigbeeNetworkRestore(this.config.dataDir)) {
+      return "Zigbee ağ yedeği geri yüklenmeyi bekliyor.";
+    }
+    return null;
+  }
+
+  /**
+   * Yalnız yerel hazırlık: cihaz tanımını çözer. `interview(true)` **çağrılmaz** — ilan zaten
+   * cihazın erişilebilir olduğunu söyler, pahalı ve sonuçsuz görüşmeye gerek yok.
+   */
+  private async selfHealPrepare(deviceId: string): Promise<(() => Promise<void>) | null> {
+    const controller = this.controller;
+    const device = controller?.getDeviceByIeeeAddr(deviceId);
+    if (!controller || !device || device.type === "Coordinator") return null;
+    if (this.config.devices[deviceId]?.disabled === true) return null;
+    const definition = this.definitions.get(deviceId) ?? await this.definitionResolver(device);
+    if (!definition) return null;
+    this.definitions.set(deviceId, definition);
+    if (!definition.configure) return null;
+    const coordinatorDevice = controller.getDevicesByType("Coordinator")[0];
+    const coordinator = coordinatorDevice?.getEndpoint(1) ?? coordinatorDevice?.endpoints[0];
+    if (!coordinator) return null;
+    return async () => {
+      await definition.configure?.(device, coordinator, definition);
+      await this.refreshDevices();
+    };
+  }
+
+  /**
+   * Çevrimdışı yönlendiriciyi tek hafif okumayla yoklar (`genBasic/zclVersion`, 5 sn,
+   * `disableRecovery`). Amaç en ucuz yol: yanıt gelirse cihaz zaten erişilebilirdir,
+   * "erişilemez" işareti düşürülür. `interview(true)` bu yolda **asla** çağrılmaz.
+   */
+  private async selfHealProbe(deviceId: string): Promise<(() => Promise<SelfHealProbeResult>) | null> {
+    const device = this.controller?.getDeviceByIeeeAddr(deviceId);
+    if (!device || !isSelfHealProbeTarget(device)) return null;
+    if (this.config.devices[deviceId]?.disabled === true) return null;
+    const endpoint = device.getEndpoint(1) ?? device.endpoints[0];
+    if (!endpoint) return null;
+    return async () => {
+      try {
+        await endpoint.read("genBasic", ["zclVersion"], {
+          timeout: selfHealProbeTimeoutMs,
+          disableRecovery: true
+        });
+      } catch (error) {
+        // Tek deneme; ikinci okuma yok. Karar geri çekilmeye bırakılır.
+        return { reachable: false, message: error instanceof Error ? error.message : String(error) };
+      }
+      const recovered = this.deviceAvailability.get(deviceId) !== "online";
+      this.setAvailability(deviceId, "online");
+      try {
+        return { reachable: true, recovered, configured: await this.selfHealConfigureIfPending(device) };
+      } catch (error) {
+        // Cihaz erişilebilir; yalnız yapılandırma yazılamadı. Yoklama başarısız sayılmaz.
+        return {
+          reachable: true,
+          recovered,
+          configured: false,
+          message: error instanceof Error ? error.message : String(error)
+        };
+      }
+    };
+  }
+
+  /**
+   * Yapılandırma gerçekten gerekiyor mu? Herdsman veritabanında `meta.configured` yazılıysa
+   * cihaz zaten yapılandırılmıştır; yoklamanın ardından koordinatörü boşuna meşgul etmeyiz.
+   */
+  private async selfHealConfigureIfPending(device: { ieeeAddr: string; meta?: JsonObject }): Promise<boolean> {
+    if (device.meta?.configured !== undefined) return false;
+    const run = await this.selfHealPrepare(device.ieeeAddr);
+    if (!run) return false;
+    await run();
+    return true;
+  }
+
+  private recordSelfHealEvent(deviceId: string, outcome: SelfHealOutcome): void {
+    const friendlyName = this.config.devices[deviceId]?.friendly_name ?? deviceId;
+    this.store.recordExternalEvent(friendlyName, "self_heal", outcome);
+  }
 
   async start(): Promise<void> {
     const controller = new Controller({
@@ -131,15 +399,248 @@ export class DirectZigbeeSource implements ZigbeeSource {
     await this.loadCachedStates();
     await this.refreshDevices();
     await this.startMqttCompatibility();
+    this.deviceAvailability.clear();
+    this.refreshAvailability();
+    this.availabilityTimer = setInterval(() => this.refreshAvailability(), 60_000);
+    this.availabilityTimer.unref();
     const parameters = await controller.getNetworkParameters();
     console.log(`SLZB koordinatörü devralındı; Zigbee kanalı ${parameters.channel}.`);
     const initialStateTimer = setTimeout(() => void this.requestInitialActuatorStates(), 1_000);
     initialStateTimer.unref();
   }
 
-  async permitJoin(seconds: number): Promise<void> {
+  async permitJoin(seconds: number, routerId?: string): Promise<void> {
     if (!this.controller) throw new Error("SLZB koordinatörü hazır değil.");
-    await this.controller.permitJoin(seconds);
+    const router = routerId ? this.controller.getDeviceByIeeeAddr(routerId) : undefined;
+    if (routerId && !router) throw new Error("Seçilen Zigbee yönlendiricisi bulunamadı.");
+    await this.controller.permitJoin(seconds, router);
+  }
+
+  async addInstallCode(value: string): Promise<void> {
+    if (!this.controller) throw new Error("SLZB koordinatörü hazır değil.");
+    await this.controller.addInstallCode(value);
+  }
+
+  async reconfigureDevice(id: string): Promise<void> {
+    const controller = this.controller;
+    const device = controller?.getDeviceByIeeeAddr(id);
+    if (!controller || !device) throw new Error("Cihaz bulunamadı.");
+    await device.interview(true);
+    const definition = await this.definitionResolver(device);
+    const coordinator = controller.getDevicesByType("Coordinator")[0]?.endpoints[0];
+    if (!definition || !coordinator) throw new Error("Cihaz yapılandırma tanımı bulunamadı.");
+    if (definition.configure) await definition.configure(device, coordinator, definition);
+    this.definitions.set(id, definition);
+    await this.refreshDevices();
+  }
+
+  async scanTouchlink(): Promise<Array<{ ieeeAddress: string; channel: number }>> {
+    if (!this.controller) throw new Error("SLZB koordinatörü hazır değil.");
+    const devices = await this.controller.touchlink.scan();
+    return devices.map((device) => ({ ieeeAddress: device.ieeeAddr, channel: device.channel }));
+  }
+
+  async resetTouchlink(ieeeAddress: string, channel: number): Promise<void> {
+    if (!this.controller) throw new Error("SLZB koordinatörü hazır değil.");
+    const reset = await this.controller.touchlink.factoryReset(ieeeAddress, channel);
+    if (!reset) throw new Error("Yakındaki cihaz sıfırlanamadı.");
+  }
+
+  async createGroup(name: string): Promise<void> {
+    const controller = this.controller;
+    if (!controller) throw new Error("SLZB koordinatörü hazır değil.");
+    let id = 1;
+    while (id <= 0xfff7 && controller.getGroupByID(id)) id += 1;
+    if (id > 0xfff7) throw new Error("Yeni Zigbee grubu için boş kimlik kalmadı.");
+    const group = controller.createGroup(id);
+    this.config.groups[String(id)] = { friendly_name: name };
+    try {
+      await this.persistGroupConfiguration(id, name);
+    } catch (error) {
+      delete this.config.groups[String(id)];
+      group.removeFromDatabase();
+      throw error;
+    }
+    this.refreshGroups();
+  }
+
+  async renameGroup(id: string, name: string): Promise<void> {
+    const group = this.groupByIdentifier(id);
+    await this.persistGroupConfiguration(group.groupID, name);
+    this.config.groups[String(group.groupID)] = {
+      ...(this.config.groups[String(group.groupID)] ?? {}),
+      friendly_name: name
+    };
+    this.refreshGroups();
+  }
+
+  async removeGroup(id: string, force = false): Promise<void> {
+    const group = this.groupByIdentifier(id);
+    if (force) group.removeFromDatabase();
+    else await group.removeFromNetwork();
+    delete this.config.groups[String(group.groupID)];
+    await this.persistGroupConfiguration(group.groupID, null);
+    this.refreshGroups();
+  }
+
+  async setGroupMember(id: string, deviceId: string, add: boolean, endpoint?: number): Promise<void> {
+    const controller = this.controller;
+    const group = this.groupByIdentifier(id);
+    const device = controller?.getDeviceByIeeeAddr(deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı.");
+    const target = endpoint ? device.getEndpoint(endpoint) : device.endpoints.find((item) => item.inputClusters.includes(6)) ?? device.endpoints[0];
+    if (!target) throw new Error("Cihazın gruba eklenebilir uç noktası bulunamadı.");
+    if (add) await target.addToGroup(group);
+    else await target.removeFromGroup(group);
+    this.refreshGroups();
+  }
+
+  async setGroup(id: string, command: JsonObject): Promise<void> {
+    const group = this.groupByIdentifier(id);
+    const state = command.state;
+    if (
+      typeof state !== "string"
+      || !["ON", "OFF", "TOGGLE"].includes(state.toUpperCase())
+    ) {
+      throw new Error("Direct Zigbee grubu yalnız aç, kapat veya değiştir komutunu destekliyor.");
+    }
+    await group.command("genOnOff", state.toLowerCase(), {} as never);
+  }
+
+  async bindDevice(
+    fromId: string,
+    toId: string,
+    bind: boolean,
+    clusters?: string[],
+    fromEndpoint?: number,
+    toEndpoint?: number
+  ): Promise<void> {
+    const controller = this.controller;
+    const from = controller?.getDeviceByIeeeAddr(fromId);
+    if (!controller || !from) throw new Error("Kaynak cihaz bulunamadı.");
+    const sourceEndpoint = fromEndpoint ? from.getEndpoint(fromEndpoint) : from.endpoints[0];
+    const targetDevice = controller.getDeviceByIeeeAddr(toId);
+    const target = targetDevice
+      ? toEndpoint
+        ? targetDevice.getEndpoint(toEndpoint)
+        : targetDevice.endpoints[0]
+      : this.groupByIdentifier(toId);
+    if (!sourceEndpoint || !target) throw new Error("Bağlama uç noktası bulunamadı.");
+    const commonControlClusters = new Set([5, 6, 8, 768]);
+    const selected = clusters?.length
+      ? clusters
+      : sourceEndpoint.outputClusters.filter((cluster) =>
+        commonControlClusters.has(cluster)
+        && ("inputClusters" in target ? target.inputClusters.includes(cluster) : true)
+      );
+    if (!selected.length) throw new Error("Cihazlar arasında bağlanabilir küme bulunamadı.");
+    for (const cluster of selected) {
+      if (bind) await sourceEndpoint.bind(cluster, target);
+      else await sourceEndpoint.unbind(cluster, target);
+    }
+    await this.refreshDevices();
+  }
+
+  async groupScene(
+    id: string,
+    sceneId: number,
+    action: "store" | "recall" | "remove",
+    name?: string
+  ): Promise<void> {
+    const group = this.groupByIdentifier(id);
+    if (action === "store") await group.command("genScenes", "store", { groupid: group.groupID, sceneid: sceneId });
+    else if (action === "recall") {
+      await group.command("genScenes", "recall", { groupid: group.groupID, sceneid: sceneId });
+    } else await group.command("genScenes", "remove", { groupid: group.groupID, sceneid: sceneId });
+    if (action !== "recall") {
+      const scenes = this.configuredGroupScenes(group);
+      const updated = action === "store"
+        ? [
+          ...scenes.filter((scene) => scene.id !== sceneId),
+          { id: sceneId, name: name?.trim() || `Scene ${sceneId}` }
+        ].sort((left, right) => left.id - right.id)
+        : scenes.filter((scene) => scene.id !== sceneId);
+      this.persistGroupScenes(group, updated);
+    }
+    this.refreshGroups();
+  }
+
+  async networkMap(): Promise<ZigbeeNetworkMap> {
+    const controller = this.controller;
+    if (!controller) throw new Error("SLZB koordinatörü hazır değil.");
+    const devices = [...controller.getDevicesIterator()];
+    const nodes = devices.map((device) => ({
+      id: device.ieeeAddr,
+      name: this.config.devices[device.ieeeAddr]?.friendly_name ?? (device.type === "Coordinator" ? "Coordinator" : device.ieeeAddr),
+      type: device.type
+    }));
+    const links: ZigbeeNetworkMap["links"] = [];
+    for (const device of devices.filter((item) => item.type !== "EndDevice")) {
+      try {
+        for (const neighbor of await device.lqi()) {
+          const to = String(neighbor.eui64).toLowerCase();
+          if (!nodes.some((node) => node.id.toLowerCase() === to)) continue;
+          links.push({ from: device.ieeeAddr, to, quality: neighbor.lqi });
+        }
+      } catch {
+        // Sleeping or busy routers may omit their table; keep the partial map useful.
+      }
+    }
+    return { nodes, links };
+  }
+
+  async scheduleOta(id: string, enabled: boolean): Promise<void> {
+    const device = this.controller?.getDeviceByIeeeAddr(id);
+    if (!device) throw new Error("Cihaz bulunamadı.");
+    const definition = this.definitions.get(id) ?? await findByDevice(device);
+    if (!definition?.ota) throw new Error("Bu cihaz kablosuz yazılım güncellemesini desteklemiyor.");
+    if (enabled) {
+      device.scheduleOta({});
+      this.publishOtaState(id, { state: "scheduled", progress: 0 });
+    } else {
+      device.unscheduleOta();
+      this.publishOtaState(id, { state: "idle", progress: 0 });
+    }
+  }
+
+  async checkOta(id: string): Promise<OtaCheckResult> {
+    const device = this.controller?.getDeviceByIeeeAddr(id);
+    if (!device) throw new Error("Cihaz bulunamadı.");
+    const definition = this.definitions.get(id) ?? await findByDevice(device);
+    if (!definition?.ota) throw new Error("Bu cihaz kablosuz yazılım güncellemesini desteklemiyor.");
+    const extraMetas = typeof definition.ota === "object" ? definition.ota : {};
+    const result = await device.checkOta({}, undefined, extraMetas);
+    const checked: OtaCheckResult = {
+      available: result.available,
+      currentVersion: result.current.fileVersion,
+      ...(result.availableMeta ? { availableVersion: result.availableMeta.fileVersion } : {})
+    };
+    this.publishOtaState(id, {
+      state: result.available ? "available" : "idle",
+      progress: 0,
+      current_version: checked.currentVersion ?? null,
+      available_version: checked.availableVersion ?? null
+    });
+    return checked;
+  }
+
+  async setDeviceOptions(
+    id: string,
+    options: { transition?: number; debounce?: number; retain?: boolean }
+  ): Promise<void> {
+    if (!this.controller?.getDeviceByIeeeAddr(id)) throw new Error("Cihaz bulunamadı.");
+    const path = this.config.configurationFile;
+    if (!path) throw new Error("Zigbee yapılandırma dosyası tanımlı değil.");
+    const document = YAML.parseDocument(await readFile(path, "utf8"));
+    const definedOptions = Object.fromEntries(
+      Object.entries(options).filter((entry): entry is [string, number | boolean] => entry[1] !== undefined)
+    );
+    for (const [key, value] of Object.entries(definedOptions)) {
+      document.setIn(["devices", id, key], value);
+    }
+    await writeFileAtomic(path, document.toString());
+    this.config.devices[id] = { ...(this.config.devices[id] ?? {}), ...definedOptions };
+    await this.refreshDevices();
   }
 
   async renameDevice(id: string, name: string): Promise<void> {
@@ -154,6 +655,12 @@ export class DirectZigbeeSource implements ZigbeeSource {
       throw error;
     }
     await this.refreshDevices();
+    const availability = this.deviceAvailability.get(id);
+    if (availability) {
+      this.publishRetained(`${previousName}/availability`, "");
+      this.deviceAvailability.delete(id);
+      this.setAvailability(id, availability);
+    }
     this.publish("bridge/response/device/rename", {
       status: "ok",
       data: { from: previousName, to: name }
@@ -162,7 +669,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     if (state) {
       this.store.ingest(name, Buffer.from(JSON.stringify(state)));
       this.publishRetained(previousName, "");
-      this.publish(name, state, true);
+      this.publish(name, state, this.config.devices[id]?.retain === true);
     }
     this.publishHomeAssistantDiscovery();
   }
@@ -172,11 +679,18 @@ export class DirectZigbeeSource implements ZigbeeSource {
     if (!device) throw new Error("Cihaz bulunamadı.");
     const previousName = this.config.devices[id]?.friendly_name ?? id;
     await removeZigbeeDevice(device, force);
+    // Zorlamasız silmede cihaza havadan "ağdan ayrıl" komutu gider; mesh'te geciken bu komut,
+    // kullanıcı aynı cihazı hemen yeniden eşleştirirse yeni oturumu düşürebilir. Kayıt panelin
+    // "bu cihazı az önce kaldırdınız" uyarısını verebilmesi için tutulur.
+    this.departures.record(id, "removed", Date.now(), this.config.devices[id]?.friendly_name);
     delete this.config.devices[id];
     await this.persistDeviceConfiguration(id, null);
     this.definitions.delete(id);
     this.states.delete(id);
+    this.deviceAvailability.delete(id);
+    this.lastDevicePublications.delete(id);
     this.publishRetained(previousName, "");
+    this.publishRetained(`${previousName}/availability`, "");
     await this.refreshDevices();
     this.publish("bridge/response/device/remove", {
       status: "ok",
@@ -189,7 +703,24 @@ export class DirectZigbeeSource implements ZigbeeSource {
     await this.persistStates();
   }
 
+  recentDeparture(id: string): DeviceDeparture | undefined {
+    return this.departures.get(id);
+  }
+
+  recentDepartures(): DeviceDeparture[] {
+    return this.departures.list();
+  }
+
+  async prepareNetworkBackup(): Promise<null> {
+    const controller = this.controller;
+    if (!controller) throw new Error("Zigbee koordinatörü hazır değil.");
+    await controller.backup();
+    await this.persistStates();
+    return null;
+  }
+
   async stop(): Promise<void> {
+    this.selfHeal.setEnabled(false);
     this.abort.abort();
     const controller = this.controller;
     this.controller = null;
@@ -200,6 +731,10 @@ export class DirectZigbeeSource implements ZigbeeSource {
     if (this.statePersistTimer) {
       clearTimeout(this.statePersistTimer);
       this.statePersistTimer = null;
+    }
+    if (this.availabilityTimer) {
+      clearInterval(this.availabilityTimer);
+      this.availabilityTimer = null;
     }
     await this.persistStates();
     if (mqttClient) {
@@ -214,6 +749,9 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.store.setMqttConnected(false);
       this.store.ingest("bridge/state", Buffer.from('{"state":"offline"}'));
       this.publishRetained("bridge/state", { state: "offline" });
+      for (const device of controller.getDevicesIterator()) {
+        if (device.type !== "Coordinator") this.setAvailability(device.ieeeAddr, "offline");
+      }
     });
     controller.on("permitJoinChanged", ({ permitted, time }) => {
       this.pairingState = { permitted, time: permitted ? time ?? 0 : 0 };
@@ -233,6 +771,14 @@ export class DirectZigbeeSource implements ZigbeeSource {
     });
     controller.on("deviceJoined", async ({ device }) => {
       const friendlyName = this.config.devices[device.ieeeAddr]?.friendly_name ?? device.ieeeAddr;
+      // Katılma kalıcı günlüğe doğrudan yazılır: `departures` yalnız ayrılmayı tutar. Yeni
+      // cihazın henüz adı yoktur; o zaman satır IEEE adresiyle anılır.
+      const knownName = this.config.devices[device.ieeeAddr]?.friendly_name;
+      this.networkEvents?.record({
+        id: device.ieeeAddr,
+        reason: "joined",
+        ...(knownName ? { name: knownName } : {})
+      });
       const event = {
         type: "device_joined",
         data: { friendly_name: friendlyName, ieee_address: device.ieeeAddr }
@@ -251,12 +797,26 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
       this.publish("bridge/event", event);
     };
-    controller.on("deviceAnnounce", ({ device }) => announceKnownDevice(device));
+    // İlan = cihaz güç döngüsünden/rota kurulumundan sonra ağa döndüğünün kanıtı. Zigbee2MQTT
+    // deseni: burada raporlama ayarları yeniden yazılır, görüşme başlatılmaz.
+    controller.on("deviceAnnounce", ({ device }) => {
+      announceKnownDevice(device);
+      this.selfHeal.schedule(device.ieeeAddr);
+    });
     controller.on("lastSeenChanged", ({ device, reason }) => {
+      this.setAvailability(device.ieeeAddr, "online");
       if (reason === "deviceJoined") announceKnownDevice(device);
     });
     controller.on("deviceLeave", async ({ ieeeAddr }) => {
       const friendlyName = this.config.devices[ieeeAddr]?.friendly_name ?? ieeeAddr;
+      // Cihaz listeden düşmeden önce sebebi not et: bundan sonraki her kurulum isteği
+      // "bulunamadı" yerine "az önce ağdan ayrıldı" diyebilsin.
+      this.departures.record(
+        ieeeAddr,
+        "left",
+        Date.now(),
+        this.config.devices[ieeeAddr]?.friendly_name
+      );
       this.publish("bridge/event", {
         type: "device_leave",
         data: { friendly_name: friendlyName, ieee_address: ieeeAddr }
@@ -291,7 +851,27 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
       this.publish("bridge/event", event);
     });
-    controller.on("message", (message) => void this.onMessage(message));
+    // Sinyal/son görülme, cihaz tanımı çözülmeden yakalanır: desteklenmeyen bir cihaz da tabloda
+    // "hangi cihaz ne zaman görüldü" sorusunu yanıtlayabilmeli. `onMessage` tanım bulamazsa döner.
+    controller.on("message", (message) => {
+      this.recordDeviceLink(message);
+      void this.onMessage(message);
+    });
+  }
+
+  /**
+   * Doğrudan kipin sinyal yolu: `linkquality` her gelen Zigbee mesajında taşınır, `lastSeen` ise
+   * herdsman'in cihaz kaydında tutulur. Zigbee2MQTT bunları yayın payload'ına eklerken biz cihaz
+   * defterine yazarız — yayınlanan uyumluluk payload'ı olduğu gibi kalsın diye.
+   */
+  private recordDeviceLink(message: Events.MessagePayload): void {
+    const ieeeAddress = message.device.ieeeAddr;
+    const friendlyName = this.config.devices[ieeeAddress]?.friendly_name ?? ieeeAddress;
+    const lastSeen = typeof message.device.lastSeen === "number" ? message.device.lastSeen : Date.now();
+    this.store.recordDeviceLink(friendlyName, {
+      ...(typeof message.linkquality === "number" ? { linkquality: message.linkquality } : {}),
+      lastSeen: new Date(lastSeen).toISOString()
+    });
   }
 
   private async refreshDevices(): Promise<void> {
@@ -350,11 +930,29 @@ export class DirectZigbeeSource implements ZigbeeSource {
           vendor: definition.vendor,
           description: definition.description,
           exposes,
-          options: definition.options ?? []
+          options: definition.options ?? [],
+          ota: Boolean(definition.ota)
         } : inferredDefinition,
+        configured_options: {
+          ...(typeof configured.transition === "number" ? { transition: configured.transition } : {}),
+          ...(typeof configured.debounce === "number" ? { debounce: configured.debounce } : {}),
+          ...(typeof configured.retain === "boolean" ? { retain: configured.retain } : {})
+        },
         ...(Object.keys(endpointNames).length > 0 ? { endpoint_names: endpointNames } : {}),
         endpoints: Object.fromEntries(device.endpoints.map((endpoint) => [String(endpoint.ID), {
-          bindings: [],
+          bindings: endpoint.binds.map((binding) => ({
+            cluster: binding.cluster.name,
+            target: "groupID" in binding.target
+              ? {
+                type: "group",
+                id: binding.target.groupID
+              }
+              : {
+                type: "device",
+                ieee_address: binding.target.deviceIeeeAddress,
+                endpoint: binding.target.ID
+              }
+          })),
           configured_reportings: [],
           clusters: {
             input: endpoint.inputClusters,
@@ -380,7 +978,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
         ieee_address: endpoint.deviceIeeeAddress,
         endpoint: endpoint.ID
       })),
-      scenes: []
+      scenes: this.configuredGroupScenes(group)
     }));
     this.store.ingest("bridge/groups", Buffer.from(JSON.stringify(this.bridgeGroups)));
     this.publishRetained("bridge/groups", this.bridgeGroups);
@@ -390,8 +988,10 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const definition = this.definitions.get(message.device.ieeeAddr) ?? await findByDevice(message.device);
     if (!definition) return;
     this.definitions.set(message.device.ieeeAddr, definition);
+    if (await this.handleScheduledOta(message, definition)) return;
     const configured = this.config.devices[message.device.ieeeAddr] ?? {};
     const friendlyName = configured.friendly_name ?? message.device.ieeeAddr;
+    this.setAvailability(message.device.ieeeAddr, "online");
     const options = configured as JsonObject;
     const previous = this.states.get(message.device.ieeeAddr) ?? {};
     const matching = definition.fromZigbee.filter((converter) => {
@@ -400,11 +1000,25 @@ export class DirectZigbeeSource implements ZigbeeSource {
     });
     const publish = (payload: JsonObject): void => {
       const merged = { ...(this.states.get(message.device.ieeeAddr) ?? {}), ...payload };
-      this.states.set(message.device.ieeeAddr, merged);
+      // `action` anlık bir kenar olayıdır; yayınlanır ama kalıcı duruma yazılmaz (Zigbee2MQTT ile
+      // aynı davranış). Aksi hâlde her sonraki durum yayını eski tuş basışını tekrar duyururdu.
+      const { action: _action, ...retained } = merged;
+      this.states.set(message.device.ieeeAddr, retained);
       this.store.ingest(friendlyName, Buffer.from(JSON.stringify(merged)));
-      this.store.ingest(`${friendlyName}/availability`, Buffer.from('{"state":"online"}'));
-      this.publish(friendlyName, merged, true);
-      this.publish(`${friendlyName}/availability`, { state: "online" }, true);
+      const serialized = JSON.stringify(merged);
+      const debounce = typeof configured.debounce === "number" ? configured.debounce : 0;
+      const now = Date.now();
+      const actionEvent = typeof payload.action === "string" && payload.action.trim().length > 0;
+      if (shouldPublishDeviceState(
+        this.lastDevicePublications.get(message.device.ieeeAddr),
+        serialized,
+        debounce,
+        now,
+        actionEvent
+      )) {
+        this.publish(friendlyName, merged, configured.retain === true);
+        this.lastDevicePublications.set(message.device.ieeeAddr, { payload: serialized, at: now });
+      }
       this.queueStatePersistence();
     };
     let result: JsonObject = {};
@@ -426,10 +1040,134 @@ export class DirectZigbeeSource implements ZigbeeSource {
         console.warn(`Zigbee mesajı dönüştürülemedi (${friendlyName}): ${String(error)}`);
       }
     }
+    if (Object.keys(result).length === 0 && isRawGenOnOffFrame(message)) {
+      const decoded = this.decodeButtonFrame(message, definition, friendlyName, options);
+      if (decoded) {
+        publish(decoded);
+        return;
+      }
+    }
+    if (isUnresolvedActionMessage(message, matching.length, Object.keys(result).length)) {
+      const endpoint = "ID" in message.endpoint ? message.endpoint.ID : "unknown";
+      console.warn(
+        `Zigbee tuş olayı çözümlenemedi (${friendlyName}): `
+        + JSON.stringify({
+          endpoint,
+          cluster: message.cluster,
+          type: message.type,
+          data: message.data,
+          matchingConverters: matching.length
+        })
+      );
+    }
     if (Object.keys(result).length > 0) {
       postProcessConvertedFromZigbeeMessage(definition, result, options, message.device);
       publish(result);
     }
+  }
+
+  /**
+   * Tuya TS004x sahne anahtarlarının çözümlenemeyen `genOnOff` çerçevesini `action`
+   * değerine çevirir. Üretilen değer cihaz tanımının `action` sözlüğüyle doğrulanır;
+   * uymazsa yayımlanmaz ama Türkçe uyarı bırakılır.
+   */
+  private decodeButtonFrame(
+    message: Events.MessagePayload,
+    definition: Definition,
+    friendlyName: string,
+    options: JsonObject
+  ): JsonObject | undefined {
+    const endpointId = "ID" in message.endpoint ? message.endpoint.ID : Number.NaN;
+    const decoded = decodeTuyaButtonFrame({
+      data: message.data as ArrayLike<number>,
+      endpointId,
+      endpointCount: message.device.endpoints.length,
+      modelId: message.device.modelID ?? undefined
+    });
+    if (!decoded.ok) {
+      console.warn(`Zigbee tuş çerçevesi çözümlenemedi (${friendlyName}): ${decoded.reason}`);
+      return undefined;
+    }
+    const exposes = typeof definition.exposes === "function"
+      ? definition.exposes(message.device, options)
+      : definition.exposes;
+    const supported = featureValues(exposes, "action");
+    if (supported.length > 0 && !supported.includes(decoded.action)) {
+      console.warn(
+        `Tuya tuş olayı cihaz sözlüğünde yok (${friendlyName}): ${decoded.action}`
+      );
+      return undefined;
+    }
+    // Cihaz aynı çerçeveyi tekrarlayabilir; Zigbee2MQTT gibi ZCL sıra numarasına bakıyoruz.
+    if (this.lastButtonSequences.get(message.device.ieeeAddr) === decoded.sequence) return undefined;
+    this.lastButtonSequences.set(message.device.ieeeAddr, decoded.sequence);
+    return { action: decoded.action };
+  }
+
+  private publishOtaState(id: string, update: JsonObject): void {
+    const configured = this.config.devices[id] ?? {};
+    const friendlyName = configured.friendly_name ?? id;
+    const merged = {
+      ...(this.states.get(id) ?? {}),
+      update
+    };
+    this.states.set(id, merged);
+    this.store.ingest(friendlyName, Buffer.from(JSON.stringify(merged)));
+    this.publish(friendlyName, merged, configured.retain === true);
+    this.queueStatePersistence();
+  }
+
+  private async handleScheduledOta(
+    message: Events.MessagePayload,
+    definition: Definition
+  ): Promise<boolean> {
+    const id = message.device.ieeeAddr;
+    if (
+      message.cluster !== "genOta"
+      || message.type !== "commandQueryNextImageRequest"
+      || !message.device.scheduledOta
+      || this.otaUpdates.has(id)
+      || !definition.ota
+    ) {
+      return false;
+    }
+    this.otaUpdates.add(id);
+    const extraMetas = typeof definition.ota === "object" ? definition.ota : {};
+    this.publishOtaState(id, { state: "updating", progress: 0 });
+    try {
+      const [, installed] = await message.device.updateOta(
+        undefined,
+        message.data as never,
+        message.meta.zclTransactionSequenceNumber,
+        extraMetas,
+        (progress, remaining) => this.publishOtaState(id, {
+          state: "updating",
+          progress: Math.max(0, Math.min(100, progress)),
+          remaining
+        }),
+        {
+          requestTimeout: 150_000,
+          responseDelay: 250,
+          baseSize: 50
+        },
+        message.endpoint
+      );
+      this.publishOtaState(id, {
+        state: "idle",
+        progress: installed ? 100 : 0,
+        installed_version: installed?.fileVersion ?? null
+      });
+    } catch (error) {
+      this.publishOtaState(id, {
+        state: "failed",
+        progress: 0,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      console.error(`OTA güncellemesi başarısız (${id}): ${String(error)}`);
+    } finally {
+      this.otaUpdates.delete(id);
+    }
+    return true;
   }
 
   private async startMqttCompatibility(): Promise<void> {
@@ -438,7 +1176,13 @@ export class DirectZigbeeSource implements ZigbeeSource {
       password: this.mqttConfig.password,
       clientId: `villa-bridge-direct-${process.pid}`,
       clean: true,
-      reconnectPeriod: 2_000
+      reconnectPeriod: 2_000,
+      will: {
+        topic: `${this.mqttConfig.baseTopic}/bridge/state`,
+        payload: JSON.stringify({ state: "offline" }),
+        qos: 1,
+        retain: true
+      }
     });
     this.mqtt = client;
     client.on("error", (error) => console.error(`Uyumluluk MQTT hatası: ${error.message}`));
@@ -470,10 +1214,40 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.publishRetained("bridge/groups", this.bridgeGroups);
     for (const [ieeeAddress, state] of this.states) {
       const friendlyName = this.config.devices[ieeeAddress]?.friendly_name ?? ieeeAddress;
-      this.publish(friendlyName, state, true);
+      this.publish(friendlyName, state, this.config.devices[ieeeAddress]?.retain === true);
     }
     this.publishHomeAssistantDiscovery();
     console.log("Home Assistant ve Matterbridge için MQTT uyumluluk katmanı hazır.");
+  }
+
+  private setAvailability(ieeeAddress: string, availability: "online" | "offline"): void {
+    if (this.deviceAvailability.get(ieeeAddress) === availability) return;
+    this.deviceAvailability.set(ieeeAddress, availability);
+    const friendlyName = this.config.devices[ieeeAddress]?.friendly_name ?? ieeeAddress;
+    const payload = { state: availability };
+    this.store.ingest(`${friendlyName}/availability`, Buffer.from(JSON.stringify(payload)));
+    this.publish(`${friendlyName}/availability`, payload, true);
+  }
+
+  private refreshAvailability(): void {
+    const controller = this.controller;
+    if (!controller) return;
+    const now = Date.now();
+    for (const device of controller.getDevicesIterator()) {
+      if (device.type === "Coordinator") continue;
+      const availability = zigbeeAvailabilityState(device.lastSeen, device, now);
+      this.setAvailability(device.ieeeAddr, availability);
+      // Mesaj yolu yalnız çözümlenen çerçeveleri görür; dakikalık tarama son görülmeyi her cihaz
+      // için tazeler. Sıklığı zamanlayıcı sınırlar, böylece cihaz görünümü önbelleği boğulmaz.
+      if (typeof device.lastSeen === "number") {
+        const friendlyName = this.config.devices[device.ieeeAddr]?.friendly_name ?? device.ieeeAddr;
+        this.store.recordDeviceLink(friendlyName, { lastSeen: new Date(device.lastSeen).toISOString() });
+      }
+      // Çevrimdışı görünen şebeke beslemeli yönlendirici yoklanır; sıklığı zamanlayıcı belirler.
+      if (availability === "offline" && isSelfHealProbeTarget(device)) {
+        this.selfHeal.scheduleProbe(device.ieeeAddr);
+      }
+    }
   }
 
   private publishHomeAssistantDiscovery(): void {
@@ -576,7 +1350,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const deviceEntry = Object.entries(this.config.devices)
         .find(([, options]) => options.friendly_name === friendlyName);
       const state = deviceEntry ? this.states.get(deviceEntry[0]) : undefined;
-      if (state) this.publish(friendlyName, state, true);
+      if (state) this.publish(friendlyName, state, deviceEntry?.[1].retain === true);
       return;
     }
     if (!relative.endsWith("/set")) return;
@@ -622,7 +1396,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const endpoint = (endpointId ? device.getEndpoint(endpointId) : device.getEndpoint(1)) ?? device.endpoints[0];
       if (!endpoint) throw new Error("Cihaz uç noktası bulunamadı.");
       const publish = (update: JsonObject): void => {
-        state = { ...state, ...update };
+        state = { ...state, ...applyEndpointSuffix(update, endpointName, definition) };
         this.states.set(ieeeAddress, state);
       };
       const converterMessage = endpointName
@@ -640,13 +1414,24 @@ export class DirectZigbeeSource implements ZigbeeSource {
         endpoint_name: endpointName,
         publish
       });
-      if (result?.state) state = { ...state, ...result.state };
+      if (result?.state) {
+        state = {
+          ...state,
+          ...applyEndpointSuffix(result.state as JsonObject, endpointName, definition)
+        };
+      }
     }
     this.states.set(ieeeAddress, state);
     const friendlyName = configured.friendly_name ?? ieeeAddress;
     this.store.ingest(friendlyName, Buffer.from(JSON.stringify(state)));
-    this.publish(friendlyName, state, true);
-    await this.persistStates();
+    this.publish(friendlyName, state, configured.retain === true);
+    // Komut cihaza gitti; durum önbelleğinin diske yazılamaması komutu başarısız saymamalı.
+    // Hata yutulmuyor, yalnızca çağırana yansımıyor.
+    try {
+      await this.persistStates();
+    } catch (error) {
+      console.warn(`Zigbee durum önbelleği yazılamadı: ${String(error)}`);
+    }
   }
 
   private publishBridgeInfo(): void {
@@ -669,13 +1454,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
 
   private async persistStates(): Promise<void> {
     const path = join(this.config.dataDir, "state.json");
-    const temporaryPath = `${path}.${process.pid}.tmp`;
-    await writeFile(
-      temporaryPath,
-      `${JSON.stringify(Object.fromEntries(this.states), null, 2)}\n`,
-      "utf8"
-    );
-    await rename(temporaryPath, path);
+    await writeJsonAtomic(path, Object.fromEntries(this.states));
   }
 
   private async persistDeviceConfiguration(id: string, name: string | null): Promise<void> {
@@ -684,9 +1463,60 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const document = YAML.parseDocument(await readFile(path, "utf8"));
     if (name === null) document.deleteIn(["devices", id]);
     else document.setIn(["devices", id, "friendly_name"], name);
-    const temporaryPath = `${path}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, document.toString(), "utf8");
-    await rename(temporaryPath, path);
+    await writeFileAtomic(path, document.toString());
+  }
+
+  private groupByIdentifier(id: string) {
+    const controller = this.controller;
+    if (!controller) throw new Error("SLZB koordinatörü hazır değil.");
+    const numeric = Number(id.replace(/^group-/, ""));
+    const group = Number.isInteger(numeric)
+      ? controller.getGroupByID(numeric)
+      : [...controller.getGroupsIterator()].find(
+        (item) => this.config.groups[String(item.groupID)]?.friendly_name === id
+      );
+    if (!group) throw new Error("Zigbee grubu bulunamadı.");
+    return group;
+  }
+
+  private async persistGroupConfiguration(id: number, name: string | null): Promise<void> {
+    const path = this.config.configurationFile;
+    if (!path) throw new Error("Zigbee yapılandırma dosyası tanımlı değil.");
+    const document = YAML.parseDocument(await readFile(path, "utf8"));
+    if (name === null) document.deleteIn(["groups", String(id)]);
+    else document.setIn(["groups", String(id), "friendly_name"], name);
+    await writeFileAtomic(path, document.toString());
+  }
+
+  private configuredGroupScenes(group: {
+    meta: JsonObject;
+  }): Array<{ id: number; name: string }> {
+    const raw = group.meta.villa_scenes;
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((scene) => {
+      if (!scene || typeof scene !== "object" || Array.isArray(scene)) return [];
+      const value = scene as Record<string, unknown>;
+      const sceneId = Number(value.id);
+      if (!Number.isInteger(sceneId) || sceneId < 1 || sceneId > 255) return [];
+      return [{
+        id: sceneId,
+        name: typeof value.name === "string" && value.name.trim()
+          ? value.name.trim().slice(0, 64)
+          : `Scene ${sceneId}`
+      }];
+    }).sort((left, right) => left.id - right.id);
+  }
+
+  private persistGroupScenes(
+    group: {
+      meta: JsonObject;
+      save(): void;
+    },
+    scenes: Array<{ id: number; name: string }>
+  ): void {
+    if (scenes.length) group.meta.villa_scenes = scenes;
+    else delete group.meta.villa_scenes;
+    group.save();
   }
 
   private publish(relativeTopic: string, value: unknown, retain = false): void {

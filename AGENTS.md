@@ -6,9 +6,15 @@ Application code lives in `src/`. `index.ts` defines the HTTP API,
 `direct-zigbee-source.ts` owns direct coordinator access, and `device-store.ts`
 normalizes Zigbee data into UID-based device views. Home Assistant discovery,
 favorites, connection settings, and Matterbridge integration each have focused
-modules beside their tests. The dependency-free dashboard is
-`public/index.html`. Deployment units and the Matterbridge alias hook are in
-`deploy/`; safe defaults are in `config/default.yaml`.
+modules beside their tests. The dependency-free dashboard has no build step and
+is edited directly: markup in `public/index.html`, styles in
+`public/css/panel.css`, logic in `public/js/*.js` (classic `<script src>`, one
+shared scope, load order = the `<script src>` order in `index.html`, with
+`99-bind.js` always last). A new panel file must be added to `index.html`,
+`panelAssetRoutes` in `src/index.ts` and `panelScriptFiles` in
+`src/panel-source.ts` together; `scripts/panel-graph.mjs` guards that.
+Deployment units and the Matterbridge alias hook are in `deploy/`; safe defaults
+are in `config/default.yaml`.
 
 ## Build, Test, and Development Commands
 

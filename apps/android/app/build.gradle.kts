@@ -48,7 +48,7 @@ val prepareNodeAssets by tasks.registering(Exec::class) {
     commandLine("npm", "run", "android:prepare")
     val repositoryRoot = rootProject.projectDir.parentFile.parentFile
     inputs.files(
-        fileTree(rootProject.projectDir.resolve("node-runtime")) {
+        fileTree(repositoryRoot.resolve("apps/runtime")) {
             exclude("node_modules/**")
         },
         fileTree(rootProject.projectDir.resolve("patches")),
