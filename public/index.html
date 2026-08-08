@@ -891,7 +891,7 @@
     return new Set(Array.isArray(value)?value.filter(id=>typeof id==="string"):[]);
   }catch{return new Set()}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   const weatherState={location:savedWeatherLocation,data:savedWeatherSnapshot?.data||null,error:null,loading:false,updatedAt:savedWeatherSnapshot?.updatedAt||0};
   const weatherStaleAfter=7200000;
@@ -3437,7 +3437,7 @@
     restoreDeviceFocus(focusToken);
   }
   async function refresh(){
-    try{const data=await api("/api/overview");const signature=JSON.stringify([data.devices,data.health,data.pairing,data.events,data.groups,data.departures]);state.connectionError=null;state.devices=data.devices;state.zigbeeGroups=data.groups||[];state.events=data.events||[];state.health=data.health;state.pairing=data.pairing;state.departures=data.departures||[];state.overviewLoaded=true;trackPairingProgress();watchSetupFlowDevice();if(signature!==state.overviewSignature){state.overviewSignature=signature;render()}else renderSystemAlertBar();return true;}
+    try{const data=await api("/api/overview");const signature=JSON.stringify([data.devices,data.health,data.pairing,data.events,data.groups,data.departures]);state.connectionError=null;state.devices=data.devices;state.zigbeeGroups=data.groups||[];state.events=data.events||[];state.health=data.health;state.pairing=data.pairing;state.departures=data.departures||[];state.overviewLoaded=true;trackPairingProgress();watchSetupFlowDevice();void closePairingNetworkIfIdle();if(signature!==state.overviewSignature){state.overviewSignature=signature;render()}else renderSystemAlertBar();return true;}
     catch(error){state.connectionError=error.message;$("#sideDot").className="status-dot bad";$("#sideStatus").textContent=t("serverUnreachable");renderSystemAlertBar();showToast(error.message,true);return false}
   }
   const pullRefreshState={tracking:false,refreshing:false,startX:0,startY:0,distance:0};
@@ -3553,10 +3553,9 @@
       session.phase=found.interviewCompleted===true?"ready":"found";
       if(session.phase==="ready"&&!session.completing){
         session.completing=true;
+        schedulePairingNetworkClose();
         setTimeout(async()=>{
           if(state.pairingSession!==session)return;
-          try{await api("/api/pairing/stop",{method:"POST"})}catch{}
-          state.pairing={open:false};
           if($("#pairingDialog").open)$("#pairingDialog").close();
           showToast(t(session.reconnected?"pairingReconnectComplete":"pairingComplete"));
           await refresh();
@@ -3566,6 +3565,38 @@
       return;
     }
     if(state.pairing?.open===false)session.phase="timed-out";
+  }
+  /* Ağ, interview biter bitmez kapatılmaz. Zigbee revizyon 21 cihazlar katılımdan sonra güven
+     merkezi bağlantı anahtarı değişimini sürdürüyor; `permit_join` o anda kapatılınca süreç
+     yarıda kalıyor ve cihaz saniyeler içinde ağdan düşüyor. Bu yüzden kapatma en az bu kadar
+     ertelenir; kullanıcı için akış (diyalog, bildirim, kurulum adımları) aynı kalır. */
+  const pairingNetworkHoldMs=60000;
+  function schedulePairingNetworkClose(){
+    cancelPairingNetworkClose();
+    /* Bekleyen kapatma oturuma bağlı: yeni bir eşleştirme başlarsa eskisi iptal edilir, yani
+       eski oturumun zamanlayıcısı yeni açılan ağı kapatamaz. */
+    const pending={ready:false,timer:null};
+    state.pairingNetworkClose=pending;
+    pending.timer=setTimeout(()=>{
+      pending.timer=null;
+      pending.ready=true;
+      void closePairingNetworkIfIdle();
+    },pairingNetworkHoldMs);
+  }
+  function cancelPairingNetworkClose(){
+    const pending=state.pairingNetworkClose;
+    if(pending?.timer)clearTimeout(pending.timer);
+    state.pairingNetworkClose=null;
+  }
+  /* Bekleme dolsa bile isim/oda/rol adımları sürerken ağ kapatılmaz. Akış bittiğinde ya da
+     iptal edildiğinde `refresh()` bunu yeniden çağırır, kapatma o an yapılır. Sekme kapanırsa
+     zamanlayıcı sayfayla birlikte kaybolur; ağı sunucunun kendi 180 sn'lik süresi söndürür. */
+  async function closePairingNetworkIfIdle(){
+    const pending=state.pairingNetworkClose;
+    if(!pending||!pending.ready||setupFlowDeviceId()!==null)return;
+    state.pairingNetworkClose=null;
+    try{await api("/api/pairing/stop",{method:"POST"})}catch{}
+    state.pairing={open:false};
   }
   /* Kurulum akışının hangi cihaz üstünde olduğunu tek yerden söyler: isim, görsel, rol ve oda
      adımlarının hepsi aynı cihazı taşır. */
@@ -3615,6 +3646,9 @@
   }
   async function startPairing(open=true){
     if(open&&!state.overviewLoaded)return;
+    /* Elle "Aramayı durdur" bilinçli bir eylem: beklemeden kapatılır. Yeni bir arama da eski
+       oturumun bekleyen kapatmasını üstlenmez. */
+    cancelPairingNetworkClose();
     if(open){
       state.pairingSession={foundId:null,phase:"searching",hidden:false,completing:false,reconnected:false};
       renderPairingProgress();$("#pairingDialog").showModal();

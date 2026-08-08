@@ -48,6 +48,9 @@ Kaydedilecek bir şey yok (isim/oda/rol kendi pencerelerinde kaydedildi) — bu 
 
 Yeni metin: `finishSetup`.
 
+Aynı akışın ağ tarafı ayrı bir notta: `eslesme-permit-join-notu.md` (interview bitince
+`permit_join` hemen kapatılmıyor, kurulum bitene kadar açık kalıyor).
+
 ---
 
 ## 2. Devices sayfası üst tasarımı — **7 ile birleşik**
