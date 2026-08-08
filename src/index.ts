@@ -7,7 +7,8 @@ import { loadAliases, saveAliases } from "./aliases.js";
 import { AutomationEngine } from "./automation-engine.js";
 import { AutomationRunLog } from "./automation-runs.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
-import { AuthStore } from "./auth-store.js";
+import { AgentTokenStore } from "./agent-tokens.js";
+import { AuthStore, type AuthRole } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { normalizeControlValue, soleSwitchChannelId } from "./device-controls.js";
 import { deviceMissingResponse } from "./device-departures.js";
@@ -41,6 +42,7 @@ import {
 } from "./lan-discovery.js";
 import { createPeerProbe, createPeerWatcher, type PeerWatcher } from "./peer-watch.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
+import { registerMcpEndpoint } from "./mcp.js";
 import { MqttShadowSource } from "./mqtt-source.js";
 import { getNetworkInfo } from "./network-info.js";
 import { isDeviceRemovalConfirmation } from "./removal-confirmation.js";
@@ -128,6 +130,8 @@ const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
 );
 const authStore = new AuthStore(resolve(dirname(configPath), "auth.json"));
+// Ajan token'ları kullanıcı hesaplarından ayrı dosyada: süresiz yaşar, çerez taşımaz.
+const agentTokenStore = new AgentTokenStore(resolve(dirname(configPath), "agent-tokens.json"));
 // Yedek yalnızca ev yapılandırmasını kapsar: parola özetleri, ağ anahtarı ve kuruluma
 // özel durum dosyaları bilerek dışarıda bırakılmıştır.
 const homeBackupService = new HomeBackupService({
@@ -275,7 +279,14 @@ const automationEngine = new AutomationEngine({
 });
 const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
-  secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true"
+  secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true",
+  agentTokens: agentTokenStore,
+  mcpAllowedOrigins: config.mcp.allowedOrigins
+});
+// Ajan ucu: cihaz listesi ve tek cihaz okuması. Kimlik kapısı yukarıdaki tabloda.
+registerMcpEndpoint(app, {
+  devices: () => store.getDevices(),
+  homeGroups: () => homeGroupsStore.get()
 });
 registerRecentErrorApi(app, recentErrors);
 
@@ -365,7 +376,9 @@ app.get("/api/locales", async (_request, reply) => {
 
 app.get("/api/health", async () => ({ ...store.getHealth(), node: nodeStatus() }));
 app.get("/api/discovery", async () => ({ ...discoveryRecord, sentAt: Date.now() }));
-const visibleDevices = (role: "admin" | "resident" | undefined) => store.getDevices().map((device) => ({
+// Tip birliğinde `agent` rolü de var ama buraya hiç uğramaz: ajan yalnız `/mcp` üzerinden konuşur,
+// `/api/*` yolları oturum ister. Pratikte gelen rol admin ya da resident'tır.
+const visibleDevices = (role: AuthRole | undefined) => store.getDevices().map((device) => ({
   ...device,
   controls: role === "resident"
     ? device.controls.filter((control) => control.adminOnly !== true)

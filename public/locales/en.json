@@ -1168,6 +1168,22 @@
     "retrySetup": "Try again",
     "pairingRemovedWarning": "This device was removed a moment ago. If pairing does not finish, wait a minute and try again.",
     "pairingDeviceWait": "The device briefly lost its connection. Waiting for it to come back…",
-    "pairingDeviceReturned": "The device is back. Setup continues where it left off."
+    "pairingDeviceReturned": "The device is back. Setup continues where it left off.",
+    "agentAccessTitle": "Assistant access",
+    "agentAccessLead": "Give your own AI assistant a token so it can read the home over the MCP endpoint. A token never expires and is shown only once, right after you create it.",
+    "agentTokenNamePlaceholder": "Laptop assistant",
+    "agentTokenCreate": "Create token",
+    "agentTokenRevealTitle": "Copy this token now",
+    "agentTokenRevealLead": "This is the only time the token is shown. If you lose it, revoke it and create a new one.",
+    "copyToken": "Copy",
+    "agentTokenCopied": "Token copied.",
+    "agentTokenCopyFailed": "The token could not be copied. Select it and copy by hand.",
+    "agentTokenCreatedAt": "created {at}",
+    "agentTokenLastUsed": "last used {at}",
+    "agentTokenNeverUsed": "never used",
+    "agentTokenRevoke": "Revoke",
+    "agentTokenRevokeConfirm": "Revoke the token “{name}”? The assistant using it loses access immediately.",
+    "agentTokenRevoked": "Token revoked.",
+    "agentTokenEmpty": "No assistant token yet."
   }
 }

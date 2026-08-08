@@ -7,7 +7,12 @@ import {
 import { readFile } from "node:fs/promises";
 import { writeJsonAtomic } from "./atomic-file.js";
 
-export type AuthRole = "admin" | "resident";
+/**
+ * `agent`, makine istemcisinin (kullanıcının kendi LLM istemcisi) rolüdür. Diğer ikisinin aksine
+ * bir kullanıcı kaydı ya da çerez oturumu yoktur: kimliği `agent-tokens.json` içindeki Bearer
+ * token taşır. Rol burada durur ki yetki tabloları ondan da isimle söz edebilsin.
+ */
+export type AuthRole = "admin" | "resident" | "agent";
 
 interface ScryptParameters {
   N: number;

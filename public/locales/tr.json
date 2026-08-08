@@ -1168,6 +1168,22 @@
     "retrySetup": "Tekrar dene",
     "pairingRemovedWarning": "Bu cihaz az önce kaldırıldı. Eşleştirme tamamlanmazsa bir dakika bekleyip tekrar deneyin.",
     "pairingDeviceWait": "Cihaz bir an bağlantıyı kaybetti, geri gelmesi bekleniyor…",
-    "pairingDeviceReturned": "Cihaz geri geldi, kurulum kaldığı yerden sürüyor."
+    "pairingDeviceReturned": "Cihaz geri geldi, kurulum kaldığı yerden sürüyor.",
+    "agentAccessTitle": "Asistan erişimi",
+    "agentAccessLead": "Kendi yapay zekâ asistanınıza bir token verin; evi MCP ucundan okuyabilsin. Token süresiz yaşar ve yalnız oluşturulduğu anda bir kez gösterilir.",
+    "agentTokenNamePlaceholder": "Dizüstü asistan",
+    "agentTokenCreate": "Token üret",
+    "agentTokenRevealTitle": "Bu token'ı şimdi kopyalayın",
+    "agentTokenRevealLead": "Token yalnız bu bir kez gösterilir. Kaybederseniz iptal edip yenisini üretin.",
+    "copyToken": "Kopyala",
+    "agentTokenCopied": "Token kopyalandı.",
+    "agentTokenCopyFailed": "Token kopyalanamadı. Seçip elle kopyalayın.",
+    "agentTokenCreatedAt": "{at} oluşturuldu",
+    "agentTokenLastUsed": "son kullanım {at}",
+    "agentTokenNeverUsed": "hiç kullanılmadı",
+    "agentTokenRevoke": "İptal et",
+    "agentTokenRevokeConfirm": "“{name}” token'ı iptal edilsin mi? Onu kullanan asistan anında erişimini kaybeder.",
+    "agentTokenRevoked": "Token iptal edildi.",
+    "agentTokenEmpty": "Henüz asistan token'ı yok."
   }
 }

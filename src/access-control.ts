@@ -1,10 +1,14 @@
 import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { AgentTokenStore, AgentTokenSummary } from "./agent-tokens.js";
 import type { AuthRole, AuthSession, AuthStore, CreatedAuthSession } from "./auth-store.js";
+import { isAllowedMcpOrigin, mcpErrorBody, mcpErrorCodes, mcpRoutePath } from "./mcp.js";
 
 declare module "fastify" {
   interface FastifyRequest {
     villaSession: AuthSession | null;
+    /** `/mcp` isteğini doğrulayan ajan token'ı; başka hiçbir yolda dolmaz. */
+    villaAgent: AgentTokenSummary | null;
   }
 }
 
@@ -122,6 +126,10 @@ export class LoginThrottle {
 export interface AccessControlOptions {
   secureCookies?: boolean;
   throttle?: LoginThrottle;
+  /** Ajan token deposu; verilmezse `/mcp` her istekte 401 döner ve yönetim uçları açılmaz. */
+  agentTokens?: AgentTokenStore;
+  /** `/mcp` için izinli `Origin` başlıkları; boşsa Origin gönderen istemci reddedilir. */
+  mcpAllowedOrigins?: readonly string[];
 }
 
 const sendSession = (
@@ -150,16 +158,59 @@ export const registerAccessControl = async (
 ): Promise<void> => {
   const secureCookies = options.secureCookies === true;
   const throttle = options.throttle ?? new LoginThrottle();
+  const agentTokens = options.agentTokens;
+  const mcpAllowedOrigins = options.mcpAllowedOrigins ?? [];
   let configured = await authStore.configured();
   app.decorateRequest("villaSession", null);
+  app.decorateRequest("villaAgent", null);
 
   const requestToken = (request: FastifyRequest): string | undefined =>
     parseCookie(request.headers.cookie, sessionCookieName);
   const requestSession = (request: FastifyRequest): Promise<AuthSession | null> =>
     authStore.getSession(requestToken(request));
 
+  /**
+   * `/mcp` kapısı. Aşağıdaki tablo yalnız `/api/` yollarını kapsadığı için bu uç kendi başına
+   * **korumasız kalırdı**; bu yüzden açıkça ilk sırada ele alınır. Yalnız `Authorization: Bearer`
+   * geçer — çerez oturumu bilerek kabul EDİLMEZ, yoksa açık bir tarayıcı sekmesi üzerinden
+   * (CSRF deseniyle) evin tamamı sürülebilirdi.
+   */
+  const authorizeMcpRequest = async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<FastifyReply | undefined> => {
+    // Yöntem denetimi kimlikten önce gelir: `GET /mcp` hiçbir veri açmaz, yalnız "bu sürümde
+    // akış yok" der; 401 döndürmek istemciyi yanlış yöne (token sorunu) sürüklerdi.
+    if (request.method !== "POST") {
+      return reply.code(405).header("Allow", "POST").send(mcpErrorBody(
+        mcpErrorCodes.methodNotAllowed,
+        "MCP ucu yalnız POST kabul eder; bu sürümde GET akışı yoktur."
+      ));
+    }
+    if (!isAllowedMcpOrigin(request.headers.origin, mcpAllowedOrigins)) {
+      return reply.code(403).send(mcpErrorBody(
+        mcpErrorCodes.forbiddenOrigin,
+        "İstek kökeni (Origin) bu uç için izinli değil."
+      ));
+    }
+    const authorization = request.headers.authorization;
+    const token = typeof authorization === "string" && /^Bearer /.test(authorization)
+      ? authorization.slice("Bearer ".length).trim()
+      : undefined;
+    const agent = token && agentTokens ? await agentTokens.verify(token) : null;
+    if (!agent) {
+      return reply.code(401).header("WWW-Authenticate", "Bearer").send(mcpErrorBody(
+        mcpErrorCodes.unauthorized,
+        "Geçerli bir ajan token'ı gerekiyor: Authorization: Bearer <token>."
+      ));
+    }
+    request.villaAgent = agent;
+    return undefined;
+  };
+
   app.addHook("onRequest", async (request, reply) => {
     const route = request.routeOptions.url ?? request.url.split("?")[0];
+    if (route === mcpRoutePath) return authorizeMcpRequest(request, reply);
     if (!route.startsWith("/api/") || publicRoutes.has(route)) return;
     if (!configured) {
       return reply.code(423).send({
@@ -305,4 +356,38 @@ export const registerAccessControl = async (
       });
     }
   });
+
+  // Ajan token yönetimi. Yetki tablolarında listelenmediği için yönetici ister; ham token
+  // yalnız üretim yanıtında bir kez döner, listede bir daha görünmez.
+  if (agentTokens) {
+    app.get("/api/agent-tokens", async (_request, reply) => {
+      try {
+        return { ok: true, tokens: await agentTokens.list() };
+      } catch (error) {
+        return reply.code(503).send({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
+
+    app.post<{ Body?: { name?: unknown } }>("/api/agent-tokens", async (request, reply) => {
+      try {
+        const created = await agentTokens.create(request.body?.name);
+        return { ok: true, token: created.token, record: created.record };
+      } catch (error) {
+        return reply.code(400).send({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
+
+    app.delete<{ Params: { id: string } }>("/api/agent-tokens/:id", async (request, reply) => {
+      if (!await agentTokens.revoke(request.params.id)) {
+        return reply.code(404).send({ ok: false, error: "Ajan token'ı bulunamadı." });
+      }
+      return { ok: true, tokens: await agentTokens.list() };
+    });
+  }
 };

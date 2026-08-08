@@ -76,6 +76,8 @@
   $("#coachNext").onclick=nextCoachStep;
   $("#coachBack").onclick=previousCoachStep;
   $("#coachSkip").onclick=finishCoach;
+  $("#agentTokenForm").onsubmit=createAgentToken;
+  $("#copyAgentToken").onclick=copyAgentToken;
   $("#restartOnboarding").onclick=openOnboarding;
   $("#restartDashboardTour").onclick=restartDashboardGuide;
   $("#downloadZigbeeBackup").onclick=downloadZigbeeBackup;

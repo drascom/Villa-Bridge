@@ -28,6 +28,11 @@ selfHealing:
   probeOffline: true
 debug:
   enabled: true
+# MCP ucu (POST /mcp) yalnız Bearer ajan token'ı kabul eder. allowedOrigins boşken Origin başlığı
+# gönderen istek (tarayıcı) reddedilir; makine istemcisi Origin göndermediği için çalışır.
+# VILLA_BRIDGE_MCP_ALLOWED_ORIGINS ile virgülle ayırarak da verilebilir.
+mcp:
+  allowedOrigins: []
 http:
   host: 0.0.0.0
   port: 8091

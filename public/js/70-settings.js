@@ -16,7 +16,69 @@
       renderDebugSettings();
       if(state.settings.debug?.enabled===true)await loadDebugErrors();
       await loadDebugNetworkEvents();
+      await loadAgentTokens();
     }catch(error){showToast(t("settingsUnavailable"),true)}
+  }
+  /* Ajan token'ları: kullanıcının kendi yazdığı LLM istemcisi `/mcp` ucuna bu token'la bağlanır.
+     Ham değer yalnız üretim yanıtında bir kez gelir; listede yalnız ad ve zaman damgaları durur.
+     Kart `data-admin-only` taşır, ev kullanıcısı hiç görmez. */
+  function renderAgentTokens(){
+    const tokens=state.agentTokens||[];
+    $("#agentTokenList").innerHTML=tokens.length?tokens.map(token=>`<article class="agent-token-row"><div><strong>${esc(token.name)}</strong><small>${t("agentTokenCreatedAt",{at:ago(token.createdAt)})} · ${token.lastUsedAt?t("agentTokenLastUsed",{at:ago(token.lastUsedAt)}):t("agentTokenNeverUsed")}</small></div><button class="quiet" type="button" data-revoke-agent-token="${esc(token.id)}">${t("agentTokenRevoke")}</button></article>`).join(""):`<div class="agent-token-empty">${t("agentTokenEmpty")}</div>`;
+    $$("[data-revoke-agent-token]").forEach(button=>button.onclick=()=>revokeAgentToken(button.dataset.revokeAgentToken));
+  }
+  async function loadAgentTokens(){
+    try{
+      const data=await api("/api/agent-tokens");
+      state.agentTokens=Array.isArray(data.tokens)?data.tokens:[];
+    }catch(error){state.agentTokens=[]}
+    renderAgentTokens();
+  }
+  async function createAgentToken(event){
+    event.preventDefault();
+    const input=$("#agentTokenName");
+    if(!input.reportValidity())return;
+    const button=$("#agentTokenForm button");
+    button.disabled=true;
+    try{
+      const data=await api("/api/agent-tokens",{method:"POST",body:JSON.stringify({name:input.value.trim()})});
+      input.value="";
+      $("#agentTokenValue").textContent=data.token;
+      $("#agentTokenReveal").hidden=false;
+      await loadAgentTokens();
+    }catch(error){showToast(error.message,true)}
+    finally{button.disabled=false}
+  }
+  async function copyAgentToken(){
+    const value=$("#agentTokenValue").textContent||"";
+    if(!value)return;
+    try{
+      /* Android WebView'de pano API'si her zaman yok; eski seçim yoluna düşülür. */
+      if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(value);
+      else{
+        const field=document.createElement("textarea");
+        field.value=value;
+        field.setAttribute("readonly","");
+        field.style.position="fixed";
+        field.style.opacity="0";
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand("copy");
+        field.remove();
+      }
+      showToast(t("agentTokenCopied"));
+    }catch(error){showToast(t("agentTokenCopyFailed"),true)}
+  }
+  async function revokeAgentToken(id){
+    const token=(state.agentTokens||[]).find(item=>item.id===id);
+    if(!token||!confirm(t("agentTokenRevokeConfirm",{name:token.name})))return;
+    try{
+      await api(`/api/agent-tokens/${encodeURIComponent(id)}`,{method:"DELETE"});
+      $("#agentTokenReveal").hidden=true;
+      $("#agentTokenValue").textContent="";
+      showToast(t("agentTokenRevoked"));
+      await loadAgentTokens();
+    }catch(error){showToast(error.message,true)}
   }
   const onboardingStepCount=6;
   const onboardingIcon=kind=>{

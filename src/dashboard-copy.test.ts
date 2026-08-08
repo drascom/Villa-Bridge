@@ -958,6 +958,33 @@ test("Settings debug modu son API hatalarını güvenli ve isteğe bağlı göst
   assert.doesNotThrow(() => new Function(scripts));
 });
 
+test("asistan token kartı yalnız yöneticiye açıktır ve ham token'ı bir kez gösterir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  assert.match(dashboard, /id="agentAccessCard" class="setting-card agent-access-card" data-admin-only/);
+  assert.match(dashboard, /id="agentTokenForm" class="agent-token-create"/);
+  assert.match(dashboard, /id="agentTokenReveal" class="agent-token-reveal" role="status" hidden/);
+  assert.match(dashboard, /id="agentTokenValue"/);
+  assert.match(dashboard, /id="agentTokenList"/);
+  assert.match(dashboard, /api\("\/api\/agent-tokens"\)/);
+  assert.match(dashboard, /api\("\/api\/agent-tokens",\{method:"POST"/);
+  assert.match(dashboard, /api\(`\/api\/agent-tokens\/\$\{encodeURIComponent\(id\)\}`,\{method:"DELETE"\}\)/);
+  // Ham token yalnız üretim yanıtından gelir; listeleme yolunda hiç geçmez.
+  assert.match(dashboard, /\$\("#agentTokenValue"\)\.textContent=data\.token/);
+  assert.match(dashboard, /\$\("#agentTokenReveal"\)\.hidden=false/);
+  assert.doesNotMatch(dashboard, /token\.token/);
+  assert.match(dashboard, /confirm\(t\("agentTokenRevokeConfirm",\{name:token\.name\}\)\)/);
+  assert.match(dashboard, /await loadAgentTokens\(\)/);
+  assert.match(dashboard, /agentAccessTitle:"Assistant access"/);
+  assert.match(dashboard, /agentAccessTitle:"Asistan erişimi"/);
+  assert.match(dashboard, /agentTokenRevealTitle:"Copy this token now"/);
+  assert.match(dashboard, /agentTokenRevealTitle:"Bu token'ı şimdi kopyalayın"/);
+  // Ölçüler sabit px değil: 1024×640 tablette de, geniş ekranda da aynı kart.
+  assert.match(dashboard, /\.agent-token-create\{display:grid;grid-template-columns:minmax\(0,1fr\) auto;gap:clamp\(8px,1vw,12px\)\}/);
+  assert.match(dashboard, /\.agent-token-reveal\{[^}]*background:var\(--forest-soft\);color:var\(--ink\)\}/);
+  assert.doesNotMatch(dashboard, /agent-token[^{]*\{[^}]*color-mix\(/);
+});
+
 test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async () => {
   const dashboard = await readDashboardBundle();
 

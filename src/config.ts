@@ -39,6 +39,9 @@ interface FileConfig {
   debug?: {
     enabled?: boolean;
   };
+  mcp?: {
+    allowedOrigins?: string[];
+  };
   http?: {
     host?: string;
     port?: number;
@@ -154,6 +157,14 @@ export interface AppConfig {
   debug: {
     enabled: boolean;
   };
+  /**
+   * MCP ucu (`POST /mcp`). `allowedOrigins` yalnız DNS rebinding koruması içindir: liste boşken
+   * `Origin` başlığı gönderen (yani tarayıcı içinden gelen) istek reddedilir, başlık göndermeyen
+   * makine istemcisi çalışır. Tarayıcıdan çağıracak bir istemci varsa kökeni buraya yazılır.
+   */
+  mcp: {
+    allowedOrigins: string[];
+  };
   http: {
     host: string;
     port: number;
@@ -227,6 +238,13 @@ export async function loadConfig(): Promise<AppConfig> {
       enabled: process.env.VILLA_BRIDGE_DEBUG
         ? process.env.VILLA_BRIDGE_DEBUG === "true"
         : file.debug?.enabled !== false
+    },
+    mcp: {
+      allowedOrigins: (process.env.VILLA_BRIDGE_MCP_ALLOWED_ORIGINS !== undefined
+        ? process.env.VILLA_BRIDGE_MCP_ALLOWED_ORIGINS.split(",")
+        : file.mcp?.allowedOrigins ?? [])
+        .map((origin) => String(origin).trim())
+        .filter((origin) => origin.length > 0)
     },
     http: {
       host: process.env.VILLA_BRIDGE_HOST ?? file.http?.host ?? "0.0.0.0",
