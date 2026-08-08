@@ -856,3 +856,84 @@ test("köprünün kendi olayları iki yola da girer", () => {
     ["availability", "battery_threshold", "occupancy", "self_heal"]
   );
 });
+
+/** Sinyal/son görülme testlerinin ortak cihaz defteri. */
+function signalStore(overrides: Record<string, unknown> = {}): DeviceStore {
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0xsignal",
+      friendly_name: "Koridor Lamba",
+      type: "Router",
+      supported: true,
+      interview_completed: true,
+      network_address: 4660,
+      power_source: "Mains (single phase)",
+      definition: { model: "TS0001", vendor: "Tuya", exposes: [] },
+      ...overrides
+    }]))
+  );
+  return store;
+}
+
+test("gölge kipinde linkquality yayın payload'ından yakalanıp cihaz görünümüne düşer", () => {
+  const store = signalStore();
+  store.ingest("Koridor Lamba", Buffer.from('{"state":"ON","linkquality":186,"last_seen":"2026-08-07T10:00:00.000Z"}'));
+
+  const [device] = store.getDevices();
+  assert.equal(device.linkquality, 186);
+  assert.equal(device.lastSeen, "2026-08-07T10:00:00.000Z");
+  // Kısa NWK adresi ve güç kaynağı köprü cihaz listesinden taşınır.
+  assert.equal(device.networkAddress, 4660);
+  assert.equal(device.powerSource, "Mains (single phase)");
+});
+
+test("linkquality taşımayan sonraki yayın son bilinen sinyali silmez", () => {
+  const store = signalStore();
+  store.ingest("Koridor Lamba", Buffer.from('{"state":"ON","linkquality":186}'));
+  // Zigbee2MQTT bazı yayınlarda sinyali atlar; defter son değeri korur.
+  store.ingest("Koridor Lamba", Buffer.from('{"state":"OFF"}'));
+
+  assert.equal(store.getDevices()[0]?.linkquality, 186);
+});
+
+test("doğrudan kipin mesaj yolu sinyal ve son görülmeyi cihaz başına yazar", () => {
+  const store = signalStore();
+  // Doğrudan kipte sinyal cihaz durumunun parçası değildir: kaynak `recordDeviceLink` çağırır.
+  store.recordDeviceLink("Koridor Lamba", { linkquality: 63, lastSeen: "2026-08-07T11:30:00.000Z" });
+
+  const [device] = store.getDevices();
+  assert.equal(device.linkquality, 63);
+  assert.equal(device.lastSeen, "2026-08-07T11:30:00.000Z");
+});
+
+test("sinyal verisi hiç yoksa alanlar bulunmaz, sıfır uydurulmaz", () => {
+  const store = signalStore({ network_address: undefined, power_source: undefined });
+  store.ingest("Koridor Lamba", Buffer.from('{"state":"ON"}'));
+
+  const [device] = store.getDevices();
+  assert.equal("linkquality" in device, false);
+  assert.equal("powerSource" in device, false);
+  assert.equal("networkAddress" in device, false);
+  assert.equal(device.lastSeen, null);
+});
+
+test("sinyal defteri 0-255 aralığına kırpılır ve tam sayıya yuvarlanır", () => {
+  const store = signalStore();
+  store.recordDeviceLink("Koridor Lamba", { linkquality: 999 });
+  assert.equal(store.getDevices()[0]?.linkquality, 255);
+  store.recordDeviceLink("Koridor Lamba", { linkquality: 41.6 });
+  assert.equal(store.getDevices()[0]?.linkquality, 42);
+  // Geçersiz değer son bilineni bozmaz.
+  store.recordDeviceLink("Koridor Lamba", { linkquality: Number.NaN });
+  assert.equal(store.getDevices()[0]?.linkquality, 42);
+});
+
+test("sinyal ve son görülme otomasyon akışına da olay günlüğüne de girmez", () => {
+  const store = signalStore();
+  const feed = automationFeed(store);
+  store.recordDeviceLink("Koridor Lamba", { linkquality: 120, lastSeen: "2026-08-07T12:00:00.000Z" });
+  assert.deepEqual(feed, []);
+  assert.deepEqual(store.getEvents(), []);
+});

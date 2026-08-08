@@ -361,6 +361,13 @@
     .device-grid.devices-list-view{justify-items:center}.device-grid.devices-list-view>.device-card{width:min(100%,760px)}.device-grid.devices-list-view>.empty{width:100%}
     .device-card-hint{flex:none;display:flex;align-items:center;color:var(--muted);font-size:19px;font-weight:700;line-height:1;opacity:.6}.device-card-hint.divided{margin-right:2px;padding-right:10px;border-right:1px solid var(--line)}
     .device-card.command-failed,.group-control-tile.command-failed{border-color:var(--danger);box-shadow:0 0 0 3px rgba(184,58,53,.16)}.device-card.command-failed .device-primary-status{color:var(--danger)}:root[data-theme="dark"] .device-card.command-failed,:root[data-theme="dark"] .group-control-tile.command-failed{border-color:#c86058;box-shadow:0 0 0 3px rgba(255,192,186,.16)}
+    /* Liste görünümü = Zigbee2MQTT'nin Devices tablosunun karşılığı. Yatay kaydırma yalnızca
+       `.device-table-wrap` içindedir: sayfa gövdesi hiçbir genişlikte yana kaymaz. Ölçüler
+       `clamp()` + viewport ile verilir, hedef 1024×640'ta on sütun da okunur kalsın. */
+    .device-grid.devices-list-view>.device-table-panel{width:100%;min-width:0}.device-table-panel{min-width:0}.device-table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--card-shadow)}.device-table{width:100%;min-width:clamp(44rem,70vw,56rem);border-collapse:collapse;font-size:clamp(11px,1.05vw,13px)}.device-table th,.device-table td{padding:clamp(6px,.7vw,10px) clamp(7px,.75vw,12px);border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.device-table thead th{padding-top:0;padding-bottom:0;color:var(--muted);background:var(--surface-soft);font-size:clamp(10px,.95vw,11px);font-weight:850;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}.device-table tbody tr:last-child td{border-bottom:0}.device-table tbody tr{cursor:pointer;touch-action:manipulation}.device-table tbody tr:hover{background:var(--surface-soft)}.device-table tbody tr:focus-visible{outline:3px solid var(--forest-soft);outline-offset:-3px}.device-table tbody tr.focused{outline:3px solid var(--forest);outline-offset:-3px}.device-table tbody tr.device-row-offline{filter:saturate(.7);opacity:.78}
+    .device-table-sort{min-height:44px;display:inline-flex;align-items:center;gap:5px;padding:0;border:0;color:inherit;background:transparent;font:inherit;letter-spacing:inherit;text-transform:inherit;touch-action:manipulation}.device-table-sort:hover,.device-table-sort:focus-visible{color:var(--forest)}.device-table-arrow{font-size:9px;line-height:1;opacity:0}.device-table-sort[data-sort="ascending"] .device-table-arrow,.device-table-sort[data-sort="descending"] .device-table-arrow{opacity:1}.device-table-index{width:1%;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}.device-table-visual{width:1%}.device-table .device-visual{width:clamp(28px,3vw,38px);height:clamp(28px,3vw,38px);border-radius:9px}.device-table-name{min-width:clamp(7rem,13vw,12rem);color:var(--ink);font-weight:800;overflow-wrap:anywhere}.device-table-uid{color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(10px,.9vw,11px);white-space:nowrap}.device-table-uid small{display:block;font-size:.92em;opacity:.75}.device-table-text{color:var(--muted);overflow-wrap:anywhere}.device-table-lqi{font-variant-numeric:tabular-nums;font-weight:800;white-space:nowrap}.device-table-lqi.strong{color:#24805a}.device-table-lqi.weak{color:var(--danger)}
+    .device-table-state{display:flex;align-items:center;gap:6px;font-weight:800;white-space:nowrap}.device-table-dot{width:9px;height:9px;flex:none;border-radius:50%;background:var(--muted)}.device-table-state.online{color:#24805a}.device-table-state.online .device-table-dot{background:#24805a}.device-table-state.offline{color:var(--danger)}.device-table-state.offline .device-table-dot{background:var(--danger)}.device-table-seen{display:block;margin-top:3px;color:var(--muted);font-size:clamp(10px,.9vw,11px);font-weight:600;white-space:nowrap}.device-table-actions{width:1%;white-space:nowrap}.device-table-action-row{display:flex;align-items:center;justify-content:flex-end;gap:clamp(1px,.3vw,4px)}.device-table-action{width:44px;height:44px;flex:none;display:grid;place-items:center;border:0;border-radius:11px;color:var(--muted);background:transparent;touch-action:manipulation}.device-table-action:hover,.device-table-action:focus-visible{color:var(--ink);background:var(--surface-soft)}.device-table-action.danger:hover,.device-table-action.danger:focus-visible{color:var(--danger)}.device-table-action svg{width:clamp(15px,1.5vw,18px);height:clamp(15px,1.5vw,18px);fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.device-table-note{margin:11px 0 0;padding:0 clamp(4px,.6vw,10px);color:var(--muted);font-size:clamp(10px,.95vw,12px);line-height:1.4}
+    :root[data-theme="dark"] .device-table tbody tr:hover{background:#20302a}:root[data-theme="dark"] .device-table-lqi.strong,:root[data-theme="dark"] .device-table-state.online{color:#7fd8ab}:root[data-theme="dark"] .device-table-state.online .device-table-dot{background:#7fd8ab}:root[data-theme="dark"] .device-table-lqi.weak,:root[data-theme="dark"] .device-table-state.offline{color:#ffc0ba}:root[data-theme="dark"] .device-table-state.offline .device-table-dot{background:#ffc0ba}
 
     .automation-list{display:grid;gap:12px}.automation-card{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:15px;padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--card-shadow)}.automation-card-glyph{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;color:var(--forest);background:var(--forest-soft);font-size:21px}.automation-card-copy{min-width:0}.automation-card strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.automation-card-note{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.35}.automation-empty{display:grid;justify-items:center;gap:10px;padding:44px 20px}.automation-empty-icon{width:62px;height:62px;display:grid;place-items:center;border-radius:20px;color:var(--forest);background:var(--forest-soft);font-size:30px}.automation-empty h2{margin:4px 0 0;color:var(--ink);font:750 23px/1.1 system-ui,sans-serif}.automation-empty p{max-width:480px;margin:0}
     dialog.simple-link-dialog{width:min(94vw,660px)}.simple-link-modal{max-height:min(92vh,860px);padding:24px;overflow-y:auto;overscroll-behavior:contain}.simple-link-modal .room-filter{margin:16px 0 0}.simple-link-choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:11px;margin-top:16px}.simple-link-choice{min-height:88px;display:grid;align-content:center;gap:6px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);text-align:left;touch-action:manipulation}.simple-link-choice:hover,.simple-link-choice:focus-visible{border-color:var(--forest)}.simple-link-choice:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.simple-link-choice.active{border-color:var(--forest);background:var(--forest-soft)}.simple-link-choice strong{font-size:14px;font-weight:800;overflow-wrap:anywhere}.simple-link-choice small{color:var(--muted);font-size:12px}.simple-link-summary{margin-top:18px;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.simple-link-summary[hidden]{display:none}.simple-link-summary strong{display:block;font-size:15px;font-weight:800;overflow-wrap:anywhere}.simple-link-summary p{margin:8px 0 0;font-size:13px;line-height:1.4}.simple-link-modal .modal-actions button[hidden]{display:none}
@@ -791,6 +798,10 @@
   const savedDeviceLayout=(()=>{try{return localStorage.getItem("villa-device-layout")||localStorage.getItem("villa-quick-layout")}catch{return null}})();
   const savedAttentionOpen=(()=>{try{return localStorage.getItem("villa-attention-open")==="true"}catch{return false}})();
   const savedDeviceColumns=(()=>{try{const value=Number(localStorage.getItem("villa-device-columns"));return Number.isFinite(value)&&value>=1?Math.min(4,Math.round(value)):null}catch{return null}})();
+  const savedDeviceSort=(()=>{try{
+    const[key,direction]=String(localStorage.getItem("villa-device-sort")||"").split(":");
+    return["name","lqi","status","lastSeen"].includes(key)?{key,direction:direction==="desc"?"desc":"asc"}:null;
+  }catch{return null}})();
   const savedThemeMode=(()=>{try{const value=localStorage.getItem("villa-theme");return["light","dark","system"].includes(value)?value:"system"}catch{return"system"}})();
   const savedWeatherLocation=(()=>{try{const value=JSON.parse(localStorage.getItem("villa-weather-location")||"null");return Number.isFinite(value?.latitude)&&Number.isFinite(value?.longitude)?{...value,name:typeof value.name==="string"?value.name.slice(0,80):"",country:typeof value.country==="string"?value.country.slice(0,80):"",admin1:typeof value.admin1==="string"?value.admin1.slice(0,80):""}:null}catch{return null}})();
   const savedWeatherSnapshot=(()=>{try{
@@ -891,7 +902,7 @@
     return new Set(Array.isArray(value)?value.filter(id=>typeof id==="string"):[]);
   }catch{return new Set()}})();
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,deviceSort:savedDeviceSort??{key:"name",direction:"asc"},attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   const weatherState={location:savedWeatherLocation,data:savedWeatherSnapshot?.data||null,error:null,loading:false,updatedAt:savedWeatherSnapshot?.updatedAt||0};
   const weatherStaleAfter=7200000;
@@ -1182,9 +1193,16 @@
     if(!imageModel)return"";
     return`<div class="device-detail-photo" data-device-photo hidden><img class="device-photo" src="/api/device-image/${encodeURIComponent(imageModel)}" alt="" data-device-image data-model="${esc(imageModel)}"><button class="image-edit-overlay" type="button" data-admin-only data-change-image="${esc(device.id)}" aria-label="${esc(t("changeImage"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h4l2-2h4l2 2h4v15H4V5Z"/><circle cx="12" cy="12" r="4"/></svg><span>${t("changeImage")}</span></button></div>`;
   };
+  /* Ham LQI (0-255). Sunucu son değeri cihaz başına saklar (`device.linkquality`); doğrudan kipte
+     sinyal cihaz durumunun parçası olmadığı için tek güvenilir kaynak odur. Eski gölge payload'ı
+     için `state.linkquality` yedekte kalır. Değer yoksa `null` döner — uydurma değer yok. */
+  const rawLinkQuality=device=>{
+    const value=Number(device.linkquality??device.state?.linkquality);
+    return Number.isFinite(value)?Math.round(Math.max(0,Math.min(255,value))):null;
+  };
   const linkQualityPercent=device=>{
-    const value=Number(device.state?.linkquality);
-    return Number.isFinite(value)?Math.round(Math.max(0,Math.min(255,value))/255*100):null;
+    const value=rawLinkQuality(device);
+    return value===null?null:Math.round(value/255*100);
   };
   const linkQualityBadge=device=>{
     const percent=linkQualityPercent(device);
@@ -1443,6 +1461,104 @@
       <div class="device-card-header"><div class="device-card-lead">${deviceStatusIcon(device,primaryStatus)}${cardStatusBadge(device)}</div><div class="device-card-copy"><div class="device-name-row"><div class="device-name">${esc(device.name)}</div></div><div class="device-meta"><span class="device-meta-text"><span class="device-primary-status ${primaryStatus.tone}">${esc(primaryStatus.label)}</span></span></div></div><div class="device-header-status">${detailHint}${cardToggle}</div></div>
     </article>`;
   };
+  /* Liste görünümü — Zigbee2MQTT'nin Devices tablosunun sütun düzeni, aynı sırayla:
+     # · Görsel · Ad · UID · Üretici · Model · LQI · Durum · Güç · Eylemler.
+     "En son görülme" Z2M'de ayrı sütun değildir; 1024×640'ta on birinci sütun sığmadığı için
+     Durum hücresinin altına ikinci satır olarak konur (göreli metin, tam zaman `title`'da).
+     Hiçbir hücrede uydurma değer yoktur: veri yoksa "—" yazar. */
+  const deviceTableDash=`<span class="device-table-text" aria-hidden="true">—</span>`;
+  const deviceTablePower=device=>{
+    const battery=batteryPercent(device);
+    const source=String(device.powerSource||"");
+    if(battery!==null)return`${t("powerBattery")} ${battery}%`;
+    if(/batter/i.test(source))return t("powerBattery");
+    if(/mains|dc\s*source/i.test(source))return t("powerMains");
+    /* `powerSource` yoksa pil özelliğinin varlığından türetilir; o da yoksa bilgi yoktur. */
+    if(device.features?.includes("battery"))return t("powerBattery");
+    return null;
+  };
+  const deviceTableAvailability=device=>{
+    if(device.availability==="online")return{tone:"online",label:t("online")};
+    if(device.availability==="offline")return{tone:"offline",label:t("unreachable")};
+    return{tone:"",label:t("availabilityUnknown")};
+  };
+  /* Sıralama anahtarı olarak da kullanılır: karşılaştırılabilir bir skaler döndürür. */
+  const deviceSortValue=(device,key)=>{
+    if(key==="lqi")return rawLinkQuality(device)??-1;
+    if(key==="status")return device.availability==="online"?2:device.availability==="offline"?0:1;
+    if(key==="lastSeen")return device.lastSeen?new Date(device.lastSeen).getTime()||0:0;
+    return null;
+  };
+  const sortedDeviceRows=devices=>{
+    const{key,direction}=state.deviceSort;
+    const factor=direction==="desc"?-1:1;
+    const byName=(left,right)=>String(left.name).localeCompare(String(right.name),state.language);
+    if(key==="name")return[...devices].sort((left,right)=>byName(left,right)*factor);
+    return[...devices].sort((left,right)=>{
+      const difference=deviceSortValue(left,key)-deviceSortValue(right,key);
+      return difference!==0?difference*factor:byName(left,right);
+    });
+  };
+  const deviceTableHeader=(key,label)=>{
+    const active=state.deviceSort.key===key;
+    const sort=active?(state.deviceSort.direction==="desc"?"descending":"ascending"):"none";
+    /* `aria-sort` yalnızca başlık hücresine aittir; düğmedeki `data-sort` sadece okun CSS kancasıdır. */
+    return`<th scope="col" aria-sort="${sort}"><button class="device-table-sort" type="button" data-device-sort="${esc(key)}" data-sort="${sort}" title="${esc(t("deviceTableSort",{label}))}"><span>${esc(label)}</span><span class="device-table-arrow" aria-hidden="true">${state.deviceSort.direction==="desc"?"▼":"▲"}</span></button></th>`;
+  };
+  const deviceTableActions=device=>[
+    `<button class="device-table-action" type="button" data-admin-only data-rename="${esc(device.id)}" title="${esc(t("changeName"))}" aria-label="${esc(`${t("changeName")}: ${device.name}`)}">${renameGlyph}</button>`,
+    `<button class="device-table-action" type="button" data-admin-only data-reconfigure="${esc(device.id)}" title="${esc(t("repairDevice"))}" aria-label="${esc(`${t("repairDevice")}: ${device.name}`)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M19 12a7 7 0 1 0-2 5"/></svg></button>`,
+    `<button class="device-table-action danger" type="button" data-admin-only data-remove="${esc(device.id)}" title="${esc(t("removeDevice"))}" aria-label="${esc(`${t("removeDevice")}: ${device.name}`)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg></button>`
+  ].join("");
+  const deviceTableRowHtml=(device,index)=>{
+    const availability=deviceTableAvailability(device);
+    const lqi=rawLinkQuality(device);
+    const percent=linkQualityPercent(device);
+    const lqiTone=percent===null?"":percent>=70?"strong":percent>=25?"good":"weak";
+    const power=deviceTablePower(device);
+    const shortAddress=Number.isInteger(device.networkAddress)
+      ?`<small>0x${device.networkAddress.toString(16).padStart(4,"0")}</small>`
+      :"";
+    const seen=device.lastSeen
+      ?`<span class="device-table-seen" title="${esc(new Date(device.lastSeen).toLocaleString(state.language))}">${esc(ago(device.lastSeen))}</span>`
+      :`<span class="device-table-seen">${esc(t("deviceTableLastSeen"))}: —</span>`;
+    return`<tr tabindex="0" data-device-card="${esc(device.id)}" data-name="${esc(device.name.toLowerCase())}"${device.availability==="offline"?' class="device-row-offline"':""} aria-label="${esc(`${device.name} · ${availability.label}`)}">
+      <td class="device-table-index">${index+1}</td>
+      <td class="device-table-visual">${deviceVisualFor(device,device.image?device.image.model:device.model)}</td>
+      <td class="device-table-name">${esc(device.name)}</td>
+      <td class="device-table-uid">${esc(device.id)}${shortAddress}</td>
+      <td class="device-table-text">${device.vendor?esc(device.vendor):deviceTableDash}</td>
+      <td class="device-table-text">${device.model?esc(device.model):deviceTableDash}</td>
+      <td class="device-table-lqi${lqiTone?` ${lqiTone}`:""}"${lqi===null?"":` title="${esc(`${t("signal")} ${percent}%`)}"`}>${lqi===null?"—":lqi}</td>
+      <td><span class="device-table-state${availability.tone?` ${availability.tone}`:""}"><span class="device-table-dot" aria-hidden="true"></span>${esc(availability.label)}</span>${seen}</td>
+      <td class="device-table-text">${power?esc(power):deviceTableDash}</td>
+      <td class="device-table-actions"><div class="device-table-action-row">${deviceTableActions(device)}</div></td>
+    </tr>`;
+  };
+  const deviceTableHtml=devices=>{
+    const rows=sortedDeviceRows(devices).map(deviceTableRowHtml).join("");
+    return`<div class="device-table-panel"><div class="device-table-wrap"><table class="device-table"><thead><tr>
+      <th scope="col" class="device-table-index">#</th>
+      <th scope="col">${esc(t("deviceTablePicture"))}</th>
+      ${deviceTableHeader("name",t("deviceTableName"))}
+      <th scope="col">${esc(t("uid"))}</th>
+      <th scope="col">${esc(t("deviceTableVendor"))}</th>
+      <th scope="col">${esc(t("model"))}</th>
+      ${deviceTableHeader("lqi","LQI")}
+      ${deviceTableHeader("status",t("deviceTableStatus"))}
+      <th scope="col">${esc(t("deviceTablePower"))}</th>
+      <th scope="col" class="device-table-actions">${esc(t("deviceTableActions"))}</th>
+    </tr></thead><tbody>${rows}</tbody></table></div><p class="device-table-note">${esc(t("deviceTableCount",{count:devices.length}))}</p></div>`;
+  };
+  function setDeviceSort(key){
+    const same=state.deviceSort.key===key;
+    /* Ad artan başlar (alfabe), ölçüm sütunları azalan başlar: en güçlü/en yeni üstte. */
+    const direction=same?(state.deviceSort.direction==="asc"?"desc":"asc"):key==="name"?"asc":"desc";
+    state.deviceSort={key,direction};
+    try{localStorage.setItem("villa-device-sort",`${key}:${direction}`)}catch{}
+    filterDevices();
+    bindCards();
+  }
   const deviceRoomsHtml=device=>{
     if(!state.groups.length)return"";
     const chips=state.groups.map(group=>{
@@ -1700,7 +1816,7 @@
       </div>
       ${deviceRoomsHtml(device)}
       ${deviceVisibilityHtml(device)}
-      <details class="technical-details" data-admin-only${state.detailTechnicalOpen?" open":""}><summary>${t("technicalDetails")}</summary><div class="technical-body"><div class="technical">${t("uid")}: ${esc(device.id)}<br>${t("source")}: ${esc(device.sourceName)}<br>${t("model")}: ${esc(device.model||"—")}<br>${t("rawSignal")}: ${typeof device.state.linkquality==="number"?esc(device.state.linkquality):"—"} LQI</div></div></details>
+      <details class="technical-details" data-admin-only${state.detailTechnicalOpen?" open":""}><summary>${t("technicalDetails")}</summary><div class="technical-body"><div class="technical">${t("uid")}: ${esc(device.id)}<br>${t("source")}: ${esc(device.sourceName)}<br>${t("model")}: ${esc(device.model||"—")}<br>${t("rawSignal")}: ${rawLinkQuality(device)===null?"—":esc(rawLinkQuality(device))} LQI</div></div></details>
       ${deviceSelfHealHtml(device)}
       <div class="card-actions"><button class="secondary" data-note="${esc(device.id)}">📝 ${t("note")}</button><button class="secondary" data-admin-only data-options="${esc(device.id)}">⚙ ${t("options")}</button><button class="secondary" data-admin-only data-reconfigure="${esc(device.id)}">${t("repairDevice")}</button>${otaButton}</div>
       <div class="card-actions card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="${esc(device.id)}">${t("removeDevice")}</button></div>
@@ -2119,8 +2235,7 @@
     $("#deviceCount").textContent=devices.length;
     $("#alertCount").textContent=devices.filter(isAlert).length;
     renderSystemAlertBar();
-    const signalValues=devices.map(device=>Number(device.state?.linkquality)).filter(Number.isFinite);
-    const signalPercents=signalValues.map(value=>Math.round(Math.max(0,Math.min(255,value))/255*100));
+    const signalPercents=devices.map(linkQualityPercent).filter(value=>value!==null);
     const averageSignal=signalPercents.length?Math.round(signalPercents.reduce((sum,value)=>sum+value,0)/signalPercents.length):null;
     const signalStrength=$("#signalAverage");
     const signalTone=averageSignal===null?null:signalToneForPercent(averageSignal);
@@ -3416,8 +3531,11 @@
     const devices=state.devices
       .filter(device=>device.name.toLowerCase().includes(query)&&roomFilterMatches(device))
       .sort((left,right)=>String(left.name).localeCompare(String(right.name),state.language));
-    const attentionDevices=devices.filter(deviceNeedsAttention);
-    const regularDevices=devices.filter(device=>!deviceNeedsAttention(device));
+    /* Liste kipinde Z2M gibi tek düz tablo çizilir: "dikkat isteyen" ayrımı ızgaraya özgüdür,
+       çevrimdışı cihaz tabloda kendi Durum hücresiyle zaten görünür. Izgara kipi aynen korunur. */
+    const tableMode=state.deviceLayout==="list";
+    const attentionDevices=tableMode?[]:devices.filter(deviceNeedsAttention);
+    const regularDevices=tableMode?devices:devices.filter(device=>!deviceNeedsAttention(device));
     const emptyHome=state.overviewLoaded&&state.devices.length===0&&!query&&!state.roomFilter;
     const attention=$("#deviceAttention");
     attention.hidden=attentionDevices.length===0;
@@ -3426,7 +3544,9 @@
     $("#attentionDevices").innerHTML=attentionDevices.map(deviceCardHtml).join("");
     const allDevices=$("#allDevices");
     allDevices.hidden=regularDevices.length===0&&attentionDevices.length>0;
-    allDevices.innerHTML=regularDevices.length?regularDevices.map(deviceCardHtml).join(""):emptyHome
+    allDevices.innerHTML=regularDevices.length
+      ?tableMode?deviceTableHtml(regularDevices):regularDevices.map(deviceCardHtml).join("")
+      :emptyHome
       ?`<div class="empty device-empty-guide"><div class="device-empty-icon" aria-hidden="true">＋</div><h2>${t("emptyDevicesTitle")}</h2><p>${t("emptyDevicesLead")}</p><button class="primary" type="button" data-admin-only data-empty-add-device>${t("addFirstDevice")}</button></div>`
       :state.roomFilter&&!attentionDevices.length
       ?`<div class="empty room-filter-empty"><strong>${t("roomFilterEmpty")}</strong><button class="secondary" type="button" data-clear-room-filter>${t("roomFilterShowAll")}</button></div>`
@@ -3434,6 +3554,11 @@
     const addButton=$("[data-empty-add-device]");
     if(addButton)addButton.onclick=()=>startPairing(true);
     $$("[data-clear-room-filter]").forEach(button=>button.onclick=()=>setRoomFilter(""));
+    $$("[data-device-sort]").forEach(button=>button.onclick=event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      setDeviceSort(button.dataset.deviceSort);
+    });
     restoreDeviceFocus(focusToken);
   }
   async function refresh(){
@@ -8810,8 +8935,8 @@
     }
     if(metric==="signal"){
       const weakest=[...state.devices]
-        .filter(device=>Number.isFinite(Number(device.state?.linkquality)))
-        .sort((a,b)=>Number(a.state.linkquality)-Number(b.state.linkquality))[0];
+        .filter(device=>rawLinkQuality(device)!==null)
+        .sort((a,b)=>rawLinkQuality(a)-rawLinkQuality(b))[0];
       if(weakest){showDevice(weakest.id);return}
     }
     activateView("devices");
@@ -8858,6 +8983,9 @@
     state.deviceLayout=layout==="list"?"list":"grid";
     try{localStorage.setItem("villa-device-layout",state.deviceLayout)}catch{}
     applyDeviceLayout();
+    /* İki kipin içeriği farklıdır (kart ↔ tablo), yalnız sınıf değiştirmek yetmez; yeniden çizilir. */
+    filterDevices();
+    bindCards();
   }
   function setAttentionOpen(open){
     state.attentionOpen=open===true;

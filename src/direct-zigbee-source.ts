@@ -815,7 +815,27 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.store.ingest("bridge/event", Buffer.from(JSON.stringify(event)));
       this.publish("bridge/event", event);
     });
-    controller.on("message", (message) => void this.onMessage(message));
+    // Sinyal/son görülme, cihaz tanımı çözülmeden yakalanır: desteklenmeyen bir cihaz da tabloda
+    // "hangi cihaz ne zaman görüldü" sorusunu yanıtlayabilmeli. `onMessage` tanım bulamazsa döner.
+    controller.on("message", (message) => {
+      this.recordDeviceLink(message);
+      void this.onMessage(message);
+    });
+  }
+
+  /**
+   * Doğrudan kipin sinyal yolu: `linkquality` her gelen Zigbee mesajında taşınır, `lastSeen` ise
+   * herdsman'in cihaz kaydında tutulur. Zigbee2MQTT bunları yayın payload'ına eklerken biz cihaz
+   * defterine yazarız — yayınlanan uyumluluk payload'ı olduğu gibi kalsın diye.
+   */
+  private recordDeviceLink(message: Events.MessagePayload): void {
+    const ieeeAddress = message.device.ieeeAddr;
+    const friendlyName = this.config.devices[ieeeAddress]?.friendly_name ?? ieeeAddress;
+    const lastSeen = typeof message.device.lastSeen === "number" ? message.device.lastSeen : Date.now();
+    this.store.recordDeviceLink(friendlyName, {
+      ...(typeof message.linkquality === "number" ? { linkquality: message.linkquality } : {}),
+      lastSeen: new Date(lastSeen).toISOString()
+    });
   }
 
   private async refreshDevices(): Promise<void> {
@@ -1181,6 +1201,12 @@ export class DirectZigbeeSource implements ZigbeeSource {
       if (device.type === "Coordinator") continue;
       const availability = zigbeeAvailabilityState(device.lastSeen, device, now);
       this.setAvailability(device.ieeeAddr, availability);
+      // Mesaj yolu yalnız çözümlenen çerçeveleri görür; dakikalık tarama son görülmeyi her cihaz
+      // için tazeler. Sıklığı zamanlayıcı sınırlar, böylece cihaz görünümü önbelleği boğulmaz.
+      if (typeof device.lastSeen === "number") {
+        const friendlyName = this.config.devices[device.ieeeAddr]?.friendly_name ?? device.ieeeAddr;
+        this.store.recordDeviceLink(friendlyName, { lastSeen: new Date(device.lastSeen).toISOString() });
+      }
       // Çevrimdışı görünen şebeke beslemeli yönlendirici yoklanır; sıklığı zamanlayıcı belirler.
       if (availability === "offline" && isSelfHealProbeTarget(device)) {
         this.selfHeal.scheduleProbe(device.ieeeAddr);

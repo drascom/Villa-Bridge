@@ -34,6 +34,24 @@ interface ChannelSinceEntry {
 /** Defterin üst sınırı — durum haritasıyla aynı büyüklük sınıfı; taşarsa en eski düşer. */
 const maxChannelSinceEntries = 5_000;
 
+/**
+ * Cihaz başına son bağlantı kalitesi ve son görülme. Bu ikisi cihaz **durumu** değildir: gölge
+ * kipinde Zigbee2MQTT payload'ında gelir, doğrudan kipte yalnızca ham Zigbee mesajında taşınır.
+ * Ayrı defterde tutulur ki içinde `linkquality` olmayan bir yayın son bilinen değeri silmesin.
+ * Alanlar bilerek opsiyoneldir: veri yoksa hiç yazılmaz, uydurma değer üretilmez.
+ */
+interface DeviceLinkEntry {
+  linkquality?: number;
+  lastSeen?: string;
+}
+
+/** LQI 0-255 aralığında tam sayıdır; dışındaki her şey "veri yok" sayılır. */
+function normalizedLinkQuality(value: unknown): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return undefined;
+  return Math.round(Math.max(0, Math.min(255, numeric)));
+}
+
 interface PairingDevice {
   id: string;
   name: string;
@@ -312,6 +330,8 @@ export class DeviceStore {
    */
   private readonly channelSince = new Map<string, ChannelSinceEntry>();
   private readonly availability = new Map<string, "online" | "offline">();
+  /** `sourceName` → son sinyal/son görülme. Durum haritasıyla aynı anahtar uzayında yaşar. */
+  private readonly links = new Map<string, DeviceLinkEntry>();
   private devices: BridgeDevice[] = [];
   private groups: BridgeGroup[] = [];
   private bridgeOnline = false;
@@ -517,10 +537,35 @@ export class DeviceStore {
       this.recordEvents(events);
       this.emitAutomationEvents(automationEvents);
       this.trackChannelSince(topic, parsed, at);
+      // Gölge kipinin sinyal/son görülme yolu: Zigbee2MQTT ikisini de yayın payload'ında gönderir.
+      this.recordDeviceLink(topic, {
+        ...(parsed.linkquality === undefined ? {} : { linkquality: normalizedLinkQuality(parsed.linkquality) }),
+        ...(typeof parsed.last_seen === "string" || typeof parsed.last_seen === "number"
+          ? { lastSeen: String(parsed.last_seen) }
+          : {})
+      });
       this.states.set(topic, { value: parsed, updatedAt: at });
       this.invalidate();
       this.completeReconnectedPairingFromState(topic);
     }
+  }
+
+  /**
+   * Gelen mesaj yolundan yakalanan sinyal/son görülme değerini cihaz başına saklar. Doğrudan kip
+   * bunu ham Zigbee mesajından çağırır; gölge kipinde `ingest` Zigbee2MQTT payload'ından çağırır.
+   * Verilmeyen alan **eskisini silmez**; hiç bilinmeyen alan hiç yazılmaz.
+   */
+  recordDeviceLink(sourceName: string, link: DeviceLinkEntry): void {
+    const name = normalizeTopicPart(sourceName);
+    const previous = this.links.get(name);
+    const linkquality = normalizedLinkQuality(link.linkquality) ?? previous?.linkquality;
+    const lastSeen = link.lastSeen ?? previous?.lastSeen;
+    if (previous?.linkquality === linkquality && previous?.lastSeen === lastSeen) return;
+    this.links.set(name, {
+      ...(linkquality === undefined ? {} : { linkquality }),
+      ...(lastSeen === undefined ? {} : { lastSeen })
+    });
+    this.invalidate();
   }
 
   /**
@@ -647,7 +692,8 @@ export class DeviceStore {
         const sourceName = device.friendly_name ?? device.ieee_address ?? "unknown";
         const id = (device.ieee_address ?? sourceName).toLowerCase();
         const state = this.states.get(sourceName);
-        const lastSeen = state?.value.last_seen;
+        const link = this.links.get(sourceName);
+        const lastSeen = state?.value.last_seen ?? link?.lastSeen;
         const availability: DeviceView["availability"] = this.availability.get(sourceName) ?? "unknown";
         const name = this.aliases.get(id) ?? sourceName;
         const exposes = device.definition?.exposes;
@@ -738,6 +784,15 @@ export class DeviceStore {
           availability,
           lastSeen: typeof lastSeen === "string" || typeof lastSeen === "number" ? String(lastSeen) : null,
           stateUpdatedAt: state?.updatedAt.toISOString() ?? null,
+          // Sinyal defteri önce gelir; yayında `linkquality` hiç görülmediyse durumdan okunur.
+          ...(() => {
+            const linkquality = link?.linkquality ?? normalizedLinkQuality(stateValue.linkquality);
+            return linkquality === undefined ? {} : { linkquality };
+          })(),
+          ...(typeof device.power_source === "string" && device.power_source.trim().length > 0
+            ? { powerSource: device.power_source }
+            : {}),
+          ...(Number.isInteger(device.network_address) ? { networkAddress: device.network_address } : {}),
           otaSupported: device.definition?.ota === true || device.definition?.supports_ota === true,
           options: {
             transition: device.configured_options?.transition ?? 0,

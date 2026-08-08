@@ -485,7 +485,9 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /attentionDevices:"Dikkat gerektiren cihazlar"/);
   assert.match(dashboard, /const deviceNeedsAttention=device=>device\.availability==="offline"/);
   assert.match(dashboard, /attention\.hidden=attentionDevices\.length===0/);
-  assert.match(dashboard, /const regularDevices=devices\.filter\(device=>!deviceNeedsAttention\(device\)\)/);
+  // Dikkat bölümü ızgaraya özgüdür: liste kipinde tek düz tablo çizilir, ayrım devre dışı kalır.
+  assert.match(dashboard, /const attentionDevices=tableMode\?\[\]:devices\.filter\(deviceNeedsAttention\)/);
+  assert.match(dashboard, /const regularDevices=tableMode\?devices:devices\.filter\(device=>!deviceNeedsAttention\(device\)\)/);
   assert.match(dashboard, /\.sort\(\(left,right\)=>String\(left\.name\)\.localeCompare\(String\(right\.name\),state\.language\)\)/);
   assert.match(dashboard, /<article class="device-card\$\{failed\?" command-failed":""\}\$\{offline\?" device-card-offline":""\}\$\{preparing\?" preparing":""\}"/);
   assert.match(dashboard, /const offline=device\.availability==="offline"/);
@@ -1098,7 +1100,9 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /id="lowBatteryCount" class="fact" hidden/);
   assert.match(dashboard, /\.system-alert-bar\{min-height:48px;[^}]*color:#fff;background:var\(--danger\);font-size:16px;font-weight:800\}/);
   assert.match(dashboard, /:root\[data-theme="dark"\] \.system-alert-bar\{color:#2a100e;background:var\(--danger\)/);
-  assert.match(dashboard, /sort\(\(a,b\)=>Number\(a\.state\.linkquality\)-Number\(b\.state\.linkquality\)\)/);
+  // Sinyal metriği artık cihaz başına saklanan LQI'yi okur: doğrudan kipte değer durumda yoktur.
+  assert.match(dashboard, /\.filter\(device=>rawLinkQuality\(device\)!==null\)\s*\.sort\(\(a,b\)=>rawLinkQuality\(a\)-rawLinkQuality\(b\)\)/);
+  assert.doesNotMatch(dashboard, /Number\(a\.state\.linkquality\)/);
   assert.match(dashboard, /\$\$\("\[data-home-metric\]"\)\.forEach\(button=>button\.onclick=\(\)=>navigateHomeMetric\(button\.dataset\.homeMetric\)\)/);
   assert.doesNotMatch(dashboard, /greetingKeyForHour/);
   assert.doesNotMatch(dashboard, /greetingMorning|greetingAfternoon|greetingEvening|greetingNight/);
@@ -1248,7 +1252,7 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.doesNotMatch(dashboard, /villa-room-filter/);
   assert.doesNotMatch(dashboard, /localStorage\.setItem\("[^"]*",\s*state\.roomFilter/);
   assert.match(dashboard, /pendingGroupMigration:false,roomFilter:null,/);
-  assert.match(dashboard, /const attentionDevices=devices\.filter\(deviceNeedsAttention\)/);
+  assert.match(dashboard, /const attentionDevices=tableMode\?\[\]:devices\.filter\(deviceNeedsAttention\)/);
   assert.match(dashboard, /\$\("#attentionDeviceCount"\)\.textContent=String\(attentionDevices\.length\)/);
   assert.match(dashboard, /const deviceRoomsHtml=device=>\{\s*if\(!state\.groups\.length\)return""/);
   assert.match(dashboard, /const member=deviceInRoom\(device,group\.id\)/);

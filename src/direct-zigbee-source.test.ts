@@ -1063,3 +1063,85 @@ test("silinen cihaz yeniden eşleşme uyarısı için 'kaldırıldı' diye anıl
   await fixture.handlers.get("deviceLeave")?.({ ieeeAddr: fixture.device.ieeeAddr } as never);
   assert.equal(source.recentDeparture(fixture.device.ieeeAddr)?.reason, "removed");
 });
+
+/** Sinyal yolu testleri için kaynak: sahte koordinatör, canlı donanıma hiç dokunulmaz. */
+async function linkQualitySource(context: { after(fn: () => unknown): void }) {
+  const directory = await mkdtemp(join(tmpdir(), "villa-linkquality-direct-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const fixture = selfHealFixture();
+  const store = new DeviceStore(new Map());
+  store.ingest("bridge/devices", Buffer.from(JSON.stringify([{
+    ieee_address: fixture.device.ieeeAddr,
+    friendly_name: "Hall Switch",
+    type: "Router",
+    supported: true,
+    interview_completed: true
+  }])));
+  const source = new DirectZigbeeSource(
+    { devices: { [fixture.device.ieeeAddr]: { friendly_name: "Hall Switch" } }, groups: {}, dataDir: directory } as never,
+    { url: "mqtt://127.0.0.1:1883", baseTopic: "zigbee2mqtt" },
+    store,
+    false,
+    new Map(),
+    (async () => ({ ...fixture.definition, fromZigbee: [], toZigbee: [] })) as never,
+    { enabled: false, spacingMs: 0 }
+  );
+  Object.assign(source, { controller: fixture.controller, refreshDevices: async () => undefined });
+  (source as unknown as { attachEvents(controller: unknown): void }).attachEvents(fixture.controller);
+  return { fixture, store, source };
+}
+
+const genBasicReport = (device: unknown, linkquality: number) => ({
+  device,
+  endpoint: { ID: 1 },
+  cluster: "genBasic",
+  type: "attributeReport",
+  data: {},
+  linkquality,
+  meta: {}
+});
+
+test("doğrudan kipte gelen mesajın linkquality'si cihaz görünümüne düşer", async (context) => {
+  const { fixture, store } = await linkQualitySource(context);
+  const seenAt = Date.UTC(2026, 7, 7, 9, 30, 0);
+  fixture.device.lastSeen = seenAt;
+
+  fixture.handlers.get("message")?.(genBasicReport(fixture.device, 148) as never);
+
+  const [device] = store.getDevices();
+  assert.equal(device.linkquality, 148);
+  // `lastSeen` doğrudan kipte cihaz durumunda hiç bulunmuyordu; aynı mesaj yolundan doluyor.
+  assert.equal(device.lastSeen, new Date(seenAt).toISOString());
+});
+
+test("sinyal cihaz tanımı çözülmeden önce yakalanır", async (context) => {
+  const { fixture, store, source } = await linkQualitySource(context);
+  // Desteklenmeyen cihazda `onMessage` tanım bulamayıp döner; sinyal defteri buna rağmen dolar.
+  Object.assign(source, { definitions: new Map() });
+  fixture.device.lastSeen = Date.UTC(2026, 7, 7, 10, 0, 0);
+
+  fixture.handlers.get("message")?.(genBasicReport(fixture.device, 61) as never);
+
+  assert.equal(store.getDevices()[0]?.linkquality, 61);
+});
+
+test("hiç mesaj gelmeyen cihazda sinyal alanı boş kalır", async (context) => {
+  const { store } = await linkQualitySource(context);
+
+  const [device] = store.getDevices();
+  assert.equal("linkquality" in device, false);
+  assert.equal(device.lastSeen, null);
+});
+
+test("dakikalık erişilebilirlik taraması son görülmeyi sinyalsiz de tazeler", async (context) => {
+  const { fixture, store, source } = await linkQualitySource(context);
+  const seenAt = Date.UTC(2026, 7, 7, 11, 15, 0);
+  fixture.device.lastSeen = seenAt;
+
+  (source as unknown as { refreshAvailability(): void }).refreshAvailability();
+
+  const [device] = store.getDevices();
+  assert.equal(device.lastSeen, new Date(seenAt).toISOString());
+  // Tarama sinyal ölçmez: LQI uydurulmaz, alan boş kalır.
+  assert.equal("linkquality" in device, false);
+});

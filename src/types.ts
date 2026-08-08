@@ -65,6 +65,16 @@ export interface DeviceView {
   availability: "online" | "offline" | "unknown";
   lastSeen: string | null;
   stateUpdatedAt: string | null;
+  /**
+   * Son bilinen bağlantı kalitesi (LQI, 0-255). Cihaz durumunun parçası değildir: gelen mesaj
+   * yolundan yakalanıp cihaz başına saklanır. **Veri yoksa alan hiç bulunmaz** — arayüz "—" gösterir,
+   * uydurma değer konmaz.
+   */
+  linkquality?: number;
+  /** Zigbee güç kaynağı (`Battery`, `Mains (single phase)`, …). Bilinmiyorsa alan bulunmaz. */
+  powerSource?: string;
+  /** Kısa NWK adresi. Kalıcı kimlik değildir (UID kuralı), yalnızca gösterim içindir. */
+  networkAddress?: number;
   otaSupported: boolean;
   options: {
     transition: number;
