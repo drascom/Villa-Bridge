@@ -25,6 +25,16 @@
     const namedZone=worldClockZones.find(zone=>zone.timeZone===localTimeZone&&zone.label!=="clockLocal");
     const localName=namedZone?locationName(namedZone):localTimeZone.split("/").pop().replace(/_/g," ");
     $("#hubZoneName").textContent=`${localName} · ${t("clockLocal")}`;
+    renderHubCities(now);
+  }
+  // Hub'daki iki şehir: dünya saati penceresindeki listenin ilk iki kaydı, yerelle aynı saat
+  // dilimi atlanır (o zaten büyük saatte yazıyor). Şehir seçilmemişse düğüm boş kalır ve
+  // `.hub-cities:empty` onu tümüyle gizler — davet satırı ya da boşluk çıkmaz.
+  const hubClockCities=()=>worldClockZones.filter(zone=>zone.timeZone&&zone.timeZone!==localTimeZone).slice(0,2);
+  function renderHubCities(now){
+    const container=$("#hubCities");
+    if(!container)return;
+    container.innerHTML=hubClockCities().map(zone=>`<span class="hub-city"><em>${esc(locationName(zone))}</em><b>${esc(zoneTime(now,zone.timeZone))}</b></span>`).join("");
   }
   function tickWorldClock(){
     const now=new Date();
@@ -240,6 +250,17 @@
     const sameDay=at.toDateString()===new Date().toDateString();
     return dateTimeFormatter(sameDay?{hour:"2-digit",minute:"2-digit",hour12:false}:{weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).format(at);
   }
+  // Hub'ın hava detayı: bugünün en yüksek/en düşük değeri (`daily`) ve nem (`current`).
+  // Eksik alan satırı düşürür, hepsi eksikse hiç düğüm üretilmez — konum seçilmemişken zaten
+  // `weatherState.data` boş olduğu için buraya hiç girilmez, davet satırı olduğu gibi kalır.
+  function hubWeatherStats(current,units){
+    const today=weatherDailyEntries(1)[0];
+    const hasRange=weatherNumber(today?.max)!==null&&weatherNumber(today?.min)!==null;
+    const hasHumidity=weatherNumber(current?.relative_humidity_2m)!==null;
+    const range=hasRange?`<span class="hub-w-stat">${esc(t("hubWeatherRange",{high:weatherValue(today.max,"°"),low:weatherValue(today.min,"°")}))}</span>`:"";
+    const humidity=hasHumidity?`<span class="hub-w-stat hub-w-stat-extra">${esc(t("hubWeatherHumidity",{humidity:weatherValue(current.relative_humidity_2m,units?.relative_humidity_2m||"%")}))}</span>`:"";
+    return range||humidity?`<span class="hub-w-stats">${range}${humidity}</span>`:"";
+  }
   function renderWeather(){
     const body=$("#hubWeatherBody");
     if(!body)return;
@@ -252,9 +273,10 @@
       const units=weatherState.data.current_units||{};
       const presentation=weatherPresentation(Number(current.weather_code),Number(current.is_day)!==0);
       const degree=esc(units.temperature_2m||"°C");
-      // Hub yalnız "şu an"ı gösterir; günlük tahmin `#weatherDialog`da duruyor.
+      // Hub "şu an"ın yanına bugünün uçlarını ve nemi yazar; saatlik/günlük tahmin
+      // `#weatherDialog`da duruyor. Üçü de zaten çekilen alanlar — ek istek yok.
       const note=weatherState.error?t("weatherOfflineNote",{time:weatherAgeText()}):weatherIsStale()?t("weatherStaleNote",{time:weatherAgeText()}):"";
-      body.innerHTML=`<span class="hub-now"><span class="hub-w-icon" aria-hidden="true">${presentation.icon}</span><span><b class="hub-w-temp">${esc(weatherValue(current.temperature_2m,"°"))}</b><span class="hub-w-cond">${esc(t(presentation.label))} · ${esc(t("weatherFeelsLike"))} ${esc(weatherValue(current.apparent_temperature,degree))}</span></span></span>${note?`<span class="hub-note">${esc(note)}</span>`:""}`;
+      body.innerHTML=`<span class="hub-now"><span class="hub-w-icon" aria-hidden="true">${presentation.icon}</span><span><b class="hub-w-temp">${esc(weatherValue(current.temperature_2m,"°"))}</b><span class="hub-w-cond">${esc(t(presentation.label))} · ${esc(t("weatherFeelsLike"))} ${esc(weatherValue(current.apparent_temperature,degree))}</span>${hubWeatherStats(current,units)}</span></span>${note?`<span class="hub-note">${esc(note)}</span>`:""}`;
     }
     if($("#weatherDialog").open)renderWeatherDialog();
   }

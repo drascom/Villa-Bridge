@@ -144,6 +144,8 @@
     "weatherUnknown": "Güncel hava",
     "hubWeatherZoneLabel": "Hava durumu tahminini aç",
     "hubWeatherHint": "Ayrıntılı tahmin için dokunun",
+    "hubWeatherRange": "En yüksek {high} · En düşük {low}",
+    "hubWeatherHumidity": "Nem {humidity}",
     "hubToday": "Bugün",
     "hubTomorrow": "Yarın",
     "weatherHourly": "Saatlik",

@@ -144,6 +144,8 @@
     "weatherUnknown": "Current weather",
     "hubWeatherZoneLabel": "Open the weather forecast",
     "hubWeatherHint": "Tap for the detailed forecast",
+    "hubWeatherRange": "High {high} · Low {low}",
+    "hubWeatherHumidity": "Humidity {humidity}",
     "hubToday": "Today",
     "hubTomorrow": "Tomorrow",
     "weatherHourly": "Hourly",

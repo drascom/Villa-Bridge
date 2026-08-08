@@ -1348,8 +1348,8 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /function scheduleWorldClockTick\(\)\{\s*setTimeout\(\(\)=>\{tickWorldClock\(\);scheduleWorldClockTick\(\)\},1000-new Date\(\)\.getMilliseconds\(\)\+20\)/);
   assert.match(dashboard, /const localTimeZone=\(\(\)=>\{try\{return Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone\|\|"UTC"\}catch\{return "UTC"\}\}\)\(\)/);
   assert.match(dashboard, /\{id:"default-local",label:"clockLocal",name:"Local time",country:"",timeZone:localTimeZone\}/);
-  // Dünya saatleri yalnız #clockDialog'da: hub'da ikinci şehir satırı yok.
-  assert.doesNotMatch(dashboard, /id="hubCities"|class="hub-city"|\.hub-cities\{/);
+  // Hub yeniden iki şehir yazıyor; tam liste yine #clockDialog'da.
+  assert.match(dashboard, /id="hubCities" class="hub-cities"/);
   assert.match(dashboard, /id="clockDialogRows" class="hub-rows"/);
   assert.match(dashboard, /time\.firstChild\.nodeValue=zoneTime\(now\)/);
   assert.match(dashboard, /<span id="hubTime" class="hub-time">--:--<span id="hubSeconds" class="hub-seconds"><\/span><\/span>/);
@@ -1631,8 +1631,9 @@ test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yata
   // Ölçüler dar yatayda da viewport'tan türer: cihaz listesi değil formül karar verir.
   assert.match(dashboard, /#home \.home-hub\{--hub-time-size:clamp\(30px,6\.6vh,52px\);--hub-gap:clamp\(5px,1vh,10px\);--hub-pad-y:clamp\(4px,\.9vh,10px\);grid-column:1;grid-row:1;z-index:0;min-height:0;margin-top:0;max-height:100%;overflow:auto;scrollbar-width:none;transition:opacity \.18s ease\}/);
   assert.match(dashboard, /#home \.hub-date\{margin-top:clamp\(3px,\.7vh,6px\);font-size:clamp\(12px,1\.8vh,15px\)\}/);
-  // Şehir ve günlük tahmin satırları tümüyle kalktı; kırpma kuralına gerek kalmadı.
-  assert.doesNotMatch(dashboard, /hub-city|hub-days|class="hub-day"/);
+  // Günlük tahmin satırları hub'da yok; şehir satırları geri geldi ve kırpma kuralı onlara ait.
+  assert.doesNotMatch(dashboard, /hub-days|class="hub-day"/);
+  assert.match(dashboard, /#home \.hub-city\{min-height:0;padding:clamp\(2px,\.5vh,5px\) 0\}/);
   assert.match(dashboard, /#home \.hub-hint\{display:none\}/);
   assert.match(dashboard, /#home \.group-summary\{margin-top:7px\}#home \.home-summary\{gap:14px;margin-top:12px\}#home \.widget-value\{margin-top:14px\}/);
   // Yükseklik koşullu blok artık tipografi kurallarını içermemeli.
@@ -5155,13 +5156,12 @@ test("ana ekran hub'ı fotoğraf zemininden bağımsız okunur", async () => {
   assert.match(dashboard, /body\[data-active-view="home"\] #home \.hub-hint\{opacity:1\}/);
 });
 
-test("hub yalnız yerel saati ve şu anki havayı yazar, tahminler pencerelerde kalır", async () => {
+test("hub özeti: yerel saat, iki şehir ve şu anki hava; tam tahminler pencerelerde kalır", async () => {
   const dashboard = await readDashboardBundle();
 
-  // Saat bölgesi: büyük saat + saniye + tarih + yerel bölge satırı. Şehir listesi yok.
-  assert.match(dashboard, /<span id="hubDate" class="hub-date"><\/span>\s*<span id="hubZoneName" class="hub-sub"><\/span>\s*<span class="hub-alarm">/);
-  assert.doesNotMatch(dashboard, /hubCities|hub-cities|hub-city/);
-  // Hava bölgesi yalnız "şu an"ı basar: hub-days düğümü hiç üretilmiyor.
+  // Saat bölgesi: büyük saat + saniye + tarih + yerel bölge satırı + iki şehirlik özet.
+  assert.match(dashboard, /<span id="hubDate" class="hub-date"><\/span>\s*<span id="hubZoneName" class="hub-sub"><\/span>\s*<span id="hubCities" class="hub-cities"><\/span>\s*<span class="hub-alarm">/);
+  // Hava bölgesi yalnız "şu an" + bugünün özeti; günlük satırlar hub'da yok.
   assert.doesNotMatch(dashboard, /hub-days|class="hub-day"/);
   assert.match(dashboard, /body\.innerHTML=`<span class="hub-now">[\s\S]*?<\/span><\/span>\$\{note\?`<span class="hub-note">/);
   // Alarm satırı duruyor.
