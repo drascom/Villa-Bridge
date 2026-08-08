@@ -15,6 +15,7 @@
       renderHomeAssistant();
       renderDebugSettings();
       if(state.settings.debug?.enabled===true)await loadDebugErrors();
+      await loadDebugNetworkEvents();
     }catch(error){showToast(t("settingsUnavailable"),true)}
   }
   const onboardingStepCount=6;
@@ -295,6 +296,24 @@
       state.debugErrors=Array.isArray(data.errors)?data.errors:[];
       renderDebugErrors();
     }catch(error){showToast(error.message,true)}
+  }
+  const debugNetworkReasonKeys={joined:"deviceEventJoined",left:"deviceEventLeft",removed:"deviceEventRemoved"};
+  const debugNetworkFullTime=iso=>{const at=new Date(iso);return Number.isNaN(at.getTime())?"":at.toLocaleString(state.language||undefined)};
+  function renderDebugNetworkEvents(){
+    // Sunucu en yeniden eskiye veriyor; sıralama yine de burada garanti edilir.
+    const events=[...(state.debugNetworkEvents||[])].sort((a,b)=>String(b.at||"").localeCompare(String(a.at||"")));
+    $("#debugNetworkTitle").textContent=t("deviceNetworkEvents",{count:events.length});
+    $("#debugNetworkList").innerHTML=events.length?events.map(event=>{
+      const label=t(debugNetworkReasonKeys[event.reason]||"deviceEventLeft");
+      return`<article class="debug-network-row" data-network-reason="${esc(event.reason)}"><strong>${esc(event.name||event.id)}</strong><time datetime="${esc(event.at)}" title="${esc(debugNetworkFullTime(event.at))}">${ago(event.at)}</time><p>${esc(label)} · ${esc(event.id)}</p></article>`;
+    }).join(""):`<div class="debug-empty">${t("noDeviceNetworkEvents")}</div>`;
+  }
+  async function loadDebugNetworkEvents(){
+    try{
+      const data=await api("/api/debug/network-events");
+      state.debugNetworkEvents=Array.isArray(data.events)?data.events:[];
+    }catch(error){state.debugNetworkEvents=[]}
+    renderDebugNetworkEvents();
   }
   async function toggleDebugMode(){
     if(!state.settings)return;

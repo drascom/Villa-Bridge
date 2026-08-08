@@ -11,6 +11,7 @@ import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import { normalizeControlValue, soleSwitchChannelId } from "./device-controls.js";
 import { deviceMissingResponse } from "./device-departures.js";
+import { DeviceNetworkEventLog } from "./device-network-events.js";
 import { DeviceImageCache } from "./device-image-cache.js";
 import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
@@ -192,6 +193,19 @@ const nodeStatus = (): JsonObject => ({
   peerWatch: (peerWatcher?.status() ?? null) as JsonObject | null
 });
 store.setMode(config.mode);
+/**
+ * Cihaz ağ üyeliği günlüğü — katıldı/düştü/silindi. Hata ayıklama anahtarından **bağımsız**
+ * olarak hep yazılır: "dün gece ne oldu" sorusu, sorun yaşandıktan sonra sorulur.
+ */
+const deviceNetworkEventLog = new DeviceNetworkEventLog(
+  resolve(dirname(configPath), "device-network-events.jsonl"),
+  {
+    onError: (message) => {
+      console.error(message);
+      recentErrors.record({ operation: "device-network-events", statusCode: 500, message });
+    }
+  }
+);
 let source: ZigbeeSource;
 if (config.mode === "direct") {
   if (!config.zigbee) throw new Error("Doğrudan Zigbee ayarları bulunamadı.");
@@ -218,9 +232,12 @@ if (config.mode === "direct") {
       recordFailure: (deviceId, message) => {
         recentErrors.record({ operation: "self-heal", statusCode: 503, message: `${deviceId}: ${message}` });
       }
-    }
+    },
+    deviceNetworkEventLog
   );
 } else {
+  // Shadow modda koordinatör Zigbee2MQTT'nin; ağ üyeliği olayları için karşılık yok, günlük
+  // sessizce boş kalır — kaynak kırılmaz.
   source = new MqttShadowSource(config.mqtt, store);
 }
 // Çalışma günlüğü JSONL: olay başına ekleme, tam JSON yeniden yazma yok (HANDOFF 2026-08-04 §6).
@@ -260,6 +277,22 @@ await registerAccessControl(app, authStore, {
   secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true"
 });
 registerRecentErrorApi(app, recentErrors);
+
+/**
+ * Cihaz ağ olayları — en yeniden eskiye. Hata ayıklama ekranının ikinci listesi; yetkisi
+ * `/api/debug/errors` ile aynıdır: yetki tablolarında listelenmediği için yönetici ister.
+ */
+app.get<{ Querystring: { limit?: string } }>("/api/debug/network-events", async (request, reply) => {
+  try {
+    const limit = Number(request.query.limit ?? 200);
+    return {
+      ok: true,
+      events: await deviceNetworkEventLog.read({ limit: Number.isFinite(limit) ? limit : 200 })
+    };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
 const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));

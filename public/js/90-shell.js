@@ -202,6 +202,7 @@
     renderConnectedServerAddress();
     renderDebugSettings();
     renderDebugErrors();
+    renderDebugNetworkEvents();
     applyWidgetLayout();
     applyDeviceLayout();
     applyTheme();

@@ -14,6 +14,8 @@ export interface DeviceDeparture {
   id: string;
   reason: DeviceDepartureReason;
   at: number;
+  /** Olay anındaki dost isim; kalıcı günlüğün okunur satır yazabilmesi için taşınır. */
+  name?: string;
 }
 
 /** Beş dakika: kullanıcının aynı oturumda tekrar denemesini kapsayacak kadar uzun, eskimiş bilgiyi taşımayacak kadar kısa. */
@@ -24,10 +26,15 @@ export class DeviceDepartureLog {
 
   constructor(
     private readonly ttlMs: number = DEVICE_DEPARTURE_TTL_MS,
-    private readonly limit: number = 64
+    private readonly limit: number = 64,
+    /**
+     * Kabul edilen her kayıt için çağrılır — bastırılanlar için çağrılmaz. Kalıcı ağ günlüğü
+     * buradan beslenir: aynı olay, aynı bastırma kuralı, iki ayrı ömür.
+     */
+    private readonly onRecord?: (entry: DeviceDeparture) => void
   ) {}
 
-  record(id: string, reason: DeviceDepartureReason, now = Date.now()): void {
+  record(id: string, reason: DeviceDepartureReason, now = Date.now(), name?: string): void {
     const key = id.toLowerCase();
     this.prune(now);
     const previous = this.entries.get(key);
@@ -35,7 +42,9 @@ export class DeviceDepartureLog {
     // sebebi "kayboldu"ya düşürmemeli — kullanıcıya söylenecek doğru şey "az önce sildiniz".
     if (previous && previous.reason === "removed" && reason === "left") return;
     this.entries.delete(key);
-    this.entries.set(key, { id: key, reason, at: now });
+    const entry: DeviceDeparture = { id: key, reason, at: now, ...(name ? { name } : {}) };
+    this.entries.set(key, entry);
+    this.onRecord?.(entry);
     while (this.entries.size > this.limit) {
       const oldest = this.entries.keys().next();
       if (oldest.done) break;

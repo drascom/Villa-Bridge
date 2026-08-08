@@ -12,7 +12,12 @@ import {
 import { writeFileAtomic, writeJsonAtomic } from "./atomic-file.js";
 import type { DirectZigbeeConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
-import { DeviceDepartureLog, type DeviceDeparture } from "./device-departures.js";
+import {
+  DEVICE_DEPARTURE_TTL_MS,
+  DeviceDepartureLog,
+  type DeviceDeparture
+} from "./device-departures.js";
+import type { DeviceNetworkEventSink } from "./device-network-events.js";
 import { DeviceStore, featureValues } from "./device-store.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
@@ -212,7 +217,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
   /** Tuya tuş çerçevelerinin son ZCL sıra numarası; cihazın tekrarlarını eler. */
   private readonly lastButtonSequences = new Map<string, number>();
   /** Az önce ağdan düşen/kaldırılan cihazlar; kurulum uçları sebebi buradan okur. */
-  private readonly departures = new DeviceDepartureLog();
+  private readonly departures: DeviceDepartureLog;
   private readonly selfHeal: SelfHealScheduler;
 
   constructor(
@@ -222,8 +227,26 @@ export class DirectZigbeeSource implements ZigbeeSource {
     private homeAssistantDiscoveryEnabled = false,
     private readonly aliases: ReadonlyMap<string, string> = new Map(),
     private readonly definitionResolver: typeof findByDevice = findByDevice,
-    selfHealing: DirectSelfHealingSetup = { enabled: false }
+    selfHealing: DirectSelfHealingSetup = { enabled: false },
+    /**
+     * Kalıcı ağ üyeliği günlüğü. İsteğe bağlıdır: verilmezse kaynak eskisi gibi yalnız kısa
+     * ömürlü bellek kaydını tutar.
+     */
+    private readonly networkEvents?: DeviceNetworkEventSink
   ) {
+    // Bellekteki kayıt ile kalıcı günlük aynı olaydan beslenir; "sildim, sonra düştü"yü
+    // bastıran kural tek yerde kalsın diye kalıcı yazma da bu kancadan geçer.
+    this.departures = new DeviceDepartureLog(
+      DEVICE_DEPARTURE_TTL_MS,
+      64,
+      (entry) => {
+        this.networkEvents?.record({
+          id: entry.id,
+          reason: entry.reason,
+          ...(entry.name ? { name: entry.name } : {})
+        });
+      }
+    );
     this.selfHeal = new SelfHealScheduler({
       enabled: selfHealing.enabled,
       probeEnabled: selfHealing.probeOffline === true,
@@ -659,7 +682,7 @@ export class DirectZigbeeSource implements ZigbeeSource {
     // Zorlamasız silmede cihaza havadan "ağdan ayrıl" komutu gider; mesh'te geciken bu komut,
     // kullanıcı aynı cihazı hemen yeniden eşleştirirse yeni oturumu düşürebilir. Kayıt panelin
     // "bu cihazı az önce kaldırdınız" uyarısını verebilmesi için tutulur.
-    this.departures.record(id, "removed");
+    this.departures.record(id, "removed", Date.now(), this.config.devices[id]?.friendly_name);
     delete this.config.devices[id];
     await this.persistDeviceConfiguration(id, null);
     this.definitions.delete(id);
@@ -748,6 +771,14 @@ export class DirectZigbeeSource implements ZigbeeSource {
     });
     controller.on("deviceJoined", async ({ device }) => {
       const friendlyName = this.config.devices[device.ieeeAddr]?.friendly_name ?? device.ieeeAddr;
+      // Katılma kalıcı günlüğe doğrudan yazılır: `departures` yalnız ayrılmayı tutar. Yeni
+      // cihazın henüz adı yoktur; o zaman satır IEEE adresiyle anılır.
+      const knownName = this.config.devices[device.ieeeAddr]?.friendly_name;
+      this.networkEvents?.record({
+        id: device.ieeeAddr,
+        reason: "joined",
+        ...(knownName ? { name: knownName } : {})
+      });
       const event = {
         type: "device_joined",
         data: { friendly_name: friendlyName, ieee_address: device.ieeeAddr }
@@ -780,7 +811,12 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const friendlyName = this.config.devices[ieeeAddr]?.friendly_name ?? ieeeAddr;
       // Cihaz listeden düşmeden önce sebebi not et: bundan sonraki her kurulum isteği
       // "bulunamadı" yerine "az önce ağdan ayrıldı" diyebilsin.
-      this.departures.record(ieeeAddr, "left");
+      this.departures.record(
+        ieeeAddr,
+        "left",
+        Date.now(),
+        this.config.devices[ieeeAddr]?.friendly_name
+      );
       this.publish("bridge/event", {
         type: "device_leave",
         data: { friendly_name: friendlyName, ieee_address: ieeeAddr }

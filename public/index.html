@@ -153,6 +153,7 @@
       <article id="debugCard" class="setting-card debug-card">
         <div class="debug-head"><div><h2 data-i18n="debugMode">Debug mode</h2><p data-i18n="debugModeLead">Keep a short, privacy-safe list of recent system errors while testing.</p></div><div class="debug-toggle-wrap"><span id="debugModeStatus" data-i18n="enabled">Enabled</span><button id="toggleDebug" class="switch" type="button" aria-pressed="true" aria-label="Debug mode"><span></span></button></div></div>
         <div id="debugLogPanel" class="debug-log-panel" hidden><div class="debug-log-toolbar"><strong id="debugLogTitle">Recent errors</strong><div class="debug-log-actions"><button id="refreshDebugErrors" class="quiet" type="button" data-i18n="refreshErrors">Refresh</button><button id="clearDebugErrors" class="secondary" type="button" data-i18n="clearErrors">Clear</button></div></div><div id="debugErrorList" class="debug-error-list"></div></div>
+        <div class="debug-log-panel debug-network-panel"><div class="debug-log-toolbar"><strong id="debugNetworkTitle">Device network events</strong><div class="debug-log-actions"><button id="refreshDebugNetworkEvents" class="quiet" type="button" data-i18n="refreshErrors">Refresh</button></div></div><p class="debug-network-lead" data-i18n="deviceNetworkEventsLead">Joins, drops and deletions stay here even after a restart.</p><div id="debugNetworkList" class="debug-network-list"></div></div>
       </article>
     </section>
   </main>
