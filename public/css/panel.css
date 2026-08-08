@@ -595,3 +595,64 @@
       dialog#appMenuDialog .app-menu-nav{flex:1 1 auto;align-content:safe center;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       dialog#appMenuDialog .modal-actions{flex:none;margin-top:14px}
     }
+    /* TELEFON DİKEY ONARIMI — tek kapı: (orientation:portrait) and (max-width:560px).
+       Yeniden tasarım değil, duvar tableti ölçülerinin telefonda ürettiği dört kırığın onarımı:
+       (1) alt sekme şeridi telefonda da sabit, (2) başlık tek satır, (3) dört başlık düğmesi de
+       görünür, (4) tipografi tabanları ekrana iner.
+
+       TABLET DOKUNULMAZ: yatay kip bloklarının hepsi `orientation:landscape` taşır, bu blok ise
+       `orientation:portrait` — 1024×640, 1280×800 ve 800×480 buraya HİÇ girmez. Portre tablet de
+       `max-width:560px` ile dışarıda kalır. Blok dosyanın SONUNDA duruyor: eşit özgüllükteki
+       `max-width:900px`, `max-width:560px` ve `orientation:portrait` bloklarını sıra ile yener. */
+    @media(orientation:portrait) and (max-width:560px){
+      /* (2)+(3) Başlık tek satır: menü + başlık + dört düğme aynı sırada.
+         `.home-heading` `display:contents` olur ki içindeki eyebrow ve metrik satırı doğrudan
+         başlık ızgarasının hücreleri olsun; metrikler tek satıra sığmadığı için ikinci sıraya iner. */
+      #home .page-head{--head-action-h:clamp(44px,12.6vw,52px);--head-action-w:var(--head-action-h);--head-action-gap:clamp(6px,2vw,10px);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:var(--head-action-gap);row-gap:clamp(4px,1.2vh,8px);margin-bottom:clamp(10px,2.2vh,18px)}
+      #home .home-heading{display:contents}
+      #home .page-head>.app-menu-button{grid-column:1;grid-row:1;align-self:center}
+      #home .page-head .eyebrow{grid-column:2;grid-row:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(10px,2.8vw,12px);letter-spacing:.1em}
+      #home .home-title-line{grid-column:1/-1;grid-row:2;flex-wrap:wrap;gap:clamp(4px,1.4vw,8px)}
+      /* (3) Dört düğmenin hiçbiri düşmez: sarma kapalı, hepsi ikon-only ve 44px tabanlı hap. */
+      #home .home-actions{grid-column:3;grid-row:1;display:flex;justify-content:flex-end;flex-wrap:nowrap;gap:var(--head-action-gap);margin-top:0}
+      #home .home-actions button{display:grid;place-items:center;flex:none}
+      #home .home-action-glyph{width:clamp(20px,5.6vw,24px);height:clamp(20px,5.6vw,24px)}
+      /* (1) Alt sekme şeridi telefonda da sabit: eskiden bu kural yalnız yatay blokta olduğu için
+         şerit sayfa akışına düşüyordu. `--strip-inset` de yalnız orada tanımlıydı, burada tekrar
+         tanımlanmazsa `left/right` geçersiz kalırdı. */
+      #home{--strip-inset:clamp(10px,3.6vw,16px)}
+      #home [data-widget="quick"]{position:fixed;z-index:9;left:var(--strip-inset);right:var(--strip-inset);bottom:calc(10px + env(safe-area-inset-bottom));grid-column:auto;grid-row:auto;min-width:0;height:clamp(64px,10vh,76px);margin-top:0;padding:clamp(6px,1vh,9px) clamp(6px,2vw,10px);overflow:hidden}
+      #home .widget-board.editing [data-widget="quick"]{height:clamp(76px,12vh,90px)}
+      #home .quick-control-widget .quick-card{min-height:0;padding:4px clamp(8px,2.6vw,12px)}
+      #home .quick-grid.grid-view,#home .quick-grid.grid-view .quick-card,#home .strip-row>.quick-card-add{height:clamp(46px,7vh,56px)}
+      #home .quick-grid.grid-view{gap:clamp(6px,2vw,10px)}
+      #home .quick-grid.grid-view .quick-card{width:max-content;min-width:clamp(112px,32vw,144px);flex-basis:auto}
+      #home .strip-row{gap:clamp(6px,2vw,10px)}
+      #home .strip-row>.quick-card-add{width:clamp(48px,13vw,58px);min-width:48px}
+      #home .quick-card-add .quick-add-icon{width:clamp(26px,7vw,32px);height:clamp(26px,7vw,32px)}
+      /* Dar şeritte ok düğmeleri sekmelerden yer çalıyor; telefonda kaydırma zaten parmakla yapılır. */
+      #home .strip-row>.quick-scroll-hint{display:none}
+      /* Şerit sabitlendiği için gövde onun altında kalmasın: ana ekranda alt boşluk şerit payı kadar. */
+      body[data-active-view="home"] main{padding-bottom:calc(104px + env(safe-area-inset-bottom))}
+      body[data-active-view="home"] .toast{bottom:calc(104px + env(safe-area-inset-bottom))}
+      /* Şerit akıştan çıktı: pano satırları DOM sırasına göre kendiliğinden yerleşsin, sabit satır
+         numaraları boş satır + boşluk bırakmasın. */
+      #home .home-hub,#home .group-panel,#home .widget-rail{grid-column:1/-1;grid-row:auto}
+      #home .home-hub{margin-top:0}
+      #home .widget-rail{margin-top:0}
+      #home .widget-board{gap:clamp(10px,2vh,14px)}
+      /* (4) Tipografi: tabanlar telefona iner, tavanlar tablet değerlerinin altında kalmaz —
+         bu blok tablette hiç uygulanmadığı için tavanlar yalnız büyük telefonu ilgilendirir. */
+      #home .home-hub{--hub-time-size:clamp(30px,10.4vw,44px);--hub-gap:clamp(5px,1.4vh,10px);--hub-pad-y:clamp(4px,1vh,9px);--hub-line:clamp(10px,3vw,12px)}
+      #home .hub-date{font-size:clamp(12px,3.4vw,15px)}
+      #home .hub-w-icon{font-size:clamp(20px,5.6vw,26px)}
+      #home .hub-w-temp{font-size:clamp(22px,7vw,30px)}
+      #home .widget-card{min-height:0;padding:clamp(13px,3.8vw,18px)}
+      #home .widget-card h2{font-size:clamp(16px,4.4vw,20px)}
+      #home .widget-card p{font-size:clamp(11px,3vw,13px)}
+      #home .summary-row strong,#home .widget-value strong{font-size:clamp(24px,7.4vw,32px)}
+      #home .home-summary{gap:clamp(8px,1.6vh,12px);margin-top:clamp(10px,2vh,14px)}
+      #home .widget-value{margin-top:clamp(10px,2vh,16px)}
+      .page-head-title h1{font-size:clamp(19px,5.4vw,26px)}
+      .section-head h2{font-size:clamp(18px,5vw,22px)}
+    }
