@@ -18,10 +18,34 @@ const panelScriptFiles = new Map<string, URL>([
   ['<script src="/js/50-widgets.js"></script>', new URL("../public/js/50-widgets.js", import.meta.url)],
   ['<script src="/js/60-pairing.js"></script>', new URL("../public/js/60-pairing.js", import.meta.url)],
   ['<script src="/js/70-settings.js"></script>', new URL("../public/js/70-settings.js", import.meta.url)],
-  ['<script src="/js/panel-automation.js"></script>', new URL("../public/js/panel-automation.js", import.meta.url)]
+  ['<script src="/js/80-zigbee-tools.js"></script>', new URL("../public/js/80-zigbee-tools.js", import.meta.url)],
+  ['<script src="/js/88-simple-link.js"></script>', new URL("../public/js/88-simple-link.js", import.meta.url)],
+  ['<script src="/js/90-shell.js"></script>', new URL("../public/js/90-shell.js", import.meta.url)],
+  ['<script src="/js/panel-automation.js"></script>', new URL("../public/js/panel-automation.js", import.meta.url)],
+  ['<script src="/js/99-bind.js"></script>', new URL("../public/js/99-bind.js", import.meta.url)]
 ]);
 
-const readPanelDocument = (): Promise<string> => readFile(panelDocumentUrl, "utf8");
+/* Panelin tek çalışma anı kuralı: üst düzeyde iş yapan bütün kod son dosyadadır, ondan önceki
+   hiçbir dosya yüklenirken bir diğerine dokunmaz. Sıra bozulursa panel hata vermeden ölür; bu
+   yüzden sıra burada, paneli okuyan her testin geçtiği noktada doğrulanır. */
+const lastPanelScriptTag = '<script src="/js/99-bind.js"></script>';
+
+function assertPanelScriptOrder(document: string): void {
+  const found = [...document.matchAll(/<script src="[^"]+"><\/script>/g)].map((match) => match[0]);
+  const expected = [...panelScriptFiles.keys()];
+  if (found.length !== expected.length || found.some((tag, index) => tag !== expected[index])) {
+    throw new Error(`Panel script sırası tabloyla uyuşmuyor: ${found.join(" ")}`);
+  }
+  if (expected.at(-1) !== lastPanelScriptTag) {
+    throw new Error(`Panel script sırasında son dosya ${lastPanelScriptTag} olmalı.`);
+  }
+}
+
+const readPanelDocument = async (): Promise<string> => {
+  const document = await readFile(panelDocumentUrl, "utf8");
+  assertPanelScriptOrder(document);
+  return document;
+};
 
 /** Panel belgesi: markup ve belge içindeki etiketler. */
 export async function panelMarkup(): Promise<string> {

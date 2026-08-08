@@ -278,7 +278,11 @@ const panelAssetRoutes = [
   "/js/50-widgets.js",
   "/js/60-pairing.js",
   "/js/70-settings.js",
-  "/js/panel-automation.js"
+  "/js/80-zigbee-tools.js",
+  "/js/88-simple-link.js",
+  "/js/90-shell.js",
+  "/js/panel-automation.js",
+  "/js/99-bind.js"
 ];
 
 for (const route of panelAssetRoutes) {
