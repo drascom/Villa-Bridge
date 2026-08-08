@@ -274,6 +274,10 @@ const panelAssetRoutes = [
   "/js/20-auth.js",
   "/js/30-device-view.js",
   "/js/40-home.js",
+  "/js/45-clock-weather.js",
+  "/js/50-widgets.js",
+  "/js/60-pairing.js",
+  "/js/70-settings.js",
   "/js/panel-automation.js"
 ];
 

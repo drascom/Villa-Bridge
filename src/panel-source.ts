@@ -14,6 +14,10 @@ const panelScriptFiles = new Map<string, URL>([
   ['<script src="/js/20-auth.js"></script>', new URL("../public/js/20-auth.js", import.meta.url)],
   ['<script src="/js/30-device-view.js"></script>', new URL("../public/js/30-device-view.js", import.meta.url)],
   ['<script src="/js/40-home.js"></script>', new URL("../public/js/40-home.js", import.meta.url)],
+  ['<script src="/js/45-clock-weather.js"></script>', new URL("../public/js/45-clock-weather.js", import.meta.url)],
+  ['<script src="/js/50-widgets.js"></script>', new URL("../public/js/50-widgets.js", import.meta.url)],
+  ['<script src="/js/60-pairing.js"></script>', new URL("../public/js/60-pairing.js", import.meta.url)],
+  ['<script src="/js/70-settings.js"></script>', new URL("../public/js/70-settings.js", import.meta.url)],
   ['<script src="/js/panel-automation.js"></script>', new URL("../public/js/panel-automation.js", import.meta.url)]
 ]);
 
