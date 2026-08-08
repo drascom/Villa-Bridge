@@ -152,7 +152,14 @@
     if(running)clearTimeout(running);
     state.commandErrors.set(id,setTimeout(()=>{state.commandErrors.delete(id);render()},commandErrorMs));
   };
-  const validRemovalConfirmation=value=>["yes","evet"].includes(String(value??"").trim());
+  /* Silme onayı: "evet" ya da "yes" (büyük/küçük harf fark etmez, iki dil de kabul), ya da
+     cihazın adı — eski alışkanlık da çalışsın. Koruma yanlışlıkla basmaya karşıdır; hangi cihazın
+     silindiğini diyalog zaten adıyla söylüyor. */
+  const removalConfirmationWords=["evet","yes"];
+  /* Harf büyüklüğü iki yönden de denenir: Türkçe "ı" küçültmede aynı kalır ama büyütmede "I"
+     olur, tek yönlü karşılaştırma "SALON LAMBASI" gibi bir yazımı boşuna reddederdi. */
+  const sameConfirmationText=(left,right)=>{const typed=String(left??"").trim();const expected=String(right??"").trim();return typed.length>0&&expected.length>0&&(typed.toLowerCase()===expected.toLowerCase()||typed.toUpperCase()===expected.toUpperCase());};
+  const validRemovalConfirmation=(value,name=null)=>removalConfirmationWords.some(word=>sameConfirmationText(value,word))||sameConfirmationText(value,name);
   const reducedMotion=()=>window.matchMedia?.("(prefers-reduced-motion: reduce)").matches===true;
   const ago=iso=>{if(!iso)return t("noData");const seconds=Math.max(0,Math.floor((Date.now()-new Date(iso))/1000));return seconds<8?t("justNow"):seconds<60?t("secondsAgo",{count:seconds}):seconds<3600?t("minutesAgo",{count:Math.floor(seconds/60)}):t("hoursAgo",{count:Math.floor(seconds/3600)})};
   const showToast=(message,error=false)=>{const toast=$("#toast");toast.textContent=message;toast.className=`toast show${error?" error":""}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className="toast",error?6000:3200)};

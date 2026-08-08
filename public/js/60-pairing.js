@@ -286,8 +286,10 @@
   }
   async function confirmDeviceRemoval(force=false){
     if(!state.removing)return;
-    const confirmation=$("#removeConfirmation").value;
-    if(!validRemovalConfirmation(confirmation)){showToast(t("nameMismatch"),true);return;}
+    if(!validRemovalConfirmation($("#removeConfirmation").value,state.removing.name)){showToast(t("nameMismatch"),true);return;}
+    /* Kullanıcı ne yazarsa yazsın sunucuya tek bir onay sözcüğü gider: onayı kullanıcıdan alan
+       yüzey burası, sunucudaki denetim onaysız çağrıya karşı duruyor. */
+    const confirmation="evet";
     const buttons=[$("#confirmRemove"),$("#forceRemove")];buttons.forEach(button=>button.disabled=true);
     try{
       const data=await api(`/api/devices/${encodeURIComponent(state.removing.id)}`,{method:"DELETE",body:JSON.stringify({confirmation,force})});

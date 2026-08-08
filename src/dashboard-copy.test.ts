@@ -237,10 +237,10 @@ test("cihaz kaldırma Android WebView uyumlu ve açıkça yıkıcı bir diyalog 
   assert.match(dashboard, /Zigbee ağından kaldırılsın mı\?/);
   assert.match(dashboard, /physical Zigbee device/);
   assert.match(dashboard, /fiziksel Zigbee cihazına/);
-  assert.match(dashboard, /type yes or evet in lowercase/);
-  assert.match(dashboard, /küçük harflerle yes veya evet yazın/);
+  assert.match(dashboard, /type yes below/);
+  assert.match(dashboard, /aşağıya evet yazın/);
   assert.match(dashboard, /autocapitalize="none"/);
-  assert.match(dashboard, /\["yes","evet"\]\.includes/);
+  assert.match(dashboard, /removalConfirmationWords=\["evet","yes"\]/);
   assert.match(dashboard, /confirmDeviceRemoval\(force=false\)/);
   assert.match(dashboard, /JSON\.stringify\(\{confirmation,force\}\)/);
   assert.match(dashboard, /forceRemove:"Kaydı zorla sil"/);
