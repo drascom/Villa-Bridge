@@ -1164,6 +1164,8 @@
     "deviceRemovedTitle": "Bu cihazı az önce kaldırdınız",
     "deviceRemovedLead": "Cihazı az önce kaldırdığınız için ayarları kaydedilemedi. Hazır olduğunuzda baştan yeniden ekleyin.",
     "retrySetup": "Tekrar dene",
-    "pairingRemovedWarning": "Bu cihaz az önce kaldırıldı. Eşleştirme tamamlanmazsa bir dakika bekleyip tekrar deneyin."
+    "pairingRemovedWarning": "Bu cihaz az önce kaldırıldı. Eşleştirme tamamlanmazsa bir dakika bekleyip tekrar deneyin.",
+    "pairingDeviceWait": "Cihaz bir an bağlantıyı kaybetti, geri gelmesi bekleniyor…",
+    "pairingDeviceReturned": "Cihaz geri geldi, kurulum kaldığı yerden sürüyor."
   }
 }

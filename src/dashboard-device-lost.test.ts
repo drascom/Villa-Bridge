@@ -27,25 +27,39 @@ function extractFunction(source: string, name: string): string {
 }
 
 interface LostRun {
-  state: Record<string, unknown>;
+  state: Record<string, any>;
   elements: Record<string, { open: boolean; textContent: string; hidden: boolean }>;
   closed: string[];
   pairingStarts: number;
   pairingTargets: (string | null)[];
   setupOpens: { id: string; reconnected: boolean }[];
   renders: number;
+  toasts: string[];
+  /** Enjekte edilebilir saat: dönüş penceresi gerçek beklemeden ilerletilir. */
+  clock: number;
+  wait: number;
+}
+
+/** Dönüş penceresinin süresi panelden okunur: test kendi sayısını uydurmaz. */
+function extractWaitWindow(source: string): string {
+  const match = source.match(/const deviceReturnWaitMs=\d+;/);
+  assert.ok(match, "deviceReturnWaitMs sabiti bulunamadı");
+  return match[0];
 }
 
 async function runFlow(script: string, initialState: Record<string, unknown>): Promise<LostRun> {
   const source = await readPanelSource();
   const result: LostRun = {
-    state: { departures: [], deviceLost: null, devices: [], ...initialState },
+    state: { departures: [], deviceLost: null, devices: [], deviceReturnWait: null, ...initialState },
     elements: {},
     closed: [],
     pairingStarts: 0,
     pairingTargets: [],
     setupOpens: [],
-    renders: 0
+    renders: 0,
+    toasts: [],
+    clock: 1_000_000,
+    wait: Number(extractWaitWindow(source).match(/\d+/)?.[0])
   };
   const factory = new Function(
     "result",
@@ -60,8 +74,15 @@ async function runFlow(script: string, initialState: Record<string, unknown>): P
     };
     const t=key=>key;
     const render=()=>{result.renders+=1};
+    const showToast=message=>{result.toasts.push(message)};
+    const pairingNow=()=>result.clock;
     const startPairing=(open,targetId=null)=>{result.pairingStarts+=1;result.pairingTargets.push(targetId)};
     const openPairingName=(id,reconnected=false)=>{result.setupOpens.push({id,reconnected})};
+    const configureNameDialog=()=>{};
+    const setTimeout=()=>0;
+    ${extractWaitWindow(source)}
+    ${extractFunction(source, "awaitDeviceReturn")}
+    ${extractFunction(source, "reportDeviceGone")}
     ${extractFunction(source, "returnedPairingDevice")}
     ${extractFunction(source, "deviceNeedsName")}
     ${extractFunction(source, "closeDeviceDetail")}
@@ -74,6 +95,9 @@ async function runFlow(script: string, initialState: Record<string, unknown>): P
     ${extractFunction(source, "retryDeviceLost")}
     ${extractFunction(source, "watchSetupFlowDevice")}
     ${extractFunction(source, "renderPairingProgress")}
+    /* Gönderilen openPairingName gövdesi, yalnız adı değiştirilerek: içeriden çağrıldığı yerlerde
+       kayıt tutan sahte hâli kalsın diye. Sınanan kod aynı kod. */
+    ${extractFunction(source, "openPairingName").replace("function openPairingName(", "function openPairingNameOrWait(")}
     return (async()=>{ ${script} })();
     `
   ) as (run: LostRun) => Promise<void>;
@@ -81,13 +105,26 @@ async function runFlow(script: string, initialState: Record<string, unknown>): P
   return result;
 }
 
-test("kurulum akışı açıkken cihaz listeden düşerse sebep hemen söylenir", async () => {
-  const run = await runFlow("watchSetupFlowDevice();", {
-    editing: { id: "0xabc", channel: null, afterPairing: true },
-    devices: [{ id: "0xother" }],
-    departures: [{ id: "0xabc", reason: "left", at: Date.now() }]
-  });
+test("kurulum akışı açıkken düşen cihaz önce beklenir, pencere dolunca sebep söylenir", async () => {
+  const run = await runFlow(
+    `watchSetupFlowDevice();
+     result.state.firstPass={lost:state.deviceLost,waiting:state.deviceReturnWait};
+     result.clock+=result.wait-1;watchSetupFlowDevice();
+     result.state.beforeWindow=state.deviceLost;
+     result.clock+=1;watchSetupFlowDevice();`,
+    {
+      editing: { id: "0xabc", channel: null, afterPairing: true },
+      devices: [{ id: "0xother" }],
+      departures: [{ id: "0xabc", reason: "left", at: Date.now() }]
+    }
+  );
 
+  // İlk düşüşte diyalog yok: cihaz beklenmeye alınır ve kullanıcıya tek satırla söylenir.
+  assert.equal(run.state.firstPass.lost, null);
+  assert.equal(run.state.firstPass.waiting.id, "0xabc");
+  assert.deepEqual(run.toasts, ["pairingDeviceWait"]);
+  // Pencere dolmadan da diyalog açılmaz.
+  assert.equal(run.state.beforeWindow, null);
   assert.deepEqual(run.state.deviceLost, { id: "0xabc", code: "DEVICE_LEFT" });
   assert.equal(run.elements["#deviceLostDialog"].open, true);
   assert.equal(run.elements["#deviceLostTitle"].textContent, "deviceLostTitle");
@@ -110,6 +147,74 @@ test("az önce silinen cihaz için kaldırılma metni gösterilir", async () => 
   assert.equal((run.state.deviceLost as { code: string }).code, "DEVICE_REMOVED");
   assert.equal(run.elements["#deviceLostTitle"].textContent, "deviceRemovedTitle");
   assert.equal(run.elements["#deviceLostLead"].textContent, "deviceRemovedLead");
+});
+
+/* Canlı günlükteki sıra: interview biter, cihaz 6 sn sonra düşer, 5 sn sonra kendiliğinden geri
+   gelir. Sihirbaz henüz açılmamışken düşerse akış bitirilmez; cihaz dönünce isim adımı açılır. */
+test("sihirbaz açılmadan düşen cihaz beklenir, geri gelince sihirbaz açılır", async () => {
+  const run = await runFlow(
+    `openPairingNameOrWait("0xa4c138462c230400",false);
+     result.state.waiting={...state.deviceReturnWait};
+     result.state.duringWait={
+       dialog:$("#pairingDialog").open,
+       line:$("#pairingWaitLine").hidden,
+       text:$("#pairingWaitLine").textContent,
+       editing:state.editing??null
+     };
+     result.clock+=5000;
+     state.devices=[{id:"0xa4c138462c230400",name:"0xa4c138462c230400"}];
+     watchSetupFlowDevice();`,
+    {
+      pairingSession: { foundId: "0xa4c138462c230400", phase: "ready", hidden: false, completing: true, reconnected: false },
+      pairing: { open: true },
+      devices: []
+    }
+  );
+
+  // Bekleme eşleştirme ekranında tek satırla görünür, ekran yeniden açılır; akış kesilmez.
+  assert.equal(run.state.waiting.id, "0xa4c138462c230400");
+  assert.equal(run.state.waiting.resume, true);
+  assert.deepEqual(run.state.duringWait, {
+    dialog: true,
+    line: false,
+    text: "pairingDeviceWait",
+    editing: null
+  });
+  assert.equal(run.elements["#pairingDialog"].open, false, "sihirbaz açılırken eşleştirme ekranı kapanır");
+
+  // Cihaz döndü: akış kaldığı yerden sürer, "kayboldu" diyaloğu hiç çıkmaz.
+  assert.equal(run.state.deviceLost, null);
+  assert.equal(run.state.deviceReturnWait, null);
+  assert.deepEqual(run.setupOpens, [{ id: "0xa4c138462c230400", reconnected: false }]);
+  assert.deepEqual(run.toasts, ["pairingDeviceWait", "pairingDeviceReturned"]);
+});
+
+test("sihirbaz açılmadan düşen cihaz dönmezse pencere dolunca kayıp sayılır", async () => {
+  const run = await runFlow(
+    `openPairingNameOrWait("0xabc",true);
+     result.clock+=result.wait;
+     watchSetupFlowDevice();`,
+    { pairingSession: { phase: "ready" }, devices: [] }
+  );
+
+  assert.deepEqual(run.setupOpens, []);
+  assert.deepEqual(run.state.deviceLost, { id: "0xabc", code: "DEVICE_LEFT" });
+  assert.equal(run.state.deviceReturnWait, null);
+});
+
+/* Sunucunun "ağdan ayrıldı" yanıtı da akışı bitirmez: aynı pencere işletilir, adım açık kalır. */
+test("kaydetme sırasındaki ayrılma yanıtı da önce beklemeye alınır", async () => {
+  const run = await runFlow(
+    `reportDeviceGone("0xabc","DEVICE_LEFT");
+     result.state.waiting={...state.deviceReturnWait};
+     reportDeviceGone("0xabc","DEVICE_REMOVED");`,
+    { editing: { id: "0xabc", channel: null, afterPairing: true }, devices: [] }
+  );
+
+  assert.equal(run.state.waiting.id, "0xabc");
+  assert.equal(run.state.waiting.resume, false);
+  // Kullanıcının kendi kaldırdığı cihaz beklenmez: o yol doğrudan diyaloğa gider.
+  assert.deepEqual(run.state.deviceLost, { id: "0xabc", code: "DEVICE_REMOVED" });
 });
 
 test("cihaz yerinde durduğu sürece kurulum akışı rahatsız edilmez", async () => {
@@ -308,7 +413,9 @@ test("kayıp cihaz metinleri iki dilde de var ve panel sunucunun kodlarını oku
     "deviceRemovedTitle",
     "deviceRemovedLead",
     "retrySetup",
-    "pairingRemovedWarning"
+    "pairingRemovedWarning",
+    "pairingDeviceWait",
+    "pairingDeviceReturned"
   ]) {
     assert.equal(typeof english[key], "string", `${key} en.json'da yok`);
     assert.equal(typeof turkish[key], "string", `${key} tr.json'da yok`);
@@ -316,13 +423,16 @@ test("kayıp cihaz metinleri iki dilde de var ve panel sunucunun kodlarını oku
 
   // Ev halkının dili: teknik terim ya da makine kodu metne sızmamalı.
   for (const catalog of [english, turkish]) {
-    for (const key of ["deviceLostLead", "deviceRemovedLead", "pairingRemovedWarning"]) {
+    for (const key of ["deviceLostLead", "deviceRemovedLead", "pairingRemovedWarning", "pairingDeviceWait", "pairingDeviceReturned"]) {
       assert.doesNotMatch(catalog[key], /IEEE|Zigbee|404|DEVICE_/);
     }
   }
 
   assert.match(dashboard, /id="deviceLostDialog"/);
   assert.match(dashboard, /id="pairingWarning"/);
+  // Bekleme satırı eşleştirme ekranında duruyor ve panelden besleniyor.
+  assert.match(dashboard, /id="pairingWaitLine" class="pairing-wait" data-i18n="pairingDeviceWait" hidden/);
+  assert.match(dashboard, /\$\("#pairingWaitLine"\)\.hidden=!waiting/);
   // Yanıt gövdesindeki makine kodu hatanın üstünde taşınmalı, yoksa panel sebebi ayırt edemez.
   assert.match(dashboard, /failure\.code=data\.code/);
   assert.match(dashboard, /watchSetupFlowDevice\(\)/);

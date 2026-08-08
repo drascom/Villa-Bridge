@@ -16,6 +16,11 @@
     const removedRecently=Boolean(pairingDevice)&&(state.departures||[]).some(item=>item.id===pairingDevice.id&&item.reason==="removed");
     $("#pairingWarning").hidden=!removedRecently;
     if(removedRecently)$("#pairingWarning").textContent=t("pairingRemovedWarning");
+    /* Cihaz bir an düşüp geri gelebiliyor. Bu tek satır bunu söyler; akış kesilmez, hiçbir adım
+       kapanmaz — kullanıcı yalnız beklendiğini bilir. */
+    const waiting=state.deviceReturnWait;
+    $("#pairingWaitLine").hidden=!waiting;
+    if(waiting)$("#pairingWaitLine").textContent=t("pairingDeviceWait");
   }
   /* Katılım olayı (`device_joined`/`device_announce`) yalnız ağa yeni giren ya da duyuru yapan
      cihaz için üretilir. Silinmiş sanılan bir cihaz aslında ağda kaldıysa yeni aramada hiç olay
@@ -79,7 +84,8 @@
      zamanlayıcı sayfayla birlikte kaybolur; ağı sunucunun kendi 180 sn'lik süresi söndürür. */
   async function closePairingNetworkIfIdle(){
     const pending=state.pairingNetworkClose;
-    if(!pending||!pending.ready||setupFlowDeviceId()!==null)return;
+    // Dönüşü beklenen cihaz varken de ağ kapatılmaz: beklediğimiz şey tam da geri katılması.
+    if(!pending||!pending.ready||setupFlowDeviceId()!==null||state.deviceReturnWait)return;
     state.pairingNetworkClose=null;
     try{await api("/api/pairing/stop",{method:"POST"})}catch{}
     state.pairing={open:false};
@@ -96,14 +102,52 @@
   function deviceGoneCode(error){
     return error?.code==="DEVICE_LEFT"||error?.code==="DEVICE_REMOVED"?error.code:null;
   }
+  /* Kaydetme sırasında cihaz bir an düşmüş olabilir: sunucunun "ağdan ayrıldı" yanıtı da akışı
+     hemen bitirmez, aynı dönüş penceresi işletilir. Kullanıcının kendi kaldırdığı cihaz beklenmez. */
+  function reportDeviceGone(id,code){
+    if(code==="DEVICE_LEFT"&&setupFlowDeviceId()===id){awaitDeviceReturn(id);return}
+    openDeviceLost(id,code);
+  }
+  /* Yeni katılan cihaz interview biter bitmez bir kez düşüp saniyeler içinde geri gelebiliyor:
+     güven merkezi anahtar değişimi sürerken, ağ hâlâ açıkken bile olan bir şey. Böyle bir düşüş
+     eşleştirmeyi bitirmez — cihaz bu pencere boyunca beklenir. Dönerse akış kaldığı yerden sürer,
+     dönmezse pencere dolduğunda bugünkü "cihaz ağdan düştü" diyaloğu çıkar. */
+  const deviceReturnWaitMs=30000;
+  /* Saat tek yerden okunur: testler pencereyi gerçek beklemeden ilerletebilsin. */
+  const pairingNow=()=>Date.now();
+  /* Beklemeye giriş: hiçbir adım kapatılmaz, yalnız tek satırla haber verilir. `resume` doğruysa
+     kurulum sihirbazı henüz açılmamıştır — cihaz döndüğü an açılacak. */
+  function awaitDeviceReturn(id,resume=false,reconnected=false){
+    if(state.deviceReturnWait?.id===id)return;
+    state.deviceReturnWait={id,since:pairingNow(),resume,reconnected};
+    showToast(t("pairingDeviceWait"));
+    if(!state.pairingSession)return;
+    renderPairingProgress();
+    if(resume&&!$("#pairingDialog").open)$("#pairingDialog").showModal();
+  }
   /* Kurulum açıkken cihaz listeden düşerse kullanıcı "Kaydet"e basana kadar bekletilmez: panel
-     zaten periyodik yeniliyor, sebep düştüğü anda söylenir. */
+     zaten periyodik yeniliyor. Ama sebep hemen "kayboldu" değildir; önce dönüş penceresi. */
   function watchSetupFlowDevice(){
     if(state.deviceLost)return;
-    const id=setupFlowDeviceId();
-    if(!id||state.devices.some(device=>device.id===id))return;
+    const waiting=state.deviceReturnWait;
+    // Sihirbaz henüz açılmadıysa akışın cihazını bekleyen kaydın kendisi taşır.
+    const id=setupFlowDeviceId()||waiting?.id||null;
+    if(!id)return;
+    if(state.devices.some(device=>device.id===id)){
+      if(waiting?.id!==id)return;
+      state.deviceReturnWait=null;
+      showToast(t("pairingDeviceReturned"));
+      if(!waiting.resume){renderPairingProgress();return}
+      if($("#pairingDialog").open)$("#pairingDialog").close();
+      openPairingName(id,waiting.reconnected===true);
+      return;
+    }
     const departure=(state.departures||[]).find(item=>item.id===id);
-    openDeviceLost(id,departure?.reason==="removed"?"DEVICE_REMOVED":"DEVICE_LEFT");
+    // Kullanıcının kendi kaldırdığı cihaz beklenmez: dönmesi beklenen bir cihaz değil.
+    if(departure?.reason==="removed"){openDeviceLost(id,"DEVICE_REMOVED");return}
+    if(waiting?.id!==id){awaitDeviceReturn(id);return}
+    if(pairingNow()-waiting.since<deviceReturnWaitMs)return;
+    openDeviceLost(id,"DEVICE_LEFT");
   }
   function renderDeviceLost(){
     const lost=state.deviceLost;if(!lost)return;
@@ -114,7 +158,7 @@
   /* Akış kilitli kalmaz: her adım kapatılır, kullanıcıya baştan deneme ya da kapatma bırakılır. */
   function openDeviceLost(id,code){
     state.deviceLost={id,code};
-    state.editing=null;state.imageEditing=null;state.roleEditing=null;state.roomEditing=null;state.pairingSession=null;
+    state.editing=null;state.imageEditing=null;state.roleEditing=null;state.roomEditing=null;state.pairingSession=null;state.deviceReturnWait=null;
     ["#nameDialog","#imageDialog","#deviceRoleDialog","#deviceRoomDialog","#pairingDialog"].forEach(selector=>{
       const dialog=$(selector);if(dialog?.open)dialog.close();
     });
@@ -142,7 +186,8 @@
     cancelPairingNetworkClose();
     if(open){
       /* Arama başlarken listedeki cihazlar not edilir: sonradan beliren bir kimlik, katılım
-         olayı hiç gelmese bile "geri döndü" demektir. */
+         olayı hiç gelmese bile "geri döndü" demektir. Yeni arama eski beklemeyi de sıfırlar. */
+      state.deviceReturnWait=null;
       state.pairingSession={foundId:null,phase:"searching",hidden:false,completing:false,reconnected:false,targetId:targetId||null,knownIds:(state.devices||[]).map(device=>device.id)};
       renderPairingProgress();$("#pairingDialog").showModal();
     }
@@ -151,7 +196,7 @@
       const data=await api(open?"/api/pairing/start":"/api/pairing/stop",{method:"POST",body:open?JSON.stringify({seconds:180,routerId}):undefined});
       state.pairing=open?data.pairing:{open:false};
       if(open)trackPairingProgress();
-      if(!open){if($("#pairingDialog").open)$("#pairingDialog").close();state.pairingSession=null;}
+      if(!open){if($("#pairingDialog").open)$("#pairingDialog").close();state.pairingSession=null;state.deviceReturnWait=null;}
       render();showToast(open?t("searchStarted"):t("searchStopped"));
     }catch(error){
       if(open&&$("#pairingDialog").open)$("#pairingDialog").close();
@@ -181,7 +226,11 @@
   }
   function openPairingName(id,reconnected=false){
     const device=state.devices.find(item=>item.id===id);
-    if(!device){finishPairingFlow(id);return}
+    /* Cihaz tam bu anda listede değilse akış bitirilmez: kısa süreli bir düşüş olabilir, dönüşü
+       beklenir. Eskiden burada akış sessizce biterdi; cihaz saniyeler sonra dönünce listede ham
+       kimliğiyle kalır, kullanıcıya isim/tür/oda hiç sorulmazdı. */
+    if(!device){awaitDeviceReturn(id,true,reconnected);return}
+    state.deviceReturnWait=null;
     state.editing={id,channel:null,afterPairing:true,reconnected};
     configureNameDialog(true,reconnected);
     $("#nameInput").value=deviceNeedsName(device)?"":device.name;
@@ -218,7 +267,7 @@
     }
     catch(error){
       const gone=deviceGoneCode(error);
-      if(gone)openDeviceLost(editing.id,gone);else showToast(error.message,true);
+      if(gone)reportDeviceGone(editing.id,gone);else showToast(error.message,true);
     }
   }
   function cancelName(){
@@ -269,7 +318,7 @@
     }catch(error){
       button.disabled=false;
       const gone=deviceGoneCode(error);
-      if(gone)openDeviceLost(editing.id,gone);else showToast(error.message,true);
+      if(gone)reportDeviceGone(editing.id,gone);else showToast(error.message,true);
     }
   }
   function removeDevice(id){
@@ -399,6 +448,9 @@
     $("#deviceDetailIcon").innerHTML=deviceTypeIcon(device);
     $("#deviceDetailKind").textContent=`${deviceKind(device)} · ${primaryStatus.label}`;
     $("#deviceDetailName").textContent=device.name;
+    /* Alt satır gövdenin dışında duruyor: kaydırma alanına girmediği için pencere ne kadar dolu
+       olursa olsun kapatma düğmesi görünür kalır. Metni gövdeyle birlikte tazelenir. */
+    $("#finishDeviceDetail").textContent=t(state.detailFromPairing?"finishSetup":"close");
     // Başlıktaki rozet/kalem gövdeden bağımsız tazelenir, bu yüzden tıklaması burada bağlanır.
     const meta=$("#deviceDetailMeta");
     const metaSignature=`${device.id}|${linkQualityPercent(device)}|${state.language}`;

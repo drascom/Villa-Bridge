@@ -116,7 +116,7 @@
       $("#deviceRoleDialog").close();
     }catch(error){
       const gone=deviceGoneCode(error);
-      if(gone)openDeviceLost(editing.id,gone);else showToast(error.message,true);
+      if(gone)reportDeviceGone(editing.id,gone);else showToast(error.message,true);
     }
   }
   function askDeviceRole(id,afterPairing=false){

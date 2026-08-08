@@ -1164,6 +1164,8 @@
     "deviceRemovedTitle": "This device was just removed",
     "deviceRemovedLead": "You removed this device a moment ago, so its settings could not be saved. Add it again from the start when you are ready.",
     "retrySetup": "Try again",
-    "pairingRemovedWarning": "This device was removed a moment ago. If pairing does not finish, wait a minute and try again."
+    "pairingRemovedWarning": "This device was removed a moment ago. If pairing does not finish, wait a minute and try again.",
+    "pairingDeviceWait": "The device briefly lost its connection. Waiting for it to come back…",
+    "pairingDeviceReturned": "The device is back. Setup continues where it left off."
   }
 }

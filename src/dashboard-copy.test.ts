@@ -521,8 +521,12 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /#home \.page-head \.lead\{display:none\}/);
   assert.doesNotMatch(dashboard, /data-i18n="devicesLead"/);
   assert.doesNotMatch(dashboard, /devicesLead:/);
-  assert.match(dashboard, /<div class="card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="\$\{esc\(device\.id\)\}">/);
-  assert.match(dashboard, /\.card-actions-footer\{align-items:stretch;gap:clamp\(10px,1\.4vw,16px\);margin-top:clamp\(12px,1\.8vh,18px\);padding-top:clamp\(12px,1\.8vh,18px\);border-top:1px solid var\(--line\)\}/);
+  // Kaldırma bakım satırında, onar düğmesinin hemen yanında.
+  assert.match(
+    dashboard,
+    /data-reconfigure="\$\{esc\(device\.id\)\}">\$\{t\("repairDevice"\)\}<\/button><button class="remove" type="button" data-admin-only data-remove="\$\{esc\(device\.id\)\}">/
+  );
+  assert.match(dashboard, /\.card-actions-footer\{justify-content:flex-end;align-items:stretch;gap:clamp\(10px,1\.4vw,16px\);margin-top:clamp\(12px,1\.8vh,18px\);padding-top:clamp\(12px,1\.8vh,18px\);border-top:1px solid var\(--line\)\}/);
   assert.match(dashboard, /\.device-detail-layout\{display:grid;gap:18px;margin-bottom:18px\}/);
   assert.match(dashboard, /@media\(min-width:900px\) and \(orientation:landscape\)\{dialog\.device-detail-dialog\{width:min\(94vw,940px\)\}\.device-detail-layout\{grid-template-columns:repeat\(auto-fit,minmax\(260px,1fr\)\);align-items:start\}\.device-detail-controls\{order:2\}\.device-detail-media\{order:1\}/);
   assert.match(dashboard, /\.device-detail-photo \.device-photo\{[^}]*max-height:min\(26vh,168px\)/);
@@ -645,33 +649,24 @@ test("başarılı eşleştirme yeni cihaz isimlendirme adımını açar", async 
   assert.doesNotThrow(() => new Function(scripts));
 });
 
-/* Eşleştirmenin son penceresi cihaz detayı: kullanıcı orada "bitti" diyebilmeli. Düğme kaldırma
-   düğmesiyle aynı satırda, sağ tarafta durur — ama kabı `data-admin-only` almaz (ev sakini de
-   bitirebilmeli). */
-test("cihaz detayında bitirme düğmesi kaldırma düğmesiyle aynı satırda, sağda durur", async () => {
+/* Eşleştirmenin son penceresi cihaz detayı: kullanıcı orada "bitti" diyebilmeli. Düğme alt
+   satırda tek başına durur, kabı `data-admin-only` almaz (ev sakini de bitirebilmeli) ve gövdenin
+   kardeşi olduğu için kaydırma alanının dışındadır. */
+test("cihaz detayında bitirme düğmesi alt satırda tek başına, kaydırmanın dışında durur", async () => {
   const dashboard = await readDashboardBundle();
 
   assert.match(
     dashboard,
-    /<div class="card-actions-done"><button class="primary" type="button" data-close-detail>\$\{esc\(t\(state\.detailFromPairing\?"finishSetup":"close"\)\)\}<\/button><\/div>/
+    /<div id="deviceDetailBody" class="device-detail-body"><\/div><div class="card-actions card-actions-footer"><button id="finishDeviceDetail" class="primary" type="button" data-close-detail data-i18n="close">/
   );
-  // Tek satır: iki kap aynı `.card-actions-footer` içinde, kaldırma önce, bitirme sonra.
-  assert.match(
-    dashboard,
-    /<div class="card-actions card-actions-footer"><div class="card-actions-danger" data-admin-only>[\s\S]{0,200}?<\/div><div class="card-actions-done">/
-  );
-  assert.doesNotMatch(dashboard, /card-actions-done"[^>]*data-admin-only/);
-  assert.match(dashboard, /\.card-actions-footer>\.card-actions-danger\{flex:0 1 auto;display:flex\}/);
-  assert.match(
-    dashboard,
-    /\.card-actions-footer>\.card-actions-done\{flex:1 1 clamp\(160px,28vw,320px\);display:flex;justify-content:flex-end\}/
-  );
-  assert.match(
-    dashboard,
-    /\.card-actions-footer>div>button\{flex:1 1 auto;width:100%;min-height:clamp\(44px,7vh,52px\)\}/
-  );
+  assert.match(dashboard, /\$\("#finishDeviceDetail"\)\.textContent=t\(state\.detailFromPairing\?"finishSetup":"close"\)/);
+  // Alt satır artık kap içermez: yalnız tek düğme, sağa yaslı.
+  assert.doesNotMatch(dashboard, /card-actions-danger/);
+  assert.doesNotMatch(dashboard, /card-actions-done/);
+  assert.doesNotMatch(dashboard, /\.card-actions-footer>div>button/);
+  assert.match(dashboard, /\.card-actions-footer>button\{flex:0 1 clamp\(160px,28vw,320px\);min-height:clamp\(44px,7vh,52px\)\}/);
   // Tehlike dili birincil dilden ayrışsın; sabit renk değil, tema değişkeni.
-  assert.match(dashboard, /\.card-actions-footer \.remove\{border:1px solid var\(--danger\)\}/);
+  assert.match(dashboard, /\.card-actions \.remove\{border:1px solid var\(--danger\)\}/);
   assert.ok(!/\.card-actions-footer[^{]*\{[^}]*color-mix\(/.test(dashboard));
   // Bağlam eşleştirmeden taşınır ve pencere kapanınca sıfırlanır.
   assert.match(dashboard, /showDevice\(id,\{fromPairing:true\}\)/);
