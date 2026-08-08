@@ -7,6 +7,8 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { registerAccessControl } from "./access-control.js";
 import { AgentTokenStore } from "./agent-tokens.js";
 import { AuthStore } from "./auth-store.js";
+import type { AutomationRunResult } from "./automation-engine.js";
+import { type Automation, validateAutomations } from "./automations.js";
 import {
   SUPPORTED_PROTOCOL_VERSIONS,
   clientCapabilitiesMetaKey,
@@ -17,7 +19,7 @@ import {
   serverInfoMetaKey
 } from "./mcp.js";
 import type { HomeGroup } from "./home-groups.js";
-import type { DeviceControlView, DeviceView } from "./types.js";
+import type { DeviceControlView, DeviceView, JsonObject } from "./types.js";
 
 const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS[0];
 
@@ -68,8 +70,9 @@ const devices: DeviceView[] = [
     powerSource: "Mains (single phase)",
     controls: [
       control({ id: "brightness", kind: "level", name: "Parlaklık", value: 120, min: 0, max: 254, unit: "%" }),
-      control({ id: "main", kind: "switch", name: "Salon lambası", value: true }),
-      control({ id: "power_on_behavior", kind: "select", name: "Açılış davranışı", value: "on", adminOnly: true })
+      control({ id: "main", kind: "switch", name: "Salon lambası", value: true, property: "state" }),
+      control({ id: "power_on_behavior", kind: "select", name: "Açılış davranışı", value: "on", adminOnly: true }),
+      control({ id: "main:color", kind: "color", name: "Renk", value: "#ffffff", property: "color" })
     ]
   }),
   device({
@@ -79,7 +82,35 @@ const devices: DeviceView[] = [
     availability: "offline",
     controls: [control({ id: "cover:position", kind: "cover", name: "Perde", value: 40, min: 0, max: 100 })]
   }),
-  device({ id: "0x0033333333333333", name: "Hol sensörü", category: "unknown", controls: [] })
+  device({ id: "0x0033333333333333", name: "Hol sensörü", category: "unknown", controls: [] }),
+  // §8.1 — ajan yolundan yazılamayacak iki kanal; panelden elle kumanda edilebilirler.
+  device({
+    id: "0x0044444444444444",
+    name: "Giriş kilidi",
+    category: "lock",
+    controls: [control({
+      id: "lock:state",
+      property: "state",
+      kind: "lock",
+      name: "Kilit",
+      value: "LOCK",
+      values: ["LOCK", "UNLOCK"]
+    })]
+  }),
+  device({
+    id: "0x0055555555555555",
+    name: "Bahçe sireni",
+    category: "unknown",
+    controls: [control({
+      id: "siren:alarm",
+      property: "alarm",
+      kind: "siren",
+      name: "Alarm",
+      value: false,
+      valueOn: "ON",
+      valueOff: "OFF"
+    })]
+  })
 ];
 
 const homeGroups: HomeGroup[] = [
@@ -87,11 +118,46 @@ const homeGroups: HomeGroup[] = [
   { id: "mutfak", name: "Mutfak", items: [{ deviceId: "0x0022222222222222", controlId: "@device" }] }
 ];
 
+/** Kural yazan testlerin başlangıç durumu; her koşum kendi kopyasını alır. */
+const seedAutomations = (): Automation[] => [
+  {
+    id: "aaaabbbbcccc",
+    name: "Akşam ışıkları",
+    enabled: true,
+    triggers: [{ type: "time", at: "19:30", days: [1, 2, 3, 4, 5, 6, 7] }],
+    conditions: [],
+    actions: [{ type: "device", deviceId: "0x0011111111111111", property: "state", value: "ON" }],
+    lastRunAt: "2026-08-05T16:30:00.000Z",
+    lastRunOk: true
+  },
+  // Damgasız, elle yazılmış eski kural: okunabilmeli ve yazılabilmeli (geriye uyumluluk).
+  {
+    id: "ddddeeeeffff",
+    name: "Sabah perdesi",
+    enabled: false,
+    triggers: [{ type: "sun", event: "sunrise", offsetMinutes: -15, days: [1, 2, 3, 4, 5] }],
+    conditions: [],
+    actions: [{ type: "device", deviceId: "0x0022222222222222", property: "position", value: 100 }],
+    lastRunAt: null,
+    lastRunOk: null
+  }
+];
+
 interface Harness {
   app: FastifyInstance;
   token: string;
+  tokenRecord: { id: string; name: string };
   cookie: string;
   csrfToken: string;
+  /** `set_device` çağrılarının izi; gerçek cihaza hiçbir şey gitmez. */
+  writes: Array<{ deviceId: string; payload: JsonObject }>;
+  /** Diskteki kural dosyasının yerine geçen bellek durumu. */
+  automations: Automation[];
+  /** Her yazmadan **önce** alınan anlık kopya — gerçek wiring'deki yedeğin karşılığı. */
+  backups: Automation[][];
+  runs: string[];
+  /** `control_automation` çalıştırmasının döndüreceği sonuç; testler değiştirir. */
+  runResult: AutomationRunResult;
 }
 
 const cookieFrom = (response: {
@@ -105,7 +171,7 @@ const cookieFrom = (response: {
 
 const setupApp = async (
   context: { after: (callback: () => Promise<void>) => void },
-  options: { allowedOrigins?: string[] } = {}
+  options: { allowedOrigins?: string[]; allowDangerousControls?: boolean } = {}
 ): Promise<Harness> => {
   const directory = await mkdtemp(join(tmpdir(), "villa-mcp-"));
   const app = Fastify();
@@ -121,9 +187,40 @@ const setupApp = async (
     agentTokens,
     mcpAllowedOrigins: options.allowedOrigins ?? []
   });
+  // Tek nesne kurulur ve hep o taşınır: `save()` alan değiştirdiğinde test de aynı nesneyi görür.
+  const harness = {
+    app,
+    token: "",
+    tokenRecord: { id: "", name: "" },
+    cookie: "",
+    csrfToken: "",
+    writes: [],
+    automations: seedAutomations(),
+    backups: [],
+    runs: [],
+    runResult: "ok"
+  } satisfies Harness as Harness;
   registerMcpEndpoint(app, {
     devices: () => devices,
-    homeGroups: async () => homeGroups
+    homeGroups: async () => homeGroups,
+    setDevice: async (deviceId, payload) => {
+      harness.writes.push({ deviceId, payload });
+    },
+    automations: {
+      list: async () => harness.automations.map((automation) => ({ ...automation })),
+      // Gerçek wiring'in aynısı: **önce** yedek, sonra doğrulayıp kaydetme.
+      save: async (next) => {
+        harness.backups.push(harness.automations.map((automation) => ({ ...automation })));
+        harness.automations = validateAutomations(next, (deviceId) =>
+          devices.find((candidate) => candidate.id === deviceId));
+        return harness.automations.map((automation) => ({ ...automation }));
+      },
+      run: async (id) => {
+        harness.runs.push(id);
+        return harness.runResult;
+      }
+    },
+    allowDangerousControls: () => options.allowDangerousControls === true
   });
   const setup = await app.inject({
     method: "POST",
@@ -138,7 +235,11 @@ const setupApp = async (
     payload: { name: "Asistan" }
   });
   assert.equal(created.statusCode, 200);
-  return { app, token: created.json().token, cookie, csrfToken: setup.json().csrfToken };
+  harness.token = created.json().token;
+  harness.tokenRecord = created.json().record as { id: string; name: string };
+  harness.cookie = cookie;
+  harness.csrfToken = setup.json().csrfToken;
+  return harness;
 };
 
 const rpc = (method: string, params: Record<string, unknown> = {}, id: unknown = 1) => ({
@@ -471,7 +572,15 @@ test("tools/list belirlenimci sırada ve dolu şemalarla döner", async (context
     name: mcpServerInfo.name,
     version: mcpServerInfo.version
   });
-  assert.deepEqual(result.tools.map((tool: { name: string }) => tool.name), ["list_devices", "get_device"]);
+  assert.deepEqual(result.tools.map((tool: { name: string }) => tool.name), [
+    "list_devices",
+    "get_device",
+    "set_device",
+    "list_automations",
+    "get_automation",
+    "write_automation",
+    "control_automation"
+  ]);
   assert.deepEqual(result.tools.map((tool: { name: string }) => tool.name), mcpTools.map((tool) => tool.name));
   for (const tool of result.tools as Array<Record<string, unknown>>) {
     assert.equal(typeof tool.title, "string");
@@ -510,7 +619,7 @@ test("list_devices süzgeçleri çalışır ve satırlar ana kanalı özetler", 
     name: mcpServerInfo.name,
     version: mcpServerInfo.version
   });
-  assert.equal(all.structuredContent.count, 3);
+  assert.equal(all.structuredContent.count, 5);
   // Metin içerik yapısal sonucun aynı JSON'u.
   assert.deepEqual(JSON.parse(all.content[0].text), all.structuredContent);
   const [salon, perde, sensor] = all.structuredContent.devices;
@@ -534,7 +643,7 @@ test("list_devices süzgeçleri çalışır ve satırlar ana kanalı özetler", 
   );
   assert.deepEqual(
     (await call({ onlineOnly: true })).structuredContent.devices.map((row: { id: string }) => row.id),
-    ["0x0011111111111111", "0x0033333333333333"]
+    ["0x0011111111111111", "0x0033333333333333", "0x0044444444444444", "0x0055555555555555"]
   );
   assert.deepEqual(
     (await call({ search: "mutfak" })).structuredContent.devices.map((row: { id: string }) => row.id),
@@ -572,7 +681,8 @@ test("get_device ham state yerine kanalları döner, bilinmeyen cihaz isError ol
   assert.deepEqual(structured.controls.map((item: { id: string }) => item.id), [
     "brightness",
     "main",
-    "power_on_behavior"
+    "power_on_behavior",
+    "main:color"
   ]);
   assert.deepEqual(structured.controls[0], {
     id: "brightness",
@@ -596,13 +706,344 @@ test("get_device ham state yerine kanalları döner, bilinmeyen cihaz isError ol
   assert.match(noArgument.content[0].text, /`id` is required/);
 });
 
+/** `tools/call` kısayolu; araç adı başlıkta ve gövdede aynı olmak zorunda. */
+const callTool = async (
+  harness: Harness,
+  name: string,
+  args: Record<string, unknown>
+): Promise<Record<string, never> & { isError: boolean; structuredContent: any; content: Array<{ text: string }> }> => {
+  const response = await harness.app.inject({
+    method: "POST",
+    url: "/mcp",
+    headers: callHeaders(harness, "tools/call", name),
+    payload: rpc("tools/call", { name, arguments: args })
+  });
+  assert.equal(response.statusCode, 200);
+  return response.json().result;
+};
+
+test("set_device paylaşılan normalizasyondan geçer: kırpar, yuvarlar, rengi xy'ye çevirir", async (context) => {
+  const harness = await setupApp(context);
+
+  const on = await callTool(harness, "set_device", {
+    id: "0x0011111111111111",
+    control: "main",
+    value: true
+  });
+  assert.equal(on.isError, false);
+  assert.equal(on.structuredContent.applied, "ON");
+  assert.deepEqual(harness.writes[0], { deviceId: "0x0011111111111111", payload: { state: "ON" } });
+
+  // Aralık dışı değer reddedilmez, `min`/`max`'a **kırpılır** — panelin davranışının aynısı.
+  const clamped = await callTool(harness, "set_device", {
+    id: "0x0011111111111111",
+    control: "brightness",
+    value: 900
+  });
+  assert.equal(clamped.isError, false);
+  assert.equal(clamped.structuredContent.requested, 900);
+  assert.equal(clamped.structuredContent.applied, 254);
+  assert.deepEqual(harness.writes[1].payload, { brightness: 254 });
+
+  // Renk hex olarak alınır, cihaza xy olarak iner: dönüşüm `normalizeControlValue` içindedir.
+  const colour = await callTool(harness, "set_device", {
+    id: "0x0011111111111111",
+    control: "main:color",
+    value: "#ff0000"
+  });
+  assert.equal(colour.isError, false);
+  const applied = colour.structuredContent.applied as { x: number; y: number };
+  assert.equal(typeof applied.x, "number");
+  assert.equal(typeof applied.y, "number");
+  assert.ok(applied.x > applied.y);
+  assert.deepEqual(harness.writes[2].payload, { color: applied });
+
+  // Biçimsiz renk: düzeltilebilir hata, hangi biçimin beklendiğini söyler.
+  const badColour = await callTool(harness, "set_device", {
+    id: "0x0011111111111111",
+    control: "main:color",
+    value: "kırmızı"
+  });
+  assert.equal(badColour.isError, true);
+  assert.match(badColour.content[0].text, /hex colour/);
+  assert.equal(harness.writes.length, 3);
+
+  // Yönetici işareti taşıyan kanal yazılabilir: token'ı zaten yönetici üretti.
+  const adminOnly = await callTool(harness, "set_device", {
+    id: "0x0011111111111111",
+    control: "power_on_behavior",
+    value: "off"
+  });
+  assert.equal(adminOnly.isError, false);
+});
+
+test("set_device bilinmeyen cihaz ve kanalda düzeltilebilir hata verir", async (context) => {
+  const harness = await setupApp(context);
+
+  const noDevice = await callTool(harness, "set_device", {
+    id: "0x00ffffffffffffff",
+    control: "main",
+    value: true
+  });
+  assert.equal(noDevice.isError, true);
+  assert.match(noDevice.content[0].text, /list_devices/);
+
+  const noControl = await callTool(harness, "set_device", {
+    id: "0x0011111111111111",
+    control: "volume",
+    value: 3
+  });
+  assert.equal(noControl.isError, true);
+  // Hangi kanalların olduğu mesajın içinde: model kendi kendini düzeltebilsin.
+  assert.match(noControl.content[0].text, /`brightness` \(level\)/);
+  assert.match(noControl.content[0].text, /`main` \(switch\)/);
+  assert.equal(harness.writes.length, 0);
+});
+
+test("kilit ve siren ajan yolundan yazılamaz, panel rotası bundan etkilenmez", async (context) => {
+  const harness = await setupApp(context);
+
+  for (const [id, control] of [
+    ["0x0044444444444444", "lock:state"],
+    ["0x0055555555555555", "siren:alarm"]
+  ]) {
+    const denied = await callTool(harness, "set_device", { id, control, value: "UNLOCK" });
+    assert.equal(denied.isError, true);
+    assert.match(denied.content[0].text, /cannot be written through the agent endpoint/);
+    assert.match(denied.content[0].text, /panel/);
+  }
+  // Hiçbiri cihaza inmedi.
+  assert.equal(harness.writes.length, 0);
+
+  // Aynı kanallar okumada görünmeye devam eder: yasak yazmadadır, gizleme değildir.
+  const lock = await callTool(harness, "get_device", { id: "0x0044444444444444" });
+  assert.equal(lock.isError, false);
+  assert.equal(lock.structuredContent.controls[0].kind, "lock");
+
+  // Yapılandırma açıkça izin verirse aynı çağrı geçer; varsayılan bu değildir.
+  const permissive = await setupApp(context, { allowDangerousControls: true });
+  const allowed = await callTool(permissive, "set_device", {
+    id: "0x0044444444444444",
+    control: "lock:state",
+    value: "UNLOCK"
+  });
+  assert.equal(allowed.isError, false);
+  assert.deepEqual(permissive.writes[0].payload, { state: "UNLOCK" });
+});
+
+test("panelin komut rotası kilit ve sireni kumanda etmeye devam eder", async () => {
+  // Yasak yalnız ajan yolundadır: HTTP rotasında düğmeye basan insanın kendisidir. Rota kanal
+  // türüne göre ayrım yapmaz; tek kapısı `adminOnly` ve ortak normalizasyondur.
+  const server = await readFile(new URL("./index.js", import.meta.url), "utf8");
+  const start = server.indexOf('"/api/devices/:id/command"');
+  assert.ok(start > 0);
+  const route = server.slice(start, server.indexOf("app.put", start));
+  assert.doesNotMatch(route, /forbiddenAutomationControlKinds|allowDangerousControls|isAgentForbidden/);
+  assert.match(route, /normalizeControlValue\(control, request\.body\?\.value, \{ booleanSwitch: true \}\)/);
+  // Ajan yolu ise yasağı taşıyor ve yalnız yapılandırma bayrağıyla açılıyor.
+  assert.match(server, /allowDangerousControls: \(\) => config\.mcp\.allowDangerousControls/);
+});
+
+test("list_automations okunur özet verir, get_automation ham şekli döner", async (context) => {
+  const harness = await setupApp(context);
+
+  const list = await callTool(harness, "list_automations", {});
+  assert.equal(list.isError, false);
+  assert.equal(list.structuredContent.count, 2);
+  const [evening, morning] = list.structuredContent.automations;
+  assert.equal(evening.id, "aaaabbbbcccc");
+  assert.deepEqual(evening.triggers, ["at 19:30 every day"]);
+  assert.deepEqual(evening.actions, ["set `state` on `0x0011111111111111` (Salon lambası) to \"ON\""]);
+  assert.deepEqual(evening.lastRun, { at: "2026-08-05T16:30:00.000Z", ok: true });
+  // Damgasız kural `agent: null` der; alan hiç kaybolmaz ki model ayrımı görebilsin.
+  assert.equal(evening.agent, null);
+  assert.deepEqual(morning.triggers, ["at sunrise-15m on Mon, Tue, Wed, Thu, Fri"]);
+  assert.equal(morning.lastRun, null);
+  // Ham iç yapı özet listesine dökülmez.
+  assert.equal(list.content[0].text.includes("\"deviceId\""), false);
+
+  assert.deepEqual(
+    (await callTool(harness, "list_automations", { enabledOnly: true }))
+      .structuredContent.automations.map((row: { id: string }) => row.id),
+    ["aaaabbbbcccc"]
+  );
+  assert.deepEqual(
+    (await callTool(harness, "list_automations", { search: "perde" }))
+      .structuredContent.automations.map((row: { id: string }) => row.id),
+    ["ddddeeeeffff"]
+  );
+
+  const full = await callTool(harness, "get_automation", { id: "aaaabbbbcccc" });
+  assert.equal(full.isError, false);
+  assert.deepEqual(full.structuredContent.triggers, [
+    { type: "time", at: "19:30", days: [1, 2, 3, 4, 5, 6, 7] }
+  ]);
+  assert.deepEqual(full.structuredContent.actions, [
+    { type: "device", deviceId: "0x0011111111111111", property: "state", value: "ON" }
+  ]);
+
+  const missing = await callTool(harness, "get_automation", { id: "yokboyle1234" });
+  assert.equal(missing.isError, true);
+  assert.match(missing.content[0].text, /list_automations/);
+});
+
+test("write_automation oluşturur, günceller, siler; her yazmadan önce yedek alınır", async (context) => {
+  const harness = await setupApp(context);
+
+  const created = await callTool(harness, "write_automation", {
+    action: "create",
+    automation: {
+      name: "Gece koridoru",
+      triggers: [{ type: "deviceState", deviceId: "0x0033333333333333", property: "occupancy", equals: true }],
+      actions: [{ type: "device", deviceId: "0x0011111111111111", property: "state", value: "ON" }]
+    }
+  });
+  assert.equal(created.isError, false);
+  assert.equal(created.structuredContent.action, "create");
+  const id = created.structuredContent.id as string;
+  assert.match(id, /^[a-z0-9-]{8,32}$/);
+  assert.equal(harness.automations.length, 3);
+  // Yedek yazmadan **önce** alındı: iki kurallı hâli taşıyor.
+  assert.equal(harness.backups.length, 1);
+  assert.equal(harness.backups[0].length, 2);
+
+  // Damga: kim yazdı, ne zaman. Ham token hiçbir alanda yok.
+  const stamp = created.structuredContent.automation.agent;
+  assert.equal(stamp.tokenId, harness.tokenRecord.id);
+  assert.equal(stamp.tokenName, "Asistan");
+  assert.ok(!Number.isNaN(Date.parse(stamp.at)));
+  assert.equal(JSON.stringify(harness.automations).includes(harness.token), false);
+  assert.equal(created.content[0].text.includes(harness.token), false);
+
+  const updated = await callTool(harness, "write_automation", {
+    action: "update",
+    id,
+    automation: {
+      name: "Gece koridoru (kısık)",
+      triggers: [{ type: "deviceState", deviceId: "0x0033333333333333", property: "occupancy", equals: true }],
+      actions: [{ type: "device", deviceId: "0x0011111111111111", property: "brightness", value: 40 }]
+    }
+  });
+  assert.equal(updated.isError, false);
+  assert.equal(updated.structuredContent.automation.name, "Gece koridoru (kısık)");
+  assert.equal(harness.automations.length, 3);
+  assert.equal(harness.backups.length, 2);
+
+  const removed = await callTool(harness, "write_automation", { action: "delete", id });
+  assert.equal(removed.isError, false);
+  assert.equal(removed.structuredContent.automation, null);
+  assert.equal(harness.automations.length, 2);
+
+  // Var olmayan kimlik sessizce başarılı sayılmaz.
+  const ghost = await callTool(harness, "write_automation", { action: "delete", id: "yokboyle1234" });
+  assert.equal(ghost.isError, true);
+  assert.equal(harness.backups.length, 3);
+});
+
+test("write_automation §8.1 ve §8.2'yi mevcut doğrulamadan geçirir", async (context) => {
+  const harness = await setupApp(context);
+
+  // §8.1 — kilit bir otomasyon eylemi olamaz.
+  const lock = await callTool(harness, "write_automation", {
+    action: "create",
+    automation: {
+      name: "Gece kilidi",
+      triggers: [{ type: "time", at: "23:00", days: [1] }],
+      actions: [{ type: "device", deviceId: "0x0044444444444444", property: "state", value: "UNLOCK" }]
+    }
+  });
+  assert.equal(lock.isError, true);
+  assert.match(lock.content[0].text, /rejected when saving/);
+  assert.match(lock.content[0].text, /Kilit ve siren/);
+
+  const siren = await callTool(harness, "write_automation", {
+    action: "create",
+    automation: {
+      name: "Siren",
+      triggers: [{ type: "time", at: "23:00", days: [1] }],
+      actions: [{ type: "device", deviceId: "0x0055555555555555", property: "alarm", value: "ON" }]
+    }
+  });
+  assert.equal(siren.isError, true);
+
+  // §8.2 — kural kendi yazdığı kanaldan tetiklenemez.
+  const loop = await callTool(harness, "write_automation", {
+    action: "create",
+    automation: {
+      name: "Döngü",
+      triggers: [{ type: "deviceState", deviceId: "0x0011111111111111", property: "state", equals: "ON" }],
+      actions: [{ type: "device", deviceId: "0x0011111111111111", property: "state", value: "OFF" }]
+    }
+  });
+  assert.equal(loop.isError, true);
+  assert.match(loop.content[0].text, /döngü/);
+
+  // Hiçbiri kaydedilmedi.
+  assert.equal(harness.automations.length, 2);
+});
+
+test("damgasız eski kural okunur, güncellenince damgalanır, ham hâli bozulmaz", async (context) => {
+  const harness = await setupApp(context);
+  const before = await callTool(harness, "get_automation", { id: "ddddeeeeffff" });
+  assert.equal(before.structuredContent.agent, null);
+  assert.equal(before.structuredContent.enabled, false);
+
+  const enabled = await callTool(harness, "control_automation", { id: "ddddeeeeffff", action: "enable" });
+  assert.equal(enabled.isError, false);
+  assert.equal(enabled.structuredContent.changed, true);
+  assert.equal(enabled.structuredContent.enabled, true);
+  const after = await callTool(harness, "get_automation", { id: "ddddeeeeffff" });
+  assert.equal(after.structuredContent.agent.tokenId, harness.tokenRecord.id);
+  // Kuralın kendisi değişmedi; yalnız anahtarı ve damgası.
+  assert.deepEqual(after.structuredContent.triggers, before.structuredContent.triggers);
+  assert.deepEqual(after.structuredContent.actions, before.structuredContent.actions);
+  // Damgasız kuralın komşusu damgasız kaldı.
+  assert.equal(harness.automations[0].agent, undefined);
+});
+
+test("control_automation açar, kapatır ve çalıştırır", async (context) => {
+  const harness = await setupApp(context);
+
+  const off = await callTool(harness, "control_automation", { id: "aaaabbbbcccc", action: "disable" });
+  assert.equal(off.structuredContent.enabled, false);
+  assert.equal(off.structuredContent.changed, true);
+
+  // Zaten kapalıysa yeniden yazılmaz; yedek de büyümez.
+  const backups = harness.backups.length;
+  const again = await callTool(harness, "control_automation", { id: "aaaabbbbcccc", action: "disable" });
+  assert.equal(again.structuredContent.changed, false);
+  assert.equal(harness.backups.length, backups);
+
+  const ran = await callTool(harness, "control_automation", { id: "aaaabbbbcccc", action: "run" });
+  assert.equal(ran.isError, false);
+  assert.equal(ran.structuredContent.outcome, "ok");
+  assert.deepEqual(harness.runs, ["aaaabbbbcccc"]);
+
+  // Koşulları tutmayan kural hata değildir: model sebebi okur.
+  harness.runResult = "blocked";
+  const blocked = await callTool(harness, "control_automation", { id: "aaaabbbbcccc", action: "run" });
+  assert.equal(blocked.isError, false);
+  assert.equal(blocked.structuredContent.outcome, "blocked");
+  assert.equal(blocked.structuredContent.changed, false);
+
+  // Meşgul ve başarısız düzeltilebilir hatadır.
+  harness.runResult = "busy";
+  const busy = await callTool(harness, "control_automation", { id: "aaaabbbbcccc", action: "run" });
+  assert.equal(busy.isError, true);
+  assert.match(busy.content[0].text, /already running/);
+
+  const unknown = await callTool(harness, "control_automation", { id: "aaaabbbbcccc", action: "toggle" });
+  assert.equal(unknown.isError, true);
+  assert.match(unknown.content[0].text, /`enable`, `disable` or `run`/);
+});
+
 test("bilinmeyen araç JSON-RPC hatasıdır, isError sonucu değil", async (context) => {
   const harness = await setupApp(context);
   const response = await harness.app.inject({
     method: "POST",
     url: "/mcp",
-    headers: callHeaders(harness, "tools/call", "set_device"),
-    payload: rpc("tools/call", { name: "set_device", arguments: {} })
+    headers: callHeaders(harness, "tools/call", "open_the_gate"),
+    payload: rpc("tools/call", { name: "open_the_gate", arguments: {} })
   });
   assert.equal(response.statusCode, 400);
   assert.equal(response.json().error.code, -32602);

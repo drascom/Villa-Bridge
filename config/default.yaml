@@ -31,8 +31,12 @@ debug:
 # MCP ucu (POST /mcp) yalnız Bearer ajan token'ı kabul eder. allowedOrigins boşken Origin başlığı
 # gönderen istek (tarayıcı) reddedilir; makine istemcisi Origin göndermediği için çalışır.
 # VILLA_BRIDGE_MCP_ALLOWED_ORIGINS ile virgülle ayırarak da verilebilir.
+# allowDangerousControls: kilit ve siren kanalları ajan (set_device) yolundan yazılabilsin mi?
+# Varsayılan false — bir otomasyonun evin kilidini açmaması gerekçesi bir model için de geçerli.
+# Panelden elle kumanda bundan etkilenmez.
 mcp:
   allowedOrigins: []
+  allowDangerousControls: false
 http:
   host: 0.0.0.0
   port: 8091

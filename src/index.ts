@@ -6,6 +6,7 @@ import { registerAccessControl } from "./access-control.js";
 import { loadAliases, saveAliases } from "./aliases.js";
 import { AutomationEngine } from "./automation-engine.js";
 import { AutomationRunLog } from "./automation-runs.js";
+import { AutomationBackupStore } from "./automation-backup.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { AgentTokenStore } from "./agent-tokens.js";
 import { AuthStore, type AuthRole } from "./auth-store.js";
@@ -110,6 +111,11 @@ const automationsStore = new AutomationsStore(
   (deviceId) => store.getDevice(deviceId),
   () => store.topologyRevision,
   automationGroupLookup
+);
+// Ajan yazmalarının yedeği; yalnız `/mcp` yolunda alınır, panelden kaydetmede alınmaz.
+const automationBackups = new AutomationBackupStore(
+  resolve(dirname(configPath), "automations.json"),
+  resolve(dirname(configPath), "automation-backups")
 );
 // Konum yalnız güneş tetikleyicisi için; panelden girilen değer yapılandırmanın önüne geçer.
 const locationStore = new LocationStore(resolve(dirname(configPath), "location.json"));
@@ -283,10 +289,27 @@ await registerAccessControl(app, authStore, {
   agentTokens: agentTokenStore,
   mcpAllowedOrigins: config.mcp.allowedOrigins
 });
-// Ajan ucu: cihaz listesi ve tek cihaz okuması. Kimlik kapısı yukarıdaki tabloda.
+/**
+ * Ajan ucu: cihaz okuma, tek kanal yazma ve otomasyon araçları. Kimlik kapısı yukarıdaki tabloda.
+ *
+ * Yazma yolları bilerek panelin kullandığı yolların **aynısı**: kumanda `source.setDevice`,
+ * kurallar `automationsStore.save()` (doğrulama, kilit/siren ve döngü koruması orada). Ajan yoluna
+ * özel tek şey yedektir: her kural yazmasından **önce** `automations.json` bir kenara kopyalanır,
+ * panel bu yedeğe dönebilsin diye.
+ */
 registerMcpEndpoint(app, {
   devices: () => store.getDevices(),
-  homeGroups: () => homeGroupsStore.get()
+  homeGroups: () => homeGroupsStore.get(),
+  setDevice: (deviceId, payload) => source.setDevice(deviceId, payload),
+  automations: {
+    list: () => automationsStore.get(),
+    save: async (automations) => {
+      await automationBackups.capture();
+      return automationsStore.save(automations);
+    },
+    run: (id) => automationEngine.run(id)
+  },
+  allowDangerousControls: () => config.mcp.allowDangerousControls
 });
 registerRecentErrorApi(app, recentErrors);
 
@@ -925,10 +948,38 @@ app.get("/api/automations", async (_request, reply) => {
         inactiveReason: automationEngine.inactiveReason(automation)
       })),
       sun: automationEngine.sunSummary(),
-      location: homeLocation
+      location: homeLocation,
+      // Ajan yedeği varsa panel "ajan değişikliklerini geri al" yolunu gösterir.
+      agentBackups: (await automationBackups.list()).length
     };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/**
+ * Ajan değişikliklerini geri al. Geri alma **kullanıcının** işidir, modelin değil: bu yüzden bir
+ * MCP aracı olarak değil, yönetici rotası olarak durur (yetki tablolarında listelenmediği için
+ * yönetici ister).
+ *
+ * En yeni yedek okunur ve **tüketilir**: düğmeye ikinci kez basmak ileri/geri salınmaz, bir adım
+ * daha geriye gider.
+ */
+app.post("/api/automations/agent-revert", async (_request, reply) => {
+  try {
+    const backup = await automationBackups.takeLatest();
+    if (!backup) {
+      return reply.code(404).send({ ok: false, error: "Geri alınacak ajan yedeği yok." });
+    }
+    const automations = await automationsStore.save(backup.automations);
+    return {
+      ok: true,
+      restoredFrom: backup.at,
+      automations,
+      agentBackups: (await automationBackups.list()).length
+    };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 

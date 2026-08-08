@@ -100,6 +100,7 @@
 
     <section id="automations" class="view" data-admin-only>
       <header class="page-head"><button class="app-menu-button" type="button" data-view-link="home" data-i18n-aria="backToOverview" aria-label="Back to overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg></button><div class="page-head-title"><h1 data-i18n="navAutomations">Automations</h1></div><button id="newAutomation" class="primary page-action-tile" type="button" data-i18n-aria="newAutomation" aria-label="New automation"><svg class="page-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg><span class="page-action-label" data-i18n="newAutomation">New automation</span></button></header>
+      <div id="automationAgentBar" class="automation-agent-bar" hidden><span class="automation-agent-bar-glyph" aria-hidden="true">🤖</span><p class="automation-agent-bar-note" data-i18n="automationAgentBarNote">An assistant changed these rules.</p><button id="revertAgentAutomations" class="secondary" type="button" data-i18n="automationAgentRevert">Undo assistant change</button></div>
       <div id="automationList" class="automation-list"></div>
     </section>
 

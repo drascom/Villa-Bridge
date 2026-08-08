@@ -1225,3 +1225,35 @@ test("izleme alanı olmayan kural bugünkü şekliyle yazılır", () => {
   const [rule] = validateAutomations([automation()], lookup);
   assert.equal("follow" in (rule.actions[0] as AutomationDeviceAction), false);
 });
+
+test("ajan damgası opsiyoneldir: yoksa yazılmaz, varsa alanları doğrulanır", () => {
+  // Geriye tam uyumluluk: damgasız kural bit bit aynı kalır — canlıdaki dokuz kural bozulmaz.
+  const [plain] = validateAutomations([automation()], lookup);
+  assert.equal("agent" in plain, false);
+
+  const stamp = { tokenId: "Ab3-_x9Zq1kQ", tokenName: "Asistan", at: "2026-08-08T09:15:00.000Z" };
+  const [stamped] = validateAutomations([automation({ agent: stamp })], lookup);
+  assert.deepEqual(stamped.agent, stamp);
+
+  // Damga bir tur daha doğrulamadan geçince aynı kalır: model okuduğunu geri yazabilir.
+  const [again] = validateAutomations([stamped], lookup);
+  assert.deepEqual(again.agent, stamp);
+
+  // Ham token gibi görünen bir alan taşınmaz: bilinmeyen alanlar okunmaz, yazılmaz.
+  const [extra] = validateAutomations(
+    [automation({ agent: { ...stamp, token: "gizli-degeri-olan-token" } })],
+    lookup
+  );
+  assert.deepEqual(extra.agent, stamp);
+  assert.equal(JSON.stringify(extra).includes("gizli-degeri-olan-token"), false);
+
+  for (const broken of [
+    { ...stamp, tokenId: "" },
+    { ...stamp, tokenId: "boşluk taşıyan kimlik" },
+    { ...stamp, tokenName: "" },
+    { ...stamp, at: "dün" },
+    { ...stamp, at: 17 }
+  ]) {
+    assert.throws(() => validateAutomations([automation({ agent: broken })], lookup), /ajan damgası/);
+  }
+});

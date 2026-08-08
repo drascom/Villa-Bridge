@@ -6617,3 +6617,40 @@ test("izleme cümlesi tam şablon anahtarıdır ve tr/en paritesi tam", async ()
     "Bahçe anahtarı Renk değişince → Salon lambası aynı renge döner"
   );
 });
+
+test("ajanın yazdığı kural panelde ayırt edilir ve yönetici son yedeğe dönebilir", async () => {
+  const dashboard = await readDashboardBundle();
+
+  // Kartta küçük bir işaret: renk tek başına yeterli değil, simge ve metin de var.
+  assert.match(dashboard, /automation-card-chip agent" title="\$\{esc\(title\)\}"><span aria-hidden="true">🤖<\/span> \$\{esc\(t\("automationAgentChip"\)\)\}/);
+  assert.match(dashboard, /\$\{automationRunChip\(automation\)\}\$\{automationAgentChip\(automation\)\}/);
+  // İşaretin ipucu kimin ne zaman yazdığını söyler; ham token panelde hiç görünmez.
+  assert.match(dashboard, /t\("automationAgentChipTitle",\{name:esc\(agent\.tokenName\|\|""\),time:ago\(agent\.at\)\}\)/);
+  // Panel damganın yalnız iki gizli olmayan alanını okur; başka bir `agent.*` alanına bakmaz.
+  assert.deepEqual(
+    [...new Set([...dashboard.matchAll(/\bagent\.([A-Za-z]+)/g)].map((match) => match[1]))].sort(),
+    ["at", "tokenName"]
+  );
+
+  // Geri alma yolu: yalnız yedek varken görünen bir şerit, otomasyon ekranının başında.
+  assert.match(dashboard, /<div id="automationAgentBar" class="automation-agent-bar" hidden>[\s\S]*?<button id="revertAgentAutomations" class="secondary" type="button" data-i18n="automationAgentRevert">/);
+  assert.match(dashboard, /id="automationAgentBar"[\s\S]*?<div id="automationList" class="automation-list">/);
+  assert.match(dashboard, /bar\.hidden=count<1;/);
+  assert.match(dashboard, /api\("\/api\/automations\/agent-revert",\{method:"POST"\}\)/);
+  assert.match(dashboard, /\$\("#revertAgentAutomations"\)\.onclick=revertAgentAutomations;/);
+  // Ekran zaten yönetici ekranı: geri alma da orada durur, ayrı bir rol denetimi icat edilmez.
+  assert.match(dashboard, /<section id="automations" class="view" data-admin-only>/);
+
+  // Şerit iki temada da ayakta: sabit renk yok, `color-mix()` yok.
+  assert.match(dashboard, /\.automation-card-chip\.agent\{margin-left:6px;color:var\(--forest\);background:var\(--forest-soft\)\}/);
+  assert.match(dashboard, /\.automation-agent-bar\{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:12px 16px;border:1px solid var\(--line\);border-radius:18px;background:var\(--surface\)/);
+  assert.doesNotMatch(dashboard, /\.automation-agent-bar[^}]*color-mix\(/);
+
+  assert.match(dashboard, /automationAgentChip:"Assistant"/);
+  assert.match(dashboard, /automationAgentChip:"Asistan"/);
+  assert.match(dashboard, /automationAgentRevert:"Undo assistant change"/);
+  assert.match(dashboard, /automationAgentRevert:"Asistan değişikliğini geri al"/);
+
+  const scripts = await panelScripts();
+  assert.doesNotThrow(() => new Function(scripts));
+});

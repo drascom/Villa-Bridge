@@ -495,6 +495,14 @@
     if(!runs.length)return`<div class="automation-runs"><p class="automation-runs-empty">${esc(t(automation.lastRunAt?"automationRunsOlderThanLog":"automationRunsEmpty"))}</p></div>`;
     return`<div class="automation-runs"><ul class="automation-run-list">${runs.map(automationRunRowHtml).join("")}</ul></div>`;
   };
+  // Ajanın yazdığı kural ayırt edilir: kim yazdı ve ne zaman, işaretin ipucunda durur. Panelden
+  // düzenlenen kural sihirbazda sıfırdan kurulduğu için damgayı kaybeder — kural artık insanındır.
+  const automationAgentChip=automation=>{
+    const agent=automation.agent;
+    if(!agent)return"";
+    const title=t("automationAgentChipTitle",{name:esc(agent.tokenName||""),time:ago(agent.at)});
+    return`<span class="automation-card-chip agent" title="${esc(title)}"><span aria-hidden="true">🤖</span> ${esc(t("automationAgentChip"))}</span>`;
+  };
   const automationInactiveHtml=automation=>{
     const inactive=automation.inactiveReason;
     if(!inactive)return"";
@@ -519,9 +527,34 @@
     const more=rest>0?` ${t("automationCardMore",{count:rest})}`:"";
     // Kapanış sözü ayrı bir cümle olarak görünür; kart özeti sihirbazdaki cümleyle tutarlı kalır.
     const autoOff=map?"":automationAutoOffLine(actions.find(item=>item.autoOff)||action);
-    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><span class="automation-card-glyph" aria-hidden="true">🧩</span><div class="automation-card-copy"><strong>${esc(automation.name)}</strong><span class="automation-card-note">${esc(line+more)}</span>${autoOff?`<span class="automation-card-note">${esc(autoOff)}</span>`:""}${automationRunChip(automation)}${automationInactiveHtml(automation)}<button class="automation-runs-toggle" type="button" data-automation-runs="${esc(automation.id)}" aria-expanded="${state.automationRunsOpen===automation.id}">${esc(t("automationRunsTitle"))}</button>${automationRunsHtml(automation)}</div><div class="automation-card-actions"><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}"><span aria-hidden="true">⋯</span></button><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button></div></article>`;
+    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><span class="automation-card-glyph" aria-hidden="true">🧩</span><div class="automation-card-copy"><strong>${esc(automation.name)}</strong><span class="automation-card-note">${esc(line+more)}</span>${autoOff?`<span class="automation-card-note">${esc(autoOff)}</span>`:""}${automationRunChip(automation)}${automationAgentChip(automation)}${automationInactiveHtml(automation)}<button class="automation-runs-toggle" type="button" data-automation-runs="${esc(automation.id)}" aria-expanded="${state.automationRunsOpen===automation.id}">${esc(t("automationRunsTitle"))}</button>${automationRunsHtml(automation)}</div><div class="automation-card-actions"><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}"><span aria-hidden="true">⋯</span></button><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button></div></article>`;
   };
+  /* Geri alma modelin değil kullanıcının işidir: bu yüzden bir MCP aracı değil, panelde bir düğme.
+     Sunucu ajan yazmasından **önce** aldığı yedekleri sayar; sayı sıfırsa geri alınacak bir şey de
+     yoktur ve şerit hiç görünmez. */
+  function renderAutomationAgentBar(){
+    const bar=$("#automationAgentBar");
+    if(!bar)return;
+    const count=Number(state.automationAgentBackups)||0;
+    bar.hidden=count<1;
+    const button=$("#revertAgentAutomations");
+    if(button)button.disabled=count<1;
+  }
+  // Yedek tüketilir: düğmeye ikinci kez basmak ileri/geri salınmaz, bir adım daha geriye gider.
+  async function revertAgentAutomations(){
+    const button=$("#revertAgentAutomations");
+    if(button)button.disabled=true;
+    try{
+      const data=await api("/api/automations/agent-revert",{method:"POST"});
+      state.automations=Array.isArray(data.automations)?data.automations:state.automations;
+      state.automationAgentBackups=Number(data.agentBackups)||0;
+      renderAutomations();
+      showToast(t("automationAgentReverted"));
+    }catch(error){showToast(error.message,true)}
+    renderAutomationAgentBar();
+  }
   function renderAutomations(){
+    renderAutomationAgentBar();
     const container=$("#automationList");
     if(!container)return;
     const links=simpleLinks();
@@ -578,6 +611,8 @@
     // Güneş saatleri ve konum yanıtın kökünden gelir; arayüz kendi hesabını yapmaz.
     state.automationSun=data.sun||null;
     state.homeLocation=data.location||null;
+    // Ajan yedeği sayısı: "geri al" yolunun görünür olup olmayacağını tek başına belirler.
+    state.automationAgentBackups=Number(data.agentBackups)||0;
   }
   async function persistAutomations(automations,successKey){
     const data=await api("/api/automations",{method:"PUT",body:JSON.stringify({automations})});

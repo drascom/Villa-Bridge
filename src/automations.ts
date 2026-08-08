@@ -275,6 +275,23 @@ export const isAutomationDeviceAction = (
   action: AutomationAction
 ): action is AutomationDeviceAction => action.type === "device";
 
+/**
+ * Ajan damgası — kuralı hangi ajan token'ı, ne zaman yazdı. **Ham token hiçbir zaman yazılmaz**:
+ * yalnız kaydın kimliği (`AgentTokenSummary.id`) ve kullanıcının verdiği ad tutulur.
+ *
+ * Alan **opsiyoneldir** ve öyle kalmalıdır: ajandan önce yazılmış kurallar ile elle kurulan
+ * kurallar damgasızdır, damgasız kalmayı sürdürür. Panelden yapılan bir düzenleme kuralı sıfırdan
+ * kurduğu için damgayı düşürür — düzenlenen kural artık insanındır.
+ */
+export interface AutomationAgentStamp {
+  /** `AgentTokenSummary.id`; token'ın kendisi değil, kaydın kimliği. */
+  tokenId: string;
+  /** Token'ın kullanıcı tarafından verilmiş adı ("Asistan"). */
+  tokenName: string;
+  /** Yazma anı (ISO). */
+  at: string;
+}
+
 export interface Automation {
   id: string;
   name: string;
@@ -289,6 +306,8 @@ export interface Automation {
   actions: AutomationAction[];
   lastRunAt: string | null;
   lastRunOk: boolean | null;
+  /** Yoksa kural insanındır — bkz. `AutomationAgentStamp`. */
+  agent?: AutomationAgentStamp;
 }
 
 /** Kilit/siren doğrulaması için cihaz çözümleyici (enjekte edilir). */
@@ -328,6 +347,8 @@ const propertyPattern = /^[A-Za-z0-9_]{1,64}$/;
 const actionPattern = /^[A-Za-z0-9_-]{1,64}$/;
 const controlIdPattern = /^[a-z0-9:_@-]{1,64}$/;
 const automationIdPattern = /^[a-z0-9-]{8,32}$/;
+/** `AgentTokenStore` kimliği: `randomBytes(9).toString("base64url")`. Kalıp yine de geniş tutulur. */
+const agentTokenIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
 /**
  * `GroupView.id` — `group-<zigbee id>`, dost isim düşerse `group-<isim>` olabildiği için
  * karakter kümesi geniş tutulur; yalnızca denetim karakterleri ve aşırı uzunluk elenir.
@@ -882,6 +903,32 @@ const validateActions = (
   });
 };
 
+/**
+ * Ajan damgası doğrulaması. Yokluk geçerlidir ve **hiç yazılmaz**; damgasız eski kurallar
+ * dokunulmadan geçer. Ham token buraya asla girmez: alan adları bilerek `tokenId`/`tokenName`,
+ * yani gizli olmayan iki alan.
+ */
+const validateAgentStamp = (value: unknown): AutomationAgentStamp | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Otomasyon ajan damgası geçersiz.");
+  }
+  const candidate = value as Record<string, unknown>;
+  const tokenId = typeof candidate.tokenId === "string" ? candidate.tokenId.trim() : "";
+  if (!agentTokenIdPattern.test(tokenId)) {
+    throw new Error("Otomasyon ajan damgası kimliği geçersiz.");
+  }
+  const tokenName = typeof candidate.tokenName === "string" ? candidate.tokenName.trim() : "";
+  if (!tokenName || tokenName.length > maxAutomationNameLength) {
+    throw new Error("Otomasyon ajan damgası adı geçersiz.");
+  }
+  const at = candidate.at;
+  if (typeof at !== "string" || Number.isNaN(Date.parse(at))) {
+    throw new Error("Otomasyon ajan damgası zamanı geçersiz.");
+  }
+  return { tokenId, tokenName, at };
+};
+
 export const validateAutomations = (
   value: unknown,
   lookup?: AutomationDeviceLookup,
@@ -916,6 +963,7 @@ export const validateAutomations = (
     if (lastRunOk !== undefined && lastRunOk !== null && typeof lastRunOk !== "boolean") {
       throw new Error("Otomasyon son çalışma sonucu geçersiz.");
     }
+    const agent = validateAgentStamp(candidate.agent);
     const triggers = validateTriggers(candidate.triggers);
     const actions = validateActions(candidate.actions, lookup, groupLookup);
     // Yalnız beklemeden oluşan bir kural hiçbir şey yapmaz; kullanıcı hatasıdır.
@@ -1002,6 +1050,8 @@ export const validateAutomations = (
     };
     // Yalnız "any" korunur; varsayılan alan hiç görünmez (yukarıdaki gerekçe).
     if (conditionMode) automation.conditionMode = conditionMode;
+    // Damga da aynı kuraldadır: yoksa yazılmaz, eski dosyalar birebir aynı kalır.
+    if (agent) automation.agent = agent;
     result.push(automation);
   }
   return result;

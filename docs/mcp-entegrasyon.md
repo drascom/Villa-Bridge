@@ -4,8 +4,14 @@ Villa Bridge, ev cihazlarını **Model Context Protocol (MCP)** ile dışarı a�
 istemcinizi yazarken gereken her şeyi verir: adres, kimlik, zorunlu başlıklar, kopyala-çalıştır
 örnekler ve hata biçimleri.
 
-**Bu faz salt okumadır.** Cihaz durumu değiştirme (`set_device`) ve otomasyon yazma araçları
-sonraki fazlarda gelir; şu an uçta yalnız `list_devices` ve `get_device` vardır.
+**Bu belge protokol ve taşıma katmanını anlatır**: adres, kimlik, zorunlu başlıklar, hata
+biçimleri. Araçların ne yaptığı, ne beklediği ve ne döndürdüğü — gerçek istek/yanıt örnekleriyle,
+modele verilebilecek hazır bir sistem istemiyle birlikte — ayrı bir belgede:
+**`docs/mcp-istemci-kilavuzu.md`** (İngilizce, çünkü doğrudan modele gidecek).
+
+Uçta yedi araç var: `list_devices`, `get_device`, `set_device`, `list_automations`,
+`get_automation`, `write_automation`, `control_automation`. Yazma araçları **gerçek eve** dokunur;
+kilit ve siren ajan yolundan bilerek yazılamaz.
 
 ## 1. Uç adresi
 
@@ -64,7 +70,8 @@ vardır: `io.modelcontextprotocol/clientCapabilities` (nesne; yeteneğiniz yoksa
 
 ## 4. `tools/list`
 
-Araç kataloğunu ve şemalarını verir. Sıra **belirlenimcidir** (`list_devices`, `get_device`),
+Araç kataloğunu ve şemalarını verir. Sıra **belirlenimcidir** (`list_devices`, `get_device`,
+`set_device`, `list_automations`, `get_automation`, `write_automation`, `control_automation`),
 sayfalama yoktur.
 
 ```sh
@@ -96,7 +103,12 @@ Yanıt:
     "resultType": "complete",
     "tools": [
       { "name": "list_devices", "title": "…", "description": "…", "inputSchema": {…}, "outputSchema": {…} },
-      { "name": "get_device",   "title": "…", "description": "…", "inputSchema": {…}, "outputSchema": {…} }
+      { "name": "get_device",   "title": "…", "description": "…", "inputSchema": {…}, "outputSchema": {…} },
+      { "name": "set_device",   "…": "…" },
+      { "name": "list_automations", "…": "…" },
+      { "name": "get_automation",   "…": "…" },
+      { "name": "write_automation", "…": "…" },
+      { "name": "control_automation", "…": "…" }
     ],
     "_meta": {
       "io.modelcontextprotocol/serverInfo": { "name": "villa-bridge", "version": "0.1.0" }
@@ -227,6 +239,18 @@ Girdi: `id` — **IEEE adresi** (`0x…`). Dost isim kabul edilmez; kullanıcı 
 Çıktı: `id`, `name`, `room`, `category`, `availability`, `lastSeen`, varsa `linkquality` ve
 `powerSource`, ve `controls` dizisi. Her kanal: `id`, `name`, `kind`, `value`, varsa
 `min`/`max`/`step`/`unit`/`values`, yalnız yöneticiye açık kanallarda `adminOnly: true`.
+
+### Yazma araçları
+
+`set_device`, `list_automations`, `get_automation`, `write_automation` ve `control_automation`
+girdi/çıktı şemalarıyla, gerçek istek ve yanıt örnekleriyle **`docs/mcp-istemci-kilavuzu.md`**
+içinde anlatılır. Buradan bilinmesi gereken üç şey:
+
+- `set_device` ve `control_automation`'ın `run`'ı **gerçek cihazlara** dokunur; önizleme yoktur.
+- Kilit ve siren ajan yolundan yazılamaz (§8.1 ile aynı gerekçe: onaylayacak insan yok). Panelden
+  elle kumanda etkilenmez. Kurulum bilerek açmak isterse `mcp.allowDangerousControls: true`.
+- Ajanın yazdığı her kural için `automations.json` önce bir kenara kopyalanır (son 20 yedek) ve
+  kural kimin yazdığını taşır. Geri alma panelde durur — model için bir araç değildir.
 
 ## 7. `outputSchema`'yı function-calling tanımına çevirmek
 

@@ -41,6 +41,7 @@ interface FileConfig {
   };
   mcp?: {
     allowedOrigins?: string[];
+    allowDangerousControls?: boolean;
   };
   http?: {
     host?: string;
@@ -164,6 +165,12 @@ export interface AppConfig {
    */
   mcp: {
     allowedOrigins: string[];
+    /**
+     * §8.1 muafiyeti. Kapalıyken (varsayılan) kilit ve siren kanalları `set_device` ile
+     * yazılamaz — bir otomasyonun evi açmaması gerekçesi bir model için de aynen geçerlidir.
+     * Panelden elle kumanda bu bayraktan **etkilenmez**; yasak yalnız ajan yolundadır.
+     */
+    allowDangerousControls: boolean;
   };
   http: {
     host: string;
@@ -244,7 +251,10 @@ export async function loadConfig(): Promise<AppConfig> {
         ? process.env.VILLA_BRIDGE_MCP_ALLOWED_ORIGINS.split(",")
         : file.mcp?.allowedOrigins ?? [])
         .map((origin) => String(origin).trim())
-        .filter((origin) => origin.length > 0)
+        .filter((origin) => origin.length > 0),
+      allowDangerousControls: process.env.VILLA_BRIDGE_MCP_ALLOW_DANGEROUS_CONTROLS
+        ? process.env.VILLA_BRIDGE_MCP_ALLOW_DANGEROUS_CONTROLS === "true"
+        : file.mcp?.allowDangerousControls === true
     },
     http: {
       host: process.env.VILLA_BRIDGE_HOST ?? file.http?.host ?? "0.0.0.0",
