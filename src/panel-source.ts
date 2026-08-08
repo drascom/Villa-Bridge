@@ -7,6 +7,11 @@ import { readFile } from "node:fs/promises";
 const panelDocumentUrl = new URL("../public/index.html", import.meta.url);
 const panelStyleUrl = new URL("../public/css/panel.css", import.meta.url);
 const panelStyleLink = '  <link rel="stylesheet" href="/css/panel.css">';
+/* Belge sırasındaki `<script src>` etiketleri: anahtar etiketin kendisi, değer dosya adresi.
+   Yeni bir panel dosyası çıktığında yalnız bu tabloya satır eklenir. */
+const panelScriptFiles = new Map<string, URL>([
+  ['<script src="/js/panel-automation.js"></script>', new URL("../public/js/panel-automation.js", import.meta.url)]
+]);
 
 const readPanelDocument = (): Promise<string> => readFile(panelDocumentUrl, "utf8");
 
@@ -23,15 +28,30 @@ export async function panelStyles(): Promise<string> {
 /** Panel script gövdeleri, yükleme sırasıyla. */
 export async function panelScripts(): Promise<string> {
   const document = await readPanelDocument();
-  return [...document.matchAll(/<script>([\s\S]*?)<\/script>/g)]
-    .map((match) => match[1])
-    .join("\n");
+  const pattern = new RegExp(`<script>([\\s\\S]*?)</script>|${[...panelScriptFiles.keys()]
+    .map((tag) => tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")}`, "g");
+  const bodies = await Promise.all([...document.matchAll(pattern)]
+    .map(async (match) => (match[1] === undefined ? readPanelScriptFile(match[0]) : match[1])));
+  return bodies.join("\n");
+}
+
+async function readPanelScriptFile(tag: string): Promise<string> {
+  const url = panelScriptFiles.get(tag);
+  if (!url) throw new Error(`Panel script dosyası bilinmiyor: ${tag}`);
+  return readFile(url, "utf8");
 }
 
 /** Panelin tamamı: parçalar yükleme sırasıyla birleştirilmiş hâli. */
 export async function readPanelSource(): Promise<string> {
   const [document, styles] = await Promise.all([readPanelDocument(), panelStyles()]);
   if (!document.includes(panelStyleLink)) throw new Error("Panel stil bağlantısı bulunamadı.");
-  // Değiştirici işlev: CSS metnindeki `$` dizileri kalıp olarak yorumlanmasın.
-  return document.replace(panelStyleLink, () => styles);
+  // Değiştirici işlev: CSS ve script metnindeki `$` dizileri kalıp olarak yorumlanmasın.
+  let source = document.replace(panelStyleLink, () => styles);
+  for (const [tag, url] of panelScriptFiles) {
+    if (!source.includes(tag)) throw new Error(`Panel script bağlantısı bulunamadı: ${tag}`);
+    const body = await readFile(url, "utf8");
+    source = source.replace(tag, () => body);
+  }
+  return source;
 }

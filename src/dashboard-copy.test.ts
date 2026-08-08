@@ -3216,8 +3216,10 @@ const automationExports = [
 // katalog verilirse şablon yerleştirme de çalışır: çeviri metninin kendisini doğrulayan testler için.
 function automationSandbox(source: string, devices: unknown[], groups: unknown[] = [], messages: Record<string, string> = {}): AutomationSandbox {
   const start = source.indexOf("const automationWeekDays=");
-  // Kaydetme de dilime girer: kural → sihirbaz → kural dönüşünün ikinci yarısı orada.
-  const end = source.indexOf("async function removeSimpleLink(");
+  // Dilim `public/js/panel-automation.js` dosyasının tamamı: kaydetme de içinde, çünkü
+  // kural → sihirbaz → kural dönüşünün ikinci yarısı orada. Dosyanın ardından yüklenen ilk
+  // metin, olay bağlama bloğunun ilk satırı.
+  const end = source.indexOf('$$(".nav-button").forEach(button=>button.onclick');
   assert.ok(start > 0 && end > start);
   const bodies: string[] = [];
   const toasts: string[] = [];
