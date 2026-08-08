@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import YAML from "yaml";
 import { isValidLatitude, isValidLongitude } from "./sun.js";
 
@@ -9,6 +9,7 @@ interface FileConfig {
   zigbee?: {
     dataDir?: string;
     configurationFile?: string;
+    externalConvertersDir?: string;
   };
   mqtt?: {
     url?: string;
@@ -85,6 +86,11 @@ interface Z2mConfig {
 export interface DirectZigbeeConfig {
   dataDir: string;
   configurationFile?: string;
+  /**
+   * Kütüphanede bulunmayan cihazlar için harici converter klasörü. Zigbee2MQTT'nin
+   * `external_converters/` klasörüyle aynı biçimdedir; varsayılanı da oradır.
+   */
+  externalConvertersDir: string;
   serial: {
     path: string;
     baudRate: number;
@@ -260,9 +266,13 @@ export async function loadConfig(): Promise<AppConfig> {
     ) {
       throw new Error("Doğrudan Zigbee modu için klonlanmış ağ ve SLZB ayarları eksik.");
     }
+    const dataDir = file.zigbee?.dataDir ?? (z2mPath ? dirname(z2mPath) : "/opt/zigbee2mqtt/data");
     result.zigbee = {
-      dataDir: file.zigbee?.dataDir ?? (z2mPath ? dirname(z2mPath) : "/opt/zigbee2mqtt/data"),
+      dataDir,
       configurationFile: z2mPath,
+      externalConvertersDir: process.env.VILLA_BRIDGE_EXTERNAL_CONVERTERS_DIR
+        ?? file.zigbee?.externalConvertersDir
+        ?? join(dataDir, "external_converters"),
       serial: {
         path: serial.port,
         baudRate: serial.baudrate ?? 115200,

@@ -19,6 +19,7 @@ import {
 } from "./device-departures.js";
 import type { DeviceNetworkEventSink } from "./device-network-events.js";
 import { DeviceStore, featureValues } from "./device-store.js";
+import { describeExternalConverters, loadExternalConverters } from "./external-converters.js";
 import { buildHomeAssistantDiscovery } from "./home-assistant-discovery.js";
 import { inferFallbackExposes } from "./inferred-exposes.js";
 import {
@@ -360,12 +361,30 @@ export class DirectZigbeeSource implements ZigbeeSource {
     return true;
   }
 
+  /**
+   * Zigbee2MQTT'nin `external_converters/` kancasının doğrudan moddaki karşılığı.
+   * Hata toleranslıdır: klasör yoksa veya bir dosya patlarsa kaynak yine de açılır.
+   */
+  private async loadExternalConverters(): Promise<void> {
+    try {
+      const result = await loadExternalConverters(this.config.externalConvertersDir);
+      if (result.directoryExists) console.log(describeExternalConverters(result));
+    } catch (error) {
+      console.warn(
+        `Harici converter'lar yüklenemedi: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
   private recordSelfHealEvent(deviceId: string, outcome: SelfHealOutcome): void {
     const friendlyName = this.config.devices[deviceId]?.friendly_name ?? deviceId;
     this.store.recordExternalEvent(friendlyName, "self_heal", outcome);
   }
 
   async start(): Promise<void> {
+    // Cihaz tanımları çözülmeye başlamadan ÖNCE harici converter'lar kütüphaneye kaydedilmeli;
+    // yoksa kütüphanede olmayan cihaz "bilinmeyen" olarak önbelleğe girer.
+    await this.loadExternalConverters();
     const controller = new Controller({
       network: {
         panID: this.config.network.panId,

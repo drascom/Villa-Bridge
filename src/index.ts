@@ -18,6 +18,7 @@ import { DeviceEventsStore } from "./device-events.js";
 import { DeviceNotesStore } from "./device-notes.js";
 import { loadDeviceRoles, removeDeviceRole, setDeviceRole } from "./device-roles.js";
 import { DeviceStore } from "./device-store.js";
+import { lastExternalConverterLoad } from "./external-converters.js";
 import {
   HomeFavoritesStore,
   isHomeFavoriteControlKind,
@@ -1228,6 +1229,9 @@ app.get("/api/settings", async (_request, reply) => {
       ok: true,
       settings: await settingsStore.get(),
       network: getNetworkInfo(),
+      // Doğrudan modda kütüphaneye eklenen harici cihaz tanımları; hangi dosyanın yüklendiği
+      // (ve hangisinin patladığı) tek bakışta görülsün diye ayarlarla birlikte dönülür.
+      externalConverters: lastExternalConverterLoad(),
       mqttAccess: {
         protocol: "3.1.1",
         authenticationRequired,

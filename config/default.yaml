@@ -3,6 +3,9 @@ pairingControl: true
 zigbee:
   dataDir: /opt/zigbee2mqtt/data
   configurationFile: /opt/zigbee2mqtt/data/configuration.yaml
+  # Kütüphanede tanımı olmayan cihazlar için harici converter klasörü (Zigbee2MQTT ile aynı biçim).
+  # Verilmezse dataDir/external_converters kullanılır; VILLA_BRIDGE_EXTERNAL_CONVERTERS_DIR ezer.
+  # externalConvertersDir: /opt/zigbee2mqtt/data/external_converters
 mqtt:
   url: mqtt://127.0.0.1:1883
   baseTopic: zigbee2mqtt
