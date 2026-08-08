@@ -333,7 +333,7 @@
     #home .page-head .lead{display:none}
     .card-actions-danger{justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
     .card-actions.card-actions-done{margin-top:clamp(12px,1.8vh,18px)}.card-actions.card-actions-done>button{flex:1 1 100%;width:100%;min-height:clamp(44px,7vh,52px)}
-    .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-controls,.device-detail-media{min-width:0}.device-detail-media{display:grid;align-content:start;gap:14px}.device-detail-media .facts{margin-top:0}.device-detail-media .device-detail-photo{margin:0}.device-detail-media .device-detail-roles{margin-top:0}.device-detail-roles .control-select{min-width:0;max-width:100%}
+    .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-controls,.device-detail-media{min-width:0}.device-detail-media{display:grid;align-content:start;gap:14px}.device-detail-media .facts{margin-top:0}.device-detail-media .device-detail-photo{margin:0}.device-detail-media .device-detail-roles{margin-top:0}.device-detail-roles .control-select{min-width:0;max-width:100%}.device-setup-recovery{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.75em;margin:0 0 1.1em;padding:0.85em 1em;border-left:0.25em solid var(--sun);background:var(--surface-soft);text-align:left}.device-setup-recovery p{margin:0;flex:1 1 12em;min-width:0;color:var(--muted);font-size:0.85rem}.device-setup-recovery button{flex:0 0 auto}
     @media(min-width:900px) and (orientation:landscape){dialog.device-detail-dialog{width:min(94vw,940px)}.device-detail-layout{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}.device-detail-controls{order:2}.device-detail-media{order:1}.device-detail-photo .device-photo{max-height:min(22vh,150px)}}
     /* Işık kartındaki büyük dikey kumanda. Yükseklik viewport'a bağlı (clamp + vh), sabit px yok:
        1024×640 tablette pencere kaydırılmadan sığar. Renk karıştıran CSS işlevi YOK — Android
@@ -1788,6 +1788,13 @@
     if(!lightPanelSupported(device,parts))return new Set();
     return new Set([parts.level,parts.temperature,parts.color,lightPanelCoversPower(device,parts)?parts.power:null].filter(Boolean));
   };
+  /* Adı hiç verilmemiş cihaz: listede ham kimliğiyle duruyor demektir (kurulum yarım kalmış).
+     Aynı ölçü hem isim adımının kutusunu boş açmak hem de kurtarma düğmesini göstermek için. */
+  function deviceNeedsName(device){
+    const name=String(device?.name??"").trim();
+    if(!name)return true;
+    return name===device.id||/^0x[0-9a-f]+$/i.test(name);
+  }
   const deviceDetailBodyHtml=device=>{
     const deviceFacts=facts(device);
     const updateState=device.state.update&&typeof device.state.update==="object"?device.state.update:{};
@@ -1810,7 +1817,12 @@
        yanlış basma davetiyesi olur, ayrıca o satır `data-admin-only` — ev sakini bitiremezdi.
        Kaydedilecek bir şey yok (ad/oda/rol kendi pencerelerinde kaydedildi), bu yüzden "Bitti". */
     const panelHtml=lightPanelHtml(device);
-    return`${panelHtml}<div class="device-detail-layout">
+    /* Kurulumu yarım kalmış cihaz için tek düğmelik kurtarma: yeni ekran yok, aynı isim/oda/rol
+       adımları açılır. Adı verilmiş cihazda bu satır hiç çizilmez. */
+    const setupHtml=deviceNeedsName(device)
+      ?`<div class="device-setup-recovery"><p>${esc(t("finishSetupLead"))}</p><button class="primary" type="button" data-finish-setup="${esc(device.id)}">${esc(t("finishSetup"))}</button></div>`
+      :"";
+    return`${setupHtml}${panelHtml}<div class="device-detail-layout">
         <div class="device-detail-controls"><div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div></div>
         ${mediaHtml}
       </div>
@@ -2161,6 +2173,7 @@
     $$("[data-rename-channel]").forEach(button=>button.onclick=()=>openRename(button.dataset.renameChannel,button.dataset.channel));
     $$("[data-reconfigure]").forEach(button=>button.onclick=()=>reconfigureDevice(button.dataset.reconfigure));
     $$("[data-note]").forEach(button=>button.onclick=()=>openDeviceNote(button.dataset.note));
+    $$("[data-finish-setup]").forEach(button=>button.onclick=event=>{event.preventDefault();event.stopPropagation();finishDeviceSetup(button.dataset.finishSetup)});
     $$("[data-ota-check]").forEach(button=>button.onclick=()=>checkOta(button.dataset.otaCheck));
     $$("[data-ota]").forEach(button=>button.onclick=()=>scheduleOta(button.dataset.ota,button.dataset.otaEnabled!=="false"));
     $$("[data-options]").forEach(button=>button.onclick=()=>openDeviceOptions(button.dataset.options));
@@ -3652,7 +3665,7 @@
   }
   function renderPairingProgress(){
     const session=state.pairingSession;if(!session)return;
-    const pairingDevice=state.pairing?.device||null;
+    const pairingDevice=state.pairing?.device||returnedPairingDevice(session);
     const device=pairingDevice?state.devices.find(item=>item.id===pairingDevice.id):null;
     const reconnected=pairingDevice?.reconnected===true||session.reconnected===true;
     const visual=$("#pairingVisual");visual.className=`pairing-visual ${session.phase==="found"?"found":session.phase==="ready"?"ready":session.phase==="timed-out"?"timed-out":""}`.trim();
@@ -3669,9 +3682,22 @@
     $("#pairingWarning").hidden=!removedRecently;
     if(removedRecently)$("#pairingWarning").textContent=t("pairingRemovedWarning");
   }
+  /* Katılım olayı (`device_joined`/`device_announce`) yalnız ağa yeni giren ya da duyuru yapan
+     cihaz için üretilir. Silinmiş sanılan bir cihaz aslında ağda kaldıysa yeni aramada hiç olay
+     çıkarmaz: arama sonsuza dek sürer, kurulum adımları hiç açılmazdı. Bu yüzden arama sırasında
+     listeye dönen cihaz da "bulundu" sayılır ve "yeniden bağlandı" yolundan ilerler. */
+  function returnedPairingDevice(session){
+    if(!session)return null;
+    const known=session.knownIds||[];
+    const returned=(state.devices||[]).find(device=>session.targetId
+      ?device.id===session.targetId
+      :!known.includes(device.id));
+    if(!returned)return null;
+    return{id:returned.id,name:returned.name,interviewCompleted:true,supported:null,reconnected:true};
+  }
   function trackPairingProgress(){
     const session=state.pairingSession;if(!session||session.phase==="ready")return;
-    const found=state.pairing?.device;
+    const found=state.pairing?.device||returnedPairingDevice(session);
     if(found){
       session.foundId=found.id;
       session.reconnected=found.reconnected===true;
@@ -3765,17 +3791,24 @@
     if($("#deviceLostDialog").open)$("#deviceLostDialog").close();
     render();
   }
+  /* "Tekrar dene" önce cihazın kendiliğinden geri gelip gelmediğine bakar: silme komutu mesh'te
+     düşüp cihaz ağda kaldıysa listede zaten durur, o hâlde arama açmanın anlamı yok — doğrudan
+     kurulum adımları açılır. Değilse arama hedefi bu cihaz olarak başlatılır. */
   function retryDeviceLost(){
+    const id=state.deviceLost?.id||null;
     closeDeviceLost();
-    startPairing(true);
+    if(id&&state.devices.some(device=>device.id===id)){openPairingName(id,true);return}
+    startPairing(true,id);
   }
-  async function startPairing(open=true){
+  async function startPairing(open=true,targetId=null){
     if(open&&!state.overviewLoaded)return;
     /* Elle "Aramayı durdur" bilinçli bir eylem: beklemeden kapatılır. Yeni bir arama da eski
        oturumun bekleyen kapatmasını üstlenmez. */
     cancelPairingNetworkClose();
     if(open){
-      state.pairingSession={foundId:null,phase:"searching",hidden:false,completing:false,reconnected:false};
+      /* Arama başlarken listedeki cihazlar not edilir: sonradan beliren bir kimlik, katılım
+         olayı hiç gelmese bile "geri döndü" demektir. */
+      state.pairingSession={foundId:null,phase:"searching",hidden:false,completing:false,reconnected:false,targetId:targetId||null,knownIds:(state.devices||[]).map(device=>device.id)};
       renderPairingProgress();$("#pairingDialog").showModal();
     }
     try{
@@ -3816,11 +3849,17 @@
     if(!device){finishPairingFlow(id);return}
     state.editing={id,channel:null,afterPairing:true,reconnected};
     configureNameDialog(true,reconnected);
-    const generatedName=device.name===device.id||/^0x[0-9a-f]+$/i.test(device.name);
-    $("#nameInput").value=generatedName?"":device.name;
+    $("#nameInput").value=deviceNeedsName(device)?"":device.name;
     $("#nameInput").placeholder=device.model||t("newName");
     $("#nameDialog").showModal();
     setTimeout(()=>$("#nameInput").focus(),0);
+  }
+  /* Yarım kalan kurulumu tamamlama: cihaz zaten ağda olduğu için arama açılmaz, doğrudan
+     kurulum adımları çalışır — yeni katılmış cihazla aynı yol. */
+  function finishDeviceSetup(id){
+    if(!state.devices.some(device=>device.id===id))return;
+    closeDeviceDetail();
+    openPairingName(id,false);
   }
   function openRename(id,channel=null){
     const device=state.devices.find(item=>item.id===id);if(!device)return;

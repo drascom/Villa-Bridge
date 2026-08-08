@@ -408,6 +408,7 @@
     "back": "Back",
     "next": "Next",
     "finishSetup": "Finish setup",
+    "finishSetupLead": "This device has no name yet. You can pick its name, its room and what it does now.",
     "emptyDevicesTitle": "Add your first device",
     "emptyDevicesLead": "Put a Zigbee device into pairing mode, then use the button below. Villa Bridge will guide you through the rest.",
     "addFirstDevice": "＋ Add first device",

@@ -82,6 +82,7 @@ async function runFlow(script: string, initialState: Record<string, unknown> = {
     const clearTimeout=timer=>{if(timer)timer.cancelled=true};
     ${extractHold(source)}
     ${extractFunction(source, "setupFlowDeviceId")}
+    ${extractFunction(source, "returnedPairingDevice")}
     ${extractFunction(source, "trackPairingProgress")}
     ${extractFunction(source, "schedulePairingNetworkClose")}
     ${extractFunction(source, "cancelPairingNetworkClose")}
@@ -119,6 +120,43 @@ test("ağ interview biter bitmez kapatılmaz, en az bir dakika açık kalır", a
   assert.equal(stopCalls(run), 1);
   assert.deepEqual(run.state.pairing, { open: false });
   assert.equal(run.state.pairingNetworkClose, null);
+});
+
+test("arama sürerken listeye dönen cihaz akışı ilerletir, arama sonsuza sürmez", async () => {
+  const run = await runFlow("trackPairingProgress();", {
+    pairingSession: {
+      foundId: null,
+      phase: "searching",
+      hidden: false,
+      completing: false,
+      reconnected: false,
+      targetId: "0xa4c138462c230400",
+      knownIds: []
+    },
+    // Katılım olayı yok: cihaz zaten ağdaydı, yalnız listeye geri döndü.
+    pairing: { open: true },
+    devices: [{ id: "0xa4c138462c230400", name: "0xa4c138462c230400" }]
+  });
+
+  assert.equal(run.state.pairingSession.phase, "ready");
+  assert.equal(run.state.pairingSession.reconnected, true);
+  await run.advance(1200);
+  assert.ok(run.calls.includes("openPairingName"), "kurulum adımı açılmalı");
+
+  // permit_join bekletmesi bu yolda da aynı: ağ hemen kapatılmaz.
+  assert.equal(stopCalls(run), 0);
+  await run.advance(run.hold);
+  assert.equal(stopCalls(run), 1);
+});
+
+test("arama başlarken listede duran cihazlar bulundu sayılmaz", async () => {
+  const run = await runFlow("await startPairing(true);trackPairingProgress();", {
+    devices: [{ id: "0xold", name: "Salon" }]
+  });
+
+  assert.equal(run.state.pairingSession.phase, "searching");
+  assert.deepEqual(run.state.pairingSession.knownIds, ["0xold"]);
+  assert.equal(run.calls.includes("openPairingName"), false);
 });
 
 test("elle durdurma beklemez, ağı hemen kapatır", async () => {

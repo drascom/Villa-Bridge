@@ -6046,7 +6046,8 @@ test("ışık detay kartındaki büyük dikey kumanda yetenek bazlı çizilir", 
   assert.match(dashboard, /const powerButton=parts\.power/);
   // Kumanda detay penceresinin en üstüne, mevcut düzenin ÜSTÜNE gelir; gerisi korunur.
   assert.match(dashboard, /const panelHtml=lightPanelHtml\(device\);/);
-  assert.match(dashboard, /return`\$\{panelHtml\}<div class="device-detail-layout">/);
+  // Yarım kalan kurulumun kurtarma satırı dışında panelin üstünde başka bir şey yok.
+  assert.match(dashboard, /return`\$\{setupHtml\}\$\{panelHtml\}<div class="device-detail-layout">/);
   // Kolonun rengi ışığın o anki durumu: renk varsa o, renk sıcaklığı varsa Kelvin karşılığı,
   // düz ışıkta panelin sıcak sarısı (`--sun`). Kapalıyken sönük.
   assert.match(dashboard, /if\(typeof parts\.color\?\.value==="string"&&\/\^#\[0-9a-f\]\{6\}\$\/i\.test\(parts\.color\.value\)\)return parts\.color\.value\.toLowerCase\(\)/);

@@ -408,6 +408,7 @@
     "back": "Geri",
     "next": "İleri",
     "finishSetup": "Kurulumu tamamla",
+    "finishSetupLead": "Bu cihaza henüz ad verilmedi. Adını, odasını ve ne işe yaradığını şimdi seçebilirsiniz.",
     "emptyDevicesTitle": "İlk cihazınızı ekleyin",
     "emptyDevicesLead": "Bir Zigbee cihazını eşleştirme moduna alın ve aşağıdaki düğmeyi kullanın. Kalan adımlarda Villa Bridge sizi yönlendirecek.",
     "addFirstDevice": "＋ İlk cihazı ekle",
