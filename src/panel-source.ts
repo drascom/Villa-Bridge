@@ -25,19 +25,15 @@ const panelScriptFiles = new Map<string, URL>([
   ['<script src="/js/99-bind.js"></script>', new URL("../public/js/99-bind.js", import.meta.url)]
 ]);
 
-/* Panelin tek çalışma anı kuralı: üst düzeyde iş yapan bütün kod son dosyadadır, ondan önceki
-   hiçbir dosya yüklenirken bir diğerine dokunmaz. Sıra bozulursa panel hata vermeden ölür; bu
-   yüzden sıra burada, paneli okuyan her testin geçtiği noktada doğrulanır. */
-const lastPanelScriptTag = '<script src="/js/99-bind.js"></script>';
-
+/* Buradaki tek kontrol: belgedeki etiket sırası bu tabloyla birebir aynı mı — yani testlerin
+   birleştirme sırası tarayıcının yükleme sırasıyla eşleşiyor mu. Panelin diskteki bütünlüğü
+   (eksik/fazla dosya, ayrıştırılabilirlik, `99-bind.js` en sonda mı, iki dosyada aynı üst düzey ad)
+   `scripts/panel-graph.mjs` ile korunur; aynı kontrol iki yerde tekrarlanmaz. */
 function assertPanelScriptOrder(document: string): void {
   const found = [...document.matchAll(/<script src="[^"]+"><\/script>/g)].map((match) => match[0]);
   const expected = [...panelScriptFiles.keys()];
   if (found.length !== expected.length || found.some((tag, index) => tag !== expected[index])) {
     throw new Error(`Panel script sırası tabloyla uyuşmuyor: ${found.join(" ")}`);
-  }
-  if (expected.at(-1) !== lastPanelScriptTag) {
-    throw new Error(`Panel script sırasında son dosya ${lastPanelScriptTag} olmalı.`);
   }
 }
 

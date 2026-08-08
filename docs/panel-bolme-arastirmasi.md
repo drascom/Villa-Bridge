@@ -1,5 +1,36 @@
 # Villa Bridge — Panel Dosyasını Bölme Araştırması
 
+> ## Durum: bölme tamamlandı (2026-08-08)
+>
+> §8'deki B planı uygulandı; aşağıdaki metin **bölmeden önceki** ölçümü ve kararı taşır, tarihsel
+> kayıt olarak olduğu gibi bırakıldı. Bugünkü yapı:
+>
+> | Dosya | Satır |
+> |---|---:|
+> | `public/index.html` (yalnız markup + `<head>`'deki tema IIFE'si) | 227 |
+> | `public/css/panel.css` | 584 |
+> | `public/js/*.js` (13 dosya, en büyüğü `panel-automation.js` 3.501) | 8.636 |
+> | **Toplam** | **9.447** |
+>
+> | Faz | Ne yapıldı | Commit |
+> |---|---|---|
+> | 0 + 1 | `src/panel-source.ts` test yardımcısı; `<style>` → `public/css/panel.css` | `e1ca850` |
+> | 2 | Otomasyon kümesi → `public/js/panel-automation.js` | `a5e8c7c` |
+> | 3 | Kalan 12 küme → `public/js/*.js` | `08d485c`, `7e17b5b`, `c1b35fa` |
+> | 4 | Koruma testi (`scripts/panel-graph.mjs`), paketleme özeti, doküman | bu tur |
+>
+> Kalıcı kurallar:
+>
+> - **Derleme adımı yok.** Panel doğrudan `public/index.html` + `public/css/` + `public/js/`
+>   içinde düzenlenir.
+> - **Yükleme sırası = `index.html`'deki `<script src>` sırası.** `99-bind.js` her zaman en sonda.
+> - Yeni bir panel dosyası üç yere birlikte yazılır: `index.html` etiketi, `src/index.ts`
+>   içindeki `panelAssetRoutes`, `src/panel-source.ts` içindeki `panelScriptFiles`.
+> - `scripts/panel-graph.mjs` (testi `npm run runtime:test` içinde, ayrıca `npm run android:prepare`
+>   paketlemeden önce çağırır) şunları korur: etiket–disk eşleşmesi, sıra, her dosyanın
+>   ayrıştırılabilirliği, iki dosyada aynı üst düzey ad. `asset-manifest.json`'daki
+>   `dashboardSha256` artık tüm panel dosyalarını kapsayan tek özettir (`dashboardFiles` listeler).
+
 `public/index.html` tek dosyada büyüdü ve düzenlemesi zorlaştı. Bu doküman dosyanın **ölçülmüş**
 anatomisini, bölmenin önündeki gerçek engelleri ve üç ayrı yolun bu projedeki gerçek maliyetini
 taşır. Araştırma 2026-08-07'de yalnız kod okunarak yapıldı; **kod taşınmadı, dosya bölünmedi,

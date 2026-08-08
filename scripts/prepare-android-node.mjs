@@ -13,6 +13,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { create as createTar } from "tar";
+import { assertPanelGraph, panelDigest } from "./panel-graph.mjs";
 import { assertRuntimeFileList, assertRuntimeModuleGraph } from "./runtime-module-graph.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -111,6 +112,8 @@ async function prepare() {
   }
   await access(path.join(projectRoot, "public", "index.html"));
   await access(lazySerialPortPatch);
+  // Panel parcalari eksik/bozuksa APK'ya yarim panel girmesin.
+  await assertPanelGraph(projectRoot);
   // Yeni bir runtime modulu eklenip listeye yazilmadiysa paketleme burada durur.
   const sourceGraph = await assertRuntimeFileList(runtimeSource, requiredFiles);
   if (sourceGraph.dynamic.length > 0) {
@@ -238,6 +241,9 @@ async function prepare() {
     await assertRuntimeModuleGraph(stagedProject);
 
     const packageJson = JSON.parse(await readFile(path.join(stagedProject, "package.json"), "utf8"));
+    // Panel tek dosya degil: index.html + public/css + public/js. Ozet hepsini kapsar,
+    // dosya sirasi alfabetik goreli yol oldugu icin sonuc platformdan bagimsiz deterministiktir.
+    const panel = await panelDigest(bundledCore);
     const manifest = {
       format: 1,
       runtime: packageJson.name,
@@ -251,9 +257,8 @@ async function prepare() {
         path.join(bundledCore, "dist", "index.js")
       ),
       dashboard: "villa-bridge/public/index.html",
-      dashboardSha256: await sha256(
-        path.join(bundledCore, "public", "index.html")
-      )
+      dashboardFiles: panel.files.map((file) => `villa-bridge/public/${file}`),
+      dashboardSha256: panel.sha256
     };
     await writeFile(
       path.join(stagedProject, "asset-manifest.json"),
