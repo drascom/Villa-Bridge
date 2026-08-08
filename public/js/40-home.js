@@ -1,0 +1,759 @@
+  /* Alt şerit sekmeleri: "Genel görünüm" hep ilk sırada ve kaldırılamaz, ardından gruplar.
+     Sekme grubun kendi kimliğiyle anılır; dostane ad yalnız sunum. */
+  function homeTabItems(){
+    const groups=dashboardGroups();
+    const cards=groups.filter(group=>groupInOverview(group)&&groupHasVisibleEntries(group)).length;
+    const hidden=state.hiddenTiles.size;
+    return[{
+      id:overviewTabId,
+      name:t("overviewTab"),
+      icon:"overview",
+      locked:true,
+      inOverview:false,
+      sub:t("overviewTabSummary",{cards,hidden})
+    },...groups.map(group=>{
+      const entries=groupControlEntries(group);
+      const on=entries.filter(({device,control})=>control?dashboardControlAction(control)?.active===true:["active","alert"].includes(groupDeviceVisualState(device))).length;
+      return{
+        id:group.id,
+        name:group.name,
+        icon:group.id===lightsGroupId?"light":"group",
+        locked:group.locked===true,
+        inOverview:groupInOverview(group)&&entries.length>0,
+        sub:`${t("groupTabDevices",{count:entries.length})} · ${on?t("groupSummaryOn",{count:on}):t("groupSummaryAllOff")}`
+      };
+    })];
+  }
+  function homeTabHtml(item){
+    const selected=state.homeTab===item.id;
+    const mark=item.locked
+      ?`<span class="home-tab-mark" aria-hidden="true">🔒</span>`
+      :item.inOverview?`<span class="home-tab-dot" aria-hidden="true" title="${esc(t("showInOverview"))}"></span>`:"<span></span>";
+    return`<button class="quick-card home-tab${selected?" selected":""}" type="button" role="tab" id="hometab-${esc(item.id)}" aria-selected="${selected?"true":"false"}" tabindex="${selected?"0":"-1"}" aria-controls="${item.id===overviewTabId?"widgetRail":"groupPanel"}" data-home-tab="${esc(item.id)}"><span class="home-tab-body"><span class="quick-device-icon" aria-hidden="true">${deviceIconSvg(item.icon)}</span><span class="home-tab-copy"><span class="device-name">${esc(item.name)}</span><small>${esc(item.sub)}</small></span>${mark}</span></button>`;
+  }
+  function renderHomeTabs(){
+    const items=homeTabItems();
+    if(!items.some(item=>item.id===state.homeTab))state.homeTab=overviewTabId;
+    $("#homeTabs").innerHTML=items.map(homeTabHtml).join("");
+    $$("[data-home-tab]").forEach(button=>button.onclick=()=>selectHomeTab(button.dataset.homeTab));
+    $("#createHomeGroup").onclick=()=>openGroupEditor();
+  }
+  function saveHomeTab(){
+    try{localStorage.setItem(homeTabStorageKey,state.homeTab)}catch{}
+  }
+  function selectHomeTab(id){
+    if(!id)return;
+    state.homeTab=id;
+    saveHomeTab();
+    applyWidgetLayout();
+    const tab=$(`#homeTabs [data-home-tab="${CSS.escape(id)}"]`);
+    if(!tab)return;
+    tab.scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"nearest",inline:"nearest"});
+    tab.focus();
+  }
+  /* Şeritte ok/Home/End ile gezinme; "+ yeni grup" düğmesi tablist'in dışında kalır. */
+  function moveHomeTabFocus(key){
+    const tabs=$$("#homeTabs [data-home-tab]");
+    if(!tabs.length)return;
+    const current=Math.max(0,tabs.findIndex(tab=>tab.dataset.homeTab===state.homeTab));
+    const steps={ArrowLeft:-1,ArrowRight:1};
+    const next=key==="Home"?0:key==="End"?tabs.length-1:(current+steps[key]+tabs.length)%tabs.length;
+    selectHomeTab(tabs[next].dataset.homeTab);
+  }
+  function bindDeviceImages(){
+    $$("[data-device-image]").forEach(image=>{
+      if(image.dataset.bound==="true")return;
+      image.dataset.bound="true";
+      const photo=image.closest("[data-device-photo]");
+      const fail=()=>{
+        if(photo){photo.hidden=true;return}
+        image.hidden=true;
+        image.nextElementSibling.hidden=false;
+      };
+      const succeed=()=>{if(photo)photo.hidden=false};
+      image.onerror=fail;
+      image.onload=succeed;
+      if(image.complete)image.naturalWidth===0?fail():succeed();
+    });
+  }
+  function bindLongPress(element,callback,{ignore}={}){
+    if(element.dataset.longPressBound==="true")return;
+    element.dataset.longPressBound="true";
+    let timer=null,startX=0,startY=0,pointerId=null;
+    const clear=()=>{
+      clearTimeout(timer);
+      timer=null;
+      element.classList.remove("long-press-active");
+      if(pointerId!==null&&element.hasPointerCapture?.(pointerId))element.releasePointerCapture(pointerId);
+      pointerId=null;
+    };
+    element.addEventListener("pointerdown",event=>{
+      if(event.pointerType==="mouse"&&event.button!==0||ignore?.(event.target))return;
+      clear();
+      startX=event.clientX;startY=event.clientY;pointerId=event.pointerId;
+      element.setPointerCapture?.(pointerId);
+      timer=setTimeout(()=>{
+        timer=null;
+        element.dataset.suppressClick="true";
+        element.classList.add("long-press-active");
+        navigator.vibrate?.(18);
+        callback(event);
+      },longPressDelay);
+    });
+    element.addEventListener("pointermove",event=>{
+      if(timer&&Math.hypot(event.clientX-startX,event.clientY-startY)>12)clear();
+    });
+    element.addEventListener("pointerup",clear);
+    element.addEventListener("pointercancel",clear);
+    element.addEventListener("contextmenu",event=>event.preventDefault());
+    element.addEventListener("click",event=>{
+      if(element.dataset.suppressClick!=="true")return;
+      delete element.dataset.suppressClick;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },true);
+  }
+  function setupQuickMouseScrolling(){
+    const scroller=$("#homeTabs");
+    if(!scroller||scroller.dataset.mouseDragBound==="true")return;
+    scroller.dataset.mouseDragBound="true";
+    let pointerId=null,startX=0,startScrollLeft=0,dragged=false,startCard=null;
+    const reset=()=>{
+      pointerId=null;
+      startCard=null;
+      dragged=false;
+      scroller.classList.remove("mouse-dragging");
+    };
+    scroller.addEventListener("pointerdown",event=>{
+      if(event.pointerType!=="mouse"||event.button!==0)return;
+      pointerId=event.pointerId;
+      startX=event.clientX;
+      startScrollLeft=scroller.scrollLeft;
+      dragged=false;
+      startCard=event.target.closest("[data-home-tab]");
+    });
+    window.addEventListener("pointermove",event=>{
+      if(pointerId===null||event.pointerId!==pointerId)return;
+      const distance=event.clientX-startX;
+      if(!dragged&&Math.abs(distance)>6){
+        dragged=true;
+        startCard?.dispatchEvent(new Event("pointercancel"));
+        scroller.classList.add("mouse-dragging");
+      }
+      if(!dragged)return;
+      event.preventDefault();
+      scroller.scrollLeft=startScrollLeft-distance;
+    },{passive:false});
+    const finish=event=>{
+      if(pointerId===null||event.pointerId!==pointerId)return;
+      const suppressClick=dragged;
+      reset();
+      if(!suppressClick)return;
+      scroller.dataset.suppressMouseClick="true";
+      setTimeout(()=>delete scroller.dataset.suppressMouseClick,0);
+    };
+    window.addEventListener("pointerup",finish);
+    window.addEventListener("pointercancel",finish);
+    scroller.addEventListener("click",event=>{
+      if(scroller.dataset.suppressMouseClick!=="true")return;
+      delete scroller.dataset.suppressMouseClick;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },true);
+    scroller.addEventListener("dragstart",event=>event.preventDefault());
+  }
+  function confirmDashboardCommand(deviceId,property,value,messageKey){
+    const device=state.devices.find(item=>item.id===deviceId);
+    if(!device)return;
+    state.contextDevice=deviceId;
+    state.pendingConfirm={id:deviceId,property,value};
+    $("#deviceActionName").textContent=device.name;
+    $("#deviceActionLead").textContent=t(messageKey,{name:device.name});
+    $("#confirmDeviceAction").hidden=false;
+    $("#showDeviceDetails").hidden=true;
+    const dialog=$("#deviceActionDialog");
+    if(!dialog.open)dialog.showModal();
+  }
+  function runDashboardCommand(button,deviceId,property,value){
+    const messageKey=button?.dataset.confirmCommand;
+    if(messageKey){confirmDashboardCommand(deviceId,property,value,messageKey);return}
+    command(deviceId,property,value);
+  }
+  function bindDashboardDeviceActions(){
+    $$("[data-group-device]").forEach(card=>bindLongPress(card,()=>openDeviceDetail(card.dataset.groupDevice)));
+    $$("[data-group-show-device]").forEach(card=>bindLongPress(card,()=>openDeviceDetail(card.dataset.groupShowDevice)));
+  }
+  /* Gerçek eve yazıyoruz: sürüklerken cihaz komutla boğulmasın. Arayüz İYİMSER (parmakla birlikte
+     anında boyanır), yazma KISITLI (en çok `lightWriteInterval` ms'de bir ve aynı anda tek uçuşta
+     komut), bırakınca KESİN değer bir kez daha yazılır. Uçuşta komut varken son değer düşmez —
+     `job` yerinde kalır, sıra boşalınca yazılır; ara değerler üstüne yazıldığı için birleşir. */
+  const lightWriteInterval=200;
+  const lightWrite={at:0,timer:null,job:null};
+  // Sürükleme durumu modül düzeyinde: komut sonrası yeniden bağlama olsa da parmak takibi kopmaz.
+  const lightDrag={pointerId:null,startY:0,moved:false,fraction:0};
+  function flushLightWrite(){
+    if(lightWrite.timer){clearTimeout(lightWrite.timer);lightWrite.timer=null}
+    const job=lightWrite.job;
+    if(!job)return;
+    if(commandPending(job.id,job.property)){lightWrite.timer=setTimeout(flushLightWrite,80);return}
+    lightWrite.job=null;
+    lightWrite.at=Date.now();
+    command(job.id,job.property,job.value);
+  }
+  function queueLightWrite(id,property,value,immediate){
+    lightWrite.job={id,property,value};
+    const wait=immediate?0:lightWriteInterval-(Date.now()-lightWrite.at);
+    if(wait<=0){flushLightWrite();return}
+    if(!lightWrite.timer)lightWrite.timer=setTimeout(flushLightWrite,wait);
+  }
+  function bindLightPanel(){
+    const column=$("[data-light-column]");
+    if(!column)return;
+    const device=state.devices.find(item=>item.id===column.dataset.lightColumn);
+    if(!device)return;
+    const parts=lightPanelParts(device);
+    const spec=lightColumnSpec(device,parts,lightPanelMode(device,parts));
+    const slider=spec.kind!=="switch";
+    const blocked=()=>column.getAttribute("aria-disabled")==="true";
+    const readFraction=()=>slider
+      ?Number(column.getAttribute("aria-valuenow")||0)/100
+      :(column.getAttribute("aria-checked")==="true"?1:0);
+    const paint=fraction=>{
+      const clamped=Math.max(0,Math.min(1,fraction));
+      const percent=Math.round(clamped*100);
+      const fill=column.querySelector(".light-column-fill");
+      if(fill)fill.style.height=`${percent}%`;
+      column.classList.toggle("off",percent===0);
+      const text=spec.readoutAt(spec.valueAt(clamped));
+      if(slider){column.setAttribute("aria-valuenow",String(percent));column.setAttribute("aria-valuetext",text)}
+      const readout=$("[data-light-readout]");
+      if(readout)readout.textContent=text;
+    };
+    const write=(fraction,immediate)=>{
+      if(!spec.control)return;
+      queueLightWrite(device.id,spec.control.property,spec.valueAt(Math.max(0,Math.min(1,fraction))),immediate);
+    };
+    const toggle=()=>{
+      if(!parts.power)return;
+      const next=!binaryControlActive(parts.power);
+      column.setAttribute("aria-checked",String(next));
+      column.classList.toggle("off",!next);
+      command(device.id,parts.power.property,next);
+    };
+    const fractionAt=clientY=>{
+      const box=column.getBoundingClientRect();
+      return box.height?(box.bottom-clientY)/box.height:0;
+    };
+    column.onpointerdown=event=>{
+      if(blocked())return;
+      lightDrag.pointerId=event.pointerId;
+      lightDrag.startY=event.clientY;
+      lightDrag.moved=false;
+      lightDrag.fraction=readFraction();
+      if(column.setPointerCapture)column.setPointerCapture(event.pointerId);
+    };
+    column.onpointermove=event=>{
+      if(lightDrag.pointerId!==event.pointerId)return;
+      if(!lightDrag.moved&&Math.abs(event.clientY-lightDrag.startY)<6)return;
+      lightDrag.moved=true;
+      if(!slider)return;
+      event.preventDefault();
+      lightDrag.fraction=Math.max(0,Math.min(1,fractionAt(event.clientY)));
+      paint(lightDrag.fraction);
+      write(lightDrag.fraction,false);
+    };
+    column.onpointerup=event=>{
+      if(lightDrag.pointerId!==event.pointerId)return;
+      const moved=lightDrag.moved;
+      const fraction=lightDrag.fraction;
+      lightDrag.pointerId=null;
+      // Kısa dokunuş: aç/kapa kanalı varsa değiştirir (yalnız aç/kapat olan ışıkta tek davranış bu),
+      // yoksa dokunulan yüksekliğe ayarlar. Sürükleme bittiyse kesin değer yazılır.
+      if(!moved){
+        if(parts.power){toggle();return}
+        if(!slider)return;
+        const tapped=Math.max(0,Math.min(1,fractionAt(event.clientY)));
+        paint(tapped);
+        write(tapped,true);
+        return;
+      }
+      if(slider){paint(fraction);write(fraction,true)}
+    };
+    column.onpointercancel=()=>{
+      const moved=lightDrag.moved;
+      const fraction=lightDrag.fraction;
+      lightDrag.pointerId=null;
+      if(moved&&slider)write(fraction,true);
+    };
+    column.onkeydown=event=>{
+      if(blocked())return;
+      if(event.key===" "||event.key==="Enter"){
+        if(!parts.power)return;
+        event.preventDefault();
+        toggle();
+        return;
+      }
+      if(!slider)return;
+      const edge=event.key==="Home"?0:event.key==="End"?1:null;
+      if(edge!==null){event.preventDefault();paint(edge);write(edge,true);return}
+      const steps={ArrowUp:1,ArrowRight:1,ArrowDown:-1,ArrowLeft:-1,PageUp:2,PageDown:-2};
+      const step=steps[event.key];
+      if(step===undefined)return;
+      event.preventDefault();
+      const next=Math.max(0,Math.min(1,readFraction()+step*.05));
+      paint(next);
+      write(next,false);
+    };
+    $$("[data-light-mode-button]").forEach(button=>button.onclick=()=>{
+      state.lightPanelMode=button.dataset.lightModeButton;
+      renderDeviceDetail();
+    });
+    $$("[data-light-preset]").forEach(button=>button.onclick=()=>command(button.dataset.device,button.dataset.property,button.dataset.lightPreset));
+  }
+  function bindCards(){
+    bindDeviceImages();
+    $$("[data-device-card]").forEach(card=>{
+      const open=event=>{if(event.target.closest("button,input,select,a,summary"))return;openDeviceDetail(card.dataset.deviceCard)};
+      card.onclick=open;
+      card.onkeydown=event=>{if(event.key!=="Enter"&&event.key!==" ")return;if(event.target.closest("button,input,select,a,summary"))return;event.preventDefault();openDeviceDetail(card.dataset.deviceCard)};
+    });
+    $$("[data-command-value]").forEach(button=>button.onclick=()=>runDashboardCommand(button,button.dataset.device,button.dataset.property,JSON.parse(button.dataset.commandValue)));
+    $$("[data-toggle-room]").forEach(button=>button.onclick=()=>toggleDeviceRoom(button.dataset.roomDevice,button.dataset.toggleRoom));
+    $$("[data-level]").forEach(input=>{
+      input.oninput=()=>{
+        const target=input.closest(".control-row")?.querySelector(".control-value");
+        if(target)target.innerHTML=levelValueHtml(input.value,input.dataset.unit);
+      };
+      input.onchange=()=>command(input.dataset.level,input.dataset.property,Number(input.value));
+    });
+    $$("[data-select]").forEach(input=>input.onchange=()=>command(input.dataset.select,input.dataset.property,input.value));
+    $$("[data-device-role-select]").forEach(input=>input.onchange=()=>changeDeviceRole(input,input.dataset.deviceRoleSelect,input.dataset.deviceRoleChannel,input.value));
+    $$("[data-color]").forEach(input=>input.onchange=()=>command(input.dataset.color,input.dataset.property,input.value));
+    bindLightPanel();
+    bindDashboardDeviceActions();
+    $$("[data-visibility-device]:not(.tile-eye)").forEach(button=>button.onclick=()=>toggleTileVisibility(button.dataset.visibilityDevice,button.dataset.visibilityControl));
+    $$("[data-change-image]").forEach(button=>button.onclick=()=>openImageChooser(button.dataset.changeImage));
+    $$("[data-rename]").forEach(button=>button.onclick=event=>{event.preventDefault();event.stopPropagation();openRename(button.dataset.rename)});
+    $$("[data-rename-channel]").forEach(button=>button.onclick=()=>openRename(button.dataset.renameChannel,button.dataset.channel));
+    $$("[data-reconfigure]").forEach(button=>button.onclick=()=>reconfigureDevice(button.dataset.reconfigure));
+    $$("[data-note]").forEach(button=>button.onclick=()=>openDeviceNote(button.dataset.note));
+    $$("[data-finish-setup]").forEach(button=>button.onclick=event=>{event.preventDefault();event.stopPropagation();finishDeviceSetup(button.dataset.finishSetup)});
+    $$("[data-ota-check]").forEach(button=>button.onclick=()=>checkOta(button.dataset.otaCheck));
+    $$("[data-ota]").forEach(button=>button.onclick=()=>scheduleOta(button.dataset.ota,button.dataset.otaEnabled!=="false"));
+    $$("[data-options]").forEach(button=>button.onclick=()=>openDeviceOptions(button.dataset.options));
+    $$("[data-remove]").forEach(button=>button.onclick=()=>removeDevice(button.dataset.remove));
+    $$("[data-close-detail]").forEach(button=>button.onclick=closeDeviceDetail);
+  }
+  function renderPairingRouters(){
+    const select=$("#pairingRouter");
+    if(!select)return;
+    const selected=select.value;
+    const routers=state.devices.filter(device=>device.type==="Router"&&device.availability!=="offline");
+    select.innerHTML=`<option value="">${t("coordinator")}</option>`+routers.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("");
+    if([...select.options].some(option=>option.value===selected))select.value=selected;
+  }
+  function renderZigbeeGroups(){
+    const container=$("#zigbeeGroupList");
+    if(!container)return;
+    container.innerHTML=state.zigbeeGroups.length?state.zigbeeGroups.map(group=>{
+      const available=state.devices.filter(device=>!group.memberIds?.includes(device.id));
+      const members=(group.memberIds||[]).map(id=>{
+        const device=state.devices.find(item=>item.id===id);
+        return`<span class="touchlink-device">${esc(device?.name||id)}<button class="danger-button" type="button" data-zgroup-remove-member="${esc(group.id)}" data-device="${esc(id)}">×</button></span>`;
+      }).join("");
+      const scenes=(group.scenes||[]).map(scene=>`<span class="zigbee-scene"><span>${esc(scene.name)} · ${scene.id}</span><button class="secondary" type="button" data-zgroup-existing-scene="recall" data-group="${esc(group.id)}" data-scene="${scene.id}" title="${t("recallScene")}">▶</button><button class="danger-button" type="button" data-zgroup-existing-scene="remove" data-group="${esc(group.id)}" data-scene="${scene.id}" title="${t("removeScene")}">×</button></span>`).join("");
+      return`<div class="zigbee-group-row"><div class="zigbee-group-row-head"><input value="${esc(group.name)}" maxlength="64" data-zgroup-name="${esc(group.id)}"><span class="zigbee-member-count">${t("groupMembers",{count:group.members})}</span><button class="secondary" type="button" data-zgroup-rename="${esc(group.id)}" title="${t("changeName")}">✓</button></div><div class="zigbee-group-actions"><select data-zgroup-device="${esc(group.id)}"><option value="">＋ ${t("device")}</option>${available.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("")}</select><button class="secondary" type="button" data-zgroup-add-member="${esc(group.id)}" title="${t("add")}">＋</button><input type="number" min="1" max="255" value="1" data-zgroup-scene="${esc(group.id)}" aria-label="${t("scene")}"><input type="text" maxlength="64" data-zgroup-scene-name="${esc(group.id)}" placeholder="${t("sceneName")}"><button class="secondary" type="button" data-zgroup-scene-action="store" data-group="${esc(group.id)}" title="${t("storeScene")}">●</button><button class="danger-button" type="button" data-zgroup-delete="${esc(group.id)}" title="${t("deleteGroup")}">×</button></div>${members?`<div class="zigbee-member-list">${members}</div>`:""}${scenes?`<div class="zigbee-scene-list">${scenes}</div>`:""}</div>`;
+    }).join(""):`<div class="zigbee-group-empty"><span aria-hidden="true">＋</span><div><strong>${t("noZigbeeGroups")}</strong><p>${t("noZigbeeGroupsLead")}</p></div></div>`;
+    $$("[data-zgroup-rename]").forEach(button=>button.onclick=()=>renameZigbeeGroup(button.dataset.zgroupRename));
+    $$("[data-zgroup-add-member]").forEach(button=>button.onclick=()=>addZigbeeGroupMember(button.dataset.zgroupAddMember));
+    $$("[data-zgroup-remove-member]").forEach(button=>button.onclick=()=>setZigbeeGroupMember(button.dataset.zgroupRemoveMember,button.dataset.device,false));
+    $$("[data-zgroup-scene-action]").forEach(button=>button.onclick=()=>zigbeeGroupScene(button.dataset.group,button.dataset.zgroupSceneAction));
+    $$("[data-zgroup-existing-scene]").forEach(button=>button.onclick=()=>zigbeeGroupScene(button.dataset.group,button.dataset.zgroupExistingScene,Number(button.dataset.scene)));
+    $$("[data-zgroup-delete]").forEach(button=>button.onclick=()=>deleteZigbeeGroup(button.dataset.zgroupDelete));
+    const source=$("#bindSource"),target=$("#bindTarget");
+    const sourceValue=source.value,targetValue=target.value;
+    source.innerHTML=`<option value="">${t("sourceDevice")}</option>`+state.devices.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("");
+    target.innerHTML=`<option value="">${t("targetDevice")}</option>`+state.devices.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("")+state.zigbeeGroups.map(group=>`<option value="${esc(group.id)}">◇ ${esc(group.name)}</option>`).join("");
+    if([...source.options].some(option=>option.value===sourceValue))source.value=sourceValue;
+    if([...target.options].some(option=>option.value===targetValue))target.value=targetValue;
+    renderBindingEndpoints();
+    renderBindingList();
+  }
+  function renderSystemAlertBar(){
+    const serverMetric=$("#serverConnectionMetric");
+    const serverConnected=state.overviewLoaded&&!state.connectionError;
+    serverMetric.hidden=!state.androidMonitor;
+    if(state.androidMonitor){
+      const serverStatus=t(serverConnected?"serverConnected":"serverDisconnected");
+      $("#serverConnectionDot").className=`server-connection-dot${serverConnected?" ok":""}`;
+      serverMetric.title=serverStatus;
+      serverMetric.setAttribute("aria-label",serverStatus);
+    }
+    const criticalMessages=[];
+    if(state.connectionError)criticalMessages.push(t("serverUnreachable"));
+    else if(state.health&&state.health.ok===false)criticalMessages.push(t("connectionWaiting"));
+    state.devices.forEach(device=>{
+      const alert=criticalAlert(device);
+      if(alert)criticalMessages.push(t(criticalAlertKeys[alert.code]||"deviceNeedsAttention",{name:device.name}));
+    });
+    const message=criticalMessages[0]||"";
+    const extra=criticalMessages.length>1?t("moreCriticalAlerts",{count:criticalMessages.length-1}):"";
+    const bar=$("#systemAlertBar");
+    bar.hidden=!message;
+    $("#systemAlertText").textContent=message;
+    const counter=$("#systemAlertCount");
+    counter.textContent=extra;
+    counter.hidden=!extra;
+    document.body.classList.toggle("has-system-alert",Boolean(message));
+  }
+  function render(){
+    const devices=state.devices;
+    $$(".add-device").forEach(button=>button.disabled=!state.overviewLoaded);
+    $("#deviceCount").textContent=devices.length;
+    $("#alertCount").textContent=devices.filter(isAlert).length;
+    renderSystemAlertBar();
+    const signalPercents=devices.map(linkQualityPercent).filter(value=>value!==null);
+    const averageSignal=signalPercents.length?Math.round(signalPercents.reduce((sum,value)=>sum+value,0)/signalPercents.length):null;
+    const signalStrength=$("#signalAverage");
+    const signalTone=averageSignal===null?null:signalToneForPercent(averageSignal);
+    signalStrength.textContent=signalTone?t(signalToneKeys[signalTone]):"—";
+    signalStrength.className=signalTone?`signal-${signalTone}`:"";
+    signalStrength.title=averageSignal===null?"":`${averageSignal}%`;
+    const onlineDevices=devices.filter(device=>device.availability==="online").length;
+    const offlineDevices=devices.filter(device=>device.availability==="offline").length;
+    $("#onlineDeviceCount").textContent=String(onlineDevices);
+    $("#offlineDeviceCount").textContent=t("offlineDevices",{count:offlineDevices});
+    const lowBatteryDevices=devices.filter(hasLowBattery).length;
+    const lowBatteryFact=$("#lowBatteryCount");
+    lowBatteryFact.textContent=t("lowBatteryDevices",{count:lowBatteryDevices});
+    lowBatteryFact.hidden=lowBatteryDevices===0;
+    $("#chooseZigbeeRestore").hidden=state.health?.mode!=="direct";
+    renderPairingRouters();
+    renderZigbeeGroups();
+    renderHomeSummary();
+    renderAutomations();
+    refreshAutomationHint();
+    filterDevices();
+    const ok=state.health?.ok;$("#sideDot").className=`status-dot ${ok?"ok":"bad"}`;$("#sideStatus").textContent=ok?t("homeControlReady"):t("connectionWaiting");
+    const pairing=state.pairing?.open;$("#pairingBanner").classList.toggle("show",Boolean(pairing));
+    $("#showPairing").hidden=!pairing||state.pairingSession?.hidden!==true;
+    if(pairing){
+      const pairingDevice=state.pairing?.device;
+      const found=pairingDevice?state.devices.find(device=>device.id===pairingDevice.id):null;
+      if(pairingDevice)$("#pairingText").textContent=t("pairingFoundBanner",{name:found?.name||pairingDevice.name||pairingDevice.id});
+      else{const left=Math.max(0,Math.ceil((new Date(state.pairing.until)-Date.now())/1000));$("#pairingText").textContent=t("pairingCountdown",{count:left});}
+    }
+    applyWidgetLayout();
+    renderWidgetLists();
+    bindCards();
+    renderPairingProgress();
+    if($("#lightDialog").open)renderLightDialog();
+    if($("#deviceDetailDialog").open)renderDeviceDetail();
+  }
+  function renderHomeSummary(){
+    const container=$("#homeSummary");
+    if(!container)return;
+    const devices=state.devices;
+    const lightsOn=devices.filter(device=>{
+      const control=dashboardControlForDevice(device);
+      return Boolean(control)&&["switch","fan"].includes(control.kind)&&binaryControlActive(control);
+    }).length;
+    const openings=devices.filter(device=>device.state?.contact===false).length;
+    const motion=devices.filter(device=>device.state?.occupancy===true||device.state?.presence===true).length;
+    const rows=[
+      {count:lightsOn,label:t("summaryLightsOn"),zero:t("summaryAllOff"),tone:lightsOn?"active":"muted"},
+      {count:openings,label:t("summaryOpenings"),zero:t("summaryAllClosed"),tone:openings?"alert":"muted"},
+      {count:motion,label:t("summaryMotion"),zero:t("summaryNoMotion"),tone:motion?"active":"muted"}
+    ];
+    container.innerHTML=rows.map(row=>`<div class="summary-row ${row.tone}">${row.count?`<strong>${row.count}</strong><span>${esc(row.label)}</span>`:`<em>${esc(row.zero)}</em>`}</div>`).join("");
+  }
+  function widgetListCapacity(selector,fallback){
+    const list=$(selector);
+    const card=list?.closest(".dashboard-widget");
+    if(!list||!card)return fallback;
+    const available=card.clientHeight-list.offsetTop-10;
+    if(available<70)return fallback;
+    return Math.max(fallback,Math.min(14,Math.floor(available/62)));
+  }
+  function latestEventPerDevice(events,limit){
+    const seen=new Set();
+    const rows=[];
+    for(const event of events){
+      if(seen.has(event.sourceName))continue;
+      seen.add(event.sourceName);
+      rows.push({event,presentation:eventPresentation(event)});
+      if(rows.length>=limit)break;
+    }
+    return rows;
+  }
+  function renderWidgetLists(){
+    const devices=state.devices;
+    const rows=latestEventPerDevice(state.events||[],widgetListCapacity("#activityEvents",5));
+    $("#activityEvents").innerHTML=rows.length?rows.map(row=>{
+      const device=devices.find(item=>item.sourceName===row.event.sourceName);
+      return`<div class="widget-list-row"><strong>${esc(device?.name||row.event.sourceName)}</strong><time>${ago(row.event.at)}</time><span>${row.presentation.icon} ${esc(row.presentation.label)}</span></div>`;
+    }).join(""):`<div class="device-meta">${t("noActivity")}</div>`;
+  }
+  function saveWidgetLayout(){
+    try{localStorage.setItem("villa-dashboard-widgets",JSON.stringify(state.widgets))}catch{}
+  }
+  function saveRemovedWidgets(){
+    try{localStorage.setItem(removedWidgetsKey,JSON.stringify([...state.removedWidgets]))}catch{}
+  }
+  /* Yeni grup kartı, düzen kaydında kendinden önceki grubun hemen ardına girer; hiçbiri yoksa
+     kendinden sonraki ilk grubun önüne. Böylece onarım mevcut sırayı bozmadan boşluğu doldurur. */
+  function groupWidgetSlot(ids,index){
+    for(let i=index-1;i>=0;i--){const slot=state.widgets.indexOf(ids[i]);if(slot>=0)return slot+1}
+    for(let i=index+1;i<ids.length;i++){const slot=state.widgets.indexOf(ids[i]);if(slot>=0)return slot}
+    return state.widgets.length;
+  }
+  /* Ekranda duran her kart sıralamaya dahil olmalı. Sunucudan senkronla gelen ya da düzen kaydı
+     çıkmadan önce oluşmuş gruplar listede yoktu: kart görünüyor ama ok düğmeleri ölüydü ve listedeki
+     ilk grup "en sol" sanılıyordu. Burada eksikler sessizce eklenir, silinen grupların kimlikleri
+     düşer.
+
+     Görünürlük artık bu listede DEĞİL: Genel görünümden kapatılan oda kartı da sırasını korur,
+     yoksa geri açıldığında yeri kayardı. `removedWidgets` yalnız bilgi kartları içindir; içinde
+     kalan eski `group:` girdileri göçte ve burada temizlenir. */
+  function reconcileWidgetLayout(){
+    const ids=dashboardGroups().map(group=>groupWidgetId(group.id));
+    const known=new Set(ids);
+    const stale=id=>id.startsWith(groupWidgetPrefix)&&!known.has(id);
+    let changed=false;
+    const kept=state.widgets.filter(id=>!stale(id));
+    if(kept.length!==state.widgets.length){state.widgets=kept;changed=true}
+    ids.forEach((id,index)=>{
+      if(state.widgets.includes(id))return;
+      state.widgets.splice(groupWidgetSlot(ids,index),0,id);
+      changed=true;
+    });
+    let dropped=false;
+    for(const id of[...state.removedWidgets]){
+      if(!id.startsWith(groupWidgetPrefix))continue;
+      state.removedWidgets.delete(id);
+      dropped=true;
+    }
+    if(dropped)saveRemovedWidgets();
+    if(changed)saveWidgetLayout();
+    return changed;
+  }
+  function saveDashboardGroups(){
+    try{localStorage.setItem("villa-dashboard-groups",JSON.stringify(state.groups))}catch{}
+  }
+  /* Hazır "Işıklar" grubu jenerik türetilir: sunucunun `light` kategorisine koyduğu her cihaz.
+     Sabit oda/isim listesi yok — ürün çok evli. Kayıtta durmaz, silinemez, düzenlenemez. */
+  function lightsAutoGroup(){
+    const items=state.devices.filter(device=>device.category==="light").map(device=>{
+      const control=dashboardControlForDevice(device);
+      return{deviceId:device.id,controlId:control?control.id:groupDeviceControlId};
+    });
+    return{id:lightsGroupId,name:t("lightsGroup"),items,locked:true};
+  }
+  /* "Odasız": hiçbir odaya (grup) atanmamış cihazlar. Cihaz–oda ilişkisi grup üyeliğinde durur,
+     yeni bir depo açılmaz. Kart yalnız içi doluyken çıkar; boşken sekmesi de basılmaz. */
+  const deviceHasRoom=device=>state.groups.some(group=>group.items.some(item=>item.deviceId===device.id));
+  function noRoomAutoGroup(){
+    const items=state.devices.filter(device=>!deviceHasRoom(device)).map(device=>{
+      const control=dashboardControlForDevice(device);
+      return{deviceId:device.id,controlId:control?control.id:groupDeviceControlId};
+    });
+    return{id:noRoomGroupId,name:t("noRoomGroup"),items,locked:true};
+  }
+  const dashboardGroups=()=>{
+    const noRoom=noRoomAutoGroup();
+    return[lightsAutoGroup(),...state.groups,...(noRoom.items.length?[noRoom]:[])];
+  };
+  const dashboardGroupById=id=>dashboardGroups().find(group=>group.id===id)||null;
+  const groupEntryControlId=entry=>entry.control?entry.control.id:groupDeviceControlId;
+  /* Varsayılan GÖRÜNÜR: oda kartı grubun tüm cihazlarını gösterir. Kullanıcı tek tek gizler;
+     gizlenenler kartın altında sayısıyla duyurulur, böylece kaybolmuş sayılmazlar. */
+  function overviewGroupEntries(entries){
+    const visible=entries.filter(entry=>!isTileHidden(entry.device.id,entry.control?entry.control.id:null));
+    return{entries:visible,hidden:entries.length-visible.length};
+  }
+  /* Oda kartı Genel görünümde çıksın mı? Karar sunucudaki görünürlük kaydında durur — ev
+     genelinde tek doğru. Kart SIRASI (`villa-dashboard-widgets`) bundan ayrı ve cihaza özgü:
+     her oda kartı her zaman sıraya girer, yalnız basılıp basılmayacağı buradan belirlenir. */
+  const groupInOverview=group=>!state.hiddenGroups.has(group.id);
+  const groupWidgetHidden=widgetId=>widgetId.startsWith(groupWidgetPrefix)
+    &&state.hiddenGroups.has(widgetId.slice(groupWidgetPrefix.length));
+  function groupControlEntries(group){
+    return group.items.map(item=>{
+      const device=state.devices.find(candidate=>candidate.id===item.deviceId);
+      if(device&&item.controlId===groupDeviceControlId)return{device,control:null};
+      const control=device?.controls.find(candidate=>candidate.id===item.controlId&&isDashboardControl(candidate));
+      return device&&control?{device,control}:null;
+    }).filter(Boolean);
+  }
+  /* Genel görünümde gerçekten kart basılacak mı? Hiç cihazı olmayan grup gibi, tüm cihazları
+     gizlenmiş grup da boş bir kart bırakmaz. Düzenleme kipinde ölçüt gevşer: göz düğmelerine
+     ulaşılabilsin diye kart görünür kalır (`applyWidgetLayout` aynı emniyeti kuruyor). */
+  function groupHasVisibleEntries(group){
+    const entries=groupControlEntries(group);
+    if(!entries.length)return false;
+    return state.dashboardEditing===true||overviewGroupEntries(entries).entries.length>0;
+  }
+  function groupDeviceVisualState(device){
+    if(device.availability==="offline")return"offline";
+    if(isAlert(device))return"alert";
+    if(device.state.presence===true||device.state.occupancy===true||device.state.contact===false||device.state.smoke===true||device.state.carbon_monoxide===true)return"active";
+    return"off";
+  }
+  const widgetAddIcon=()=>'<svg class="widget-catalog-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
+  const widgetRemoveIcon=()=>'<svg class="widget-catalog-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m6 7 1 13h10l1-13"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>';
+  /* Grup düzenleme düğmesi kalem değil liste çizer: panelin başka yerlerinde de (uygulama menüsü,
+     cihaz düzeni geçişi) liste aynı üç çubukla anlatılır — ikinci bir görsel dil açılmıyor.
+     Davranış aynı: düğme grup düzenleyicisini açar, etiketi de bunu söylemeye devam eder. */
+  const groupEditIcon=()=>'<svg class="group-action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+  function groupSummaryHtml(entries){
+    const onCount=entries.filter(({device,control})=>control?dashboardControlAction(control)?.active===true:["active","alert"].includes(groupDeviceVisualState(device))).length;
+    const offlineCount=entries.filter(({device})=>device.availability==="offline").length;
+    const rows=[onCount
+      ?{tone:"active",text:t("groupSummaryOn",{count:onCount})}
+      :{tone:"muted",text:t("groupSummaryAllOff")}];
+    if(offlineCount)rows.push({tone:"alert",text:t("groupSummaryOffline",{count:offlineCount})});
+    return`<span class="group-summary">${rows.map(row=>`<span class="${row.tone}">${esc(row.text)}</span>`).join("")}</span>`;
+  }
+  const tileWidthGlyphs={
+    expand:'<svg class="tile-width-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg>',
+    collapse:'<svg class="tile-width-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="m5 8 4 4-4 4"/><path d="m19 8-4 4 4 4"/></svg>'
+  };
+  const tileWidthPreference=key=>state.tileWidths[key]||"auto";
+  function saveTileWidths(){
+    try{localStorage.setItem(tileWidthStorageKey,JSON.stringify(state.tileWidths))}catch{}
+  }
+  function tileWidthToggleHtml(key,wide){
+    const label=t(wide?"collapseTile":"expandTile");
+    return`<button class="tile-width-toggle" type="button" data-tile-width-toggle="${esc(key)}" aria-pressed="${wide?"true":"false"}" aria-label="${esc(label)}" title="${esc(label)}">${wide?tileWidthGlyphs.collapse:tileWidthGlyphs.expand}</button>`;
+  }
+  function refreshTileWidthToggle(slot){
+    const button=slot.querySelector("[data-tile-width-toggle]");
+    if(!button)return;
+    const wide=slot.classList.contains("is-wide");
+    const label=t(wide?"collapseTile":"expandTile");
+    button.setAttribute("aria-pressed",wide?"true":"false");
+    button.setAttribute("aria-label",label);
+    button.title=label;
+    button.innerHTML=wide?tileWidthGlyphs.collapse:tileWidthGlyphs.expand;
+  }
+  /* Önce her butonu kendi tercihine kur (yazma turu), sonra yalnız "auto" olanları ölç (okuma turu)
+     ve sığmayanları genişlet. Ölçüm hep dar hâlde yapıldığı için geniş→ölç→dar döngüsü oluşmaz. */
+  function applyTileWidths(grid){
+    if(!grid)return;
+    const slots=[...grid.querySelectorAll(".group-control-slot")];
+    if(!slots.length)return;
+    for(const slot of slots){
+      const preference=tileWidthPreference(slot.dataset.tileKey);
+      slot.dataset.tileWidth=preference;
+      slot.classList.toggle("is-wide",preference==="wide");
+    }
+    const auto=slots.filter(slot=>slot.dataset.tileWidth==="auto");
+    if(auto.length&&grid.clientWidth>0){
+      const clipped=auto.filter(slot=>{
+        const label=slot.querySelector(".group-control-copy strong");
+        return Boolean(label)&&label.scrollWidth>label.clientWidth+1;
+      });
+      for(const slot of clipped)slot.classList.add("is-wide");
+    }
+    for(const slot of slots)refreshTileWidthToggle(slot);
+  }
+  function applyAllTileWidths(){$$(".group-control-grid").forEach(applyTileWidths)}
+  let tileWidthObserver=null;
+  const tileGridWidths=new WeakMap();
+  function observeTileWidths(){
+    if(typeof ResizeObserver!=="function")return;
+    if(!tileWidthObserver){
+      tileWidthObserver=new ResizeObserver(entries=>{
+        for(const entry of entries){
+          const width=Math.round(entry.contentRect.width);
+          if(tileGridWidths.get(entry.target)===width)continue;
+          tileGridWidths.set(entry.target,width);
+          applyTileWidths(entry.target);
+        }
+      });
+    }
+    tileWidthObserver.disconnect();
+    $$(".group-control-grid").forEach(grid=>tileWidthObserver.observe(grid));
+  }
+  function toggleTileWidth(button){
+    const slot=button.closest(".group-control-slot");
+    if(!slot)return;
+    const key=button.dataset.tileWidthToggle;
+    if(!key)return;
+    state.tileWidths[key]=slot.classList.contains("is-wide")?"narrow":"wide";
+    saveTileWidths();
+    applyTileWidths(slot.closest(".group-control-grid"));
+  }
+  /* Göz döşemenin kardeşi: döşeme zaten <button>, iç içe buton olamaz. Tıklama cihazı açıp
+     kapatmaz — düzenleme kipinde döşeme `pointer-events:none`, olay da ayrıca durdurulur.
+     Kontrolü olmayan cihaz (sensör) da gizlenebilir: anahtarı `@device`. */
+  function tileVisibilityHtml(device,control,name){
+    const hidden=isTileHidden(device.id,control?control.id:null);
+    const label=`${visibilityLabel(hidden)}: ${name}`;
+    return`<button class="tile-eye" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(control?control.id:groupDeviceControlId)}" aria-label="${esc(label)}" title="${esc(label)}">${visibilityIcon(hidden)}</button>`;
+  }
+  /* Grup seviyesi filtre: kart Genel görünümde çıksın mı? Kayıt sunucuda `hiddenGroups` içinde
+     grup kimliğiyle durur, dostane ad değil. Cihazsız grupta anahtar pasif ve sebebi yazılı. */
+  function overviewSwitchHtml(group,entries){
+    const active=groupInOverview(group);
+    const empty=entries.length===0;
+    const label=`${group.name} · ${t("showInOverview")}`;
+    return`<span class="ov-switch-wrap"><button class="ov-switch" type="button" role="switch" aria-checked="${active?"true":"false"}"${empty?" disabled aria-disabled=\"true\"":""} data-overview-toggle="${esc(group.id)}" aria-label="${esc(empty?`${label} — ${t("showInOverviewEmpty")}`:label)}"><span class="ov-switch-track" aria-hidden="true"><span class="ov-switch-knob"></span></span><span class="ov-switch-text">${esc(t("showInOverview"))}</span></button>${empty?`<small class="ov-switch-note">${esc(t("showInOverviewEmpty"))}</small>`:""}</span>`;
+  }
+  function groupWidgetHtml(group,options={}){
+    const overview=options.variant!=="panel";
+    const entries=groupControlEntries(group);
+    const picked=overview?overviewGroupEntries(entries):{entries,hidden:0};
+    const shown=state.dashboardEditing?entries:picked.entries;
+    const controls=shown.map(({device,control})=>{
+      const name=control?channelDisplayName(device,control):device.name;
+      const controlAction=dashboardControlAction(control);
+      const preparing=device.preparing===true;
+      const pending=Boolean(controlAction&&commandPending(device.id,control.property));
+      const failed=commandFailed(device.id);
+      const shown=pending?!controlAction.active:controlAction?.active===true;
+      const visualState=preparing?"preparing":control?(device.availability==="offline"?"offline":shown?"on":"off"):groupDeviceVisualState(device);
+      const action=controlAction?`data-group-device="${esc(device.id)}" data-group-property="${esc(control.property)}" data-group-command-value="${commandValue(controlAction.value)}"${confirmCommandAttribute(control,controlAction)}`:`data-group-show-device="${esc(device.id)}"`;
+      const primaryStatus=primaryStatusForDevice(device,preparing);
+      const statusLabel=preparing?t("preparing"):device.availability==="offline"?primaryStatus.label:pending?t("sendingCommand"):controlAction?(shown?t("on"):t("off")):primaryStatus.label;
+      const statusTone=preparing?"muted":device.availability==="offline"?"danger":controlAction?(shown?"active":"muted"):primaryStatus.tone;
+      const label=controlAction?`${name} · ${statusLabel} · ${pending?t("sendingCommand"):controlAction.active?t("off"):t("on")}`:`${t("showInDevices")}: ${name} · ${statusLabel}`;
+      const widthKey=tileWidthKey(device.id,control?control.id:groupDeviceControlId);
+      const widthMode=tileWidthPreference(widthKey);
+      const wide=widthMode==="wide";
+      const tile=`<button class="group-control-tile ${visualState}${pending?" pending":""}${failed?" command-failed":""}" type="button" ${action} aria-label="${esc(preparing?`${name} · ${t("preparing")}`:label)}"${preparing||(device.availability==="offline"&&Boolean(controlAction))||pending?" disabled":""}><div class="group-control-visual">${deviceStatusIcon(device,{label:statusLabel,tone:statusTone})}</div><div class="group-control-copy"><strong>${esc(name)}</strong><small>${esc(statusLabel)}</small></div>${preparing||pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</button>`;
+      const hiddenTile=isTileHidden(device.id,control?control.id:null);
+      return`<div class="group-control-slot has-eye${wide?" is-wide":""}${hiddenTile?" is-hidden-tile":""}" data-tile-key="${esc(widthKey)}" data-tile-width="${esc(widthMode)}">${tile}${tileWidthToggleHtml(widthKey,wide)}${tileVisibilityHtml(device,control,name)}</div>`;
+    }).join("");
+    /* Gizlenen cihaz sessizce kaybolmaz: kartın altında sayısıyla duyurulur ve satır Cihazlar
+       görünümüne (mümkünse o odayı süzerek) götürür. Gizli yoksa satır hiç basılmaz. */
+    const hiddenNote=overview&&!state.dashboardEditing&&picked.hidden
+      ?`<button class="ov-hidden-note" type="button" data-hidden-room="${esc(group.id)}">${esc(t("hiddenDevicesNote",{count:picked.hidden}))}</button>`
+      :"";
+    const roomNote=overview&&!state.dashboardEditing&&group.id===noRoomGroupId
+      ?`<button class="ov-hidden-note" type="button" data-hidden-room="">${esc(t("noRoomCardHint"))}</button>`
+      :"";
+    const note=`${hiddenNote}${roomNote}`;
+    const widgetId=groupWidgetId(group.id);
+    const editButton=group.locked?"":`<button type="button" data-edit-group="${esc(group.id)}" aria-label="${t("editGroup")}">${groupEditIcon()}</button>`;
+    const body=`${controls?`<div class="group-control-grid">${controls}</div>`:note?"":`<div class="group-empty">${t("groupNoControls")}</div>`}${note}`;
+    if(!overview){
+      return`<div class="group-widget-head"><div><h2>${esc(group.name)}</h2>${groupSummaryHtml(entries)}</div><div class="group-widget-actions">${state.dashboardEditing?overviewSwitchHtml(group,entries):""}${editButton}</div></div>${body}`;
+    }
+    const title=`<button class="ov-title" type="button" data-home-tab="${esc(group.id)}" aria-label="${esc(t("openGroupTab",{name:group.name}))}"><span class="ov-title-name">${esc(group.name)}<span class="ov-go" aria-hidden="true">›</span></span>${groupSummaryHtml(entries)}</button>`;
+    return`<article class="dashboard-widget widget-card group-widget${groupInOverview(group)?"":" is-off"}" data-widget="${esc(widgetId)}" data-group-widget="${esc(group.id)}" hidden>
+      <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
+      <div class="group-widget-head">${title}<div class="group-widget-actions">${state.dashboardEditing?overviewSwitchHtml(group,entries):""}${editButton}</div></div>
+      ${body}
+    </article>`;
+  }
+  /* Cihazı olmayan ya da tüm cihazları gizlenmiş grup Genel görünümde hiç kart basmaz (anahtarı
+     açık olsa bile); sekmesi alt şeritte durur. */
+  function renderGroupWidgets(){
+    $$("[data-group-widget]").forEach(widget=>widget.remove());
+    const empty=$("#widgetEmpty");
+    for(const group of dashboardGroups()){
+      if(!groupHasVisibleEntries(group))continue;
+      empty.insertAdjacentHTML("beforebegin",groupWidgetHtml(group));
+    }
+  }

@@ -10,6 +10,10 @@ const panelStyleLink = '  <link rel="stylesheet" href="/css/panel.css">';
 /* Belge sırasındaki `<script src>` etiketleri: anahtar etiketin kendisi, değer dosya adresi.
    Yeni bir panel dosyası çıktığında yalnız bu tabloya satır eklenir. */
 const panelScriptFiles = new Map<string, URL>([
+  ['<script src="/js/10-core.js"></script>', new URL("../public/js/10-core.js", import.meta.url)],
+  ['<script src="/js/20-auth.js"></script>', new URL("../public/js/20-auth.js", import.meta.url)],
+  ['<script src="/js/30-device-view.js"></script>', new URL("../public/js/30-device-view.js", import.meta.url)],
+  ['<script src="/js/40-home.js"></script>', new URL("../public/js/40-home.js", import.meta.url)],
   ['<script src="/js/panel-automation.js"></script>', new URL("../public/js/panel-automation.js", import.meta.url)]
 ]);
 

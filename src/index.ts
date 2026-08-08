@@ -262,20 +262,26 @@ await registerAccessControl(app, authStore, {
 registerRecentErrorApi(app, recentErrors);
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
-// Panel stilleri de açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
-// geçiş noktası servis yeniden başlatması olarak kalır.
-const dashboardStyles = await readFile(resolve(moduleDir, "../public/css/panel.css"), "utf8");
-const dashboardAutomationScript = await readFile(resolve(moduleDir, "../public/js/panel-automation.js"), "utf8");
 const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
 const localesDirectory = resolve(moduleDir, "../public/locales");
 
-app.get("/css/panel.css", async (_request, reply) => reply
-  .type("text/css; charset=utf-8")
-  .send(dashboardStyles));
+// Panel parçaları da açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
+// geçiş noktası servis yeniden başlatması olarak kalır. Yeni bir panel dosyası çıktığında yalnız
+// bu listeye satır eklenir; sıra, `index.html`'deki `<script src>` sırasıdır.
+const panelAssetRoutes = [
+  "/css/panel.css",
+  "/js/10-core.js",
+  "/js/20-auth.js",
+  "/js/30-device-view.js",
+  "/js/40-home.js",
+  "/js/panel-automation.js"
+];
 
-app.get("/js/panel-automation.js", async (_request, reply) => reply
-  .type("text/javascript; charset=utf-8")
-  .send(dashboardAutomationScript));
+for (const route of panelAssetRoutes) {
+  const body = await readFile(resolve(moduleDir, `../public${route}`), "utf8");
+  const contentType = route.endsWith(".css") ? "text/css; charset=utf-8" : "text/javascript; charset=utf-8";
+  app.get(route, async (_request, reply) => reply.type(contentType).send(body));
+}
 
 app.get("/assets/dashboard-landscape.jpg", async (_request, reply) => reply
   .header("Cache-Control", "public, max-age=31536000, immutable")
