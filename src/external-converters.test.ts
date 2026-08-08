@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { forbiddenAutomationControlKinds } from "./automations.js";
+import { DeviceStore } from "./device-store.js";
 import {
   describeExternalConverters,
   lastExternalConverterLoad,
@@ -163,4 +166,89 @@ test("kaldırma kütüphaneyi eski haline döndürür", async (t) => {
   assert.ok(converters.externalDefinitions.some((definition) => definition.model === "TEST-REMOVE"));
   unloadExternalConverters("temp_sensor.js");
   assert.ok(!converters.externalDefinitions.some((definition) => definition.model === "TEST-REMOVE"));
+});
+
+/**
+ * Buradan aşağısı **sevk edilen dosyanın kendisini** yükler, uydurma bir kopyasını değil.
+ * `external-converters/door_sensor.js` bir kez `e.presets.binary(...)` yazımıyla bozulmuş,
+ * yüklenirken patlamış ve iki kapı kontağı sessizce "bilinmeyen" kalmıştı. Testin tek amacı
+ * o sessizliği kırmak: dosya patlarsa ya da özellik kümesi değişirse `npm test` düşer.
+ */
+const shippedConvertersDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "external-converters");
+const doorSensorFile = "door_sensor.js";
+
+const loadDoorSensor = async (context: { after: (callback: () => Promise<void>) => void }) => {
+  context.after(async () => unloadExternalConverters(doorSensorFile));
+  const result = await loadExternalConverters(shippedConvertersDirectory);
+  assert.deepEqual(result.failed, [], `Sevk edilen converter yüklenemedi: ${describeExternalConverters(result)}`);
+  const entry = result.loaded.find((item) => item.file === doorSensorFile);
+  assert.ok(entry, "door_sensor.js yüklenen dosyalar arasında yok.");
+  const { externalDefinitions } = await import("zigbee-herdsman-converters");
+  const definition = externalDefinitions.find((item) => item.model === "TS0601_u8ouaqsz");
+  assert.ok(definition, "TS0601_u8ouaqsz tanımı kütüphaneye kaydedilmedi.");
+  return definition;
+};
+
+test("sevk edilen door_sensor.js yüklenir ve tanımı kütüphaneye girer", async (t) => {
+  const definition = await loadDoorSensor(t);
+
+  assert.equal(definition.vendor, "Tuya");
+  assert.deepEqual(definition.fingerprint, [{ modelID: "TS0601", manufacturerName: "_TZE284_u8ouaqsz" }]);
+  assert.ok(Array.isArray(definition.exposes), "exposes düz bir dizi olmalı.");
+  assert.deepEqual(
+    (definition.exposes as Array<{ property?: string }>).map((expose) => expose.property),
+    ["contact", "battery", "alarm", "volume", "duration"]
+  );
+});
+
+test("door_sensor.js sirenli kapı kontağı doğru kumanda sınıflarını üretir", async (t) => {
+  const definition = await loadDoorSensor(t);
+
+  const store = new DeviceStore(new Map());
+  store.ingest(
+    "bridge/devices",
+    Buffer.from(JSON.stringify([{
+      ieee_address: "0xkapi",
+      friendly_name: "Giriş Kapısı",
+      type: "EndDevice",
+      supported: true,
+      interview_completed: true,
+      definition: {
+        model: definition.model,
+        vendor: definition.vendor,
+        description: definition.description,
+        exposes: definition.exposes
+      }
+    }]))
+  );
+  store.ingest(
+    "Giriş Kapısı",
+    Buffer.from(JSON.stringify({ contact: true, battery: 90, alarm: "OFF", volume: 50, duration: 10 }))
+  );
+
+  const [device] = store.getDevices();
+  assert.deepEqual(device.features, ["alarm", "battery", "contact", "duration", "volume"]);
+
+  const controls = new Map(device.controls.map((control) => [control.property, control]));
+  // Salt okunur kanallar kumanda değildir.
+  assert.equal(controls.has("contact"), false);
+  assert.equal(controls.has("battery"), false);
+
+  const alarm = controls.get("alarm");
+  assert.ok(alarm, "alarm kanalı üretilmedi.");
+  assert.equal(alarm.kind, "siren");
+  assert.equal(alarm.id, "siren:alarm");
+  assert.equal(alarm.valueOn, "ON");
+  assert.equal(alarm.valueOff, "OFF");
+  // Kullanıcı sireni elle kapatabilmeli: ayar bölümüne düşmemeli.
+  assert.equal(alarm.adminOnly, false);
+  // §8.1: siren kanalı otomasyon eylemi olamaz.
+  assert.equal(forbiddenAutomationControlKinds.has(alarm.kind), true);
+
+  assert.equal(controls.get("volume")?.kind, "number");
+  assert.equal(controls.get("volume")?.min, 1);
+  assert.equal(controls.get("volume")?.max, 100);
+  assert.equal(controls.get("duration")?.kind, "number");
+  assert.equal(controls.get("duration")?.min, 3);
+  assert.equal(controls.get("duration")?.max, 180);
 });

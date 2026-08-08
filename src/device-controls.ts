@@ -292,10 +292,30 @@ export function deviceControls(
   };
   const descriptorKind = (feature: WritableFeature | undefined): string =>
     `${feature?.parentType ?? ""} ${feature?.parentName ?? ""}`.toLowerCase();
+  /**
+   * Siren tespiti. Birinci ölçüt her zamanki gibi sarmalayan tipli expose'un adı/tipidir.
+   *
+   * İkinci ölçüt bir boşluğu kapatır: Zigbee sözleşmesinde sireni saran **tipli** bir expose
+   * yoktur (`light`, `cover`, `fan`, `climate`, `lock` var; `siren` yok). Siren çaldıran cihazlar
+   * alarmı üst düzey jenerik bir `binary("alarm", ...)` olarak yayımlar, dolayısıyla
+   * `parentType`/`parentName` boş kalır ve kanal `switch` sınıfına düşerdi. Bu yalnız görsel bir
+   * kusur değil: §8.1'in kilit/siren yasağı (`forbiddenAutomationControlKinds`) `kind` üzerinden
+   * çalışır, `switch` görünen bir siren otomasyonla öttürülebilir hâle gelirdi.
+   *
+   * Kural bilerek dar tutuldu — özellik tipi `binary` ve adı **tam olarak** `alarm` olmalı.
+   * Kütüphanedeki yazılabilir `binary("alarm", ...)` expose'larının tamamı siren/alarm çaldıran
+   * cihazlara ait (adurosmart, climax, develco, neo, senoro, woox ve Tuya sirenleri). Duman/su
+   * dedektörlerindeki `alarm` salt okunurdur ve kumanda listesine hiç girmez; buraya yalnız
+   * yazılabilir özellikler gelir. `alarm_time`, `alarm_volume` gibi ayarlar ad tam eşleşmediği
+   * için kapsam dışıdır.
+   */
+  const isSirenFeature = (feature: WritableFeature | undefined): boolean =>
+    /\bsiren\b/.test(descriptorKind(feature))
+    || (feature?.type === "binary" && feature.property === "alarm");
   const isSpecial = (feature: WritableFeature | undefined): boolean =>
-    /\b(cover|climate|lock|fan|siren)\b/.test(descriptorKind(feature));
+    /\b(cover|climate|lock|fan)\b/.test(descriptorKind(feature)) || isSirenFeature(feature);
   const isPrimaryContext = (feature: WritableFeature | undefined): boolean =>
-    /\b(light|switch|cover|climate|lock|fan|siren)\b/.test(descriptorKind(feature));
+    /\b(light|switch|cover|climate|lock|fan)\b/.test(descriptorKind(feature)) || isSirenFeature(feature);
   /**
    * Ayar mı, asıl işlev mi? Ölçüt tanım verisidir, özellik adı değil:
    *
@@ -308,7 +328,8 @@ export function deviceControls(
    *
    * Ayar kaybolmaz — yalnız ana kontrol olmaktan çıkar, listenin ayar bölümüne iner.
    * `state`/`brightness`/`color_temp` kanalları bu kuralın dışındadır: onlar sözleşme gereği
-   * zaten asıl işlevdir, tanım onları sarmalamamış olsa bile.
+   * zaten asıl işlevdir, tanım onları sarmalamamış olsa bile. Yazılabilir `alarm` da öyledir —
+   * gerekçesi `isSirenFeature`'da.
    */
   const isDeviceSetting = (feature: WritableFeature | undefined): boolean =>
     feature?.category === "config"
@@ -458,7 +479,7 @@ export function deviceControls(
       });
       continue;
     }
-    if (/\bsiren\b/.test(context)) {
+    if (isSirenFeature(feature)) {
       add({
         ...common,
         id: `siren:${property}`,
