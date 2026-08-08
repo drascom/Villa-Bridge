@@ -123,10 +123,15 @@ test("alt sayfa yüzeyleri ana ekranla aynı cam belirteçlerine bağlı, pencer
     dashboard,
     /body:not\(\[data-active-view="home"\]\) \.view \.connection-settings-card \.settings-actions\{border-width:1px 0 0;border-color:var\(--line\);background:none;box-shadow:none\}/
   );
-  // Kendi kenar dilini koruyanlar yalnız dolgu alır.
+  // Kendi kenar dilini koruyanlar yalnız dolgu alır. Gölge hepsine, dolgu seçili oda çipi hariç
+  // hepsine: seçili çip kendi koyu zeminini taşıdığı için cam dolgu onu ezmemeli.
   assert.match(
     dashboard,
-    /body:not\(\[data-active-view="home"\]\) \.view :where\(\.device-card,\.room-chip\)\{background:var\(--home-control\);box-shadow:var\(--home-float-shadow\)\}/
+    /body:not\(\[data-active-view="home"\]\) \.view :where\(\.device-card,\.room-chip\)\{box-shadow:var\(--home-float-shadow\)\}/
+  );
+  assert.match(
+    dashboard,
+    /body:not\(\[data-active-view="home"\]\) \.view :where\(\.device-card,\.room-chip:not\(\.active\)\)\{background:var\(--home-control\)\}/
   );
   // Yapışkan araç çubuğu sayfanın en opak yüzeyi: yarı saydamken altından kayan kartların hayaleti
   // görünüyordu, artık her iki temada da bir ton koyu ve tam mat.

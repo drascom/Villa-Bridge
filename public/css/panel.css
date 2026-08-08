@@ -116,8 +116,14 @@
     /* Kartın İÇİNDEKİ eylem şeridi ayrı bir yüzey değil: cam kartın üstüne ikinci bir dolgu ve
        gölge binmesin diye kendi saydam hâline döner. */
     body:not([data-active-view="home"]) .view .connection-settings-card .settings-actions{border-width:1px 0 0;border-color:var(--line);background:none;box-shadow:none}
-    /* Kenar rengine dokunulmayanlar: kendi `:hover`/`:focus` kenar dilini koruyorlar. */
-    body:not([data-active-view="home"]) .view :where(.device-card,.room-chip){background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    /* Kenar rengine dokunulmayanlar: kendi `:hover`/`:focus` kenar dilini koruyorlar.
+       Seçili oda çipi cam dolgunun DIŞINDA: kendi koyu yeşil zeminini (`--forest`) ve onun
+       üstüne yazılan metin rengini (`--on-forest`) taşıyor. Cam dolgu zemini ezseydi metin
+       her iki temada da zemine yaklaşıp okunmaz hâle gelirdi — o yüzden dışlama `:where()`
+       içinde, özgüllüğü büyütmeden yazılır. Gölge ayrı satırda ve dışlamasız: seçili çip de
+       diğerleriyle aynı düzlemde durmaya devam eder, yalnız dolgusu kendisine kalır. */
+    body:not([data-active-view="home"]) .view :where(.device-card,.room-chip){box-shadow:var(--home-float-shadow)}
+    body:not([data-active-view="home"]) .view :where(.device-card,.room-chip:not(.active)){background:var(--home-control)}
     /* Yapışkan araç çubuğu kaydırılan kartların üstünden geçer: sayfanın en opak yüzeyi odur. */
     body:not([data-active-view="home"]) .view .toolbar{background:#e2e8ea}
     :root[data-theme="dark"] body:not([data-active-view="home"]) .view .toolbar{background:#0b100f}
