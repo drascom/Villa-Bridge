@@ -717,8 +717,9 @@
     const controlsBodyHtml=device.controls.filter(control=>!covered.has(control)).map(control=>controlHtml(device,control)).join("")+deviceButtonsHtml(device);
     /* Boş-durum metni yalnızca ne kontrol ne de düğme kaldığında (sensör gibi) çıkar. Kumanda
        çizilmişken çıkmaz: her şeyi kumanda devraldıysa "kumanda yok" demek yanlış olurdu. */
-    /* Bitirme düğmesi tehlike satırının ALTINDA ve tam genişlikte: "Kaldır"ın yanına konursa
-       yanlış basma davetiyesi olur, ayrıca o satır `data-admin-only` — ev sakini bitiremezdi.
+    /* Kaldırma ve bitirme tek alt satırda yan yana durur: kırmızı solda, yeşil sağda. Yalnız
+       kaldırmanın kabı `data-admin-only`; bitirme kabı yetkiden bağımsızdır, yoksa ev sakini
+       pencereyi kapatamazdı. Ev sakininde sol taraf gizlenir, bitirme satırı tek başına doldurur.
        Kaydedilecek bir şey yok (ad/oda/rol kendi pencerelerinde kaydedildi), bu yüzden "Bitti". */
     const panelHtml=lightPanelHtml(device);
     /* Kurulumu yarım kalmış cihaz için tek düğmelik kurtarma: yeni ekran yok, aynı isim/oda/rol
@@ -740,6 +741,5 @@
       <details class="technical-details" data-admin-only${state.detailTechnicalOpen?" open":""}><summary>${t("technicalDetails")}</summary><div class="technical-body"><div class="technical">${t("uid")}: ${esc(device.id)}<br>${t("source")}: ${esc(device.sourceName)}<br>${t("model")}: ${esc(device.model||"—")}<br>${t("rawSignal")}: ${rawLinkQuality(device)===null?"—":esc(rawLinkQuality(device))} LQI</div></div></details>
       ${deviceSelfHealHtml(device)}
       <div class="card-actions"><button class="secondary" data-note="${esc(device.id)}">📝 ${t("note")}</button><button class="secondary" data-admin-only data-options="${esc(device.id)}">⚙ ${t("options")}</button><button class="secondary" data-admin-only data-reconfigure="${esc(device.id)}">${t("repairDevice")}</button>${otaButton}</div>
-      <div class="card-actions card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="${esc(device.id)}">${t("removeDevice")}</button></div>
-      <div class="card-actions card-actions-done"><button class="primary" type="button" data-close-detail>${esc(t(state.detailFromPairing?"finishSetup":"close"))}</button></div>`;
+      <div class="card-actions card-actions-footer"><div class="card-actions-danger" data-admin-only><button class="remove" data-admin-only data-remove="${esc(device.id)}">${t("removeDevice")}</button></div><div class="card-actions-done"><button class="primary" type="button" data-close-detail>${esc(t(state.detailFromPairing?"finishSetup":"close"))}</button></div></div>`;
   };

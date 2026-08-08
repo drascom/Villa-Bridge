@@ -316,8 +316,15 @@
        eder, `aria-label` de düğmede ayrıca durur. */
     @media(min-width:561px){.page-action-tile{position:relative;width:var(--head-action-w);min-width:var(--head-action-w);height:var(--head-action-h);flex:none;align-self:center;display:grid;place-items:center;gap:0;margin:0;padding:0;border:1px solid var(--forest);border-radius:999px;color:var(--forest);background:var(--forest-soft);box-shadow:none}.page-action-tile .page-action-glyph{display:block;width:26px;height:26px;stroke-width:1.9}.page-action-tile .page-action-label{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}}
     #home .page-head .lead{display:none}
-    .card-actions-danger{justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
-    .card-actions.card-actions-done{margin-top:clamp(12px,1.8vh,18px)}.card-actions.card-actions-done>button{flex:1 1 100%;width:100%;min-height:clamp(44px,7vh,52px)}
+    /* Alt satır: kaldırma solda, kapatma sağda, aynı satırda. Kapatma kabı `data-admin-only`
+       DEĞİL — ev sakininde yalnız sol taraf gizlenir, kapatma satırı tek başına doldurur.
+       Dar ekranda kapatmanın taban genişliği yetmezse satır sarar (`.card-actions` wrap eder). */
+    .card-actions-footer{align-items:stretch;gap:clamp(10px,1.4vw,16px);margin-top:clamp(12px,1.8vh,18px);padding-top:clamp(12px,1.8vh,18px);border-top:1px solid var(--line)}
+    .card-actions-footer>.card-actions-danger{flex:0 1 auto;display:flex}
+    .card-actions-footer>.card-actions-done{flex:1 1 clamp(160px,28vw,320px);display:flex;justify-content:flex-end}
+    .card-actions-footer>div>button{flex:1 1 auto;width:100%;min-height:clamp(44px,7vh,52px)}
+    /* Yan yana durduklarına göre tehlike dili birincil dilden bakışta ayrışsın: kırmızı çerçeve. */
+    .card-actions-footer .remove{border:1px solid var(--danger)}
     .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-controls,.device-detail-media{min-width:0}.device-detail-media{display:grid;align-content:start;gap:14px}.device-detail-media .facts{margin-top:0}.device-detail-media .device-detail-photo{margin:0}.device-detail-media .device-detail-roles{margin-top:0}.device-detail-roles .control-select{min-width:0;max-width:100%}.device-setup-recovery{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.75em;margin:0 0 1.1em;padding:0.85em 1em;border-left:0.25em solid var(--sun);background:var(--surface-soft);text-align:left}.device-setup-recovery p{margin:0;flex:1 1 12em;min-width:0;color:var(--muted);font-size:0.85rem}.device-setup-recovery button{flex:0 0 auto}
     @media(min-width:900px) and (orientation:landscape){dialog.device-detail-dialog{width:min(94vw,940px)}.device-detail-layout{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}.device-detail-controls{order:2}.device-detail-media{order:1}.device-detail-photo .device-photo{max-height:min(22vh,150px)}}
     /* Işık kartındaki büyük dikey kumanda. Yükseklik viewport'a bağlı (clamp + vh), sabit px yok:
