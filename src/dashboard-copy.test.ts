@@ -519,7 +519,7 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   assert.match(dashboard, /\$\{deviceDetailPhoto\(device\)\}/);
   assert.match(dashboard, /const mediaHtml=`<div class="device-detail-media">\$\{photoHtml\}\$\{factsHtml\}\$\{rolesHtml\}<\/div>`/);
   assert.match(dashboard, /\.device-detail-roles \.control-select\{min-width:0;max-width:100%\}/);
-  assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls"><div class="controls">\$\{controlsBodyHtml\|\|/);
+  assert.match(dashboard, /<div class="device-detail-layout">\s*<div class="device-detail-controls">\$\{panelHtml\}<div class="controls">\$\{controlsBodyHtml\|\|/);
   // Alt sayfalarda `.lead` artık markup'ta yok; gizleme kuralı yalnız ana ekran için kaldı.
   assert.match(dashboard, /#home \.page-head \.lead\{display:none\}/);
   assert.doesNotMatch(dashboard, /data-i18n="devicesLead"/);
@@ -2263,7 +2263,7 @@ test("cihaz detayı kumandanın düğmelerini adlarıyla ve son basışla göste
   );
   assert.match(
     dashboard,
-    /<div class="device-detail-controls"><div class="controls">\$\{controlsBodyHtml\|\|\(panelHtml\?"":`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\)\}<\/div><\/div>/
+    /<div class="device-detail-controls">\$\{panelHtml\}<div class="controls">\$\{controlsBodyHtml\|\|\(panelHtml\?"":`<div class="device-exposed-empty">\$\{t\("noExposedControls"\)\}<\/div>`\)\}<\/div><\/div>/
   );
   assert.doesNotMatch(dashboard, /\$\{deviceButtonsHtml\(device\)\}\s*\$\{deviceRoomsHtml\(device\)\}/);
   assert.match(dashboard, /\.device-detail-controls \.controls>\.device-buttons\{margin-top:0\}/);
@@ -6044,10 +6044,16 @@ test("ışık detay kartındaki büyük dikey kumanda yetenek bazlı çizilir", 
   assert.match(dashboard, /<div class="light-color"\$\{mode==="color"\?"":" hidden"\}>/);
   assert.match(dashboard, /<input class="color-picker" type="color" value="\$\{esc\(typeof parts\.color\.value==="string"\?parts\.color\.value:"#ffffff"\)\}" data-color=/);
   assert.match(dashboard, /const powerButton=parts\.power/);
-  // Kumanda detay penceresinin en üstüne, mevcut düzenin ÜSTÜNE gelir; gerisi korunur.
+  // Kumanda ayar satırlarının sütununun ilk öğesi; tam genişlikte ayrı bir üst blok değil.
   assert.match(dashboard, /const panelHtml=lightPanelHtml\(device\);/);
-  // Yarım kalan kurulumun kurtarma satırı dışında panelin üstünde başka bir şey yok.
-  assert.match(dashboard, /return`\$\{setupHtml\}\$\{panelHtml\}<div class="device-detail-layout">/);
+  assert.match(dashboard, /return`\$\{setupHtml\}<div class="device-detail-layout">/);
+  assert.doesNotMatch(dashboard, /\$\{setupHtml\}\$\{panelHtml\}/);
+  // Kurulum kurtarma şeridi taşınmadı: pencerenin en üstünde, düzenin üstünde kalır.
+  assert.match(dashboard, /const setupHtml=deviceNeedsName\(device\)/);
+  // Yüzde okuması, kolon, kip düğmeleri + göz, hazır renkler ve efekt tek panelin içinde kalır.
+  assert.match(dashboard, /const eyeHtml=lightPanelCoversPower\(device,parts\)\?visibilityButton\(device,parts\.power\):"";/);
+  assert.match(dashboard, /const actionsHtml=modesHtml\|\|eyeHtml\?`<div class="light-actions">\$\{modesHtml\}\$\{eyeHtml\}<\/div>`:"";/);
+  assert.match(dashboard, /\$\{actionsHtml\}\$\{presetsHtml\}\$\{effectHtml\}\s*<\/div>`;/);
   // Kolonun rengi ışığın o anki durumu: renk varsa o, renk sıcaklığı varsa Kelvin karşılığı,
   // düz ışıkta panelin sıcak sarısı (`--sun`). Kapalıyken sönük.
   assert.match(dashboard, /if\(typeof parts\.color\?\.value==="string"&&\/\^#\[0-9a-f\]\{6\}\$\/i\.test\(parts\.color\.value\)\)return parts\.color\.value\.toLowerCase\(\)/);

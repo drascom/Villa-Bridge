@@ -339,6 +339,11 @@
        1024×640 tablette pencere kaydırılmadan sığar. Renk karıştıran CSS işlevi YOK — Android
        WebView desteklemiyor; dolgunun rengi satır içi `--light-tint` ile gelir, yoksa sıcak sarı. */
     .light-panel{display:grid;justify-items:center;gap:clamp(8px,1.5vh,15px);margin:0 0 clamp(14px,2.2vh,20px);padding:clamp(12px,2vh,20px);border:1px solid var(--line);border-radius:20px;background:var(--surface-soft)}
+    /* Kumanda ayar satırlarının sütununda: üstünde boşluk yok (sütunun ilk öğesi), altında satırlara
+       geçiş payı var. Sütun daraldığı için kolonun ölçüsü burada ayrıca tabanlanır — sürükleme hedefi
+       44px'in çok üstünde kalsın diye genişlik tabanı 88px, yükseklik tabanı 132px. */
+    .device-detail-controls>.light-panel{margin:0 0 clamp(12px,2vh,18px)}
+    .device-detail-controls .light-column{width:clamp(88px,12vw,120px);height:clamp(132px,26vh,200px)}
     .light-readout{text-align:center}.light-readout-value{font:800 clamp(24px,4.4vh,36px)/1.05 system-ui,sans-serif}.light-readout-since{margin-top:3px;color:var(--muted);font-size:clamp(11px,1.6vh,13px)}
     .light-column{position:relative;width:clamp(88px,15vw,124px);height:clamp(120px,28vh,220px);display:block;padding:0;border:1px solid var(--line);border-radius:clamp(16px,2.6vh,26px);background:var(--surface);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
     .light-column-fill{position:absolute;left:0;right:0;bottom:0;background:var(--light-tint,var(--sun));transition:height .18s ease}
@@ -1822,8 +1827,13 @@
     const setupHtml=deviceNeedsName(device)
       ?`<div class="device-setup-recovery"><p>${esc(t("finishSetupLead"))}</p><button class="primary" type="button" data-finish-setup="${esc(device.id)}">${esc(t("finishSetup"))}</button></div>`
       :"";
-    return`${setupHtml}${panelHtml}<div class="device-detail-layout">
-        <div class="device-detail-controls"><div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div></div>
+    /* Kumanda ayrı bir tam genişlik bloğu DEĞİL: ayar satırlarının durduğu sütunun ilk öğesi.
+       Üstte tek başına dururken pencerenin başını boş bir şeride çeviriyordu; sütuna girince
+       aynı akışın içinde, satırların hemen üstünde okunuyor ve toplam yükseklik artmıyor
+       (öncesi: panel + max(medya,satırlar); sonrası: max(medya, panel+satırlar) — asla daha büyük değil).
+       Kurulum kurtarma şeridi taşınmadı, pencerenin en üstünde kalır. */
+    return`${setupHtml}<div class="device-detail-layout">
+        <div class="device-detail-controls">${panelHtml}<div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div></div>
         ${mediaHtml}
       </div>
       ${deviceRoomsHtml(device)}
