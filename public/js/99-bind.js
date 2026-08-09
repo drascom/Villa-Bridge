@@ -53,6 +53,10 @@
   $("#deviceRoomDialog").onclose=()=>{const editing=state.roomEditing;state.roomEditing=null;if(editing?.afterPairing)finishPairingFlow(editing.id);else render()};
   $("#groupForm").onsubmit=event=>{event.preventDefault();saveDashboardGroup()};
   $("#groupName").oninput=updateGroupSelection;
+  /* Cihaz süzgeci yalnız listeyi yeniden çizer; seçim kümesine dokunmaz. Enter formu
+     göndermesin — arama kutusundayken kaydetme beklenmeyen bir sonuç olur. */
+  $("#groupDeviceSearch").oninput=renderGroupDeviceChoices;
+  $("#groupDeviceSearch").onkeydown=event=>{if(event.key==="Enter")event.preventDefault()};
   $("#cancelGroup").onclick=closeAddDialog;
   $("#deleteGroup").onclick=requestGroupDelete;$("#groupMoveLeft").onclick=()=>moveDashboardGroup(-1);$("#groupMoveRight").onclick=()=>moveDashboardGroup(1);$("#cancelGroupDelete").onclick=()=>$("#groupDeleteDialog").close();$("#confirmGroupDelete").onclick=confirmGroupDelete;$("#groupDeleteDialog").onclose=()=>{state.groupDeleting=null};
   $$("[data-open-group-create]").forEach(button=>button.onclick=()=>openGroupEditor());

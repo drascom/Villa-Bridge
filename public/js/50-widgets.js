@@ -372,13 +372,25 @@
     bindDashboardDeviceActions();
   }
   const groupItemKey=(deviceId,controlId)=>JSON.stringify([deviceId,controlId]);
+  /* Arama karşılaştırması Türkçe'ye duyarsız: önce Türkçe küçültme (I→ı, İ→i), sonra aksanlı
+     harfler ASCII karşılıklarına düşer. Böylece "isik" yazan "IŞIK"ı da bulur. */
+  const groupSearchKey=value=>String(value??"").toLocaleLowerCase("tr")
+    .replace(/ı/g,"i").replace(/ş/g,"s").replace(/ğ/g,"g").replace(/ü/g,"u").replace(/ö/g,"o").replace(/ç/g,"c")
+    .replace(/â/g,"a").replace(/î/g,"i").replace(/û/g,"u");
   function renderGroupDeviceChoices(){
     const editing=state.groupEditing;
     if(!editing)return;
-    const choices=state.devices.flatMap(device=>{
+    const all=state.devices.flatMap(device=>{
       const controls=device.controls.filter(isDashboardControl);
       return controls.length?controls.map(control=>({device,control})):[{device,control:null}];
     });
+    /* Süzme yalnız görünürlüğü etkiler: seçim `editing.selected` kümesinde durur, süzülen
+       satırlar çizilmese de seçili kalır ve kaydetme tam kümeyle çalışır. */
+    const query=groupSearchKey($("#groupDeviceSearch")?.value.trim()||"");
+    const choices=query?all.filter(({device,control})=>{
+      const name=control?channelDisplayName(device,control):device.name;
+      return groupSearchKey(name).includes(query)||groupSearchKey(device.name).includes(query);
+    }):all;
     $("#groupDeviceChoices").innerHTML=choices.length?choices.map(({device,control})=>{
       const key=groupItemKey(device.id,control?.id||groupDeviceControlId);
       const checked=editing.selected.has(key);
@@ -386,7 +398,7 @@
       const detail=control&&name!==device.name?device.name:deviceKind(device);
       const visualState=control?(device.availability==="offline"?"offline":dashboardControlAction(control)?.active?"on":"off"):groupDeviceVisualState(device);
       return`<label class="group-device-choice"><input type="checkbox" data-group-choice="${esc(key)}"${checked?" checked":""}><span class="group-choice-state ${visualState}" aria-hidden="true"></span><span><strong>${esc(name)}</strong><small>${esc(detail)}</small></span></label>`;
-    }).join(""):`<div class="group-empty">${t("groupNoAvailableControls")}</div>`;
+    }).join(""):`<div class="group-empty">${t(all.length?"noSearchResults":"groupNoAvailableControls")}</div>`;
     $$("[data-group-choice]").forEach(input=>input.onchange=()=>{
       if(input.checked)editing.selected.add(input.dataset.groupChoice);
       else editing.selected.delete(input.dataset.groupChoice);
@@ -422,9 +434,12 @@
       id:group?.id||null,
       selected:new Set((group?.items||[]).map(item=>groupItemKey(item.deviceId,item.controlId)))
     };
+    updateAddDialogMode();
     updateAddDialogTitle();
     $("#groupName").value=group?.name||"";
     $("#deleteGroup").hidden=!group;
+    // Süzgeç her açılışta sıfırdan başlar; renderGroupDeviceChoices bunu okuyacak.
+    if($("#groupDeviceSearch"))$("#groupDeviceSearch").value="";
     updateGroupOrderControls();
     renderRoomSuggestions();
     renderGroupDeviceChoices();
@@ -511,6 +526,15 @@
   }
   // Modalın TEK başlığı var; hangi sekme seçiliyse onun adını taşır. Grup formunun içindeki
   // ikinci başlık kaldırıldı, bu yüzden başlığı yazan her akış buradan geçer.
+  /* Mevcut bir odayı düzenlerken pencerenin tek işi o oda: sekme şeridi gizlenir, doğrudan grup
+     formu kalır. Yeni grup oluşturma (panodan "＋ Ekle") sekmeli hâliyle sürer. Ölçüt
+     `state.groupEditing?.id` — kimliği olan bir grup varsa düzenleme kipindeyiz. */
+  function updateAddDialogMode(){
+    const editingExisting=Boolean(state.groupEditing?.id);
+    const tabs=$(".modal-tabs");
+    if(tabs)tabs.hidden=editingExisting;
+    $("#widgetDialog").classList.toggle("group-edit-only",editingExisting);
+  }
   function updateAddDialogTitle(){
     const heading=$("#addDialogTitle");
     if(!heading)return;
@@ -545,6 +569,9 @@
     $("#groupDeviceChoices").innerHTML="";
     $("#groupSelectionCount").textContent="";
     $("#saveGroup").disabled=true;
+    if($("#groupDeviceSearch"))$("#groupDeviceSearch").value="";
+    // Durum sızmasın: sekmeler geri gelir, çünkü groupEditing yukarıda temizlendi.
+    updateAddDialogMode();
     setAddDialogTab("widgets");
   }
   function openWidgetCatalog(){

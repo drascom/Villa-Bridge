@@ -724,6 +724,32 @@
     .group-picker-frame{flex:1 1 auto;min-height:180px;display:flex;flex-direction:column;margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}
     .group-picker-frame>.group-picker-head{margin-top:0}
     .group-picker-frame>.group-device-choices{flex:1 1 auto;min-height:0;max-height:none}
+    /* ODA FORMU — İKİ KOLON.
+       Sol kolon ayarlar (ad, oda önerileri, sıra, silme), sağ kolon cihaz listesi + arama.
+       Izgara pencerenin kalan yüksekliğini paylaşır (`minmax(0,1fr)` + `min-height:0`), böylece
+       iki kolon da KENDİ İÇİNDE kayar; modal uzamaz, alt aksiyon satırı yerinde kalır.
+       Dar/dikey ekranda tek kolona düşer: ayarlar üstte, cihazlar altta. */
+    .group-form-columns{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(140px,1fr);gap:16px;margin-top:4px}
+    .group-form-column{min-width:0;min-height:0;display:flex;flex-direction:column}
+    .group-form-settings>.field:first-child{margin-top:0}
+    .group-settings-foot{display:flex;margin-top:16px}
+    /* Silme düğmesi gizliyken satır da yok olur; yoksa boş bir boşluk kalırdı. */
+    .group-settings-foot:has(button[hidden]){display:none}
+    .group-form-devices>.group-picker-frame{flex:1 1 auto;min-height:0;margin-top:0}
+    /* Cihaz süzgeci: liste başlığıyla liste arasında, form alanlarının ortak dilinde. */
+    .group-device-search{width:100%;min-height:44px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--paper);font:inherit;outline:0}
+    .group-device-search:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}
+    /* Silme düğmesi sol kolona taşındı; kalan Kaydet/Vazgeç ikilisi sağa yaslanır. */
+    .group-modal-actions{justify-content:flex-end}
+    /* Düzenleme kipinde sekme şeridi gizlenir (bkz. updateAddDialogMode). */
+    .modal-tabs[hidden]{display:none}
+    @media(min-width:900px){
+      .add-modal>#groupForm{width:min(100%,1180px)}
+      .group-form-columns{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);grid-template-rows:minmax(0,1fr);gap:24px}
+      .group-form-settings{overflow-y:auto;overscroll-behavior:contain}
+      .group-settings-foot{margin-top:auto;padding-top:18px}
+      .group-form-devices .group-device-choices{grid-template-columns:repeat(auto-fill,minmax(196px,1fr))}
+    }
     /* ANA EKRAN EYLEM DÜĞMELERİ — saydam hap.
        Pano düğmesi ekle · düzenle · otomasyon (`#home .home-actions`): dolgu kalktı, ikonu
        fotoğrafın üstünde ince bir çerçeve ve ters renkli hale ayakta tutar — aydınlıkta koyu

@@ -600,6 +600,7 @@
     "groupWidgetLead": "{count} kumanda",
     "groupNoControls": "Bu grupta kullanılabilir kumanda yok.",
     "groupNoAvailableControls": "Grup oluşturmadan önce kontrol edilebilir bir cihaz ekleyin.",
+    "groupDeviceSearchPlaceholder": "Cihaz ara",
     "confirmReconnectedName": "Cihaz adını doğrulayın",
     "confirmReconnectedNameLead": "Kayıtlı cihaz yeniden bağlandı. Mevcut adını koruyun veya yeni bir ad girin.",
     "zigbeeTools": "Zigbee kurulum araçları",
