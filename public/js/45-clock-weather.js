@@ -318,8 +318,9 @@
   function renderWeather(){
     const body=$("#hubWeatherBody");
     if(!body)return;
-    // Hava sahnesi yalnız hava bölgesinin arkasında durur; saat tarafına ve ekran zeminine
-    // bulaşmaz. Veri yokken/hata varken görsel kaldırılır, zemin düz kalır.
+    // Hava sahnesi yalnız hava bölgesinde durur; saat tarafına ve ekran zeminine bulaşmaz.
+    // Bölgenin en üstündeki asıl görseldir (CSS `order` ile konum etiketinin altına oturur).
+    // Veri yokken/hata varken görsel kaldırılır, blok yalnız yazıya iner.
     $("#hubWeatherLocation").textContent=weatherState.location?weatherLocationText():t("weather");
     if(!weatherState.data){
       applyWeatherScene("");
@@ -334,7 +335,10 @@
       // Hub "şu an"ın yanına bugünün uçlarını ve nemi yazar; saatlik/günlük tahmin
       // `#weatherDialog`da duruyor. Üçü de zaten çekilen alanlar — ek istek yok.
       const note=weatherState.error?t("weatherOfflineNote",{time:weatherAgeText()}):weatherIsStale()?t("weatherStaleNote",{time:weatherAgeText()}):"";
-      body.innerHTML=`<span class="hub-now"><span class="hub-w-icon" aria-hidden="true">${presentation.icon}</span><span><b class="hub-w-temp">${esc(weatherValue(current.temperature_2m,"°"))}</b><span class="hub-w-cond">${esc(t(presentation.label))} · ${esc(t("weatherFeelsLike"))} ${esc(weatherValue(current.apparent_temperature,degree))}</span>${hubWeatherStats(current,units)}</span></span>${note?`<span class="hub-note">${esc(note)}</span>`:""}`;
+      // Küçük çizgi ikon burada YOK: bölgenin ikonu artık üstteki büyük sahne görseli
+      // (`.hub-weather-scene`). İki güneş çizmemek için hub'da tek ikon kaldı; ekran koruyucu ve
+      // diyalogdaki listeler kendi küçük ikonlarını (`weatherPresentation`) kullanmaya devam eder.
+      body.innerHTML=`<span class="hub-now"><b class="hub-w-temp">${esc(weatherValue(current.temperature_2m,"°"))}</b><span class="hub-w-cond">${esc(t(presentation.label))} · ${esc(t("weatherFeelsLike"))} ${esc(weatherValue(current.apparent_temperature,degree))}</span>${hubWeatherStats(current,units)}</span>${note?`<span class="hub-note">${esc(note)}</span>`:""}`;
     }
     if($("#weatherDialog").open)renderWeatherDialog();
   }
