@@ -448,9 +448,8 @@
     $("#deviceDetailIcon").innerHTML=deviceTypeIcon(device);
     $("#deviceDetailKind").textContent=`${deviceKind(device)} · ${primaryStatus.label}`;
     $("#deviceDetailName").textContent=device.name;
-    /* Alt satır gövdenin dışında duruyor: kaydırma alanına girmediği için pencere ne kadar dolu
-       olursa olsun kapatma düğmesi görünür kalır. Metni gövdeyle birlikte tazelenir. */
-    $("#finishDeviceDetail").textContent=t(state.detailFromPairing?"finishSetup":"close");
+    /* Alt "Kapat" şeridi kaldırıldı: penceredeki tek aksiyondu ve sağ üstteki çarpı zaten aynı işi
+       yapıyor. Kurulumu yarım kalan cihazın "Kurulumu bitir" akışı gövdedeki kurtarma şeridinde. */
     // Başlıktaki rozet/kalem gövdeden bağımsız tazelenir, bu yüzden tıklaması burada bağlanır.
     const meta=$("#deviceDetailMeta");
     const metaSignature=`${device.id}|${linkQualityPercent(device)}|${state.language}`;

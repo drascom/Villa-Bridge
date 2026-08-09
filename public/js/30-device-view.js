@@ -710,7 +710,10 @@
     const factsHtml=deviceFacts.length?`<div class="facts">${deviceFacts.map(fact=>`<span class="fact">${esc(fact)}</span>`).join("")}</div>`:"";
     // Rol satırları resmin altındaki boşluğa oturur; sol sütun resimsiz cihazda da bu blokla dolar.
     const rolesHtml=`<div class="controls device-detail-roles">${deviceRoleRowsHtml(device)}</div>`;
-    const mediaHtml=`<div class="device-detail-media">${photoHtml}${factsHtml}${rolesHtml}</div>`;
+    /* Resim kartı sol sütunun İLK gözü, kalan bloklar (rozetler + roller) ikinci gözü: geniş
+       ekranda ikisi ayrı ızgara satırına düşer ve resim kartı sağdaki ilk kartla hizalanır
+       (bkz. `.device-detail-layout` yatay bloğu). */
+    const mediaHtml=`<div class="device-detail-media">${photoHtml}<div class="device-detail-media-rest">${factsHtml}${rolesHtml}</div></div>`;
     // Düğme de bir kontroldür: kumandayı zaten onunla kullanıyoruz. Bu yüzden düğmeler kontrol
     // sütununda, kontrollerin altında durur; aşağıda ikinci bir kopya gösterilmez.
     const covered=lightPanelCoveredControls(device);
@@ -733,8 +736,13 @@
        aynı akışın içinde, satırların hemen üstünde okunuyor ve toplam yükseklik artmıyor
        (öncesi: panel + max(medya,satırlar); sonrası: max(medya, panel+satırlar) — asla daha büyük değil).
        Kurulum kurtarma şeridi taşınmadı, pencerenin en üstünde kalır. */
+    /* Sağ sütun da ikiye ayrılır: ilk kart (kumanda paneli yoksa kontrol/düğme kartları) tek başına
+       birinci gözde durur — resim kartı onunla hizalanır — kalanı ikinci göze iner. */
+    const controlsListHtml=`<div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div>`;
+    const controlsLeadHtml=panelHtml||controlsListHtml;
+    const controlsRestHtml=panelHtml?`<div class="device-detail-controls-rest">${controlsListHtml}</div>`:"";
     return`${setupHtml}<div class="device-detail-layout">
-        <div class="device-detail-controls">${panelHtml}<div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div></div>
+        <div class="device-detail-controls"><div class="device-detail-controls-lead">${controlsLeadHtml}</div>${controlsRestHtml}</div>
         ${mediaHtml}
       </div>
       ${deviceRoomsHtml(device)}

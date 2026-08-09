@@ -342,7 +342,6 @@
     $$("[data-ota]").forEach(button=>button.onclick=()=>scheduleOta(button.dataset.ota,button.dataset.otaEnabled!=="false"));
     $$("[data-options]").forEach(button=>button.onclick=()=>openDeviceOptions(button.dataset.options));
     $$("[data-remove]").forEach(button=>button.onclick=()=>removeDevice(button.dataset.remove));
-    $$("[data-close-detail]").forEach(button=>button.onclick=closeDeviceDetail);
   }
   function renderPairingRouters(){
     const select=$("#pairingRouter");

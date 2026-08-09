@@ -419,7 +419,7 @@
     }).join("");
     $$("[data-room-suggestion]").forEach(button=>button.onclick=()=>{
       $("#groupName").value=button.dataset.roomSuggestion;
-      $("#groupName").focus();
+      // Öneriye dokunmak da klavyeyi açmasın; odak dokunulan hapta kalır.
       updateGroupSelection();
     });
   }
@@ -449,7 +449,10 @@
     renderWidgetCatalog();
     setAddDialogTab("groups");
     if(!$("#widgetDialog").open)$("#widgetDialog").showModal();
-    $("#groupName").focus();
+    /* Ad alanına ODAKLANMAYIZ: tablette ekran klavyesi açılıp pencerenin yarısını kapatıyordu.
+       Klavye kullanıcı alana dokununca açılır. Odak yine de pencerenin İÇİNDE kalsın diye
+       başlığa verilir (`tabindex="-1"`), böylece odak tuzağı ve okuyucu akışı bozulmaz. */
+    $("#addDialogTitle")?.focus();
   }
   async function saveDashboardGroup(){
     const editing=state.groupEditing;
