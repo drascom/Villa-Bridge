@@ -520,7 +520,8 @@ test("Devices kartları görsel ayrıntı düzeni ve koşullu dikkat bölümü s
   );
   assert.match(dashboard, /\.card-actions-footer\{justify-content:flex-end;align-items:stretch;gap:clamp\(10px,1\.4vw,16px\);margin-top:clamp\(12px,1\.8vh,18px\);padding-top:clamp\(12px,1\.8vh,18px\);border-top:1px solid var\(--line\)\}/);
   assert.match(dashboard, /\.device-detail-layout\{display:grid;gap:18px;margin-bottom:18px\}/);
-  assert.match(dashboard, /@media\(min-width:900px\) and \(orientation:landscape\)\{dialog\.device-detail-dialog\{width:min\(94vw,940px\)\}\.device-detail-layout\{grid-template-columns:repeat\(auto-fit,minmax\(260px,1fr\)\);align-items:start\}\.device-detail-controls\{order:2\}\.device-detail-media\{order:1\}/);
+  // Pencere her ölçüde tam ekran; yatay kip yalnız içerik yerleşimini iki sütuna açar.
+  assert.match(dashboard, /@media\(min-width:900px\) and \(orientation:landscape\)\{\.device-detail-layout\{grid-template-columns:repeat\(auto-fit,minmax\(260px,1fr\)\);align-items:start\}\.device-detail-controls\{order:2\}\.device-detail-media\{order:1\}/);
   assert.match(dashboard, /\.device-detail-photo \.device-photo\{[^}]*max-height:min\(26vh,168px\)/);
   assert.doesNotMatch(dashboard, /max-height:min\(34vh,210px\)/);
   assert.doesNotMatch(dashboard, /technical-body"><div class="device-image-stage"/);

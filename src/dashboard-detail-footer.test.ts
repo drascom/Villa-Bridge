@@ -159,14 +159,20 @@ test("kapatma düğmesi gövdenin kardeşi: kaydırma alanının dışında ve y
 test("pencere ekrana sığar: gövde kendi içinde kayar, alt satır kaymaz", async () => {
   const styles = await panelStyles();
 
-  // Pencere ve iç kutu aynı tavana bağlı; ölçü `dvh`, sabit px yok.
+  // Pencere tam ekran: genişlik de yükseklik de ekranın tamamı, iç kutu aynı tavana bağlı.
+  // Ölçü `dvh`, sabit px yok.
   assert.match(
     styles,
-    /dialog\.device-detail-dialog\{width:min\(94vw,640px\);max-height:min\(92dvh,900px\);overflow:hidden\}/
+    /dialog\.device-detail-dialog\{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0;overflow:hidden\}/
   );
   assert.match(
     styles,
-    /\.device-detail-modal\{max-height:min\(92dvh,900px\);display:flex;flex-direction:column;padding:24px;overflow:hidden\}/
+    /\.device-detail-modal\{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;padding:24px;overflow:hidden\}/
+  );
+  // Tam ekranda okunurluk: başlık, gövde ve alt şerit ortalanmış bir sütunda kalır.
+  assert.match(
+    styles,
+    /\.device-detail-modal>\.device-detail-head,\.device-detail-modal>\.device-detail-body,\.device-detail-modal>\.card-actions-footer\{width:min\(100%,1100px\);margin-left:auto;margin-right:auto\}/
   );
   // Kaydıran tek öğe gövde; başlık ve alt satır kaymaz.
   assert.match(
@@ -183,9 +189,9 @@ test("pencere ekrana sığar: gövde kendi içinde kayar, alt satır kaymaz", as
     styles,
     /dialog#deviceDetailDialog>\.modal\{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:clamp\(14px,3vh,26px\);padding-bottom:calc\(20px \+ env\(safe-area-inset-bottom\)\)\}/
   );
-  // Telefonda da ekran birimi `dvh`: adres çubuğu açılıp kapanınca pencere taşmaz.
-  assert.match(styles, /@media\(max-width:560px\)\{dialog\.device-detail-dialog\{width:100%;max-width:none;max-height:88dvh;/);
-  assert.match(styles, /\.device-detail-modal\{max-height:88dvh;padding:22px 20px calc\(22px \+ env\(safe-area-inset-bottom\)\)\}/);
+  // Telefonda da tam ekran ve ölçü `dvh`: adres çubuğu açılıp kapanınca pencere taşmaz.
+  assert.match(styles, /@media\(max-width:560px\)\{dialog\.device-detail-dialog\{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0\}/);
+  assert.match(styles, /\.device-detail-modal\{height:100dvh;max-height:100dvh;padding:22px 20px calc\(22px \+ env\(safe-area-inset-bottom\)\)\}/);
   // Dokunma hedefi 44px'in altına düşmez; sabit px genişlik yok.
   assert.match(styles, /\.card-actions-footer>button\{flex:0 1 clamp\(160px,28vw,320px\);min-height:clamp\(44px,7vh,52px\)\}/);
   assert.ok(!/\.device-detail-modal[^{]*\{[^}]*color-mix\(/.test(styles));

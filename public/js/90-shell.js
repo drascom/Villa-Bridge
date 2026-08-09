@@ -188,7 +188,7 @@
     if($("#imageDialog").open)renderImageChooser();
     if($("#deviceRoleDialog").open)renderDeviceRoleDialog();
     if($("#deviceRoomDialog").open)renderDeviceRoomDialog();
-    if($("#widgetDialog").open){$("#groupDialogTitle").textContent=t(state.groupEditing?.id?"editGroup":"createDeviceGroup");renderRoomSuggestions();updateGroupOrderControls();renderGroupDeviceChoices();renderWidgetCatalog()}
+    if($("#widgetDialog").open){updateAddDialogTitle();renderRoomSuggestions();updateGroupOrderControls();renderGroupDeviceChoices();renderWidgetCatalog()}
     if($("#clockDialog").open){renderClockDialogRows();renderLocationSearchResults("clock")}
     if($("#weatherDialog").open)renderWeatherDialog();
     if($("#weatherLocationDialog").open)renderLocationSearchResults("weather");

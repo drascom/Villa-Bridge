@@ -422,7 +422,7 @@
       id:group?.id||null,
       selected:new Set((group?.items||[]).map(item=>groupItemKey(item.deviceId,item.controlId)))
     };
-    $("#groupDialogTitle").textContent=t(group?"editGroup":"createDeviceGroup");
+    updateAddDialogTitle();
     $("#groupName").value=group?.name||"";
     $("#deleteGroup").hidden=!group;
     updateGroupOrderControls();
@@ -509,6 +509,14 @@
     const dialog=$("#widgetDialog");
     if(dialog.open)dialog.close();
   }
+  // Modalın TEK başlığı var; hangi sekme seçiliyse onun adını taşır. Grup formunun içindeki
+  // ikinci başlık kaldırıldı, bu yüzden başlığı yazan her akış buradan geçer.
+  function updateAddDialogTitle(){
+    const heading=$("#addDialogTitle");
+    if(!heading)return;
+    const groups=$("#addTabGroups")?.getAttribute("aria-selected")==="true";
+    heading.textContent=t(groups?(state.groupEditing?.id?"editGroup":"createDeviceGroup"):"addToDashboard");
+  }
   function setAddDialogTab(tab){
     $$("[data-add-tab]").forEach(button=>{
       const active=button.dataset.addTab===tab;
@@ -517,6 +525,7 @@
       $(`#${button.getAttribute("aria-controls")}`).hidden=!active;
     });
     if(tab==="groups"&&!state.groupEditing)prepareGroupEditor(null);
+    updateAddDialogTitle();
   }
   function focusAddDialogTab(step){
     const tabs=$$("[data-add-tab]");
@@ -536,7 +545,6 @@
     $("#groupDeviceChoices").innerHTML="";
     $("#groupSelectionCount").textContent="";
     $("#saveGroup").disabled=true;
-    $("#groupDialogTitle").textContent=t("createDeviceGroup");
     setAddDialogTab("widgets");
   }
   function openWidgetCatalog(){
