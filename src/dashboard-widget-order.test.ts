@@ -173,7 +173,7 @@ test("ev hareketleri kartı rayda bir kademe geniş", async () => {
 
   assert.match(dashboard, /#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 2\}/);
   // Ölçü oransal: sütun genişliği viewport'tan türer, sabit px değil.
-  assert.match(dashboard, /--rail-column:calc\(\(100vw - 350px\)\/3\)/);
+  assert.match(dashboard, /--rail-column:calc\(\(100vw - 410px\)\/3\)/);
   assert.match(dashboard, /grid-auto-columns:var\(--rail-column\)/);
   // Diğer kartlar tek sütun; yalnız grup kartı ve hareketler geniş.
   assert.match(dashboard, /#home \.widget-rail \.widget-card\{grid-row:1;grid-column:span 1/);

@@ -116,9 +116,9 @@ test("telefon tipografisi ekrana iner, ölçüler clamp + viewport birimiyle ver
   const phone = repairBlock(styles);
 
   // Saat bloğu ekranın dörtte biriydi: taban 34→30, tavan 66→44 ve ölçü yükseklik yerine genişlikten.
-  assert.match(phone, /#home \.home-hub\{--hub-time-size:clamp\(30px,10\.4vw,44px\)/);
-  assert.match(phone, /#home \.hub-date\{font-size:clamp\(12px,3\.4vw,15px\)\}/);
-  assert.match(phone, /#home \.hub-w-temp\{font-size:clamp\(22px,7vw,30px\)\}/);
+  assert.match(phone, /#home \.home-hub\{--hub-time-size:clamp\(39px,13\.5vw,57px\)/);
+  assert.match(phone, /#home \.hub-date\{font-size:clamp\(16px,4\.4vw,20px\)\}/);
+  assert.match(phone, /#home \.hub-w-temp\{font-size:clamp\(29px,9\.1vw,39px\)\}/);
   assert.match(phone, /#home \.widget-card h2\{font-size:clamp\(16px,4\.4vw,20px\)\}/);
   assert.match(phone, /#home \.summary-row strong,#home \.widget-value strong\{font-size:clamp\(24px,7\.4vw,32px\)\}/);
   assert.match(phone, /\.page-head-title h1\{font-size:clamp\(19px,5\.4vw,26px\)\}/);
@@ -147,13 +147,13 @@ test("tabletin 1024×640 kuralları olduğu gibi duruyor", async () => {
   // Yatay şerit ölçüleri, sabit şerit payı ve iki sütunlu pano — hiçbiri değişmedi.
   assert.match(styles, /@media\(orientation:landscape\) and \(max-height:900px\),\(orientation:landscape\) and \(min-width:1000px\)\{#home \[data-widget="quick"\]\{height:76px\}/);
   assert.match(styles, /#home \.quick-grid\.grid-view,#home \.quick-grid\.grid-view \.quick-card,#home \.strip-row>\.quick-card-add,#home \.strip-row>\.quick-scroll-hint\{height:56px\}/);
-  assert.match(styles, /#home\{--hub-column:280px;--rail-column:calc\(\(100vw - 350px\)\/3\);--strip-inset:20px;--home-top:14px;--home-head-gap:clamp\(12px,2\.8vh,26px\)\}/);
+  assert.match(styles, /#home\{--hub-column:340px;--rail-column:calc\(\(100vw - 410px\)\/3\);--strip-inset:20px;--home-top:14px;--home-head-gap:clamp\(12px,2\.8vh,26px\)\}/);
   assert.match(styles, /#home\.active\{min-height:0;display:flex;flex-direction:column;height:calc\(100dvh - var\(--home-top\) - 106px - env\(safe-area-inset-bottom\)\)\}/);
   assert.match(styles, /#home \.widget-board\{flex:1 1 auto;min-height:150px;max-height:660px/);
-  assert.match(styles, /#home \.home-hub\{--hub-time-size:clamp\(30px,6\.6vh,52px\);--hub-gap:clamp\(5px,1vh,10px\)/);
+  assert.match(styles, /#home \.home-hub\{--hub-time-size:clamp\(39px,8\.6vh,68px\);--hub-gap:clamp\(5px,1vh,10px\)/);
   // Başlık düğmelerinin kök ölçüsü (tablet hapı) telefona uydurulmadı; küçültme `#home .page-head` altında.
   assert.match(styles, /--head-action-h:clamp\(60px,9\.4vh,64px\);--head-action-w:clamp\(72px,8\.6vw,96px\);--head-action-gap:clamp\(12px,1\.6vw,20px\)/);
-  assert.match(styles, /\.home-hub\{--hub-time-size:clamp\(34px,7\.6vh,66px\)/);
+  assert.match(styles, /\.home-hub\{--hub-time-size:clamp\(44px,9\.9vh,86px\)/);
   // Yatay blokta başlık üç sütunlu ızgara olarak kalır; telefonun `display:contents`i oraya sızmadı.
   const landscapeHead = /@media\(orientation:landscape\) and \(min-width:901px\)[^{]*\{[^]*?#home \.page-head\{align-items:center\}/.exec(styles);
   assert.ok(landscapeHead, "yatay başlık kuralı değişmiş");

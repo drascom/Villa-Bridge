@@ -44,8 +44,8 @@ test("üç eylem düğmesi saydam: dolgu yok, ikonu ince çerçeve tutuyor", asy
   assert.ok(blockAt > landscapeFill && blockAt > portraitReset && blockAt > floatShadow, "saydam blok dolgu kurallarından önce geliyor");
 
   // Kontrast tema başına yazılı: aydınlıkta koyu kenar + beyaz hale, karanlıkta tersi.
-  assert.match(styles, /--home-action-line:rgba\(23,33,29,\.42\);--home-action-halo:0 0 0 1px rgba\(255,255,255,\.62\);--home-action-glyph-shadow:drop-shadow\(0 1px 2px rgba\(255,255,255,\.78\)\)/);
-  assert.match(styles, /--home-action-line:rgba\(237,245,240,\.5\);--home-action-halo:0 0 0 1px rgba\(0,0,0,\.52\);--home-action-glyph-shadow:drop-shadow\(0 1px 3px rgba\(0,0,0,\.72\)\)/);
+  assert.match(styles, /--home-action-line:rgba\(23,33,29,\.34\);--home-action-halo:none;--home-action-glyph-shadow:none/);
+  assert.match(styles, /--home-action-line:rgba\(237,245,240,\.42\);--home-action-halo:none;--home-action-glyph-shadow:none/);
   // Kontrast reçetesinde `color-mix()` yok; ölçüler de sabit px değil clamp.
   assert.doesNotMatch(block, /color-mix\(/);
 });
@@ -100,7 +100,7 @@ test("odak halkası yerinde: saydamlık erişilebilirliği bozmuyor", async () =
   const block = withoutComments(actionBlock(styles));
 
   // Ana ekranın kuvvetli odak halkası (fotoğraf üstünde çift renk) duruyor.
-  assert.match(styles, /body\[data-active-view="home"\] #home \.home-actions button:focus-visible\{outline:3px solid var\(--on-forest\);outline-offset:3px;box-shadow:0 0 0 6px var\(--forest\)\}/);
+  assert.match(styles, /body\[data-active-view="home"\] #home \.home-actions button:focus-visible\{outline:3px solid var\(--forest-soft\);outline-offset:2px\}/);
   assert.match(styles, /#home \.home-actions button:hover,#home \.home-actions button:focus-visible,#refreshButton:hover,#refreshButton:focus-visible\{[^}]*outline:2px solid var\(--forest-soft\)/);
   // Yeni blok hiçbir outline'ı sıfırlamıyor ve odak seçicisine karışmıyor.
   assert.doesNotMatch(block, /outline:\s*(?:0|none)/);

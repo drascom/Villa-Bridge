@@ -13,12 +13,12 @@ async function readCatalog(url: URL): Promise<Record<string, string>> {
 test("kart içi cihaz butonu iki genişlik kademesine sahip", async () => {
   const dashboard = await readPanelSource();
 
-  assert.match(dashboard, /\.group-control-grid\{--group-tile-span:2;display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(dashboard, /\.group-control-grid\{--group-tile-span:2;display:grid;grid-template-columns:repeat\(auto-fill,minmax\(clamp\(118px,15vw,170px\),1fr\)\)/);
   assert.match(dashboard, /\.group-control-slot\{position:relative;min-width:0;display:grid\}/);
   assert.match(dashboard, /\.group-control-slot\.is-wide\{grid-column:span var\(--group-tile-span\)\}/);
-  assert.match(dashboard, /#home \.group-control-grid\{--group-tile-span:1;grid-template-columns:1fr\}/);
+  assert.match(dashboard, /#home \.group-control-grid\{--group-tile-span:2;grid-template-columns:repeat\(auto-fill,minmax\(clamp\(112px,26vw,150px\),1fr\)\)\}/);
   assert.match(dashboard, /\.group-control-slot\.is-wide \.group-control-tile strong\{overflow:visible;text-overflow:clip;white-space:normal/);
-  assert.match(dashboard, /\.group-control-tile strong\{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap/);
+  assert.match(dashboard, /\.group-control-tile strong\{display:block;overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere/);
   assert.doesNotMatch(dashboard, /color-mix\(/);
 });
 
@@ -101,8 +101,8 @@ test("grup sekmesindeki kartta da genişlik simgesi var", async () => {
   // Göz ve genişlik simgesi çakışmaz, döşeme adını da örtmez: ad alanı ikisine göre daralır.
   assert.match(dashboard, /\.tile-width-toggle\{position:absolute;z-index:6;right:6px;top:6px/);
   assert.match(dashboard, /\.tile-eye\{position:absolute;z-index:6;right:56px;top:6px/);
-  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot>\.group-control-tile\{padding-right:56px\}/);
-  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-eye>\.group-control-tile\{padding-right:106px\}/);
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot>\.group-control-tile\{padding-top:56px\}/);
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-eye>\.group-control-tile\{padding-top:56px\}/);
 });
 
 test("boyut simgesi metinleri iki dilde de var", async () => {

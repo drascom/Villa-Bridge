@@ -460,7 +460,7 @@ test("iki seviyeli filtre yalnız düzenleme kipinde görünür ve cihazı tetik
   assert.match(dashboard, /class="tile-eye" type="button" role="switch" aria-checked="\$\{hidden\?"false":"true"\}" data-visibility-device="\$\{esc\(device\.id\)\}" data-visibility-control="\$\{esc\(control\?control\.id:groupDeviceControlId\)\}"/);
   assert.match(dashboard, /\.tile-eye\{position:absolute;z-index:6;right:56px;top:6px;width:44px;height:44px;display:none/);
   assert.match(dashboard, /\.widget-board\.editing \.tile-eye\{display:grid\}/);
-  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-eye>\.group-control-tile\{padding-right:106px\}/);
+  assert.match(dashboard, /\.widget-board\.editing \.group-control-slot\.has-eye>\.group-control-tile\{padding-top:56px\}/);
   // Göz ve anahtar cihaza sızmaz: olay hem durdurulur hem de döşemenin dışındadır.
   assert.match(
     dashboard,
@@ -488,7 +488,7 @@ test("grup kartının zemini cihaz açıkken değişmez, döşemenin açık reng
   assert.match(dashboard, /\.group-widget\{grid-column:span 6;padding:22px\}/);
   // Döşemenin kendi açık rengi yerinde.
   assert.match(dashboard, /\.group-control-tile\.on\{border-color:#e1a33f;color:#70470e;background:#fff0c7\}/);
-  assert.match(dashboard, /body\[data-active-view="home"\] #home \.group-control-tile\.on\{border-color:rgba\(225,163,63,\.74\);background:rgba\(255,239,191,\.88\)\}/);
+  assert.match(dashboard, /body\[data-active-view="home"\] #home \.group-control-tile\.on\{border-color:#e1a33f;background:#fff0c7\}/);
 });
 
 test("grup sekmesi tek kart, Genel görünüm rayı yerini alır ve şeridin üstünde biter", async () => {
