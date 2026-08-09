@@ -170,7 +170,11 @@
     const group=state.homeTab===overviewTabId?null:dashboardGroupById(state.homeTab);
     rail.hidden=Boolean(group);
     panel.hidden=!group;
-    if(!group){panel.innerHTML="";return}
+    /* Panel kabı hangi grubu gösterdiğini kimliğiyle duyurur: CSS (ör. "Işıklar" kartının sütun
+       sayısı) gruba göre kural yazabilsin diye. Kimlik değişmez; başlık metnine ya da friendly
+       name'e bağlanan bir kural çok dilli/çok evli kurulumda kırılırdı. */
+    if(!group){panel.innerHTML="";delete panel.dataset.groupPanel;return}
+    panel.dataset.groupPanel=group.id;
     const entries=groupControlEntries(group);
     panel.innerHTML=groupWidgetHtml(group,{variant:"panel"});
     panel.setAttribute("aria-labelledby",`hometab-${group.id}`);
