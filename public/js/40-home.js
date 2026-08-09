@@ -540,13 +540,31 @@
   function saveDashboardGroups(){
     try{localStorage.setItem("villa-dashboard-groups",JSON.stringify(state.groups))}catch{}
   }
-  /* Hazır "Işıklar" grubu jenerik türetilir: sunucunun `light` kategorisine koyduğu her cihaz.
-     Sabit oda/isim listesi yok — ürün çok evli. Kayıtta durmaz, silinemez, düzenlenemez. */
+  /* Hazır "Işıklar" grubu jenerik türetilir: sunucunun `light` kategorisine koyduğu her uç.
+     Sabit oda/isim listesi yok — ürün çok evli. Kayıtta durmaz, silinemez, düzenlenemez.
+
+     Sınıflandırma KANAL başınadır (sunucu her aç/kapa kanalına kendi `category` alanını koyar),
+     dolayısıyla üyelik de kanal başına kurulur. Cihaz seviyesine bakmak çok kanallı duvar
+     anahtarında iki yönlü yanlış veriyordu: bir kanalı lamba olan cihaz karta giriyor ama
+     döşeme olarak "main" kanalı (kullanıcının anahtar dediği kanal) basılıyordu; lamba kanalları
+     ise hiç görünmüyordu. Kanal taşımayan cihazlarda (tek uç, dimmer, perde vb.) eski davranış
+     sürer: cihazın kendi sınıfı ve varsayılan döşemesi. */
+  const lightChannelControls=device=>(device.controls||[])
+    .filter(control=>isDashboardControl(control)&&control.kind==="switch"&&typeof control.category==="string");
   function lightsAutoGroup(){
-    const items=state.devices.filter(device=>device.category==="light").map(device=>{
+    const items=[];
+    for(const device of state.devices){
+      const channels=lightChannelControls(device);
+      if(channels.length){
+        for(const control of channels){
+          if(control.category==="light")items.push({deviceId:device.id,controlId:control.id});
+        }
+        continue;
+      }
+      if(device.category!=="light")continue;
       const control=dashboardControlForDevice(device);
-      return{deviceId:device.id,controlId:control?control.id:groupDeviceControlId};
-    });
+      items.push({deviceId:device.id,controlId:control?control.id:groupDeviceControlId});
+    }
     return{id:lightsGroupId,name:t("lightsGroup"),items,locked:true};
   }
   /* "Odasız": hiçbir odaya (grup) atanmamış cihazlar. Cihaz–oda ilişkisi grup üyeliğinde durur,

@@ -440,12 +440,103 @@ test("Işıklar grubu jenerik türetilir ve silinemez", async () => {
 
   assert.match(dashboard, /const lightsGroupId="auto:lights"/);
   // Sabit oda/isim listesi yok: sunucunun kategori çıkarımına dayanır.
-  assert.match(dashboard, /state\.devices\.filter\(device=>device\.category==="light"\)/);
+  assert.match(dashboard, /if\(device\.category!=="light"\)continue/);
   assert.match(dashboard, /return\{id:lightsGroupId,name:t\("lightsGroup"\),items,locked:true\}/);
   assert.match(dashboard, /const noRoom=noRoomAutoGroup\(\);\s*return\[lightsAutoGroup\(\),\.\.\.state\.groups/);
   // Kilitli grupta düzenle düğmesi basılmaz, katalogda da düzenleme ikonu çıkmaz.
   assert.match(dashboard, /const editButton=group\.locked\?"":`<button type="button" data-edit-group=/);
   assert.match(dashboard, /groupId:group\.locked\?null:group\.id/);
+});
+
+/* "Işıklar" kartının üyeliği gönderilen kodun kendisiyle çalıştırılıyor: sahte cihaz listesi,
+   sunucunun kanal başına koyduğu `category` alanıyla. */
+async function runLightsAutoGroup(devices: unknown[]): Promise<Array<{ deviceId: string; controlId: string }>> {
+  const source = await readPanelSource();
+  const helperStart = source.indexOf("const lightChannelControls=");
+  assert.notEqual(helperStart, -1, "lightChannelControls bulunamadı");
+  const helper = source.slice(helperStart, source.indexOf(";", helperStart) + 1);
+  const run = new Function(
+    "devices",
+    `
+    const lightsGroupId="auto:lights";
+    const groupDeviceControlId="@device";
+    const state={devices};
+    const t=key=>key;
+    const isDashboardControl=control=>["switch","level","cover","lock","fan","siren"].includes(control.kind)
+      &&control.adminOnly!==true;
+    const dashboardControlForDevice=device=>device.controls.find(isDashboardControl)||null;
+    ${helper}
+    ${extractFunction(source, "lightsAutoGroup")}
+    return lightsAutoGroup().items;
+    `
+  ) as (devices: unknown[]) => Array<{ deviceId: string; controlId: string }>;
+  return run(devices);
+}
+
+/* Kullanıcının ekranından çıkan hata: çok kanallı duvar anahtarında lamba kanalları karta hiç
+   girmiyor, onların yerine kullanıcının "anahtar" dediği `main` kanalı basılıyordu. Sınıflandırma
+   kanal başına olduğu için üyelik de kanal başına kurulmalı. */
+test("Işıklar kartı kanal başına kurulur: anahtar kanal girmez, lamba kanalları girer", async () => {
+  const items = await runLightsAutoGroup([
+    {
+      id: "0xf074bffffe1f9884",
+      category: "light",
+      controls: [
+        { id: "main", kind: "switch", role: "switch", category: "switch" },
+        { id: "l1", kind: "switch", role: "light", category: "light" },
+        { id: "l2", kind: "switch", role: "light", category: "light" },
+        { id: "main:brightness", kind: "level" }
+      ]
+    }
+  ]);
+
+  assert.deepEqual(items, [
+    { deviceId: "0xf074bffffe1f9884", controlId: "l1" },
+    { deviceId: "0xf074bffffe1f9884", controlId: "l2" }
+  ]);
+});
+
+test("kullanıcı anahtar dediyse kart o cihazı hiç göstermez", async () => {
+  const items = await runLightsAutoGroup([
+    {
+      id: "0xa4c138000000000a",
+      category: "switch",
+      controls: [{ id: "main", kind: "switch", role: "switch", category: "switch" }]
+    }
+  ]);
+
+  assert.deepEqual(items, []);
+});
+
+test("kanal taşımayan ışıkta cihaz seviyesi davranış sürer", async () => {
+  const items = await runLightsAutoGroup([
+    // Tek uçlu lamba: kanalı `main`, sınıfı sunucudan `light`.
+    {
+      id: "0xa4c138bc2b7065e8",
+      category: "light",
+      controls: [
+        { id: "main", kind: "switch", role: "auto", category: "light" },
+        { id: "main:brightness", kind: "level" }
+      ]
+    },
+    // Aç/kapa kanalı olmayan ışık (yalnız seviye): varsayılan döşemeye düşer.
+    {
+      id: "0xa4c138000000000b",
+      category: "light",
+      controls: [{ id: "main:brightness", kind: "level" }]
+    },
+    // Sınıfı ışık olmayan cihaz kanalsız da olsa girmez.
+    {
+      id: "0xa4c138000000000c",
+      category: "cover",
+      controls: [{ id: "main:cover", kind: "cover" }]
+    }
+  ]);
+
+  assert.deepEqual(items, [
+    { deviceId: "0xa4c138bc2b7065e8", controlId: "main" },
+    { deviceId: "0xa4c138000000000b", controlId: "main:brightness" }
+  ]);
 });
 
 test("iki seviyeli filtre yalnız düzenleme kipinde görünür ve cihazı tetiklemez", async () => {
