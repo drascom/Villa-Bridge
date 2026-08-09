@@ -80,11 +80,24 @@
   const dashboardWidgetTypes={
     quick:{title:"homeTabsWidget",lead:"homeTabsWidgetLead"},
     summary:{title:"summaryWidget",lead:"summaryWidgetLead"},
-    availability:{title:"availabilityWidget",lead:"availabilityWidgetLead"},
     activity:{title:"activityWidget",lead:"activityWidgetLead"}
   };
-  const defaultDashboardWidgets=["quick","summary","availability","activity"];
+  const defaultDashboardWidgets=["quick","summary","activity"];
   const fixedDashboardWidgets=new Set(["quick"]);
+  /* "Ev durumu" ile "Cihaz erişilebilirliği" tek kartta birleşti: katalogda tek giriş, tek ekle/kaldır.
+     Kayıtlı düzenlerde iki eski kimlik de bulunabilir; `availability` artık `summary`ye eşlenir.
+     Kural — eski kimliklerden en az biri düzende açıksa birleşik kart açık gelir, ikisi de
+     kaldırılmışsa kaldırılmış kalır. Konum: eskiden hangisi öndeyse o. Ölü kimlik ne düzende ne de
+     kaldırılmışlar listesinde bırakılır. */
+  const legacyDashboardWidgetIds={availability:"summary"};
+  function mergeLegacyDashboardWidgets(widgets,removed){
+    const target=id=>Object.hasOwn(legacyDashboardWidgetIds,id)?legacyDashboardWidgetIds[id]:id;
+    const merged=[];
+    for(const id of widgets){const next=target(id);if(!merged.includes(next))merged.push(next)}
+    const dropped=new Set();
+    for(const id of removed){const next=target(id);if(!merged.includes(next))dropped.add(next)}
+    return{widgets:merged,removed:dropped};
+  }
   const savedGroups=(()=>{try{
     const value=JSON.parse(localStorage.getItem("villa-dashboard-groups")||"[]");
     if(!Array.isArray(value))return[];
@@ -97,7 +110,7 @@
   const savedWidgets=(()=>{try{
     const value=JSON.parse(localStorage.getItem("villa-dashboard-widgets")||"null");
     if(!Array.isArray(value))return[...defaultDashboardWidgets];
-    const known=[...new Set(value.filter(id=>Object.hasOwn(dashboardWidgetTypes,id)||id===lightsGroupWidgetId||id===noRoomGroupWidgetId||savedGroups.some(group=>groupWidgetId(group.id)===id)))];
+    const known=mergeLegacyDashboardWidgets(value,[]).widgets.filter(id=>Object.hasOwn(dashboardWidgetTypes,id)||id===lightsGroupWidgetId||id===noRoomGroupWidgetId||savedGroups.some(group=>groupWidgetId(group.id)===id));
     return known.some(id=>!fixedDashboardWidgets.has(id))?known:[...defaultDashboardWidgets];
   }catch{return[...defaultDashboardWidgets]}})();
   /* Kullanıcının panodan kaldırdığı kartlar. Sıralama onarımı (`reconcileWidgetLayout`) eksik grup
@@ -106,8 +119,16 @@
   const removedWidgetsKey="villa-dashboard-removed-widgets";
   const savedRemovedWidgets=(()=>{try{
     const value=JSON.parse(localStorage.getItem(removedWidgetsKey)||"[]");
-    return new Set(Array.isArray(value)?value.filter(id=>typeof id==="string"):[]);
+    return mergeLegacyDashboardWidgets(savedWidgets,Array.isArray(value)?value.filter(id=>typeof id==="string"):[]).removed;
   }catch{return new Set()}})();
+  // Göç bir kez diske de yazılır; ölü kimlik kayıtta kalmasın. Eski kimlik yoksa kayda dokunulmaz.
+  try{
+    const stored=`${localStorage.getItem("villa-dashboard-widgets")||""}${localStorage.getItem(removedWidgetsKey)||""}`;
+    if(Object.keys(legacyDashboardWidgetIds).some(id=>stored.includes(`"${id}"`))){
+      localStorage.setItem("villa-dashboard-widgets",JSON.stringify(savedWidgets));
+      localStorage.setItem(removedWidgetsKey,JSON.stringify([...savedRemovedWidgets]));
+    }
+  }catch{}
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
   const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],debugNetworkEvents:[],agentTokens:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,deviceReturnWait:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,automationAgentBackups:0,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,deviceSort:savedDeviceSort??{key:"name",direction:"asc"},attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;

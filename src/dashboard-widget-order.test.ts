@@ -193,3 +193,67 @@ test("gizli kart görünmüyor ve sıralama onarımı düzene bağlanıyor", asy
   assert.match(dashboard, /const sourceIndex=state\.widgets\.indexOf\(railOrder\[index\]\);/);
   assert.doesNotMatch(dashboard, /color-mix\(/);
 });
+
+/* "Ev durumu" ve "Cihaz erişilebilirliği" tek karta birleşti. Kayıtlı düzenlerde eski
+   `availability` kimliği hâlâ durabilir; göç kuralı kaynaktan alınıp doğrudan sınanıyor. */
+async function legacyMerge(
+  widgets: string[],
+  removed: string[]
+): Promise<{ widgets: string[]; removed: string[] }> {
+  const source = await readPanelSource();
+  const run = new Function(
+    "widgets",
+    "removed",
+    `
+    const legacyDashboardWidgetIds={availability:"summary"};
+    ${extractFunction(source, "mergeLegacyDashboardWidgets")}
+    const merged=mergeLegacyDashboardWidgets(widgets,removed);
+    return{widgets:merged.widgets,removed:[...merged.removed]};
+  `
+  ) as (widgets: string[], removed: string[]) => { widgets: string[]; removed: string[] };
+  return run(widgets, removed);
+}
+
+test("eski erişilebilirlik kartı açıksa birleşik kart açık gelir ve onun sırasını alır", async () => {
+  // Kullanıcı "Ev durumu"nu kaldırmış, "Cihaz erişilebilirliği" panoda duruyordu.
+  const merged = await legacyMerge(["quick", "availability", "activity"], ["summary"]);
+
+  assert.deepEqual(merged.widgets, ["quick", "summary", "activity"]);
+  assert.deepEqual(merged.removed, []);
+});
+
+test("iki eski kart da kaldırılmışsa birleşik kart kaldırılmış kalır", async () => {
+  const merged = await legacyMerge(["quick", "activity"], ["summary", "availability"]);
+
+  assert.deepEqual(merged.widgets, ["quick", "activity"]);
+  assert.deepEqual(merged.removed, ["summary"]);
+});
+
+test("iki eski kart da açıksa birleşik kart öndeki sırayı alır, kimlik iki kez düşmez", async () => {
+  const merged = await legacyMerge(["quick", "summary", "availability", "activity"], []);
+
+  assert.deepEqual(merged.widgets, ["quick", "summary", "activity"]);
+  assert.deepEqual(merged.removed, []);
+});
+
+test("göç kaydı temizler: ölü kimlik düzende ve kaldırılmışlar listesinde kalmaz", async () => {
+  const dashboard = await readPanelSource();
+
+  assert.match(dashboard, /const legacyDashboardWidgetIds=\{availability:"summary"\}/);
+  assert.match(dashboard, /const known=mergeLegacyDashboardWidgets\(value,\[\]\)\.widgets\.filter\(/);
+  assert.match(dashboard, /return mergeLegacyDashboardWidgets\(savedWidgets,Array\.isArray\(value\)\?value\.filter\(id=>typeof id==="string"\):\[\]\)\.removed/);
+  assert.match(dashboard, /Object\.keys\(legacyDashboardWidgetIds\)\.some\(id=>stored\.includes\(`"\$\{id\}"`\)\)/);
+});
+
+/* Tek kart, tek gövde: iki bölüm arasında yalnız bir ayraç çizgisi ve tek düzenleme kümesi. */
+test("birleşik kart tek gövde: tek başlık, tek düzenleme kümesi, ayraç çizgisi", async () => {
+  const dashboard = await readPanelSource();
+
+  assert.match(dashboard, /\.widget-section-divider\{height:1px;margin-top:18px;background:var\(--line\)\}/);
+  const start = dashboard.indexOf('<article class="dashboard-widget widget-card" data-widget="summary"');
+  assert.notEqual(start, -1, "birleşik kart bulunamadı");
+  const card = dashboard.slice(start, dashboard.indexOf('data-widget="activity"', start));
+  assert.equal(card.match(/class="widget-edit-controls"/g)?.length, 1);
+  assert.equal(card.match(/<h2 /g)?.length, 1);
+  assert.equal(card.match(/class="widget-section-divider"/g)?.length, 1);
+});

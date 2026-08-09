@@ -1001,14 +1001,19 @@ test("dashboard widget düzenini hafif ve kalıcı olarak özelleştirir", async
   assert.match(dashboard, /data-widget="quick"/);
   assert.match(dashboard, /class="dashboard-widget widget-wide quick-control-widget" data-widget="quick"[\s\S]*?id="homeTabs"[^>]*role="tablist"/);
   assert.doesNotMatch(dashboard, /data-widget="quick"[\s\S]*?<h2[\s\S]*?id="homeTabs"/);
-  assert.match(dashboard, /data-widget="availability"/);
+  // Cihaz erişilebilirliği ayrı kart değil: "Ev durumu" kartının ayraç altındaki ikinci bölümü.
+  assert.doesNotMatch(dashboard, /data-widget="availability"/);
+  assert.match(
+    dashboard,
+    /data-widget="summary"[\s\S]*?<div id="homeSummary" class="home-summary"><\/div>\s*<div class="widget-section-divider" role="presentation"><\/div>\s*<h3 class="widget-subhead" data-i18n="availabilityWidget">[\s\S]*?id="onlineDeviceCount"[\s\S]*?id="offlineDeviceCount"[\s\S]*?id="lowBatteryCount"/
+  );
   assert.doesNotMatch(dashboard, /data-widget="recent"/);
   assert.doesNotMatch(dashboard, /id="recentDevices"|recentWidgetLead|noRecentDevices/);
   // Saat ve hava artık widget değil: `#widgetBoard`un ilk statik çocuğu olan hub bloğunda duruyorlar.
   assert.match(dashboard, /<div id="widgetBoard" class="widget-board">\s*<section id="homeHub" class="home-hub"/);
   assert.match(dashboard, /<section id="homeHub" class="home-hub"[\s\S]*?<div id="widgetRail" class="widget-rail"/);
   assert.doesNotMatch(dashboard, /data-widget="clock"|data-widget="weather"/);
-  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","summary","availability","activity"\]/);
+  assert.match(dashboard, /const defaultDashboardWidgets=\["quick","summary","activity"\]/);
   assert.match(dashboard, /known\.some\(id=>!fixedDashboardWidgets\.has\(id\)\)\?known:\[\.\.\.defaultDashboardWidgets\]/);
   assert.match(dashboard, /const fixed=fixedDashboardWidgets\.has\(id\)/);
   assert.match(dashboard, /class="secondary" type="button" data-add-widget="\$\{esc\(id\)\}">\$\{widgetAddIcon\(\)\}\$\{t\("addWidgetAction"\)\}/);
@@ -1559,7 +1564,7 @@ test("karmaşık ağ ve sistem araçları yalnız yöneticiye, günlük özellik
   assert.match(dashboard, /data-admin-only data-remove=/);
 
   assert.match(dashboard, /data-widget="activity"/);
-  assert.match(dashboard, /defaultDashboardWidgets=\["quick","summary","availability","activity"\]/);
+  assert.match(dashboard, /defaultDashboardWidgets=\["quick","summary","activity"\]/);
   assert.match(dashboard, /<button class="secondary" data-note=/);
   assert.doesNotMatch(dashboard, /data-admin-only data-note=/);
 });
@@ -1643,7 +1648,7 @@ test("günlük cihaz tipleri göster/gizle, Quick Control ve dashboard grupları
 test("ana ekran tipografi ve genişlik kuralları yükseklikten bağımsız yatay bloktadır", async () => {
   const dashboard = await readDashboardBundle();
   // Grup (b): her yatay ekranda (tablet + bilgisayar) geçerli olan tipografi/genişlik kuralları.
-  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-facts \.fact\{font-size:14px\}#home \.quick-battery\{font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row\{display:grid;grid-template-columns:minmax\(0,1fr\) auto;align-items:baseline;gap:2px 10px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row strong\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}#home \[data-widget="activity"\] \.widget-list-row time\{color:var\(--muted\);font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row span\{grid-column:1\/-1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px\}\}/);
+  assert.match(dashboard, /@media\(orientation:landscape\)\{#home \.widget-rail \[data-widget="activity"\]\{grid-column:span 5\}#home \.widget-card:not\(\.group-widget\) h2\{font:750 15px\/1\.2 system-ui,sans-serif;letter-spacing:\.06em;text-transform:uppercase;color:var\(--muted\)\}#home \.widget-card>p\{display:none\}#home \.widget-list-row\{padding-top:9px;font-size:20px\}#home \.widget-list-row strong\{font-weight:750\}#home \.widget-list-row span\{font-size:17px\}#home \.group-summary span\{font-size:17px\}#home \.summary-row strong\{font-size:44px\}#home \.summary-row span\{font-size:16px\}#home \.summary-row em\{font-size:17px\}#home \.widget-value strong\{font-size:46px\}#home \.widget-value span\{font-size:14px\}#home \.widget-rail \[data-widget="summary"\] \.summary-row strong,#home \.widget-rail \[data-widget="summary"\] \.widget-value strong\{font-size:34px\}#home \.widget-section-divider\{margin-top:12px\}#home \.widget-subhead\{margin-top:10px;font-size:13px\}#home \.widget-facts \.fact\{font-size:14px\}#home \.quick-battery\{font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row\{display:grid;grid-template-columns:minmax\(0,1fr\) auto;align-items:baseline;gap:2px 10px;font-size:17px\}#home \[data-widget="activity"\] \.widget-list-row strong\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}#home \[data-widget="activity"\] \.widget-list-row time\{color:var\(--muted\);font-size:14px\}#home \[data-widget="activity"\] \.widget-list-row span\{grid-column:1\/-1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px\}\}/);
   // Grup (b) bloğu, dar dikey alan bloğundan ÖNCE gelmeli ki tablette (a) kuralları hâlâ kazansın.
   const landscapeBlock = dashboard.indexOf("@media(orientation:landscape){#home .widget-rail [data-widget=\"activity\"]");
   const shortBlock = dashboard.indexOf("@media(orientation:landscape) and (max-height:900px),(orientation:landscape) and (min-width:1000px){body[data-active-view=\"home\"] main{padding-bottom:");
