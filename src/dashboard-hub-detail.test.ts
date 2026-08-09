@@ -39,12 +39,13 @@ function extractLine(source: string, name: string): string {
 interface Node {
   textContent: string;
   innerHTML: string;
+  dataset: Record<string, string>;
 }
 
 const harness = (body: string): string => `
   const elements={};
   const $=selector=>{
-    if(!elements[selector])elements[selector]={textContent:"",innerHTML:"",open:false};
+    if(!elements[selector])elements[selector]={textContent:"",innerHTML:"",open:false,dataset:{}};
     return elements[selector];
   };
   const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
@@ -177,6 +178,42 @@ test("konum seçilmemişken davet satırı bozulmaz, detay çıkmaz", async () =
   assert.equal(html, '<span class="hub-w-cond">weatherNoLocationHint</span>');
   assert.doesNotMatch(html, /hub-w-stats|hubWeatherRange|hubWeatherHumidity/);
   assert.equal(elements["#hubWeatherLocation"]?.textContent, "weather");
+});
+
+test("hava sahnesi yalnız hava bölgesine yazılır, veri yokken silinir", async () => {
+  const clear = await renderWeather({ location: { name: "Londra" }, data: forecast, updatedAt: Date.now() });
+  const rain = await renderWeather({
+    location: { name: "Londra" },
+    data: { ...forecast, current: { ...forecast.current, weather_code: 61, is_day: 0 } },
+    updatedAt: Date.now()
+  });
+  const empty = await renderWeather({ location: null, data: null, updatedAt: 0 });
+
+  assert.equal(clear["#hubWeatherZone"]?.dataset.weatherScene, "clear-day");
+  assert.equal(rain["#hubWeatherZone"]?.dataset.weatherScene, "rain");
+  // Veri yoksa sahne kalkar: hata/yükleniyor hâlinde eski havanın arka planı asılı kalmaz.
+  assert.equal(empty["#hubWeatherZone"]?.dataset.weatherScene, undefined);
+  // İkon artık metin glifi değil, panelin ortak çizgi-SVG dili.
+  assert.match(clear["#hubWeatherBody"]?.innerHTML ?? "", /<span class="hub-w-icon" aria-hidden="true"><svg class="weather-icon" viewBox="0 0 24 24"/);
+});
+
+test("hava sahnesi metni gölgelemez: arkada durur, hareket kapatılabilir", async () => {
+  const styles = await panelStyles();
+
+  // Sahne yalnız hava bölgesinin arkasında: dokunma almaz, içerik üstte kalır.
+  assert.match(styles, /\.hub-zone-weather\{[^}]*position:relative;overflow:hidden/);
+  assert.match(styles, /\.hub-zone-weather>\*\{position:relative;z-index:1\}/);
+  assert.match(styles, /\[data-weather-scene\]::before,[^{]*::after\{content:"";position:absolute;inset:0;z-index:0;pointer-events:none/);
+  // Okunurluk kuralı: sahne %12'yi geçmez (koyu temada daha da düşer).
+  const opacity = /--weather-scene-op:\.(\d+)/g;
+  const levels = [...styles.matchAll(opacity)].map((match) => Number(`0.${match[1]}`));
+  assert.ok(levels.length >= 2, "açık ve koyu tema için ayrı opaklık");
+  assert.ok(
+    levels.every((level) => level >= 0.08 && level <= 0.12),
+    `sahne opaklığı %8-12 dışında: ${levels.join(", ")}`
+  );
+  // Hareket kapalıysa sahne durur ama görünür kalır.
+  assert.match(styles, /@media\(prefers-reduced-motion:reduce\)\{\.hub-zone-weather::before,\.hub-zone-weather::after\{animation:none\}\}/);
 });
 
 test("hub detayı yeni ağ isteği getirmez", async () => {

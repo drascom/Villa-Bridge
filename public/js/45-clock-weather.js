@@ -200,14 +200,26 @@
     $("#weatherLocationDialog").close();
     loadWeather();
   }
+  // Hava ikonları panelin geri kalanıyla aynı dili konuşur: 24×24 kutu, dolgusuz, `currentColor`
+  // çizgi. Tek karakterlik metin glifleri (☀ ⛅ …) yazı tipine göre değişip bulanık duruyordu.
+  // `scene` yalnız arka plandaki hava sahnesini seçer (CSS `[data-weather-scene]`).
+  // DİKKAT: bu işlev testte yalıtılmış çalıştırılıyor — dışarıya bağlanma, parçalar içeride dursun.
   function weatherPresentation(code,isDay){
-    if(code===0)return{icon:isDay?"☀":"☾",label:"weatherClear"};
-    if(code<=3)return{icon:code===1?"⛅":"☁",label:"weatherCloudy"};
-    if(code<=48)return{icon:"≋",label:"weatherFog"};
-    if(code<=67||code>=80&&code<=82)return{icon:"☂",label:"weatherRain"};
-    if(code<=77||code>=85&&code<=86)return{icon:"❄",label:"weatherSnow"};
-    if(code>=95)return{icon:"ϟ",label:"weatherStorm"};
-    return{icon:"◌",label:"weatherUnknown"};
+    const icon=body=>`<svg class="weather-icon" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+    const smallCloud='<path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>';
+    const wideCloud='<path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24"/>';
+    if(code===0)return isDay
+      ?{icon:icon('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'),label:"weatherClear",scene:"clear-day"}
+      :{icon:icon('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'),label:"weatherClear",scene:"clear-night"};
+    if(code===1)return isDay
+      ?{icon:icon('<path d="M12 2v2M4.93 4.93l1.41 1.41M20 12h2M19.07 4.93l-1.41 1.41"/><path d="M15.95 12.65a4 4 0 0 0-5.93-4.13"/>'+smallCloud),label:"weatherCloudy",scene:"partly-day"}
+      :{icon:icon('<g transform="translate(9.7 .2) scale(.5)" stroke-width="3.6"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></g>'+smallCloud),label:"weatherCloudy",scene:"partly-night"};
+    if(code<=3)return{icon:icon('<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>'),label:"weatherCloudy",scene:"cloudy"};
+    if(code<=48)return{icon:icon(`${wideCloud}<path d="M16 17H7M17 21H9"/>`),label:"weatherFog",scene:"fog"};
+    if(code<=67||code>=80&&code<=82)return{icon:icon(`${wideCloud}<path d="M16 14v6M8 14v6M12 16v6"/>`),label:"weatherRain",scene:"rain"};
+    if(code<=77||code>=85&&code<=86)return{icon:icon(`${wideCloud}<path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>`),label:"weatherSnow",scene:"snow"};
+    if(code>=95)return{icon:icon('<path d="M6 16.33A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.97"/><path d="m13 12-3 5h4l-3 5"/>'),label:"weatherStorm",scene:"storm"};
+    return{icon:icon('<circle cx="12" cy="12" r="8.5" stroke-dasharray="2.6 3.6"/>'),label:"weatherUnknown",scene:"unknown"};
   }
   const weatherLocationText=()=>weatherState.location?`${locationName(weatherState.location)}${locationDetails(weatherState.location)?`, ${locationDetails(weatherState.location)}`:""}`:t("weatherNoLocation");
   const weatherNumber=value=>Number.isFinite(Number(value))?Math.round(Number(value)):null;
@@ -264,14 +276,19 @@
   function renderWeather(){
     const body=$("#hubWeatherBody");
     if(!body)return;
+    // Hava sahnesi yalnız hava bölgesinin arkasında durur: `data-weather-scene` CSS'teki katmanları
+    // seçer. Veri yokken/hata varken öznitelik silinir, zemin düz kalır.
+    const zone=$("#hubWeatherZone");
     $("#hubWeatherLocation").textContent=weatherState.location?weatherLocationText():t("weather");
     if(!weatherState.data){
+      if(zone?.dataset)delete zone.dataset.weatherScene;
       const message=weatherState.loading?t("weatherLoading"):weatherState.error||(weatherState.location?t("weatherUnavailable"):t("weatherNoLocationHint"));
       body.innerHTML=`<span class="hub-w-cond">${esc(message)}</span>`;
     }else{
       const current=weatherState.data.current||{};
       const units=weatherState.data.current_units||{};
       const presentation=weatherPresentation(Number(current.weather_code),Number(current.is_day)!==0);
+      if(zone?.dataset)zone.dataset.weatherScene=presentation.scene;
       const degree=esc(units.temperature_2m||"°C");
       // Hub "şu an"ın yanına bugünün uçlarını ve nemi yazar; saatlik/günlük tahmin
       // `#weatherDialog`da duruyor. Üçü de zaten çekilen alanlar — ek istek yok.
