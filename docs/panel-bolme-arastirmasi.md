@@ -24,9 +24,9 @@
 > - **Derleme adımı yok.** Panel doğrudan `public/index.html` + `public/css/` + `public/js/`
 >   içinde düzenlenir.
 > - **Yükleme sırası = `index.html`'deki `<script src>` sırası.** `99-bind.js` her zaman en sonda.
-> - Yeni bir panel dosyası üç yere birlikte yazılır: `index.html` etiketi, `src/index.ts`
->   içindeki `panelAssetRoutes`, `src/panel-source.ts` içindeki `panelScriptFiles`.
-> - `scripts/panel-graph.mjs` (testi `npm run runtime:test` içinde, ayrıca `npm run android:prepare`
+> - Yeni bir panel dosyası iki yere birlikte yazılır: `index.html` etiketi ve `src/index.ts`
+>   içindeki `panelAssetRoutes`. (`src/panel-source.ts` testlerle birlikte kaldırıldı.)
+> - `scripts/panel-graph.mjs` (`npm run check` çalıştırır, ayrıca `npm run android:prepare`
 >   paketlemeden önce çağırır) şunları korur: etiket–disk eşleşmesi, sıra, her dosyanın
 >   ayrıştırılabilirliği, iki dosyada aynı üst düzey ad. `asset-manifest.json`'daki
 >   `dashboardSha256` artık tüm panel dosyalarını kapsayan tek özettir (`dashboardFiles` listeler).

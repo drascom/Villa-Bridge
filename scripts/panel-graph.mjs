@@ -7,9 +7,7 @@ import vm from "node:vm";
    yapinin diskteki gercegini korur — `index.html`'deki etiket sirasi ile `public/js/` icerigi,
    her dosyanin ayristirilabilirligi ve ust duzey ad cakismasi.
 
-   Is bolumu: `src/panel-source.ts` icindeki `assertPanelScriptOrder`, belgedeki etiketlerin
-   testlerin okuma tablosuyla ayni oldugunu dogrular (test birlestirme sirasi = tarayici sirasi).
-   Buradaki kontroller ise diski okur; iki tarafta ayni kontrol tekrarlanmaz. */
+   Tek dogrulama noktasi burasidir; `npm run check` ve `npm run android:prepare` calistirir. */
 
 const SCRIPT_TAG = /<script\s+src="([^"]+)"\s*><\/script>/g;
 /* Panelde ust duzey bildirimler tam iki bosluk girintili (eski `<script>` blogundan devir).
@@ -129,7 +127,7 @@ export async function assertPanelGraph(projectRoot) {
   if (graph.unlisted.length > 0) {
     problems.push(
       `public/js altinda olup index.html'de etiketi olmayan dosya: ${graph.unlisted.join(", ")}. ` +
-        "Etiketi ekleyin ve src/index.ts icindeki panelAssetRoutes ile src/panel-source.ts tablosunu da guncelleyin."
+        "Etiketi ekleyin ve src/index.ts icindeki panelAssetRoutes tablosunu da guncelleyin."
     );
   }
   if (graph.order.length > 0) {
