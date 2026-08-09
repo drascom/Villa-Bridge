@@ -182,6 +182,16 @@
   const sameConfirmationText=(left,right)=>{const typed=String(left??"").trim();const expected=String(right??"").trim();return typed.length>0&&expected.length>0&&(typed.toLowerCase()===expected.toLowerCase()||typed.toUpperCase()===expected.toUpperCase());};
   const validRemovalConfirmation=(value,name=null)=>removalConfirmationWords.some(word=>sameConfirmationText(value,word))||sameConfirmationText(value,name);
   const reducedMotion=()=>window.matchMedia?.("(prefers-reduced-motion: reduce)").matches===true;
+  /* Pencere açılırken odak HİÇBİR metin alanına gitmez: tablette ekran klavyesi kendiliğinden
+     açılıp ekranın yarısını kapatıyordu. Odak yine de pencerenin İÇİNDE kalır — başlığa, başlık
+     yoksa kutunun kendisine verilir — böylece odak tuzağı ve ekran okuyucu akışı bozulmaz.
+     Kullanıcı alana kendisi dokununca klavye normal açılır; hiçbir alan devre dışı değil. */
+  const focusModalHeading=root=>{
+    if(!root)return;
+    const target=root.querySelector("h2")||root;
+    if(!target.hasAttribute("tabindex"))target.setAttribute("tabindex","-1");
+    target.focus({preventScroll:true});
+  };
   const ago=iso=>{if(!iso)return t("noData");const seconds=Math.max(0,Math.floor((Date.now()-new Date(iso))/1000));return seconds<8?t("justNow"):seconds<60?t("secondsAgo",{count:seconds}):seconds<3600?t("minutesAgo",{count:Math.floor(seconds/60)}):t("hoursAgo",{count:Math.floor(seconds/3600)})};
   const showToast=(message,error=false)=>{const toast=$("#toast");toast.textContent=message;toast.className=`toast show${error?" error":""}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className="toast",error?6000:3200)};
   const api=async(url,options={})=>{const method=String(options.method||"GET").toUpperCase();const csrf=state.auth.csrfToken&&["POST","PUT","PATCH","DELETE"].includes(method)?{"x-villa-csrf":state.auth.csrfToken}:{};const response=await fetch(url,{cache:"no-store",...options,headers:{...(options.body===undefined?{}:{"content-type":"application/json"}),...csrf,...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(response.status===401&&!url.startsWith("/api/auth/")){state.auth={configured:true,authenticated:false,user:null,csrfToken:null,expiresAt:null};applyAuthUi();openAuthGate()}if(!response.ok){const failure=new Error(data.error||t("operationFailed"));failure.status=response.status;if(data.code)failure.code=data.code;throw failure}return data};

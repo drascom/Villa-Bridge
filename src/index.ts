@@ -364,6 +364,28 @@ app.get("/assets/dashboard-landscape.jpg", async (_request, reply) => reply
   .type("image/jpeg")
   .send(dashboardBackground));
 
+/**
+ * Hava sahnesi görselleri (Meteocons, MIT — `public/assets/weather/README.md`). Onlarca dosya
+ * için tek tek rota yazmak yerine açılışta bir beyaz liste haritası kurulur: dosya adları yalnız
+ * bu haritadan gelir, istek gövdesinden değil. Haritada olmayan ad 404 döner; böylece yol dışına
+ * çıkmak (path traversal) mümkün değildir.
+ */
+const weatherAssetDirectory = resolve(moduleDir, "../public/assets/weather");
+const weatherAssets = new Map<string, Buffer>();
+for (const file of await readdir(weatherAssetDirectory)) {
+  if (!/^[a-z0-9-]+\.svg$/.test(file)) continue;
+  weatherAssets.set(file, await readFile(resolve(weatherAssetDirectory, file)));
+}
+
+app.get<{ Params: { file: string } }>("/assets/weather/:file", async (request, reply) => {
+  const body = weatherAssets.get(request.params.file);
+  if (!body) return reply.code(404).send({ ok: false, error: "Bilinmeyen hava görseli" });
+  return reply
+    .header("Cache-Control", "public, max-age=31536000, immutable")
+    .type("image/svg+xml")
+    .send(body);
+});
+
 app.get("/api/locales", async (_request, reply) => {
   try {
     const files = (await readdir(localesDirectory))

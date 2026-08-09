@@ -423,10 +423,32 @@
       updateGroupSelection();
     });
   }
+  /* Yeni grup OLUŞTURURKEN cihaz listesi hemen açılmaz: kullanıcı önce ada karar verir — ya
+     yazar ya hazır oda önerisine dokunur. Ad girilir girilmez bölüm açılır, böylece sıranın
+     "şimdi cihaz ekle" adımına geldiği belli olur; o ana kadar yerinde boş beyaz alan değil kısa
+     bir yönlendirme durur. Ad tekrar silinirse bölüm kapanır ama SEÇİM kaybolmaz — seçim
+     `state.groupEditing.selected` kümesinde durur, liste yeniden çizildiğinde geri gelir.
+     Mevcut bir odayı düzenlerken (kimliği olan grup) liste her zaman açıktır. */
+  function updateGroupDeviceStage(){
+    const frame=$("#groupPickerFrame");
+    const gate=$("#groupDeviceGate");
+    if(!frame||!gate)return;
+    const creating=!state.groupEditing?.id;
+    const ready=!creating||$("#groupName").value.trim().length>0;
+    frame.hidden=!ready;
+    gate.hidden=ready;
+    const heading=$("#groupDevicesHeading");
+    if(heading){
+      // Başlık `data-i18n` üzerinden değişir ki dil değiştiğinde de doğru kalsın.
+      heading.dataset.i18n=creating?"groupDevicesAdd":"groupDevices";
+      heading.textContent=t(heading.dataset.i18n);
+    }
+  }
   function updateGroupSelection(){
     const count=state.groupEditing?.selected.size||0;
     $("#groupSelectionCount").textContent=t("groupSelected",{count});
     $("#saveGroup").disabled=count===0||$("#groupName").value.trim().length<2;
+    updateGroupDeviceStage();
   }
   function prepareGroupEditor(groupId=null){
     const group=state.groups.find(candidate=>candidate.id===groupId);
@@ -573,6 +595,7 @@
     $("#groupSelectionCount").textContent="";
     $("#saveGroup").disabled=true;
     if($("#groupDeviceSearch"))$("#groupDeviceSearch").value="";
+    updateGroupDeviceStage();
     // Durum sızmasın: sekmeler geri gelir, çünkü groupEditing yukarıda temizlendi.
     updateAddDialogMode();
     setAddDialogTab("widgets");

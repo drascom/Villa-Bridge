@@ -590,6 +590,8 @@
     "groupName": "Group name",
     "groupNamePlaceholder": "Living room",
     "groupDevices": "Devices and controls",
+    "groupDevicesAdd": "Add a device or remote",
+    "groupDeviceGate": "First give the group a name — pick a suggestion or type your own. The devices appear right after.",
     "groupSelected": "{count} selected",
     "saveGroup": "Save group",
     "editGroup": "Edit group",

@@ -1,3 +1,13 @@
+  /* TEK KAPI: her `showModal()` sonrası odak pencerenin başlığına taşınır. Tarayıcı, `autofocus`
+     yokken diyalogun ilk odaklanabilir öğesine odaklanır — bu çoğu pencerede bir metin alanı ve
+     tablette Android klavyesi açılıp ekranın yarısını kapatıyordu. Açan yer sonradan başka bir
+     öğeye odaklanmak isterse (düğme, sekme) kendi çağrısı bunun ÜSTÜNE yazar; çağrı sırası
+     korunur. Diyalog başına ayrı kural yazılmaz, yeni pencereler de kendiliğinden uyar. */
+  const nativeShowModal=HTMLDialogElement.prototype.showModal;
+  HTMLDialogElement.prototype.showModal=function(...args){
+    nativeShowModal.apply(this,args);
+    focusModalHeading(this);
+  };
   $$(".nav-button").forEach(button=>button.onclick=()=>activateView(button.dataset.view));
   $$("[data-app-menu]").forEach(button=>button.onclick=()=>toggleAppMenu(button));
   // Alt sayfa başlıklarındaki "Genel görünüm" ve ana ekrandaki "Otomasyon" düğmeleri:

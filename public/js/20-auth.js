@@ -31,14 +31,16 @@
       login.hidden=true;
       setAuthFormError("authSetupError");
       setup.hidden=false;
-      requestAnimationFrame(()=>$("#authSetupUsername").focus());
+      // Metin alanına odaklanmıyoruz (klavye ekranın yarısını kapatıyordu); odak kutunun
+      // başlığında kalır, kullanıcı alana kendisi dokununca klavye açılır.
+      requestAnimationFrame(()=>focusModalHeading(setup));
       return;
     }
     setup.hidden=true;
     setLoginMode(state.loginMode);
     setAuthFormError("authLoginError");
     login.hidden=false;
-    requestAnimationFrame(()=>$("#authLoginSecret").focus());
+    requestAnimationFrame(()=>focusModalHeading(login));
   }
   async function loadAuthSession(){setAuthState(await api("/api/auth/session"))}
   function setLoginMode(mode){

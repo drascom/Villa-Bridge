@@ -235,8 +235,8 @@
     configureNameDialog(true,reconnected);
     $("#nameInput").value=deviceNeedsName(device)?"":device.name;
     $("#nameInput").placeholder=device.model||t("newName");
+    // Ad alanına odaklanmıyoruz; odak `showModal` ile başlıkta kalır (klavye ekranı kapatmasın).
     $("#nameDialog").showModal();
-    setTimeout(()=>$("#nameInput").focus(),0);
   }
   /* Yarım kalan kurulumu tamamlama: cihaz zaten ağda olduğu için arama açılmaz, doğrudan
      kurulum adımları çalışır — yeni katılmış cihazla aynı yol. */
@@ -254,8 +254,8 @@
     configureNameDialog(false);
     $("#nameInput").placeholder=t("newName");
     $("#nameInput").value=control?.name||(button?deviceButtonName(button):"")||device.name;
+    // Ad alanı seçili açılmaz: metin yerinde durur, kullanıcı dokununca düzenler.
     $("#nameDialog").showModal();
-    setTimeout(()=>$("#nameInput").select(),0);
   }
   async function saveName(){
     const name=$("#nameInput").value.trim();if(!state.editing||name.length<2)return;
@@ -330,8 +330,8 @@
     $("#removeConfirmation").placeholder=t("removeConfirmationPlaceholder");
     $("#confirmRemove").disabled=true;
     $("#forceRemove").disabled=true;
+    // Onay alanına odaklanmıyoruz; uyarı metni okunsun diye odak başlıkta başlar.
     $("#removeDialog").showModal();
-    setTimeout(()=>$("#removeConfirmation").focus(),0);
   }
   async function confirmDeviceRemoval(force=false){
     if(!state.removing)return;

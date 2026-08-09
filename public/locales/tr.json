@@ -590,6 +590,8 @@
     "groupName": "Grup adı",
     "groupNamePlaceholder": "Salon",
     "groupDevices": "Cihazlar ve kumandalar",
+    "groupDevicesAdd": "Cihaz ya da kumanda ekleyin",
+    "groupDeviceGate": "Önce gruba bir ad verin — bir öneriye dokunun ya da kendi adınızı yazın. Cihazlar hemen ardından çıkar.",
     "groupSelected": "{count} seçili",
     "saveGroup": "Grubu kaydet",
     "editGroup": "Grubu düzenle",
