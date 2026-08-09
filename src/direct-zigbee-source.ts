@@ -1376,6 +1376,11 @@ export class DirectZigbeeSource implements ZigbeeSource {
     const friendlyName = relative.slice(0, -4);
     const deviceEntry = Object.entries(this.config.devices)
       .find(([, options]) => options.friendly_name === friendlyName);
+    // Zigbee2MQTT'de `<taban>/<grup adı>/set` de geçerlidir; Matterbridge ve Home Assistant oda
+    // komutlarını buradan gönderir. Cihaz adı tutmadığında ada karşılık gelen grup aranır, yoksa
+    // eskisi gibi cihaz yolu denenir (ham IEEE adresiyle gönderen istemciler bozulmasın).
+    const isGroupName = !deviceEntry && Object.values(this.config.groups)
+      .some((options) => options.friendly_name === friendlyName);
     const ieeeAddress = deviceEntry?.[0] ?? friendlyName;
     try {
       const text = payload.toString("utf8");
@@ -1388,7 +1393,8 @@ export class DirectZigbeeSource implements ZigbeeSource {
       } catch {
         command = { state: text };
       }
-      await this.setDevice(ieeeAddress, command);
+      if (isGroupName) await this.setGroup(friendlyName, command);
+      else await this.setDevice(ieeeAddress, command);
     } catch (error) {
       console.warn(`Cihaz komutu işlenemedi (${friendlyName}): ${String(error)}`);
     }

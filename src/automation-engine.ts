@@ -1174,6 +1174,25 @@ export class AutomationEngine {
     return true;
   }
 
+  /**
+   * §5.4 — elle çalıştırmada `when` taşıyan eylemlerin eşleşme değeri. "Şimdi çalıştır" bir olay
+   * taşımaz; eşleme ("açılınca aç, kapanınca kapat") kuralları bu yüzden hiç eylem bulamıyor ve
+   * "koşullara uyan eylem yok" diye atlanıyordu. Tetikleyen kanalın **o anki** değeri okunur, yani
+   * kural anahtarın bulunduğu yönü uygular. Sabit değerli (`equals`) tetikleyicide eşleşme değeri
+   * zaten kuralın kendi değeridir. Sayısal eşikli tetikleyicide okunacak tek bir yön yoktur;
+   * değer çözülemezse davranış eskisi gibi kalır (eylem atlanır).
+   */
+  private manualMatchValue(automation: Automation): JsonScalar | undefined {
+    for (const trigger of automation.triggers) {
+      if (trigger.type !== "deviceState") continue;
+      if (trigger.equals !== undefined) return trigger.equals;
+      if (trigger.above !== undefined || trigger.below !== undefined) continue;
+      const value = this.options.deviceState?.(trigger.deviceId, trigger.property);
+      if (value !== undefined) return value;
+    }
+    return undefined;
+  }
+
   /** Elle çalıştırma — motorun kullandığı yolun aynısı. */
   async run(id: string): Promise<AutomationRunResult> {
     const normalizedId = id.trim().toLowerCase();
@@ -1194,7 +1213,8 @@ export class AutomationEngine {
     event?: AutomationDeviceEvent,
     trigger: AutomationRunTriggerInfo = { kind: "manual" }
   ): Promise<AutomationRunResult> {
-    const triggerValue = automationTriggerMatchValue(trigger);
+    const triggerValue = automationTriggerMatchValue(trigger)
+      ?? (trigger.kind === "manual" ? this.manualMatchValue(automation) : undefined);
     const actions = automation.actions
       .filter((action) => automationActionApplies(action, event, triggerValue));
     // Hiçbir eylem eşleşmediyse çalıştırma sayılmaz: ne kilit alınır ne de `lastRunOk` bozulur.
