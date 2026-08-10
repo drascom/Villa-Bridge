@@ -140,6 +140,72 @@
       button.setAttribute("aria-label",`${t("appearance")}: ${resolvedLabel}`);
       button.title=`${t("appearance")}: ${resolvedLabel}`;
     });
+    // Zemin de görünümün parçası: güneş takibi ilk tema uygulamasında başlar (bir kez), sonraki
+    // çağrılarda zaten dönen zamanlayıcıya dokunmaz.
+    startSunGround();
+  }
+  /* GÜNEŞİ İZLEYEN ZEMİN. Panel kendi güneş hesabını YAPMAZ: gün doğumu/batımı zaten hava
+     servisinden geliyor (`weatherState.data.daily.sunrise/sunset`, sunucu `timezone=auto` ile
+     çekiyor) ve saatler konumun yerel saatinde, ofsetsiz ISO metni olarak duruyor — tabletin
+     kendi saatiyle doğrudan karşılaştırılır. Veri yoksa işaret konmaz, zemin sabit sürümde kalır.
+     Yeniden hesap DAKİKADA BİR: güneş bir dakikada ekranın ~%0,8'i kadar ilerler, yani bakarken
+     hareket görünmez ama gün içinde zeminin değiştiği fark edilir. Veri henüz gelmediyse daha
+     sık yoklanır ki açılıştan sonra zemin geç kalmasın. */
+  const sunGroundState={timer:null,started:false};
+  const sunGroundMinutes=text=>{
+    const match=/T(\d{2}):(\d{2})/.exec(String(text||""));
+    return match?Number(match[1])*60+Number(match[2]):null;
+  };
+  function sunGroundTimes(){
+    const daily=weatherState.data?.daily;
+    const rises=Array.isArray(daily?.sunrise)?daily.sunrise:null;
+    const sets=Array.isArray(daily?.sunset)?daily.sunset:null;
+    if(!rises||!sets)return null;
+    // Günlük dizi dört gün taşır; bugünün satırı tarihe göre bulunur, bulunamazsa ilk satır.
+    const now=new Date();
+    const stamp=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    const found=rises.findIndex(item=>String(item||"").slice(0,10)===stamp);
+    const index=found<0?0:found;
+    const rise=sunGroundMinutes(rises[index]);
+    const set=sunGroundMinutes(sets[index]);
+    if(rise===null||set===null||set-rise<60)return null;
+    return{rise,set};
+  }
+  function applySunGround(){
+    const root=document.documentElement;
+    const times=sunGroundTimes();
+    if(!times){root.removeAttribute("data-sun-ground");return}
+    const now=new Date();
+    const minutes=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
+    const progress=(minutes-times.rise)/(times.set-times.rise);
+    // Yükseklik: gündüz yarım sinüs (doğuşta 0, öğlen 1, batışta 0), gece 0.
+    const altitude=progress>0&&progress<1?Math.sin(Math.PI*progress):0;
+    // Alacakaranlık: ufkun altındaki ilk 70 dakikada gökyüzü hâlâ renkli, sonra tam gece.
+    const edge=progress<0?times.rise-minutes:progress>1?minutes-times.set:0;
+    const twilight=Math.max(0,Math.min(1,1-edge/70));
+    const still=reducedMotion();
+    const track=Math.max(0,Math.min(1,progress));
+    root.style.setProperty("--sun-x",still?"50%":`${(8+track*84).toFixed(2)}%`);
+    root.style.setProperty("--sun-y",still?"26%":`${(82-68*altitude).toFixed(2)}%`);
+    // `prefers-reduced-motion` açıkken ilerleyen ışık kaynağı hiç çizilmez; tonlama saate göre
+    // doğru kalır, yalnız hareket eden öğe kalkar.
+    root.style.setProperty("--sun-disc",still?"0":Math.min(1,altitude*4).toFixed(3));
+    root.style.setProperty("--sun-glow",(twilight*(still?0.3:0.35+0.65*altitude)).toFixed(3));
+    // Sıcaklık ufka yakınken en yüksek: şafak ve gün batımı sıcak, öğlen nötr/aydınlık.
+    root.style.setProperty("--sun-warm",(twilight*(1-altitude*.9)).toFixed(3));
+    root.style.setProperty("--sun-night",(1-twilight).toFixed(3));
+    root.dataset.sunGround="on";
+  }
+  function scheduleSunGround(){
+    clearTimeout(sunGroundState.timer);
+    applySunGround();
+    const ready=document.documentElement.dataset.sunGround==="on";
+    sunGroundState.timer=setTimeout(scheduleSunGround,ready?60000:15000);
+  }
+  function startSunGround(){
+    if(sunGroundState.started)return;
+    sunGroundState.started=true;
+    scheduleSunGround();
   }
   function setThemeMode(mode){
     if(!["light","dark","system"].includes(mode))return;
