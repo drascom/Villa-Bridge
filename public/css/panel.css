@@ -12,6 +12,20 @@
       /* Hub'ın kendi dolgusu yok: metin doğrudan düz zeminin üstünde duruyor — gölge gerekmez. */
       --hub-muted:#2f3a35;
       --hub-text-shadow:none;
+      /* CAM YÜZEY DİLİ — tek küme, iki temada da aynı adlar.
+         `--ground` zeminin kendisi; `--glass-*` ana ekranın yüzeyleri. Ana ekran bu kümeye
+         `--home-*` kancalarını yeniden bağlayarak geçer (aşağıda tek yerde), diğer ekranlar
+         opak dilde kalır. Örtü opaklıkları BİLEREK yüksek: metnin kontrastı kartın kendi
+         katmanından gelsin, arkadaki zeminin parlaklığından bağımsız olsun.
+         Oda/grup kartı hafif örtü (`--glass-card`), cihaz döşemesi daha koyu (`--glass-tile`). */
+      --ground:radial-gradient(120% 90% at 80% 10%,#ffd9a8 0%,rgba(255,217,168,0) 58%),radial-gradient(95% 75% at 12% 6%,#cfd9e6 0%,rgba(207,217,230,0) 62%),radial-gradient(140% 120% at 35% 100%,#e7d3ba 0%,rgba(231,211,186,0) 62%),linear-gradient(168deg,#eef0f2 0%,#e8d8c0 52%,#d9c3a6 100%);
+      --glass-card:rgba(255,255,255,.48);--glass-card-brd:rgba(255,255,255,.66);
+      --glass-tile:rgba(255,255,255,.66);--glass-tile-brd:rgba(255,255,255,.86);
+      --glass-shadow:0 10px 26px rgba(72,52,28,.14);--glass-blur:18px;
+      /* Durum renkleri anlamını korur; yalnız birer tık saydamlaşır ki cam dilin içinde dursun. */
+      --glass-on:rgba(255,240,199,.88);--glass-on-brd:rgba(225,163,63,.85);
+      --glass-active:rgba(227,243,235,.88);--glass-active-brd:rgba(75,154,116,.8);
+      --glass-alert:rgba(252,231,228,.9);--glass-alert-brd:rgba(201,75,67,.8);
     }
     :root[data-theme="dark"]{
       color-scheme:dark;
@@ -22,6 +36,14 @@
       --home-action-line:rgba(237,245,240,.42);--home-action-halo:none;--home-action-glyph-shadow:none;
       --hub-muted:#cddcd4;
       --hub-text-shadow:none;
+      /* Koyu temada örtü de KOYU: yazı açık kaldığı için kontrast kartın kendi katmanından gelir. */
+      --ground:radial-gradient(120% 90% at 78% 12%,#b8763a 0%,rgba(184,118,58,0) 55%),radial-gradient(90% 70% at 18% 8%,#6d7f96 0%,rgba(109,127,150,0) 60%),radial-gradient(140% 110% at 30% 100%,#2b1d14 0%,rgba(43,29,20,0) 60%),linear-gradient(168deg,#3d3a3f 0%,#5b4530 46%,#241a12 100%);
+      --glass-card:rgba(14,10,7,.5);--glass-card-brd:rgba(255,255,255,.1);
+      --glass-tile:rgba(9,6,4,.62);--glass-tile-brd:rgba(255,255,255,.13);
+      --glass-shadow:0 14px 32px rgba(0,0,0,.34);--glass-blur:18px;
+      --glass-on:rgba(73,57,28,.86);--glass-on-brd:rgba(169,119,44,.9);
+      --glass-active:rgba(29,57,44,.86);--glass-active-brd:rgba(61,137,102,.9);
+      --glass-alert:rgba(67,38,34,.88);--glass-alert-brd:rgba(166,70,64,.9);
     }
     *{box-sizing:border-box}html{scroll-behavior:smooth}
     /* Odak halkasının tabanı: tarayıcı varsayılanı (Chrome mavisi) hiçbir yerde görünmesin.
@@ -30,10 +52,16 @@
     :where(a[href],area,button,input,select,textarea,summary,[tabindex]:not([tabindex="-1"])):focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     /* Ana ekranın da odak halkası panelin normal dili: fotoğraf kalktı, beyaz halka gerekmiyor. */
     body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    /* Zemin düz: fotoğraf yok, yalnız temanın kendi kâğıt rengi üstünde çok hafif bir geçiş.
-       Sabitlenmiş (fixed) kalır ki kaydırırken zemin oynamasın. */
-    body{background-color:var(--paper);background-image:linear-gradient(180deg,#f3f6f4,#e6ebe8);background-attachment:fixed}
-    :root[data-theme="dark"] body{background-color:#101514;background-image:linear-gradient(180deg,#141c18,#0c110f)}
+    /* ZEMİN — fotoğraf DEĞİL: çok katmanlı sıcak ortam gradyanı (`--ground`, temaya göre swap).
+       Kendi katmanında (`body::before`, sabitlenmiş) durur; böylece çok yavaş kayma yalnız
+       `transform` ile olur — düzen ve boyama etkilenmez, kaydırırken zemin oynamaz. Kayma 90s
+       ve fark edilmeyecek genlikte; `prefers-reduced-motion` açıkken tamamen durur.
+       Ana ekran dışındaki ekranlar opak kart dilini sürdürdüğü için zemin orada sakinleşir. */
+    body{background-color:var(--paper);background-image:none}
+    body::before{content:"";position:fixed;z-index:-1;inset:-6%;display:block;background:var(--ground);background-size:cover;pointer-events:none;will-change:transform;animation:panel-ground-drift 90s ease-in-out infinite}
+    body:not([data-active-view="home"])::before{opacity:.5}
+    @keyframes panel-ground-drift{0%{transform:scale(1) translate3d(0,0,0)}50%{transform:scale(1.05) translate3d(-1.2%,.9%,0)}100%{transform:scale(1) translate3d(0,0,0)}}
+    @media(prefers-reduced-motion:reduce){body::before{animation:none}}
     .screensaver{position:fixed;z-index:11;inset:0;display:grid;place-items:center;padding:40px;color:#fff;background:rgba(8,17,13,.82);backdrop-filter:blur(3px);text-align:center;touch-action:none;-webkit-user-select:none;user-select:none}
     .screensaver[hidden]{display:none}
     .screensaver:focus-visible{outline:0}
@@ -153,14 +181,36 @@
        sayısı. Az cihazlı odada döşemeler irileşir; beklenen. */
     #home [data-group-widget] .group-control-grid,#home .group-panel .group-control-grid{grid-template-columns:repeat(auto-fill,minmax(max(104px,(100% - 26px)/3),1fr))}
     .zigbee-tools{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px}.zigbee-tools>div>p{min-height:0;margin-bottom:12px}.zigbee-tools-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:15px;color:var(--forest);background:var(--forest-soft);font-size:24px}.zigbee-tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.zigbee-tool{display:flex;gap:8px;align-items:center;min-width:0}.zigbee-tool input,.zigbee-tool select,.zigbee-group-panel input,.zigbee-group-panel select,.zigbee-binding-panel select{min-width:0;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--ink);background:var(--surface-soft);font:inherit;outline:0}.zigbee-tool input:focus,.zigbee-tool select:focus,.zigbee-group-panel input:focus,.zigbee-group-panel select:focus,.zigbee-binding-panel select:focus{border-color:var(--forest);box-shadow:0 0 0 3px var(--forest-soft)}.zigbee-tool input,.zigbee-tool select{flex:1}.zigbee-tool button{min-height:44px}.zigbee-tool-actions{grid-column:1/-1;justify-content:flex-start}.touchlink-results{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}.touchlink-device{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:var(--paper);font-size:11px}.touchlink-device button{padding:6px 8px}.network-graph-host{grid-column:1/-1}.network-graph-host:empty{display:none}.network-map-loading,.network-map-empty{padding:18px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);background:var(--surface-soft);text-align:center;font-size:12px;font-weight:700}.network-graph{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--surface-soft),var(--paper))}.network-graph-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:16px 18px 12px;border-bottom:1px solid var(--line)}.network-graph-copy{display:grid;gap:3px}.network-graph-copy strong{font-size:15px}.network-graph-copy span{color:var(--muted);font-size:11px}.network-legend{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:10px;font-weight:750}.network-legend span{display:inline-flex;align-items:center;gap:5px}.network-legend i{width:9px;height:9px;display:block;border:2px solid var(--forest);background:var(--surface);transform:rotate(45deg)}.network-legend .coordinator i{background:var(--forest)}.network-legend .end-device i{width:8px;height:8px;border:0;border-radius:50%;background:#8ea099;transform:none}.network-legend .link i{width:18px;height:0;border:0;border-top:3px solid #2c9a68;background:transparent;transform:none}.network-legend .link.weak i{border-top-color:#c96961;border-top-style:dashed}.network-graph-scroll{overflow-x:auto;overscroll-behavior-inline:contain}.network-graph-svg{display:block;width:100%;min-width:760px;height:auto;min-height:330px}.network-edge{fill:none;stroke-linecap:round;opacity:.62}.network-edge.strong{stroke:#2c9a68}.network-edge.good{stroke:#c89b45}.network-edge.weak{stroke:#c96961;stroke-dasharray:6 5}.network-node .node-halo{fill:var(--paper);stroke:var(--line);stroke-width:2}.network-node.coordinator .node-halo{fill:var(--forest);stroke:var(--forest)}.network-node.router .node-halo{fill:var(--forest-soft);stroke:var(--forest)}.network-node.end-device .node-halo{fill:var(--surface-soft);stroke:#8ea099}.network-node .node-symbol{fill:var(--forest);font:800 14px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central}.network-node.coordinator .node-symbol{fill:var(--on-forest)}.network-node .node-name{fill:var(--ink);font:700 12px system-ui,sans-serif;text-anchor:middle}.network-node .node-quality{fill:var(--muted);font:800 10px system-ui,sans-serif;text-anchor:middle}.zigbee-group-manager{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.85fr);gap:12px;margin-top:8px;padding-top:18px;border-top:1px solid var(--line)}.zigbee-group-panel,.zigbee-binding-panel{min-width:0;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft)}.zigbee-panel-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}.zigbee-panel-icon{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;color:var(--forest);background:var(--forest-soft);font-size:17px;font-weight:800}.zigbee-panel-head strong{display:block;font-size:14px}.zigbee-panel-head p{min-height:0;margin:3px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.zigbee-group-create,.zigbee-group-actions,.zigbee-binding-actions{display:flex;align-items:center;gap:8px}.zigbee-group-create input{flex:1}.zigbee-group-create button,.zigbee-binding-actions button{width:44px;height:44px;flex:none;padding:0}.zigbee-group-list{display:grid;gap:10px;margin-top:12px}.zigbee-group-empty{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;padding:13px;border:1px dashed var(--line);border-radius:11px;background:var(--paper)}.zigbee-group-empty span:first-child{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:var(--forest);background:var(--forest-soft)}.zigbee-group-empty strong{display:block;font-size:12px}.zigbee-group-empty p{min-height:0;margin:3px 0 0;color:var(--muted);font-size:10px;line-height:1.4}.zigbee-group-row{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}.zigbee-group-row-head{display:grid;grid-template-columns:minmax(140px,1fr) auto auto;align-items:center;gap:8px}.zigbee-member-count{color:var(--muted);font-size:10px;font-weight:750}.zigbee-group-actions{flex-wrap:wrap}.zigbee-group-actions select{min-width:150px;flex:1}.zigbee-group-actions input[type=number]{width:64px}.zigbee-group-actions input[type=text]{min-width:120px;flex:1}.zigbee-group-actions button{width:38px;height:38px;padding:0}.zigbee-member-list,.zigbee-scene-list{display:flex;flex-wrap:wrap;gap:7px}.zigbee-scene{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);font-size:10px;font-weight:700}.zigbee-scene button{width:28px;height:28px;padding:0}.zigbee-binding-actions{display:grid;grid-template-columns:1fr 1fr}.zigbee-binding-actions select{width:100%}.zigbee-binding-actions button{width:42px;height:42px}.zigbee-binding-flow,.zigbee-binding-list{grid-column:1/-1}.zigbee-binding-flow{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:10px;font-weight:750}.zigbee-binding-list{display:grid;gap:6px;margin-top:4px}.zigbee-binding-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);font-size:10px}.zigbee-binding-row span{min-width:0;overflow-wrap:anywhere}
-    /* Menü düğmesi ana ekranda fotoğrafın üstünde durur: alttaki hızlı erişim düğmeleriyle aynı
-       cam dolgu, aynı kenar ve gölge — tek görsel dil. */body[data-active-view="home"] .app-menu-button{color:var(--forest);border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}/* Kartlar opak: zemin düz olduğu için saydamlığa gerek yok. */body[data-active-view="home"] #home .widget-card{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}/* Hızlı erişim şeridinin kendi kartı yok: düğmeler doğrudan zeminin üstünde durur. */#home .quick-control-widget{border-color:transparent;background:none;box-shadow:none}body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}/* Kapalı döşeme kartın dolgusuyla aynı renge düşmesin: zemin düzken tek ayrım kenarlık kalırdı. */body[data-active-view="home"] #home .group-control-tile{background:var(--surface-soft)}body[data-active-view="home"] #home .quick-card.on,body[data-active-view="home"] #home .group-control-tile.on{border-color:#e1a33f;background:#fff0c7}body[data-active-view="home"] #home .group-control-tile.active{border-color:#4b9a74;background:#e3f3eb}body[data-active-view="home"] #home .group-control-tile.alert{border-color:#c94b43;background:#fce7e4}body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button,body[data-active-view="home"] #home .home-actions button{box-shadow:var(--home-float-shadow)}body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button{background:var(--home-control)}:root[data-theme="dark"] body[data-active-view="home"] #home .quick-card.on,:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.on{color:#ffdc96;background:#49391c}:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.active{color:#a8e3c6;background:#1d392c}:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.alert{color:#ffc0ba;background:#432622}
-    /* Fotoğraf artık alt sayfaların da arkasında. Opak `var(--surface)` kartlar onu yalnız
-       kenarlarda gösterip yamalı bir görüntü bırakırdı; bu yüzden sayfa düzeyindeki kart ve
-       panel yüzeyleri ana ekranla AYNI cam belirteçlerine bağlanır — ikinci bir dil yok.
-       Kapsam `.view`: bütün `<dialog>`ler `.view` dışında yaşadığı için tam ekran pencereler
-       opak kalır (fotoğraf orada okunabilirliği düşürür). Saydamlık düz `rgba()` ile yazılır;
-       eski Android WebView'in desteklemediği renk karışımı işlevi hiçbir yerde kullanılmaz. */
+    /* ANA EKRAN CAM YÜZEY DİLİNE GEÇER — tek anahtar burası: `--home-*` kancaları cam kümesine
+       yeniden bağlanır. Aşağıdaki ve dosyanın geri kalanındaki bütün `var(--home-control/-border/
+       -float-shadow)` kuralları (kartlar, döşemeler, sekmeler, göz/anahtar rozetleri, menü
+       düğmesi) yeni dili kendiliğinden alır; tek tek kurala renk gömülmez. Diğer ekranlar
+       kök değerlerde — yani opak — kalır. */
+    body[data-active-view="home"]{--home-control:var(--glass-tile);--home-border:var(--glass-tile-brd);--home-float-shadow:var(--glass-shadow)}
+    body[data-active-view="home"] .app-menu-button{color:var(--forest);border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    /* Oda/grup kartı ve özet kartları (`Evin durumu`, `Ev hareketleri`) hafif örtü taşır; içindeki
+       cihaz döşemesi bir kademe koyu örtüyle ondan ayrılır — donuk dolguya gerek kalmadan
+       katman farkı okunur. BULANIKLIK YALNIZ ÜST DÜZEY KAPTA: kart ve hub. İçerideki döşeme,
+       satır ve sekme düz yarı saydamdır (bulanık içinde bulanık yığılmaz). */
+    body[data-active-view="home"] #home .widget-card{border-color:var(--glass-card-brd);background:var(--glass-card);box-shadow:var(--glass-shadow);backdrop-filter:blur(var(--glass-blur)) saturate(1.2);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.2)}
+    /* Hızlı erişim şeridinin kendi kartı yok: sekmeler doğrudan zeminin üstünde durur. */
+    #home .quick-control-widget{border-color:transparent;background:none;box-shadow:none}
+    body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    body[data-active-view="home"] #home .quick-card.on,body[data-active-view="home"] #home .group-control-tile.on{border-color:var(--glass-on-brd);background:var(--glass-on)}
+    body[data-active-view="home"] #home .group-control-tile.active{border-color:var(--glass-active-brd);background:var(--glass-active)}
+    body[data-active-view="home"] #home .group-control-tile.alert{border-color:var(--glass-alert-brd);background:var(--glass-alert)}
+    body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button,body[data-active-view="home"] #home .home-actions button{box-shadow:var(--home-float-shadow)}
+    body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button{background:var(--home-control)}
+    /* Koyu temada durum yazısı; dolgu yukarıdaki tema duyarlı `--glass-*` kümesinden gelir. */
+    :root[data-theme="dark"] body[data-active-view="home"] #home .quick-card.on,:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.on{color:#ffdc96}
+    :root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.active{color:#a8e3c6}
+    :root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.alert{color:#ffc0ba}
+    /* Alt sayfalar bu aşamada CAM DİLE GİRMEZ: zemin (`--ground`) orada yarı yarıya söner ve
+       kartlar `--home-*` köklerinin opak değerlerini sürdürür — okunurluk riski alınmaz, cam
+       dili yalnız ana ekranda denenir. Kancalar aynı olduğu için ileride buranın da geçmesi
+       tek satırlık iş. Kapsam `.view`: bütün `<dialog>`ler `.view` dışında yaşadığı için tam
+       ekran pencereler her hâlükârda opak kalır. Saydamlık düz `rgba()` ile yazılır; eski
+       Android WebView'in desteklemediği renk karışımı işlevi hiçbir yerde kullanılmaz. */
     body:not([data-active-view="home"]) .view :where(.setting-card,.connection-card,.ha-setup-details,.ha-network-guide,.settings-actions,.automation-card,.automation-empty,.widget-empty,.empty){border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
     /* Kartın İÇİNDEKİ eylem şeridi ayrı bir yüzey değil: cam kartın üstüne ikinci bir dolgu ve
        gölge binmesin diye kendi saydam hâline döner. */
@@ -312,8 +362,8 @@
     .quick-card.selected{border-color:#4b9a74;color:#18583d;background:#e3f3eb}
     .quick-card.selected .quick-device-icon{color:#18583d;background:#d3ecdf;box-shadow:inset 0 0 0 1px rgba(75,154,116,.5)}
     .quick-card.selected .home-tab-copy small{color:inherit;opacity:.78}
-    body[data-active-view="home"] #home .quick-card.selected{border-color:rgba(75,154,116,.72);background:rgba(227,243,235,.88)}
-    :root[data-theme="dark"] body[data-active-view="home"] #home .quick-card.selected{color:#a8e3c6;background:rgba(29,57,44,.88)}
+    body[data-active-view="home"] #home .quick-card.selected{border-color:var(--glass-active-brd);background:var(--glass-active)}
+    :root[data-theme="dark"] body[data-active-view="home"] #home .quick-card.selected{color:#a8e3c6}
     :root[data-theme="dark"] .quick-card.selected{border-color:#3d8966;color:#a8e3c6;background:#26493a}
     :root[data-theme="dark"] .quick-card.selected .quick-device-icon{color:#a8e3c6;background:#26493a;box-shadow:inset 0 0 0 1px #3d8966}
     .quick-card-add{flex:0 0 auto;width:clamp(58px,6.2vw,70px);min-width:58px;justify-content:center;padding:5px clamp(8px,1vw,12px);border:1px solid var(--forest);color:var(--on-forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}
@@ -881,3 +931,23 @@
     /* Menü penceresinde çarpı akışın içinde, başlık satırının sağında durur (başlık zaten sağa
        yaslı olduğu için mutlak konumla çakışırdı). Satır `baseline` hizalı; düğme ortalanır. */
     .app-menu-head .device-detail-close{align-self:center}
+    /* ——— CAM YÜZEYİN SON PARÇALARI ———
+       Dosyanın sonunda duruyorlar ki yukarıdaki kırılma noktalarındaki (dikey/yatay) dolgu
+       sıfırlamalarını da ezsinler; yalnız BOYA özellikleri yazılır — ölçü, biçim, odak halkası
+       ve dokunma hedefi oradaki kurallarda kalır. */
+    /* Saat + hava bloğu artık kendi cam kartında. Dolgu eklenmez: iç bölgelerin (`hub-zone`)
+       kendi payı zaten var, ölçüler ve hub sıralaması bozulmasın. Bulanıklık taşıyan İKİNCİ ve
+       SON katman burasıdır (birincisi `.widget-card`). */
+    body[data-active-view="home"] #home .home-hub{border:1px solid var(--glass-card-brd);border-radius:20px;background:var(--glass-card);box-shadow:var(--glass-shadow);backdrop-filter:blur(var(--glass-blur)) saturate(1.2);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.2)}
+    /* Hava sahnesi (Meteocons) yeni zeminde sönük kalmasın: koyu temadaki %95 kısıntı kalktı,
+       iki temada da tam opak. Sahnenin kendi alt maskesi durduğu için gölge/filtre eklenmez —
+       maske filtreden sonra uygulandığından gölge kutunun dışında zaten kırpılırdı. */
+    :root[data-theme="dark"] .hub-zone-weather{--weather-scene-op:1}
+    /* Üst bardaki yuvarlak düğmeler (menü · ekle · düzenle · otomasyon) aynı cam dili konuşur —
+       saydam hap yerine kartlarla aynı örtü. Dikey kipte de aynı: zeminin parlak bir yerine
+       denk gelen ikon kaybolmasın. */
+    body[data-active-view="home"] #home .home-actions button,
+    body[data-active-view="home"] #home .page-head>.app-menu-button,
+    body[data-active-view="home"] .app-menu-button{border:1px solid var(--glass-tile-brd);color:var(--forest);background:var(--glass-tile);box-shadow:var(--glass-shadow)}
+    body[data-active-view="home"] #home .home-actions button:hover,
+    body[data-active-view="home"] #home .page-head>.app-menu-button:hover{border-color:var(--forest);color:var(--forest);background:var(--glass-tile)}
