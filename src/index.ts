@@ -1,4 +1,5 @@
-import Fastify, { type FastifyReply } from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -289,6 +290,16 @@ await registerAccessControl(app, authStore, {
   agentTokens: agentTokenStore,
   mcpAllowedOrigins: config.mcp.allowedOrigins
 });
+/*
+ * Önbellek tabanı: kendi politikasını koymayan her yanıt saklanamaz olsun. API gövdeleri cihaz
+ * durumu taşır; başlıksız yanıtta tarayıcının sezgisel önbelleklemesi orada da eski veri gösterir.
+ * Statik varlıklar `sendAsset` içinde kendi `no-cache` + ETag başlığını koyar ve buradan dokunulmaz.
+ * Rota tablosuna bağlı değil: yeni rota eklendiğinde de varsayılan güvenli tarafta kalır.
+ */
+app.addHook("onSend", (_request, reply, _payload, done) => {
+  if (reply.getHeader("cache-control") === undefined) reply.header("Cache-Control", "no-store");
+  done();
+});
 /**
  * Ajan ucu: cihaz okuma, tek kanal yazma ve otomasyon araçları. Kimlik kapısı yukarıdaki tabloda.
  *
@@ -328,9 +339,52 @@ app.get<{ Querystring: { limit?: string } }>("/api/debug/network-events", async 
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
+/**
+ * Önbellek doğrulayıcıları.
+ *
+ * Panel dosyaları uzun süre **hiçbir** önbellek başlığı olmadan sunuldu. Başlıksız yanıtta
+ * tarayıcı sezgisel (heuristic) önbellekleme yapar: güncellemeden sonra eski CSS/JS ile yeni
+ * HTML'i karıştırıp panelin yarısını düşürür (çeviriler gelmez, giriş "operationFailed" verir).
+ * Hard refresh çözer ama kullanıcıdan bunu beklemek çözüm değil.
+ *
+ * Politika: statik içerik **içerikten türetilmiş güçlü ETag** + `Cache-Control: no-cache`
+ * — gövde saklanır ama her kullanımda doğrulanır; değişmediyse gövdesiz 304 döner (LAN'da
+ * bedava). Başlığını kendi koymayan her yanıt (API'ler) aşağıdaki `onSend` kancasıyla
+ * `no-store` alır. Dosya adı listesi yok: ETag, açılışta belleğe okunan gövdenin kendisinden
+ * hesaplanır, dolayısıyla panel dosyası ekleme/çıkarma akışı değişmez.
+ */
+function assetETag(body: string | Buffer): string {
+  return `"${createHash("sha256").update(body).digest("base64url")}"`;
+}
+
+/** `If-None-Match` listesi ETag'i kapsıyor mu? Liste, `*` ve zayıf (`W/`) ön eki desteklenir. */
+function etagMatches(header: string | string[] | undefined, etag: string): boolean {
+  const raw = Array.isArray(header) ? header.join(",") : header;
+  if (!raw) return false;
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .some((value) => value === "*" || value.replace(/^W\//, "") === etag);
+}
+
+/** Doğrulayıcılı statik yanıt: eşleşirse gövdesiz 304, değilse gövde + ETag. */
+function sendAsset(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  contentType: string,
+  body: string | Buffer,
+  etag: string
+): FastifyReply {
+  reply.header("Cache-Control", "no-cache").header("ETag", etag);
+  if (etagMatches(request.headers["if-none-match"], etag)) return reply.code(304).send();
+  return reply.type(contentType).send(body);
+}
+
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
+const dashboardETag = assetETag(dashboard);
 const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
+const dashboardBackgroundETag = assetETag(dashboardBackground);
 const localesDirectory = resolve(moduleDir, "../public/locales");
 
 // Panel parçaları da açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
@@ -356,13 +410,12 @@ const panelAssetRoutes = [
 for (const route of panelAssetRoutes) {
   const body = await readFile(resolve(moduleDir, `../public${route}`), "utf8");
   const contentType = route.endsWith(".css") ? "text/css; charset=utf-8" : "text/javascript; charset=utf-8";
-  app.get(route, async (_request, reply) => reply.type(contentType).send(body));
+  const etag = assetETag(body);
+  app.get(route, async (request, reply) => sendAsset(request, reply, contentType, body, etag));
 }
 
-app.get("/assets/dashboard-landscape.jpg", async (_request, reply) => reply
-  .header("Cache-Control", "public, max-age=31536000, immutable")
-  .type("image/jpeg")
-  .send(dashboardBackground));
+app.get("/assets/dashboard-landscape.jpg", async (request, reply) =>
+  sendAsset(request, reply, "image/jpeg", dashboardBackground, dashboardBackgroundETag));
 
 /**
  * Hava sahnesi görselleri (Meteocons, MIT — `public/assets/weather/README.md`). Onlarca dosya
@@ -371,22 +424,20 @@ app.get("/assets/dashboard-landscape.jpg", async (_request, reply) => reply
  * çıkmak (path traversal) mümkün değildir.
  */
 const weatherAssetDirectory = resolve(moduleDir, "../public/assets/weather");
-const weatherAssets = new Map<string, Buffer>();
+const weatherAssets = new Map<string, { body: Buffer; etag: string }>();
 for (const file of await readdir(weatherAssetDirectory)) {
   if (!/^[a-z0-9-]+\.svg$/.test(file)) continue;
-  weatherAssets.set(file, await readFile(resolve(weatherAssetDirectory, file)));
+  const body = await readFile(resolve(weatherAssetDirectory, file));
+  weatherAssets.set(file, { body, etag: assetETag(body) });
 }
 
 app.get<{ Params: { file: string } }>("/assets/weather/:file", async (request, reply) => {
-  const body = weatherAssets.get(request.params.file);
-  if (!body) return reply.code(404).send({ ok: false, error: "Bilinmeyen hava görseli" });
-  return reply
-    .header("Cache-Control", "public, max-age=31536000, immutable")
-    .type("image/svg+xml")
-    .send(body);
+  const asset = weatherAssets.get(request.params.file);
+  if (!asset) return reply.code(404).send({ ok: false, error: "Bilinmeyen hava görseli" });
+  return sendAsset(request, reply, "image/svg+xml", asset.body, asset.etag);
 });
 
-app.get("/api/locales", async (_request, reply) => {
+app.get("/api/locales", async (request, reply) => {
   try {
     const files = (await readdir(localesDirectory))
       .filter((file) => /^[a-z]{2}(?:-[A-Z]{2})?\.json$/.test(file))
@@ -410,7 +461,10 @@ app.get("/api/locales", async (_request, reply) => {
       }
       return parsed;
     }));
-    return { defaultLanguage: "en", locales };
+    // Dil paketleri çalışma anında keşfedilir (yeni dil için yeniden başlatma yok), o yüzden
+    // ETag açılışta değil burada, üretilen gövdeden hesaplanır.
+    const body = JSON.stringify({ defaultLanguage: "en", locales });
+    return sendAsset(request, reply, "application/json; charset=utf-8", body, assetETag(body));
   } catch (error) {
     return reply.code(503).send({
       ok: false,
@@ -1447,7 +1501,8 @@ app.post<{ Body?: { confirmation?: unknown; backup?: unknown } }>(
   }
 );
 
-app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(dashboard));
+app.get("/", async (request, reply) =>
+  sendAsset(request, reply, "text/html; charset=utf-8", dashboard, dashboardETag));
 
 type EmbeddedVillaBridgeGlobal = typeof globalThis & {
   __villaBridgeReady?: boolean;
