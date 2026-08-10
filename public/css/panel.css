@@ -52,6 +52,12 @@
       --glass-alert:rgba(67,38,34,.88);--glass-alert-brd:rgba(166,70,64,.9);
     }
     *{box-sizing:border-box}html{scroll-behavior:smooth}
+    /* DOKUNMA VURGUSU — odak halkasından AYRI bir şey. Android WebView, dokunulan her düğmenin
+       üstüne kendi MAVİ dikdörtgenini basar; eylem bitince kaybolur ama her dokunuşta yeniden
+       çıkar. Panelin kendi geri bildirimi zaten var (döşeme bölmelerindeki `:active`), ikincisi
+       yalnız gürültü. `-webkit-tap-highlight-color` KALITSAL bir özellik: kökte bir kez kapatmak
+       döşemeleri, sekme kartlarını, modal düğmelerini — panelin tamamını tutarlı yapar. */
+    html{-webkit-tap-highlight-color:transparent}
     /* Odak halkasının tabanı: tarayıcı varsayılanı (Chrome mavisi) hiçbir yerde görünmesin.
        `:where()` özgüllüğü sıfırladığı için daha aşağıdaki her özel kural bunu ezer — kendi
        halkasını yazan öğeler eskisi gibi çalışır, yazmayanlar panelin diline düşer. */
@@ -112,7 +118,7 @@
     .device-card-header{display:flex;align-items:center;gap:13px}.device-card-copy{min-width:0;flex:1}.device-card-body{padding-top:2px}
     .device-top{display:flex;justify-content:space-between;gap:14px}.device-title{display:flex;align-items:flex-start;gap:13px}.device-icon{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:50%;background:#f0f3ef;color:var(--forest)}
     .device-visual{width:54px;height:54px;flex:none;display:grid;place-items:center;border:1px solid #edf0ed;border-radius:12px;background:#fafbf9;overflow:hidden}.device-photo{grid-area:1/1;width:100%;height:100%;padding:5px;object-fit:contain;background:white}.device-fallback{grid-area:1/1;width:100%;height:100%;display:grid;place-items:center;color:var(--forest);font-size:19px;background:#f0f3ef}.device-fallback[hidden],.device-photo[hidden]{display:none}
-    .quick-grid.grid-view{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;scrollbar-width:none}.quick-grid.grid-view::-webkit-scrollbar{display:none}.quick-grid>.empty{width:100%;grid-column:1/-1}.quick-card{position:relative;min-width:0;min-height:44px;display:flex;align-items:center;padding:5px 12px;border-radius:999px;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.quick-grid.grid-view .quick-card{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start}.quick-grid .device-name{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:15px}.quick-card:focus-within{outline:3px solid #90b8a7;outline-offset:2px}.quick-battery{min-height:0;display:inline-flex;align-items:center;gap:3px;padding:0;border:0;border-radius:0;color:var(--muted);background:transparent;font-size:11px;font-weight:750}.quick-battery.low{color:var(--danger)}.battery-glyph{position:relative;width:11px;height:7px;flex:none;padding:1px;border:1px solid currentColor;border-radius:2px}.battery-glyph::after{content:"";position:absolute;right:-2px;top:1px;width:1px;height:3px;border-radius:0 1px 1px 0;background:currentColor}.battery-glyph i{display:block;height:100%;max-width:100%;border-radius:1px;background:currentColor}
+    .quick-grid.grid-view{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;scrollbar-width:none}.quick-grid.grid-view::-webkit-scrollbar{display:none}.quick-grid>.empty{width:100%;grid-column:1/-1}.quick-card{position:relative;min-width:0;min-height:44px;display:flex;align-items:center;padding:5px 12px;border-radius:999px;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.quick-grid.grid-view .quick-card{width:max-content;min-width:144px;flex:0 0 auto;aspect-ratio:auto;scroll-snap-align:start}.quick-grid .device-name{display:block;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:15px}.quick-card:focus-visible,.quick-card:has(:focus-visible){outline:3px solid #90b8a7;outline-offset:2px}.quick-battery{min-height:0;display:inline-flex;align-items:center;gap:3px;padding:0;border:0;border-radius:0;color:var(--muted);background:transparent;font-size:11px;font-weight:750}.quick-battery.low{color:var(--danger)}.battery-glyph{position:relative;width:11px;height:7px;flex:none;padding:1px;border:1px solid currentColor;border-radius:2px}.battery-glyph::after{content:"";position:absolute;right:-2px;top:1px;width:1px;height:3px;border-radius:0 1px 1px 0;background:currentColor}.battery-glyph i{display:block;height:100%;max-width:100%;border-radius:1px;background:currentColor}
     .quick-device-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:50%;color:var(--muted);background:#e7ece8}.quick-device-icon .device-type-svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}body.android-app dialog::backdrop{backdrop-filter:none}
     .device-name-row{min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.device-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:780;font-size:16px}.device-link-level{display:inline-flex;align-items:center;gap:4px;flex:none;padding:3px 6px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:10px;font-weight:800;line-height:1}.device-link-level svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}.device-link-level.strong{color:#24805a;background:#e2f3ea}.device-link-level.good{color:#927035;background:#fff1ca}.device-link-level.weak{color:var(--danger);background:#f9e6e3}.device-meta{color:var(--muted);font-size:12px;margin-top:3px}.online-text{color:#24805a}.offline-text{color:var(--danger)}.unknown-text{color:#927035}
     .controls{display:grid;gap:9px;margin-top:16px}.control-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding-top:12px;border-top:1px solid #edf0ed}.control-name{font-weight:650}.control-value{color:var(--muted);font-size:12px}.device-role-fixed{text-align:right;font-weight:750}.control-actions{display:flex;align-items:center;gap:8px}.visibility-toggle{width:44px;height:44px;display:grid;place-items:center;flex:none;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--forest);background:var(--forest-soft);line-height:1;touch-action:manipulation}.visibility-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.visibility-toggle.is-hidden{color:var(--muted);background:var(--surface-soft)}.visibility-toggle:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
@@ -260,26 +266,55 @@
        tek büyük aç/kapa düğmesine düşer. Alt satırda yalnız "Ayrıntılar" durur. */
     /* Pencere EKRANIN ORTASINDA duran dar bir kart: genişliği diyaloğun KENDİSİNE verilir, iç kutu
        onu doldurur. Diyaloğun kendi zemini yok — cam yüzey kartın üstünde durur, arkasındaki ana
-       ekran örtünün içinden görünür. Yeni renk yok: dil ana ekranın `--glass-*` kümesinden gelir,
-       iki temada da kendiliğinden döner. */
+       ekran örtünün içinden görünür.
+       KART İKİ TEMADA DA KOYU CAM. Sebep: kart karartılmış bir perdenin üstünde duruyor; açık
+       temanın beyaz örtüsü (`--glass-tile`) orada düz beyaz bir levhaya dönüşüyordu, cam dili hiç
+       görünmüyordu. Koyu örtü + beyaz yazı ile kontrast KARTIN KENDİ katmanından gelir, arkadaki
+       ekranın parlaklığından bağımsızdır — ana ekran döşemelerinde de gerekçe bu.
+       Yeni palet yok: aşağıdaki `--quick-*` değerleri koyu temanın `--glass-*` kümesinin ta
+       kendisidir (`--glass-tile`, `--glass-card`, `--glass-tile-brd`, `--glass-shadow`), yalnız
+       temaya göre dönmesinler diye sabitlenmiştir. */
     dialog.quick-dialog{width:min(420px,92vw);max-width:min(420px,92vw);border-radius:26px;background:transparent;box-shadow:none}
-    /* Örtü ana `dialog::backdrop`ten daha AÇIK: pencere öne çıksın diye hafifçe karartır ama
-       arkadaki paneli kapatmaz. */
-    dialog.quick-dialog::backdrop{background:rgba(12,22,17,.34);backdrop-filter:blur(3px)}
-    .quick-modal{width:100%;padding:22px;border:1px solid var(--glass-tile-brd);border-radius:26px;background:var(--glass-tile);box-shadow:var(--glass-shadow);backdrop-filter:blur(calc(var(--glass-blur) * 1.5)) saturate(1.25);-webkit-backdrop-filter:blur(calc(var(--glass-blur) * 1.5)) saturate(1.25)}
+    /* Örtü BELİRGİN koyu: pencere öne çıksın diye arkadaki paneli bastırır. Arkası tümüyle
+       kapanmaz (yarı saydam), panel hafifçe seçilir ama dikkat dağıtmaz. Bulanıklık yalnız
+       süstür — Android kabuğunda `body.android-app` onu kapatıyor, o yüzden karartma tek başına
+       renk alfasından gelir. */
+    dialog.quick-dialog::backdrop{background:rgba(8,14,11,.66);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+    .quick-modal{
+      --quick-surface:rgba(9,6,4,.72);--quick-inset:rgba(14,10,7,.5);
+      --quick-line:rgba(255,255,255,.13);--quick-ink:#fff;--quick-muted:rgba(255,255,255,.68);
+      width:100%;padding:20px 22px 18px;border:1px solid var(--quick-line);border-radius:26px;
+      color:var(--quick-ink);background:var(--quick-surface);box-shadow:0 14px 32px rgba(0,0,0,.34);
+      backdrop-filter:blur(calc(var(--glass-blur) * 1.6)) saturate(1.3);-webkit-backdrop-filter:blur(calc(var(--glass-blur) * 1.6)) saturate(1.3)
+    }
     .quick-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-    .quick-modal-head h2{margin:3px 0 0;font:700 24px/1.15 system-ui,sans-serif;overflow-wrap:anywhere}
+    .quick-modal-head h2{margin:2px 0 0;font:700 24px/1.15 system-ui,sans-serif;color:var(--quick-ink);overflow-wrap:anywhere}
+    .quick-modal .eyebrow{color:var(--quick-muted)}
     /* Kapatma kartın kendi sağ üstünde: 44×44 hedef korunur, yalnız dolgusu cam dile iner. */
-    .quick-dialog .quick-modal-head .device-detail-close{border:1px solid var(--glass-tile-brd);background:var(--glass-card)}
-    .quick-modal-body{display:grid;justify-items:center;gap:14px;margin-top:16px}
+    .quick-dialog .quick-modal-head .device-detail-close{border:1px solid var(--quick-line);color:var(--quick-ink);background:var(--quick-inset)}
+    .quick-modal-body{display:grid;justify-items:center;gap:14px;margin-top:8px}
     /* Kumandanın kendi kutusu pencerede kalkar: yüzey KARTIN kendisi, ikinci bir opak katman
        cam dili bozardı. Cihaz sayfasındaki tam sürüm etkilenmez. */
     .quick-modal-body .light-panel{width:100%;margin:0;padding:0;border:0;background:transparent}
+    .quick-modal-body .light-readout-value{color:var(--quick-ink)}
+    .quick-modal-body .light-readout-since{color:var(--quick-muted)}
     /* Kolon mock'taki gibi tıknaz: parmakla rahat sürüklenir, ince uzun şerit değil. */
-    .quick-modal-body .light-column{width:clamp(112px,30vw,156px);height:clamp(150px,32vh,236px);border-color:var(--glass-tile-brd);background:var(--glass-card)}
-    .quick-modal-body .light-mode:not(.active):not(.on){border-color:var(--glass-tile-brd);background:var(--glass-card)}
-    .quick-modal-body .quick-toggle:not(.on){background:var(--glass-card);box-shadow:inset 0 0 0 1px var(--glass-tile-brd)}
-    .quick-modal-actions{display:flex;justify-content:flex-end;margin-top:18px}
+    .quick-modal-body .light-column{width:clamp(112px,30vw,156px);height:clamp(150px,32vh,236px);border-color:var(--quick-line);background:var(--quick-inset)}
+    .quick-modal-body .light-column-glyph{color:var(--quick-ink)}
+    .quick-modal-body .light-mode{color:var(--quick-ink)}
+    .quick-modal-body .light-mode:not(.active):not(.on){border-color:var(--quick-line);background:var(--quick-inset)}
+    /* Seçili kip ve yanan güç düğmesi koyu temanın kendi renklerinde sabitlenir — koyu camın
+       üstünde açık temanın koyu yeşili/beyazı okunmuyordu. Değerler yine mevcut kümeden:
+       `--forest`/`--on-forest` ve `--glass-on`/`--glass-on-brd`'nin koyu tema değerleri. */
+    .quick-modal-body .light-mode.active{border-color:#71c6a2;color:#0b1c15;background:#71c6a2}
+    .quick-modal-body .light-mode.on{border-color:rgba(169,119,44,.9);color:#ffdc96;background:rgba(73,57,28,.86)}
+    .quick-modal-body .light-preset{border-color:var(--quick-line)}
+    .quick-modal-body .quick-toggle{color:var(--quick-muted)}
+    .quick-modal-body .quick-toggle:not(.on){background:var(--quick-inset);box-shadow:inset 0 0 0 1px var(--quick-line)}
+    .quick-modal-body .quick-toggle.on{color:#ffdc96;background:#5d4823;box-shadow:inset 0 0 0 1px #a9772c}
+    /* "Ayrıntılar" tek düğme: sağa yaslı durunca kartın içinde asılı kalıyordu, ortada dengeli. */
+    .quick-modal-actions{display:flex;justify-content:center;margin-top:14px}
+    .quick-modal-actions .secondary{min-height:44px;border:1px solid var(--quick-line);color:var(--quick-ink);background:var(--quick-inset)}
     .quick-toggle-wrap{display:grid;place-items:center;padding:10px 0 4px}
     .quick-toggle{width:136px;height:136px;display:grid;place-items:center;align-content:center;gap:9px;padding:0;border:0;border-radius:50%;color:var(--muted);background:var(--surface-soft);box-shadow:inset 0 0 0 1px var(--line);font:750 14px/1 system-ui,sans-serif;touch-action:manipulation;transition:.2s}
     .quick-toggle svg{width:38px;height:38px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -816,7 +851,7 @@
          KÜÇÜK ve ORTADA durur (cihaza tek dokunuşluk kumanda, tam ekran bir sayfa değil). `margin:auto`
          geri verilir: ortak kuraldaki `margin:0` pencereyi ekranın üstüne yapıştırıyordu. */
       dialog#quickControlDialog{width:min(420px,92vw)!important;max-width:min(420px,92vw)!important;margin:auto;border-radius:26px}
-      dialog#quickControlDialog>.modal{max-height:min(88dvh,760px);padding:22px}
+      dialog#quickControlDialog>.modal{max-height:min(88dvh,760px);padding:20px 22px 18px}
     }
     /* TELEFON DİKEY ONARIMI — tek kapı: (orientation:portrait) and (max-width:560px).
        Yeniden tasarım değil, duvar tableti ölçülerinin telefonda ürettiği dört kırığın onarımı:
