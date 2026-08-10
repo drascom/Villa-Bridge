@@ -107,8 +107,9 @@
     /* Hava sahnesi hazır bir setten gelir: Meteocons (`public/assets/weather`, MIT). Animasyon
        setin kendi SMIL'i; `prefers-reduced-motion` altında durağan kopyaya geçişi panel yapar
        (`45-clock-weather.js`).
-       Sahne artık DEKOR DEĞİL, bölgenin ASIL ikonu: bölge dikey bir sütun — üstte konum etiketi,
-       altında büyük görsel, onun altında sıcaklık/durum/uçlar. Bu yüzden küçük çizgi ikon
+       Sahne artık DEKOR DEĞİL, bölgenin ASIL ikonu: bölge dikey bir sütun — en üstte büyük
+       görsel, altında sıcaklık/durum/uçlar, sonra dokunma ipucu ve EN ALTTA konum etiketi
+       (adres son satır olsun diye; sıra yalnız `order` ile kurulur). Bu yüzden küçük çizgi ikon
        (`.hub-w-icon`) hub'dan kalktı — ekranda tek güneş kalsın diye; ekran koruyucu ve
        saatlik/günlük listeler kendi küçük ikonlarını sürdürür.
        ÖLÇÜ: sahne bölgenin kabaca üçte iki boyunu kaplar. Meteocons kareler (512×512) olduğu
@@ -122,10 +123,10 @@
        başladığı yerden sonra açılır, ikonun gövdesine dokunmaz. */
     .hub-zone-weather{display:flex;flex-direction:column;--weather-scene-op:1;--weather-scene-size:min(clamp(96px,19vh,240px),62%);--weather-scene-lift:calc(var(--weather-scene-size) * .18)}
     :root[data-theme="dark"] .hub-zone-weather{--weather-scene-op:.95}
-    .hub-zone-weather>.hub-label{order:0}
-    .hub-zone-weather>.hub-weather,#home .hub-zone-weather>.hub-weather{order:2;position:relative;z-index:1;margin-top:calc(-1 * var(--weather-scene-lift))}
-    .hub-zone-weather>.hub-hint{order:3}
-    .hub-weather-scene{order:1;align-self:flex-start;position:relative;z-index:0;display:block;width:var(--weather-scene-size);height:auto;margin:clamp(2px,.9vh,10px) 0 0;opacity:var(--weather-scene-op);pointer-events:none;-webkit-mask-image:linear-gradient(to bottom,#000 74%,rgba(0,0,0,.7) 87%,rgba(0,0,0,.28) 100%);mask-image:linear-gradient(to bottom,#000 74%,rgba(0,0,0,.7) 87%,rgba(0,0,0,.28) 100%);-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+    .hub-zone-weather>.hub-label{order:3;margin-top:clamp(8px,1.6vh,14px)}
+    .hub-zone-weather>.hub-weather,#home .hub-zone-weather>.hub-weather{order:1;position:relative;z-index:1;margin-top:calc(-1 * var(--weather-scene-lift))}
+    .hub-zone-weather>.hub-hint{order:2}
+    .hub-weather-scene{order:0;align-self:flex-start;position:relative;z-index:0;display:block;width:var(--weather-scene-size);height:auto;margin:clamp(2px,.9vh,10px) 0 0;opacity:var(--weather-scene-op);pointer-events:none;-webkit-mask-image:linear-gradient(to bottom,#000 74%,rgba(0,0,0,.7) 87%,rgba(0,0,0,.28) 100%);mask-image:linear-gradient(to bottom,#000 74%,rgba(0,0,0,.7) 87%,rgba(0,0,0,.28) 100%);-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
     /* Kısa görünür alanda (yatay tablet klavye/az yükseklik) sahne küçülür ve bindirme neredeyse
        kalkar: dar alanda çakışma okunmazlığa dönmesin. */
     @media(max-height:640px){
