@@ -158,6 +158,19 @@
     else button.closest("dialog")?.close();
   });
   $("#matterDialog").addEventListener("close",stopMatterWatch);
+  /* Alarm: pencerede ayrı bir "Kaydet" yok, her alan değişince yazılır (saat penceresinin geri
+     kalanı da böyle çalışıyor). Çalma katmanı `Esc` ya da düğmeyle kapanır; iki yol da aynı
+     `close` olayından geçtiği için ses her hâlükârda susar. */
+  $("#alarmEnabled").onchange=saveAlarmSetting;
+  $("#alarmTime").onchange=saveAlarmSetting;
+  $("#alarmRepeat").onchange=saveAlarmSetting;
+  $("#alarmWeekday").onchange=saveAlarmSetting;
+  $("#stopAlarm").onclick=stopAlarmRing;
+  $("#alarmDialog").addEventListener("close",stopAlarmRing);
+  /* Otomatik oynatma kısıtı: ses bağlamı ilk kullanıcı dokunuşunda kurulur ve canlı tutulur.
+     Dinleyici kalıcıdır — bağlam tarayıcı tarafından askıya alınırsa (uyku, sekme değişimi)
+     bir sonraki dokunuş onu geri getirir. */
+  ["pointerdown","keydown","touchstart"].forEach(type=>document.addEventListener(type,unlockAlarmAudio,{capture:true,passive:true}));
   async function startAuthenticatedApplication(){
     if(applicationStarted){
       const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones()];

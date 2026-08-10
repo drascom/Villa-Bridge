@@ -189,7 +189,9 @@
     if($("#deviceRoleDialog").open)renderDeviceRoleDialog();
     if($("#deviceRoomDialog").open)renderDeviceRoomDialog();
     if($("#widgetDialog").open){updateAddDialogTitle();renderRoomSuggestions();updateGroupOrderControls();renderGroupDeviceChoices();renderWidgetCatalog()}
-    if($("#clockDialog").open){renderClockDialogRows();renderLocationSearchResults("clock")}
+    if($("#clockDialog").open){renderClockDialogRows();renderLocationSearchResults("clock");renderAlarmSettings()}
+    if($("#alarmDialog").open)renderAlarmRing();
+    renderHubAlarm();
     if($("#weatherDialog").open)renderWeatherDialog();
     if($("#weatherLocationDialog").open)renderLocationSearchResults("weather");
     if($("#homeLocationDialog").open){renderHomeLocationDialog();renderLocationSearchResults("home")}

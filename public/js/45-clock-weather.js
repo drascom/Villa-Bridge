@@ -26,6 +26,7 @@
     const localName=namedZone?locationName(namedZone):localTimeZone.split("/").pop().replace(/_/g," ");
     $("#hubZoneName").textContent=`${localName} · ${t("clockLocal")}`;
     renderHubCities(now);
+    renderHubAlarm();
   }
   // Hub'daki iki şehir: dünya saati penceresindeki listenin ilk iki kaydı, yerelle aynı saat
   // dilimi atlanır (o zaten büyük saatte yazıyor). Şehir seçilmemişse düğüm boş kalır ve
@@ -43,6 +44,9 @@
     if(renderedClockMinute!==`${now.getHours()}:${now.getMinutes()}`)renderWorldClock();
     else seconds.textContent=String(now.getSeconds()).padStart(2,"0");
     if($("#clockDialog").open)renderClockDialogRows();
+    // Alarm denetimi saatin kendi tikine binir: ayrı bir zamanlayıcı kurulmaz, her turda
+    // yeniden hesaplanır (bkz. `checkAlarmDue`).
+    checkAlarmDue(now);
   }
   function scheduleWorldClockTick(){
     setTimeout(()=>{tickWorldClock();scheduleWorldClockTick()},1000-new Date().getMilliseconds()+20);
@@ -219,6 +223,7 @@
   function openClockManager(){
     resetLocationSearch("clock");
     renderClockDialogRows();
+    renderAlarmSettings();
     if(!$("#clockDialog").open)$("#clockDialog").showModal();
   }
   function addWorldClockCity(location){
@@ -484,4 +489,219 @@
   function refreshWeatherIfNeeded(){
     if(weatherState.loading)return;
     if(!weatherState.checkedAt||Date.now()-weatherState.checkedAt>weatherPollFloor)loadWeather();
+  }
+  /* ——— ALARM ———
+     TEK alarm, CİHAZDA durur (`localStorage`): hangi tablette çalacağı kullanıcının bilerek
+     verdiği bir karar, sunucuya taşınmaz. Ayarın tamamı üç alandır — açık/kapalı, saat, tekrar
+     (günlük ya da haftada bir gün). Alarm hiçbir cihaza komut göndermez; yalnız burada çalar. */
+  const alarmStorageKey="villa-alarm";
+  // Geç tetikleme penceresi: uykudan saatler sonra uyanan tablet geçmiş bir alarmı çalmasın.
+  const alarmGraceMs=120000;
+  // Kimse dokunmazsa uyarı kendiliğinden kapanır — duvarda sonsuza kadar öten tablet olmaz.
+  const alarmAutoStopMs=120000;
+  const alarmChimeIntervalMs=1900;
+  const alarmDefaultTime="07:30";
+  const normalizeAlarmTime=value=>/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))?String(value):alarmDefaultTime;
+  /* Gün kimliği YEREL tarihten kurulur (ISO/UTC değil): yaz saati geçişinde ya da cihaz saati
+     düzeltildiğinde "bugün" kayması olmasın. `lastFired` aynı alarmın aynı gün iki kez
+     çalmasını engeller. */
+  const alarmDayKey=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+  const alarmSetting=(()=>{try{
+    const value=JSON.parse(localStorage.getItem(alarmStorageKey)||"null");
+    const weekday=Number(value?.weekday);
+    return{
+      enabled:value?.enabled===true,
+      time:normalizeAlarmTime(value?.time),
+      repeat:value?.repeat==="weekly"?"weekly":"daily",
+      weekday:Number.isInteger(weekday)&&weekday>=0&&weekday<=6?weekday:1,
+      lastFired:typeof value?.lastFired==="string"?value.lastFired.slice(0,10):""
+    };
+  }catch{return{enabled:false,time:alarmDefaultTime,repeat:"daily",weekday:1,lastFired:""}}})();
+  function persistAlarmSetting(){try{localStorage.setItem(alarmStorageKey,JSON.stringify(alarmSetting))}catch{}}
+  function alarmAt(date){
+    const[hour,minute]=alarmSetting.time.split(":").map(Number);
+    const target=new Date(date);
+    target.setHours(hour,minute,0,0);
+    return target;
+  }
+  const alarmRingsOn=date=>alarmSetting.repeat!=="weekly"||date.getDay()===alarmSetting.weekday;
+  /* Sıradaki çalma anı gün gün taranarak bulunur (en çok sekiz gün): haftalık kip de, günü
+     geçmiş alarmın "yarın"ı da aynı döngüden çıkar. Hiçbir yerde gün ötesine sarkan tek bir
+     `setTimeout` tutulmaz — değer her sorulduğunda yeniden hesaplanır. */
+  function nextAlarmDate(from=new Date()){
+    if(!alarmSetting.enabled)return null;
+    for(let offset=0;offset<8;offset++){
+      const day=new Date(from);
+      day.setDate(day.getDate()+offset);
+      const target=alarmAt(day);
+      if(!alarmRingsOn(target))continue;
+      if(target.getTime()<=from.getTime())continue;
+      if(alarmSetting.lastFired===alarmDayKey(target))continue;
+      return target;
+    }
+    return null;
+  }
+  function alarmWhenText(date){
+    const today=new Date();
+    const tomorrow=new Date(today);
+    tomorrow.setDate(tomorrow.getDate()+1);
+    const key=alarmDayKey(date);
+    const day=key===alarmDayKey(today)?t("hubToday"):key===alarmDayKey(tomorrow)?t("hubTomorrow"):dateTimeFormatter({weekday:"long"}).format(date);
+    return`${day} ${zoneTime(date)}`;
+  }
+  function renderHubAlarm(){
+    const text=$("#hubAlarmText");
+    if(!text)return;
+    const next=nextAlarmDate();
+    text.textContent=next?alarmWhenText(next):t("alarmOff");
+  }
+  // Gün adları biçimlendiriciden gelir: yeni bir dil eklemek için burada yapılacak iş yok.
+  function alarmWeekdayOptions(){
+    const week=new Date();
+    week.setDate(week.getDate()-week.getDay());
+    return[0,1,2,3,4,5,6].map(index=>{
+      const day=new Date(week);
+      day.setDate(day.getDate()+index);
+      return`<option value="${index}">${esc(dateTimeFormatter({weekday:"long"}).format(day))}</option>`;
+    }).join("");
+  }
+  function renderAlarmSettings(){
+    const enabled=$("#alarmEnabled");
+    if(!enabled)return;
+    const weekday=$("#alarmWeekday");
+    enabled.checked=alarmSetting.enabled;
+    $("#alarmTime").value=alarmSetting.time;
+    $("#alarmRepeat").value=alarmSetting.repeat;
+    weekday.innerHTML=alarmWeekdayOptions();
+    weekday.value=String(alarmSetting.weekday);
+    // Alanlar alarm kapalıyken de açık kalır: kullanıcı önce saati kurup sonra açabilsin.
+    $("#alarmDayField").hidden=alarmSetting.repeat!=="weekly";
+    const next=nextAlarmDate();
+    $("#alarmStatus").textContent=next?t("alarmNext",{when:alarmWhenText(next)}):t("alarmOff");
+  }
+  /* Kaydetme akışı pencerenin geri kalanıyla aynı: ayrı "Kaydet" düğmesi yok, değişiklik anında
+     yazılır ve durum satırı sıradaki çalmayı söyler. Kurulum anında geçmişe düşen bir alarm
+     hemen ötmesin diye, bugünün çalma anı geçtiyse gün "çalınmış" işaretlenir. */
+  function saveAlarmSetting(){
+    alarmSetting.enabled=$("#alarmEnabled").checked===true;
+    alarmSetting.time=normalizeAlarmTime($("#alarmTime").value);
+    alarmSetting.repeat=$("#alarmRepeat").value==="weekly"?"weekly":"daily";
+    const weekday=Number($("#alarmWeekday").value);
+    alarmSetting.weekday=Number.isInteger(weekday)&&weekday>=0&&weekday<=6?weekday:0;
+    const now=new Date();
+    const today=alarmAt(now);
+    alarmSetting.lastFired=alarmRingsOn(today)&&now.getTime()>=today.getTime()?alarmDayKey(today):"";
+    persistAlarmSetting();
+    renderAlarmSettings();
+    renderHubAlarm();
+  }
+  /* Denetim her saniyelik tikte YENİDEN hesaplanır. Uyuyan tablet, düzeltilen sistem saati ya da
+     yaz saati geçişi zinciri kırmaz: kurulu bir zamanlayıcı yok, yalnız "şu an alarm anına ne
+     kadar yakın" sorusu var. Pencere iki dakikadır; daha geç uyanan cihaz sessiz kalır. */
+  function checkAlarmDue(now=new Date()){
+    if(!alarmSetting.enabled||alarmRingingSince!==null)return;
+    const target=alarmAt(now);
+    if(!alarmRingsOn(target))return;
+    const delta=now.getTime()-target.getTime();
+    if(delta<0||delta>alarmGraceMs)return;
+    const key=alarmDayKey(target);
+    if(alarmSetting.lastFired===key)return;
+    alarmSetting.lastFired=key;
+    persistAlarmSetting();
+    startAlarmRing();
+  }
+  let alarmRingingSince=null;
+  let alarmAutoStopTimer=null;
+  let alarmRingClockTimer=null;
+  function renderAlarmRing(){
+    const time=$("#alarmRingTime");
+    if(!time)return;
+    const now=new Date();
+    time.textContent=zoneTime(now);
+    $("#alarmRingDate").textContent=dateTimeFormatter({weekday:"long",day:"numeric",month:"long"}).format(now);
+  }
+  function startAlarmRing(){
+    if(alarmRingingSince!==null)return;
+    alarmRingingSince=Date.now();
+    renderAlarmRing();
+    const dialog=$("#alarmDialog");
+    if(dialog&&!dialog.open)dialog.showModal();
+    // Bu pencerede odak başlığa değil "Durdur"a gider: metin alanı yok, klavye açılmaz ve
+    // uyanan kullanıcı tek dokunuşla susturur.
+    $("#stopAlarm")?.focus();
+    startAlarmSound();
+    alarmAutoStopTimer=setTimeout(stopAlarmRing,alarmAutoStopMs);
+    alarmRingClockTimer=setInterval(renderAlarmRing,1000);
+    renderHubAlarm();
+  }
+  function stopAlarmRing(){
+    if(alarmAutoStopTimer!==null){clearTimeout(alarmAutoStopTimer);alarmAutoStopTimer=null}
+    if(alarmRingClockTimer!==null){clearInterval(alarmRingClockTimer);alarmRingClockTimer=null}
+    stopAlarmSound();
+    alarmRingingSince=null;
+    const dialog=$("#alarmDialog");
+    if(dialog?.open)dialog.close();
+    renderHubAlarm();
+    renderAlarmSettings();
+  }
+  /* SES — harici dosya YOK, ton Web Audio ile üretilir: paket şişmez, çevrimdışı çalışır.
+     Tarayıcı otomatik oynatma kısıtı: `AudioContext` ancak bir kullanıcı etkileşiminden sonra
+     ses verir. Bu yüzden bağlam ilk dokunuşta kurulup canlı tutulur (`unlockAlarmAudio`,
+     99-bind.js). Alarm anında bağlam hiç yoksa ya da askıda kalırsa HATA VERİLMEZ; uyarı
+     sessizce yalnız görsele düşer. */
+  let alarmAudioContext=null;
+  let alarmGain=null;
+  let alarmChimeTimer=null;
+  function ensureAlarmAudio(){
+    if(alarmAudioContext)return alarmAudioContext;
+    const Factory=window.AudioContext||window.webkitAudioContext;
+    if(!Factory)return null;
+    try{alarmAudioContext=new Factory()}
+    catch(error){console.warn("alarm-audio",error);return null}
+    return alarmAudioContext;
+  }
+  function unlockAlarmAudio(){
+    const context=ensureAlarmAudio();
+    if(context&&context.state==="suspended")context.resume().catch(()=>{});
+  }
+  // Yumuşak iki notalı çan: sinüs + üstel sönüm. Her vuruş kendi düğümünü kurar ve kendi kendine
+  // biter; susturma ana kazancı koparır, kuyrukta bekleyen ses kalmaz.
+  function alarmChime(at){
+    const context=alarmAudioContext;
+    if(!context||!alarmGain)return;
+    [880,1174.66].forEach((frequency,index)=>{
+      const start=at+index*0.19;
+      const oscillator=context.createOscillator();
+      const envelope=context.createGain();
+      oscillator.type="sine";
+      oscillator.frequency.setValueAtTime(frequency,start);
+      envelope.gain.setValueAtTime(0.0001,start);
+      envelope.gain.exponentialRampToValueAtTime(0.3,start+0.03);
+      envelope.gain.exponentialRampToValueAtTime(0.0001,start+0.85);
+      oscillator.connect(envelope).connect(alarmGain);
+      oscillator.start(start);
+      oscillator.stop(start+0.9);
+    });
+  }
+  function startAlarmSound(){
+    try{
+      const context=ensureAlarmAudio();
+      if(!context)return false;
+      if(context.state==="suspended")context.resume().catch(()=>{});
+      alarmGain=context.createGain();
+      alarmGain.gain.value=1;
+      alarmGain.connect(context.destination);
+      alarmChime(context.currentTime+0.05);
+      alarmChimeTimer=setInterval(()=>{if(alarmGain)alarmChime(alarmAudioContext.currentTime+0.02)},alarmChimeIntervalMs);
+      return true;
+    }catch(error){
+      console.warn("alarm-audio",error);
+      return false;
+    }
+  }
+  function stopAlarmSound(){
+    if(alarmChimeTimer!==null){clearInterval(alarmChimeTimer);alarmChimeTimer=null}
+    if(!alarmGain)return;
+    try{alarmGain.disconnect()}catch{}
+    alarmGain=null;
   }
