@@ -57,28 +57,17 @@
   function scrollWidgetRail(direction){scrollDashboardRow($("#widgetRail"),direction,220,.72)}
   function scrollWidgetRailForward(){scrollWidgetRail(1)}
   function scrollHomeTabs(direction){scrollDashboardRow($("#homeTabs"),direction,120,.55)}
-  /* Masaüstünde fare tekerleği dikey delta üretir; yatay ray bundan kaydırılmaz. Dikey deltayı
+  /* Masaüstünde fare tekerleği dikey delta üretir; yatay şerit bundan kaydırılmaz. Dikey deltayı
      yatay kaydırmaya çeviriyoruz — ama yalnız gerçekten çevirdiğimizde `preventDefault()`.
-     `deltaMode` piksel(0) dışında satır(1) ya da sayfa(2) olabilir, ikisini de piksele çeviriyoruz. */
+     `deltaMode` piksel(0) dışında satır(1) ya da sayfa(2) olabilir, ikisini de piksele çeviriyoruz.
+     Yalnız alt sekme şeridine bağlı: genel görünüm rayında kartların kendi dikey kaydırması
+     tekerlekle çakışıyordu, orada sağ/sol ok düğmeleri birincil yol. */
   function wheelPixelDelta(event,scroller){
     if(event.deltaMode===1)return event.deltaY*16;
     if(event.deltaMode===2)return event.deltaY*Math.max(1,scroller.clientWidth);
     return event.deltaY;
   }
   const scrollRoomLeft=(node,delta)=>delta<0?node.scrollLeft:node.scrollWidth-node.clientWidth-node.scrollLeft;
-  const scrollRoomTop=(node,delta)=>delta<0?node.scrollTop:node.scrollHeight-node.clientHeight-node.scrollTop;
-  /* Oda kartlarının cihaz ızgarası kendi dikey kaydırmasına sahip (`overflow-y:auto`). İmleç
-     böyle bir kabın üstündeyken tekerlek onu kaydırmalı; ray devralmamalı. Hedeften rayın
-     kendisine kadar yukarı bakıp o yönde yeri olan dikey bir kap var mı diye arıyoruz. */
-  function verticalScrollerInPath(target,scroller,delta){
-    let node=target instanceof Element?target:null;
-    while(node&&node!==scroller&&scroller.contains(node)){
-      const overflow=getComputedStyle(node).overflowY;
-      if((overflow==="auto"||overflow==="scroll")&&scrollRoomTop(node,delta)>1)return true;
-      node=node.parentElement;
-    }
-    return false;
-  }
   function railWheelScroll(event){
     const scroller=event.currentTarget;
     if(!scroller)return;
@@ -86,8 +75,7 @@
     if(event.ctrlKey||Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
     const delta=wheelPixelDelta(event,scroller);
     if(!delta)return;
-    if(verticalScrollerInPath(event.target,scroller,delta))return;
-    // Ray o yönde sonuna geldiyse olayı yutma; sayfa normal davransın.
+    // Şerit o yönde sonuna geldiyse olayı yutma; sayfa normal davransın.
     if(scrollRoomLeft(scroller,delta)<=1)return;
     scroller.scrollLeft+=delta;
     event.preventDefault();
