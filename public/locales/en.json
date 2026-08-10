@@ -108,6 +108,7 @@
     "alarmOn": "Alarm on",
     "alarmOff": "Alarm off",
     "alarmTime": "Alarm time",
+    "alarmTimePick": "Set the alarm time",
     "alarmHour": "Hour",
     "alarmMinute": "Minute",
     "alarmRepeat": "Repeat",

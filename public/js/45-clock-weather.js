@@ -583,53 +583,93 @@
       return`<option value="${index}">${esc(dateTimeFormatter({weekday:"long"}).format(day))}</option>`;
     }).join("");
   }
-  /* SAAT SEÇİCİ — panelin kendi içinde. `<input type="time">` kaldırıldı: Android WebView onun
+  /* SAAT SEÇİCİ — panelin kendi pop-up'ı. `<input type="time">` kaldırıldı: Android WebView onun
      için yerel bir saat penceresi açıyor ve o pencerenin alt onay şeridi 800px yüksekliğinde
-     kırpılıyordu; boyutu bizim CSS'imizle kontrol edilemiyordu. İki kaydırılabilir liste (saat
-     ve dakika) hiçbir yerel pencereye muhtaç değil. Kayıt biçimi aynı: "HH:MM". */
+     kırpılıyordu; boyutu bizim CSS'imizle kontrol edilemiyordu. Yerine iPhone tarzı iki tekerlek
+     kondu; saat penceresinde yalnız "07:30" yazan tek bir düğme durur, liste orayı şişirmez.
+     Oturma (snap) tümüyle CSS'in işi (`panel.css` → `.time-wheel`); buradaki JS ortadaki satırı
+     okur, komşuları soldurur ve klavye oklarını kaydırmaya çevirir. Kayıt biçimi aynı: "HH:MM". */
   const alarmMinuteStep=5;
   const alarmPad2=value=>String(value).padStart(2,"0");
   const alarmTimeParts=()=>({hour:Number(alarmSetting.time.slice(0,2)),minute:Number(alarmSetting.time.slice(3,5))});
+  const alarmHourChoices=()=>Array.from({length:24},(unused,hour)=>hour);
   function alarmMinuteChoices(){
     const minutes=[];
     for(let minute=0;minute<60;minute+=alarmMinuteStep)minutes.push(minute);
     // 5'in katı olmayan eski bir kayıt sessizce yuvarlanmaz; kendi değeri listeye eklenir.
     const current=alarmTimeParts().minute;
-    if(!minutes.includes(current))minutes.push(current);
+    if(Number.isInteger(current)&&!minutes.includes(current))minutes.push(current);
     return minutes.sort((first,second)=>first-second);
   }
-  function renderAlarmTimeList(list,values,selected){
+  const alarmWheels=()=>[[$("#alarmHourWheel"),alarmHourChoices()],[$("#alarmMinuteWheel"),alarmMinuteChoices()]];
+  // `offsetHeight`, `getBoundingClientRect` DEĞİL: satırlar `transform:scale()` ile soluklaşıyor,
+  // ölçülen kutu da onunla küçülürdü. Yerleşim yüksekliği ölçekten etkilenmez.
+  const alarmWheelRow=wheel=>wheel.firstElementChild?.offsetHeight||0;
+  function alarmWheelFill(wheel,values){
     const wanted=values.join(",");
-    if(list.dataset.values!==wanted){
-      list.dataset.values=wanted;
-      list.innerHTML=values.map(value=>`<button type="button" class="alarm-time-option" role="option" data-alarm-value="${value}" aria-selected="false">${alarmPad2(value)}</button>`).join("");
-    }
-    let active=null;
-    Array.from(list.children).forEach(option=>{
-      const chosen=Number(option.dataset.alarmValue)===selected;
-      option.setAttribute("aria-selected",chosen?"true":"false");
-      if(chosen)active=option;
+    if(wheel.dataset.values===wanted)return;
+    wheel.dataset.values=wanted;
+    wheel.dataset.index="";
+    wheel.innerHTML=values.map(value=>`<div class="time-wheel-option" role="option" aria-selected="false" data-wheel-value="${value}">${alarmPad2(value)}</div>`).join("");
+  }
+  /* Seçili satır ortadaki banttan okunur. Dolgu üstte ve altta tam iki satır olduğu için
+     `scrollTop` her zaman "satır yüksekliği × sıra"dır; oran CSS ile ortak, ikisi birlikte değişir. */
+  function alarmWheelIndex(wheel){
+    const row=alarmWheelRow(wheel);
+    const count=wheel.children.length;
+    if(!row||!count)return 0;
+    return Math.min(count-1,Math.max(0,Math.round(wheel.scrollTop/row)));
+  }
+  function alarmWheelMark(wheel,index){
+    wheel.dataset.index=String(index);
+    Array.from(wheel.children).forEach((option,position)=>{
+      const distance=Math.abs(position-index);
+      option.dataset.near=distance>2?"far":String(distance);
+      option.setAttribute("aria-selected",distance===0?"true":"false");
     });
-    // Seçili değer görünmüyorsa listeyi ortalarız; görünüyorsa kaydırmaya dokunulmaz, kullanıcı
-    // parmağının altındaki liste zıplamaz.
-    if(!active)return;
-    const top=active.offsetTop;
-    const bottom=top+active.offsetHeight;
-    if(top<list.scrollTop||bottom>list.scrollTop+list.clientHeight)list.scrollTop=top-(list.clientHeight-active.offsetHeight)/2;
   }
-  function renderAlarmTimePicker(){
-    const hours=$("#alarmHourList");
-    if(!hours)return;
-    const parts=alarmTimeParts();
-    renderAlarmTimeList(hours,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],parts.hour);
-    renderAlarmTimeList($("#alarmMinuteList"),alarmMinuteChoices(),parts.minute);
-    $("#alarmTimeValue").textContent=alarmSetting.time;
+  function alarmWheelPaint(wheel){
+    const index=alarmWheelIndex(wheel);
+    if(wheel.dataset.index!==String(index))alarmWheelMark(wheel,index);
   }
-  function pickAlarmTimePart(unit,value){
+  // Vurgu kaydırmayı beklemez: `scroll` olayı gecikmeli gelir, işaret hemen konur.
+  function alarmWheelScrollTo(wheel,index,smooth){
+    const row=alarmWheelRow(wheel);
+    if(!row)return;
+    alarmWheelMark(wheel,index);
+    wheel.scrollTo({top:index*row,behavior:smooth?"smooth":"auto"});
+  }
+  function alarmWheelKey(wheel,key){
+    const count=wheel.children.length;
+    if(!count)return false;
+    const steps={ArrowDown:1,ArrowUp:-1,PageDown:5,PageUp:-5};
+    const index=alarmWheelIndex(wheel);
+    const next=key==="Home"?0:key==="End"?count-1:key in steps?index+steps[key]:null;
+    if(next===null)return false;
+    alarmWheelScrollTo(wheel,Math.min(count-1,Math.max(0,next)),true);
+    return true;
+  }
+  /* Tekerlekler yalnız pencere açıkken doğru ölçülür: kapalı `dialog` sıfır yüksekliktedir,
+     satır yüksekliği okunamaz. O yüzden doldurma ve ilk konumlama `showModal`dan SONRA. */
+  function openAlarmTimePicker(){
+    const dialog=$("#alarmTimeDialog");
+    if(!dialog||dialog.open)return;
     const parts=alarmTimeParts();
-    const hour=unit==="hour"?value:parts.hour;
-    const minute=unit==="minute"?value:parts.minute;
+    dialog.showModal();
+    alarmWheels().forEach(([wheel,values])=>{
+      alarmWheelFill(wheel,values);
+      const wanted=wheel.id==="alarmHourWheel"?parts.hour:parts.minute;
+      alarmWheelScrollTo(wheel,Math.max(0,values.indexOf(wanted)),false);
+    });
+  }
+  // Vazgeçme ayrı bir yol istemez: değer yalnız burada yazılır, pencere kapanınca eskisi durur.
+  function applyAlarmTimePicker(){
+    const [[hourWheel,hours],[minuteWheel,minutes]]=alarmWheels();
+    const parts=alarmTimeParts();
+    const hour=hours[alarmWheelIndex(hourWheel)]??parts.hour;
+    const minute=minutes[alarmWheelIndex(minuteWheel)]??parts.minute;
     alarmSetting.time=`${alarmPad2(hour)}:${alarmPad2(minute)}`;
+    $("#alarmTimeDialog").close();
     saveAlarmSetting();
   }
   function renderAlarmSettings(){
@@ -637,7 +677,7 @@
     if(!enabled)return;
     const weekday=$("#alarmWeekday");
     enabled.checked=alarmSetting.enabled;
-    renderAlarmTimePicker();
+    $("#alarmTimeValue").textContent=alarmSetting.time;
     $("#alarmRepeat").value=alarmSetting.repeat;
     weekday.innerHTML=alarmWeekdayOptions();
     weekday.value=String(alarmSetting.weekday);

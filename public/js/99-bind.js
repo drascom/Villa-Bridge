@@ -162,12 +162,27 @@
      kalanı da böyle çalışıyor). Çalma katmanı `Esc` ya da düğmeyle kapanır; iki yol da aynı
      `close` olayından geçtiği için ses her hâlükârda susar. */
   $("#alarmEnabled").onchange=saveAlarmSetting;
-  /* Saat seçimi panelin kendi listelerinden gelir (yerel saat penceresi yok). Dinleyici listenin
-     kendisinde: seçenekler yeniden çizildiğinde bağ kopmaz. */
-  [["#alarmHourList","hour"],["#alarmMinuteList","minute"]].forEach(([selector,unit])=>{
-    $(selector).addEventListener("click",event=>{
-      const option=event.target.closest(".alarm-time-option");
-      if(option)pickAlarmTimePart(unit,Number(option.dataset.alarmValue));
+  /* Saat seçimi panelin kendi pop-up'ından gelir (yerel saat penceresi yok). Yazma yalnız
+     "Kaydet"te olur; kapatmanın üç yolu da (çarpı, "Vazgeç", Esc/dışarı tıklama) eski değeri
+     bırakır. Dinleyiciler tekerleğin kendisinde: satırlar yeniden çizildiğinde bağ kopmaz. */
+  $("#alarmTimeButton").onclick=openAlarmTimePicker;
+  $("#closeAlarmTimeDialog").onclick=()=>$("#alarmTimeDialog").close();
+  $("#cancelAlarmTime").onclick=()=>$("#alarmTimeDialog").close();
+  $("#confirmAlarmTime").onclick=applyAlarmTimePicker;
+  bindBackdropClose("#alarmTimeDialog",".time-picker-card",()=>$("#alarmTimeDialog").close());
+  ["#alarmHourWheel","#alarmMinuteWheel"].forEach(selector=>{
+    const wheel=$(selector);
+    // Kaydırma olayı saniyede onlarca kez gelir; boyama kare başına bir kez yapılır.
+    let painting=false;
+    wheel.addEventListener("scroll",()=>{
+      if(painting)return;
+      painting=true;
+      requestAnimationFrame(()=>{painting=false;alarmWheelPaint(wheel)});
+    },{passive:true});
+    wheel.addEventListener("keydown",event=>{if(alarmWheelKey(wheel,event.key))event.preventDefault()});
+    wheel.addEventListener("click",event=>{
+      const option=event.target.closest(".time-wheel-option");
+      if(option)alarmWheelScrollTo(wheel,Array.prototype.indexOf.call(wheel.children,option),true);
     });
   });
   $("#alarmRepeat").onchange=saveAlarmSetting;
