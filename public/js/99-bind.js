@@ -162,7 +162,14 @@
      kalanı da böyle çalışıyor). Çalma katmanı `Esc` ya da düğmeyle kapanır; iki yol da aynı
      `close` olayından geçtiği için ses her hâlükârda susar. */
   $("#alarmEnabled").onchange=saveAlarmSetting;
-  $("#alarmTime").onchange=saveAlarmSetting;
+  /* Saat seçimi panelin kendi listelerinden gelir (yerel saat penceresi yok). Dinleyici listenin
+     kendisinde: seçenekler yeniden çizildiğinde bağ kopmaz. */
+  [["#alarmHourList","hour"],["#alarmMinuteList","minute"]].forEach(([selector,unit])=>{
+    $(selector).addEventListener("click",event=>{
+      const option=event.target.closest(".alarm-time-option");
+      if(option)pickAlarmTimePart(unit,Number(option.dataset.alarmValue));
+    });
+  });
   $("#alarmRepeat").onchange=saveAlarmSetting;
   $("#alarmWeekday").onchange=saveAlarmSetting;
   $("#stopAlarm").onclick=stopAlarmRing;

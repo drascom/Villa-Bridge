@@ -499,7 +499,25 @@
   const alarmGraceMs=120000;
   // Kimse dokunmazsa uyarı kendiliğinden kapanır — duvarda sonsuza kadar öten tablet olmaz.
   const alarmAutoStopMs=120000;
-  const alarmChimeIntervalMs=1900;
+  /* Sesin kademelenmesi tek yerden ayarlanır. Uyandırma eğrisi: ilk vuruşlar alçak, seyrek ve
+     yumuşak; `alarmRampMs` boyunca hem seviye hem tını sertliği artar, vuruş arası kısalır.
+     Eğri üstel (`alarmRampCurve`) — başlangıç bölgesinde uzun süre nazik kalır, sona doğru
+     hızla sertleşir. Tepe seviye 1'in belirgin altında ve zincirin ucunda bir sıkıştırıcı var:
+     tablet hoparlöründe kırık/bozuk çıkış olmasın. */
+  const alarmRampMs=32000;
+  const alarmRampCurve=1.6;
+  const alarmChimeGapStartMs=2600;
+  const alarmChimeGapPeakMs=1150;
+  const alarmLevelStart=0.08;
+  const alarmLevelPeak=0.42;
+  // Sertlik karışımı: kare bileşen tınıya üst harmonik katar, oktav üstü bileşen "delici"liği verir.
+  const alarmHarshMix=0.45;
+  const alarmPierceMix=0.30;
+  const alarmChimeNotes=[880,1174.66];
+  const alarmNoteGapStart=0.24;
+  const alarmNoteGapPeak=0.15;
+  const alarmDecayStart=0.85;
+  const alarmDecayPeak=0.34;
   const alarmDefaultTime="07:30";
   const normalizeAlarmTime=value=>/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))?String(value):alarmDefaultTime;
   /* Gün kimliği YEREL tarihten kurulur (ISO/UTC değil): yaz saati geçişinde ya da cihaz saati
@@ -565,12 +583,61 @@
       return`<option value="${index}">${esc(dateTimeFormatter({weekday:"long"}).format(day))}</option>`;
     }).join("");
   }
+  /* SAAT SEÇİCİ — panelin kendi içinde. `<input type="time">` kaldırıldı: Android WebView onun
+     için yerel bir saat penceresi açıyor ve o pencerenin alt onay şeridi 800px yüksekliğinde
+     kırpılıyordu; boyutu bizim CSS'imizle kontrol edilemiyordu. İki kaydırılabilir liste (saat
+     ve dakika) hiçbir yerel pencereye muhtaç değil. Kayıt biçimi aynı: "HH:MM". */
+  const alarmMinuteStep=5;
+  const alarmPad2=value=>String(value).padStart(2,"0");
+  const alarmTimeParts=()=>({hour:Number(alarmSetting.time.slice(0,2)),minute:Number(alarmSetting.time.slice(3,5))});
+  function alarmMinuteChoices(){
+    const minutes=[];
+    for(let minute=0;minute<60;minute+=alarmMinuteStep)minutes.push(minute);
+    // 5'in katı olmayan eski bir kayıt sessizce yuvarlanmaz; kendi değeri listeye eklenir.
+    const current=alarmTimeParts().minute;
+    if(!minutes.includes(current))minutes.push(current);
+    return minutes.sort((first,second)=>first-second);
+  }
+  function renderAlarmTimeList(list,values,selected){
+    const wanted=values.join(",");
+    if(list.dataset.values!==wanted){
+      list.dataset.values=wanted;
+      list.innerHTML=values.map(value=>`<button type="button" class="alarm-time-option" role="option" data-alarm-value="${value}" aria-selected="false">${alarmPad2(value)}</button>`).join("");
+    }
+    let active=null;
+    Array.from(list.children).forEach(option=>{
+      const chosen=Number(option.dataset.alarmValue)===selected;
+      option.setAttribute("aria-selected",chosen?"true":"false");
+      if(chosen)active=option;
+    });
+    // Seçili değer görünmüyorsa listeyi ortalarız; görünüyorsa kaydırmaya dokunulmaz, kullanıcı
+    // parmağının altındaki liste zıplamaz.
+    if(!active)return;
+    const top=active.offsetTop;
+    const bottom=top+active.offsetHeight;
+    if(top<list.scrollTop||bottom>list.scrollTop+list.clientHeight)list.scrollTop=top-(list.clientHeight-active.offsetHeight)/2;
+  }
+  function renderAlarmTimePicker(){
+    const hours=$("#alarmHourList");
+    if(!hours)return;
+    const parts=alarmTimeParts();
+    renderAlarmTimeList(hours,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],parts.hour);
+    renderAlarmTimeList($("#alarmMinuteList"),alarmMinuteChoices(),parts.minute);
+    $("#alarmTimeValue").textContent=alarmSetting.time;
+  }
+  function pickAlarmTimePart(unit,value){
+    const parts=alarmTimeParts();
+    const hour=unit==="hour"?value:parts.hour;
+    const minute=unit==="minute"?value:parts.minute;
+    alarmSetting.time=`${alarmPad2(hour)}:${alarmPad2(minute)}`;
+    saveAlarmSetting();
+  }
   function renderAlarmSettings(){
     const enabled=$("#alarmEnabled");
     if(!enabled)return;
     const weekday=$("#alarmWeekday");
     enabled.checked=alarmSetting.enabled;
-    $("#alarmTime").value=alarmSetting.time;
+    renderAlarmTimePicker();
     $("#alarmRepeat").value=alarmSetting.repeat;
     weekday.innerHTML=alarmWeekdayOptions();
     weekday.value=String(alarmSetting.weekday);
@@ -584,7 +651,8 @@
      hemen ötmesin diye, bugünün çalma anı geçtiyse gün "çalınmış" işaretlenir. */
   function saveAlarmSetting(){
     alarmSetting.enabled=$("#alarmEnabled").checked===true;
-    alarmSetting.time=normalizeAlarmTime($("#alarmTime").value);
+    // Saat, seçicinin kendi durumundan gelir (ayrı bir alan yok); yine de biçim doğrulanır.
+    alarmSetting.time=normalizeAlarmTime(alarmSetting.time);
     alarmSetting.repeat=$("#alarmRepeat").value==="weekly"?"weekly":"daily";
     const weekday=Number($("#alarmWeekday").value);
     alarmSetting.weekday=Number.isInteger(weekday)&&weekday>=0&&weekday<=6?weekday:0;
@@ -651,7 +719,9 @@
      sessizce yalnız görsele düşer. */
   let alarmAudioContext=null;
   let alarmGain=null;
+  let alarmLimiter=null;
   let alarmChimeTimer=null;
+  let alarmSoundStartedAt=0;
   function ensureAlarmAudio(){
     if(alarmAudioContext)return alarmAudioContext;
     const Factory=window.AudioContext||window.webkitAudioContext;
@@ -664,24 +734,52 @@
     const context=ensureAlarmAudio();
     if(context&&context.state==="suspended")context.resume().catch(()=>{});
   }
-  // Yumuşak iki notalı çan: sinüs + üstel sönüm. Her vuruş kendi düğümünü kurar ve kendi kendine
-  // biter; susturma ana kazancı koparır, kuyrukta bekleyen ses kalmaz.
-  function alarmChime(at){
+  /* Tek vuruş: iki nota, her nota bir zarf ve zarfın altında üç ses. Sinüs temeli hep var;
+     kare ve oktav üstü bileşenler `intensity` (0→1) ile açılır — çan yavaş yavaş cırtlak bir
+     alarma döner. Şiddet arttıkça atak sertleşir, sönüm kısalır, notalar birbirine yaklaşır.
+     Her vuruş kendi düğümlerini kurar ve kendi kendine biter; susturma ana kazancı koparır,
+     kuyrukta bekleyen ses kalmaz. */
+  function alarmChime(at,intensity){
     const context=alarmAudioContext;
     if(!context||!alarmGain)return;
-    [880,1174.66].forEach((frequency,index)=>{
-      const start=at+index*0.19;
-      const oscillator=context.createOscillator();
+    const blend=(from,to)=>from+(to-from)*intensity;
+    const level=blend(alarmLevelStart,alarmLevelPeak);
+    const decay=blend(alarmDecayStart,alarmDecayPeak);
+    const noteGap=blend(alarmNoteGapStart,alarmNoteGapPeak);
+    const attack=blend(0.05,0.012);
+    alarmChimeNotes.forEach((frequency,index)=>{
+      const start=at+index*noteGap;
       const envelope=context.createGain();
-      oscillator.type="sine";
-      oscillator.frequency.setValueAtTime(frequency,start);
       envelope.gain.setValueAtTime(0.0001,start);
-      envelope.gain.exponentialRampToValueAtTime(0.3,start+0.03);
-      envelope.gain.exponentialRampToValueAtTime(0.0001,start+0.85);
-      oscillator.connect(envelope).connect(alarmGain);
-      oscillator.start(start);
-      oscillator.stop(start+0.9);
+      envelope.gain.exponentialRampToValueAtTime(level,start+attack);
+      envelope.gain.exponentialRampToValueAtTime(0.0001,start+decay);
+      envelope.connect(alarmGain);
+      [["sine",frequency,1],["square",frequency,alarmHarshMix*intensity],["square",frequency*2,alarmPierceMix*intensity*intensity]].forEach(([type,voiceFrequency,mix])=>{
+        if(mix<=0.002)return;
+        const oscillator=context.createOscillator();
+        const voice=context.createGain();
+        oscillator.type=type;
+        oscillator.frequency.setValueAtTime(voiceFrequency,start);
+        voice.gain.value=mix;
+        oscillator.connect(voice).connect(envelope);
+        oscillator.start(start);
+        oscillator.stop(start+decay+0.05);
+      });
     });
+  }
+  // Vuruşlar sabit bir `setInterval` yerine kendini yeniden kuran zamanlayıcıyla sürer: aralık
+  // da şiddetle birlikte kısalır. Rampa dolduktan sonra değerler sabitlenir, alarm o seviyede
+  // otomatik susana (`alarmAutoStopMs`) ya da kullanıcı durdurana kadar devam eder.
+  function alarmIntensity(){
+    const ramp=Math.min(1,Math.max(0,(Date.now()-alarmSoundStartedAt)/alarmRampMs));
+    return Math.pow(ramp,alarmRampCurve);
+  }
+  function scheduleAlarmChime(){
+    if(!alarmGain||!alarmAudioContext)return;
+    const intensity=alarmIntensity();
+    alarmChime(alarmAudioContext.currentTime+0.02,intensity);
+    const gap=alarmChimeGapStartMs+(alarmChimeGapPeakMs-alarmChimeGapStartMs)*intensity;
+    alarmChimeTimer=setTimeout(scheduleAlarmChime,gap);
   }
   function startAlarmSound(){
     try{
@@ -690,9 +788,17 @@
       if(context.state==="suspended")context.resume().catch(()=>{});
       alarmGain=context.createGain();
       alarmGain.gain.value=1;
-      alarmGain.connect(context.destination);
-      alarmChime(context.currentTime+0.05);
-      alarmChimeTimer=setInterval(()=>{if(alarmGain)alarmChime(alarmAudioContext.currentTime+0.02)},alarmChimeIntervalMs);
+      // Zincirin ucundaki sıkıştırıcı emniyet supabı: üst harmonikler üst üste binince çıkış
+      // kırpılıp bozulmasın, tepe seviye hoparlörü zorlamasın.
+      alarmLimiter=context.createDynamicsCompressor();
+      alarmLimiter.threshold.value=-10;
+      alarmLimiter.knee.value=6;
+      alarmLimiter.ratio.value=12;
+      alarmLimiter.attack.value=0.003;
+      alarmLimiter.release.value=0.15;
+      alarmGain.connect(alarmLimiter).connect(context.destination);
+      alarmSoundStartedAt=Date.now();
+      scheduleAlarmChime();
       return true;
     }catch(error){
       console.warn("alarm-audio",error);
@@ -700,7 +806,8 @@
     }
   }
   function stopAlarmSound(){
-    if(alarmChimeTimer!==null){clearInterval(alarmChimeTimer);alarmChimeTimer=null}
+    if(alarmChimeTimer!==null){clearTimeout(alarmChimeTimer);alarmChimeTimer=null}
+    if(alarmLimiter){try{alarmLimiter.disconnect()}catch{}alarmLimiter=null}
     if(!alarmGain)return;
     try{alarmGain.disconnect()}catch{}
     alarmGain=null;
