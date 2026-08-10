@@ -498,15 +498,21 @@
        (1) Sol bölmenin tıklanabilir alanı çipten geniştir (60px kutu, 46px çip) ama gövdenin
            alanını yemez — aradaki 12px boşluk ikisinin sınırını nötr bırakır.
        (2) Basılı tutma geri bildirimi BÖLME BAZINDA: hangi yarıya basıldıysa yalnız o yarı
-           koyulaşır ve azıcık küçülür. Kap tümüyle tepki verseydi ayrım kaybolurdu; bu yüzden
-           `.group-control-tile` üzerinde `:active` kuralı yoktur. Basılma zemini yeni bir renk
-           değil, cam yüzeyin kendi gölge/çerçeve tonundan türetilmiş nötr bir örtüdür. */
-    .group-control-tile{--tile-press:rgba(12,32,24,.08)}
-    :root[data-theme="dark"] .group-control-tile{--tile-press:rgba(255,255,255,.1)}
-    .group-control-tile>.tile-knob{width:auto;height:auto;min-width:60px;min-height:60px;flex:none;border-radius:18px;transition:background .12s ease,transform .12s ease}
-    .group-control-tile>.tile-body{padding:4px 6px;border-radius:12px;transition:background .12s ease,transform .12s ease}
-    .group-control-tile>.tile-knob:not(.is-static):not(:disabled):active{background:var(--tile-press);transform:scale(.94)}
-    .group-control-tile>.tile-body:not(:disabled):active{background:var(--tile-press);transform:scale(.985)}
+           küçülür ve azıcık soluklaşır. Kap tümüyle tepki verseydi ayrım kaybolurdu; bu yüzden
+           `.group-control-tile` üzerinde `:active` kuralı yoktur.
+           BİÇİM: taşıyıcı sinyal ZEMİN DEĞİL, ölçek + opaklıktır. Zemin yalnız çok hafif bir
+           tondur (yeni renk değil, aynı nötr örtünün iyice sönümlenmiş hali); daha koyu bir
+           örtü sarı/kırmızı/yeşil durum zeminlerinin üstünde leke gibi okunuyordu. Gövde
+           bölmesi döşemenin sağ kenarına dayandığı için SAĞ köşeleri kabın iç yarıçapına
+           (14px kenar − 7px iç boşluk) uyar; sol köşeleri serbesttir, bu yüzden daha yumuşak.
+           Böylece basılan alan çıplak bir dikdörtgen blok değil, kabın eğrisini izleyen bir
+           yüzey olur. İkon bölmesi zaten yuvarlak çipin üstünde duruyor, biçimi korunur. */
+    .group-control-tile{--tile-press:rgba(12,32,24,.035)}
+    :root[data-theme="dark"] .group-control-tile{--tile-press:rgba(255,255,255,.045)}
+    .group-control-tile>.tile-knob{width:auto;height:auto;min-width:60px;min-height:60px;flex:none;border-radius:18px;transition:background .12s ease,transform .12s ease,opacity .12s ease}
+    .group-control-tile>.tile-body{padding:4px 6px;border-radius:12px 7px 7px 12px;transition:background .12s ease,transform .12s ease,opacity .12s ease}
+    .group-control-tile>.tile-knob:not(.is-static):not(:disabled):active{background:var(--tile-press);opacity:.76;transform:scale(.94)}
+    .group-control-tile>.tile-body:not(:disabled):active{background:var(--tile-press);opacity:.76;transform:scale(.97)}
     .group-control-copy{display:block}
     .group-control-tile:has(.tile-knob:focus-visible),.group-control-tile:has(.tile-body:focus-visible){outline:3px solid var(--forest-soft);outline-offset:2px}
     /* Gizlenmiş döşeme yalnız grup sekmesinde ve düzenleme kipinde görünür: soluk ve işaretli. */

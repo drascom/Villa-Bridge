@@ -570,13 +570,12 @@
     $$("[data-automation-toggle]").forEach(button=>button.onclick=event=>{event.stopPropagation();toggleAutomationEnabled(button.dataset.automationToggle)});
     $$("[data-automation-menu]").forEach(button=>button.onclick=event=>{event.stopPropagation();openAutomationActions(button.dataset.automationMenu)});
     $$("[data-automation-runs]").forEach(button=>button.onclick=event=>{event.stopPropagation();toggleAutomationRuns(button.dataset.automationRuns)});
-    // Kart gövdesine tek dokunuş doğrudan düzenlemeyi açar; uzun basma yine seçenekleri getirir.
+    // Kart gövdesine tek dokunuş doğrudan düzenlemeyi açar; seçenekler görünür "⋯" düğmesinde.
     $$("[data-automation-card]").forEach(card=>{
       card.onclick=event=>{
         if(event.target.closest?.("[data-automation-toggle],[data-automation-menu],[data-automation-runs],.automation-runs"))return;
         openAutomationWizard(card.dataset.automationCard);
       };
-      bindLongPress(card,()=>openAutomationActions(card.dataset.automationCard),{ignore:target=>Boolean(target.closest?.("[data-automation-toggle],[data-automation-menu],[data-automation-runs],.automation-runs"))});
     });
   }
   // Geçmiş açılınca sunucudan çekilir; başarısız olursa boş kalmaz, sebebi yazar.

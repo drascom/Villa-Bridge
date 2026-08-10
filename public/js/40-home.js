@@ -76,43 +76,6 @@
       if(image.complete)image.naturalWidth===0?fail():succeed();
     });
   }
-  function bindLongPress(element,callback,{ignore}={}){
-    if(element.dataset.longPressBound==="true")return;
-    element.dataset.longPressBound="true";
-    let timer=null,startX=0,startY=0,pointerId=null;
-    const clear=()=>{
-      clearTimeout(timer);
-      timer=null;
-      element.classList.remove("long-press-active");
-      if(pointerId!==null&&element.hasPointerCapture?.(pointerId))element.releasePointerCapture(pointerId);
-      pointerId=null;
-    };
-    element.addEventListener("pointerdown",event=>{
-      if(event.pointerType==="mouse"&&event.button!==0||ignore?.(event.target))return;
-      clear();
-      startX=event.clientX;startY=event.clientY;pointerId=event.pointerId;
-      element.setPointerCapture?.(pointerId);
-      timer=setTimeout(()=>{
-        timer=null;
-        element.dataset.suppressClick="true";
-        element.classList.add("long-press-active");
-        navigator.vibrate?.(18);
-        callback(event);
-      },longPressDelay);
-    });
-    element.addEventListener("pointermove",event=>{
-      if(timer&&Math.hypot(event.clientX-startX,event.clientY-startY)>12)clear();
-    });
-    element.addEventListener("pointerup",clear);
-    element.addEventListener("pointercancel",clear);
-    element.addEventListener("contextmenu",event=>event.preventDefault());
-    element.addEventListener("click",event=>{
-      if(element.dataset.suppressClick!=="true")return;
-      delete element.dataset.suppressClick;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    },true);
-  }
   function setupQuickMouseScrolling(){
     const scroller=$("#homeTabs");
     if(!scroller||scroller.dataset.mouseDragBound==="true")return;

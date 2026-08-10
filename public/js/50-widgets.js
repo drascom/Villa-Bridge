@@ -320,19 +320,9 @@
     applyWidgetLayout();
     touchDashboardEditing();
   }
-  const longPressIgnore=target=>Boolean(target.closest("button,input,select,textarea,a,[data-group-device],[data-tile-open]"));
+  /* Düzenleme kipine tek giriş var: baştaki "Düzenle" düğmesi (`#editDashboard`). Karta uzun
+     basma jesti kaldırıldı — görünmez bir kısayoldu ve yanlışlıkla tetikleniyordu. */
   function bindWidgetControls(){
-    $$("#widgetRail [data-widget]").filter(widget=>!widget.hidden).forEach(widget=>{
-      bindLongPress(widget,()=>{
-        if(!state.dashboardEditing)setDashboardEditing(true);
-      },{ignore:longPressIgnore});
-    });
-    /* Grup sekmesindeki kart da düzenlenebilir bir yüzey: asıl detay ekranı orası olduğu için
-       uzun basış orada da düzenleme kipini açar, döşeme genişliği oradan da ayarlanabilir. */
-    const panel=$("#groupPanel");
-    if(panel)bindLongPress(panel,()=>{
-      if(!panel.hidden&&!state.dashboardEditing)setDashboardEditing(true);
-    },{ignore:longPressIgnore});
     $$("[data-widget-move]").forEach(button=>button.onclick=()=>{
       const id=button.closest("[data-widget]")?.dataset.widget;
       if(id)moveDashboardWidget(id,button.dataset.widgetMove);

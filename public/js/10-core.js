@@ -170,7 +170,6 @@
     home:{query:"",results:[],loading:false,error:null,requestId:0,timer:null}
   };
   const locationSearchInputs={clock:"#clockCitySearch",weather:"#weatherLocationSearch",home:"#homeLocationSearch"};
-  const longPressDelay=560;
   const $=selector=>document.querySelector(selector);
   const $$=selector=>[...document.querySelectorAll(selector)];
   const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
