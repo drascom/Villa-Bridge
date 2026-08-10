@@ -636,7 +636,9 @@
   };
   /* `options.compact`: aynı kumanda hızlı kumanda penceresinde de çizilir. Orada göz (oda kartında
      göster/gizle) yeri değil — pencereyi açan döşemeyi pencerenin içinden kaldırmak anlamsız;
-     göz cihaz sayfasındaki yerinde durmaya devam eder. Başka hiçbir parça değişmez. */
+     göz cihaz sayfasındaki yerinde durmaya devam eder. Aynı gerekçeyle "Efekt" açılır listesi de
+     düşer: hızlı kumanda parlaklık, renk sıcaklığı/renk ve aç/kapa demektir; efekt gibi ileri ayar
+     "Ayrıntılar"daki cihaz sayfasında tam sürümde durmaya devam eder. Başka hiçbir parça değişmez. */
   const lightPanelHtml=(device,options={})=>{
     const parts=lightPanelParts(device);
     if(!lightPanelSupported(device,parts))return"";
@@ -670,7 +672,7 @@
     const presetsHtml=parts.color
       ?`<div class="light-color"${mode==="color"?"":" hidden"}><div class="light-presets" role="group" aria-label="${esc(t("lightPresetColors"))}">${lightColorPresets.map(hex=>`<button class="light-preset" type="button" data-light-preset="${hex}" data-device="${esc(device.id)}" data-property="${esc(parts.color.property)}" aria-label="${esc(`${t("color")} ${hex}`)}" title="${hex}" style="background:${hex}"></button>`).join("")}</div><input class="color-picker" type="color" value="${esc(typeof parts.color.value==="string"?parts.color.value:"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(parts.color.property)}" aria-label="${esc(t("color"))}"></div>`
       :"";
-    const effectHtml=parts.effect
+    const effectHtml=options.compact!==true&&parts.effect
       ?`<label class="light-effect"><span>${esc(t("lightEffect"))}</span><select class="control-select" data-select="${esc(device.id)}" data-property="${esc(parts.effect.property)}" aria-label="${esc(t("lightEffect"))}">${(parts.effect.values||[]).map(value=>`<option value="${esc(value)}"${String(value)===String(parts.effect.value)?" selected":""}>${esc(String(value).replaceAll("_"," "))}</option>`).join("")}</select></label>`
       :"";
     return`<div class="light-panel" data-light-panel="${esc(device.id)}">

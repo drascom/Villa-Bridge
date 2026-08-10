@@ -246,11 +246,27 @@
     /* Hızlı kumanda penceresi. Kısılabilir ışıkta gövdesi cihaz sayfasındaki kumandanın TA KENDİSİ
        (`lightPanelHtml`) — ikinci bir kaydırıcı/renk arayüzü yazılmadı. Kısılamayan cihazda o gövde
        tek büyük aç/kapa düğmesine düşer. Alt satırda yalnız "Ayrıntılar" durur. */
-    .quick-modal{width:min(420px,92vw);padding:22px}
+    /* Pencere EKRANIN ORTASINDA duran dar bir kart: genişliği diyaloğun KENDİSİNE verilir, iç kutu
+       onu doldurur. Diyaloğun kendi zemini yok — cam yüzey kartın üstünde durur, arkasındaki ana
+       ekran örtünün içinden görünür. Yeni renk yok: dil ana ekranın `--glass-*` kümesinden gelir,
+       iki temada da kendiliğinden döner. */
+    dialog.quick-dialog{width:min(420px,92vw);max-width:min(420px,92vw);border-radius:26px;background:transparent;box-shadow:none}
+    /* Örtü ana `dialog::backdrop`ten daha AÇIK: pencere öne çıksın diye hafifçe karartır ama
+       arkadaki paneli kapatmaz. */
+    dialog.quick-dialog::backdrop{background:rgba(12,22,17,.34);backdrop-filter:blur(3px)}
+    .quick-modal{width:100%;padding:22px;border:1px solid var(--glass-tile-brd);border-radius:26px;background:var(--glass-tile);box-shadow:var(--glass-shadow);backdrop-filter:blur(calc(var(--glass-blur) * 1.5)) saturate(1.25);-webkit-backdrop-filter:blur(calc(var(--glass-blur) * 1.5)) saturate(1.25)}
     .quick-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
     .quick-modal-head h2{margin:3px 0 0;font:700 24px/1.15 system-ui,sans-serif;overflow-wrap:anywhere}
+    /* Kapatma kartın kendi sağ üstünde: 44×44 hedef korunur, yalnız dolgusu cam dile iner. */
+    .quick-dialog .quick-modal-head .device-detail-close{border:1px solid var(--glass-tile-brd);background:var(--glass-card)}
     .quick-modal-body{display:grid;justify-items:center;gap:14px;margin-top:16px}
-    .quick-modal-body .light-panel{width:100%;margin:0}
+    /* Kumandanın kendi kutusu pencerede kalkar: yüzey KARTIN kendisi, ikinci bir opak katman
+       cam dili bozardı. Cihaz sayfasındaki tam sürüm etkilenmez. */
+    .quick-modal-body .light-panel{width:100%;margin:0;padding:0;border:0;background:transparent}
+    /* Kolon mock'taki gibi tıknaz: parmakla rahat sürüklenir, ince uzun şerit değil. */
+    .quick-modal-body .light-column{width:clamp(112px,30vw,156px);height:clamp(150px,32vh,236px);border-color:var(--glass-tile-brd);background:var(--glass-card)}
+    .quick-modal-body .light-mode:not(.active):not(.on){border-color:var(--glass-tile-brd);background:var(--glass-card)}
+    .quick-modal-body .quick-toggle:not(.on){background:var(--glass-card);box-shadow:inset 0 0 0 1px var(--glass-tile-brd)}
     .quick-modal-actions{display:flex;justify-content:flex-end;margin-top:18px}
     .quick-toggle-wrap{display:grid;place-items:center;padding:10px 0 4px}
     .quick-toggle{width:136px;height:136px;display:grid;place-items:center;align-content:center;gap:9px;padding:0;border:0;border-radius:50%;color:var(--muted);background:var(--surface-soft);box-shadow:inset 0 0 0 1px var(--line);font:750 14px/1 system-ui,sans-serif;touch-action:manipulation;transition:.2s}
@@ -769,6 +785,11 @@
       dialog#appMenuDialog>.modal>*{flex:none;width:min(100%,920px)}
       dialog#appMenuDialog .app-menu-nav{flex:1 1 auto;align-content:safe center;min-height:0;overflow-y:auto;overscroll-behavior:contain}
       dialog#appMenuDialog .modal-actions{flex:none;margin-top:14px}
+      /* TEK İSTİSNA — hızlı kumanda. Ortak kural her diyaloğu ekrana yayar; bu pencere ise bilerek
+         KÜÇÜK ve ORTADA durur (cihaza tek dokunuşluk kumanda, tam ekran bir sayfa değil). `margin:auto`
+         geri verilir: ortak kuraldaki `margin:0` pencereyi ekranın üstüne yapıştırıyordu. */
+      dialog#quickControlDialog{width:min(420px,92vw)!important;max-width:min(420px,92vw)!important;margin:auto;border-radius:26px}
+      dialog#quickControlDialog>.modal{max-height:min(88dvh,760px);padding:22px}
     }
     /* TELEFON DİKEY ONARIMI — tek kapı: (orientation:portrait) and (max-width:560px).
        Yeniden tasarım değil, duvar tableti ölçülerinin telefonda ürettiği dört kırığın onarımı:
