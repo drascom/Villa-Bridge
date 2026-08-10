@@ -209,14 +209,18 @@ function appendMatterbridgeArguments(argv, matterHome) {
   return argv;
 }
 
-function readPluginBlackList(file) {
+function readPluginList(file, key) {
   try {
     const existing = JSON.parse(fs.readFileSync(file, "utf8"));
-    return Array.isArray(existing?.blackList) ? existing.blackList : [];
+    return Array.isArray(existing?.[key]) ? existing[key] : [];
   } catch {
-    // Bozuk ya da eksik config kara listeyi sifirlar; koordinator yine de disarida kalir.
+    // Bozuk ya da eksik config listeyi sifirlar; koordinator yine de disarida kalir.
     return [];
   }
+}
+
+function readPluginBlackList(file) {
+  return readPluginList(file, "blackList");
 }
 
 function mergeBlackList(...sources) {
@@ -257,11 +261,15 @@ function writeMatterbridgePluginConfig(config, provision, matterHome) {
     protocolVersion: 4,
     username: provision.mqttAuthRequired ? provision.mqttUsername : "",
     password: provision.mqttAuthRequired ? provision.mqttPassword : "",
-    whiteList: [],
+    whiteList: mergeBlackList(readPluginList(file, "whiteList")),
     blackList,
-    switchList: [],
-    lightList: [],
-    outletList: [],
+    // Eklenti varsayilan olarak bircok cihazi MA-onoffswitch (0x0103) diye yayinlar;
+    // 0x0103 bir istemci tipi oldugu icin Alexa onu kontrol edilebilir cihaz saymaz.
+    // Kullanicinin bu listelere yazdigi adlar cihazi light/outlet/switch tipine cevirir,
+    // o yuzden yeniden yazarken korunur.
+    switchList: mergeBlackList(readPluginList(file, "switchList")),
+    lightList: mergeBlackList(readPluginList(file, "lightList")),
+    outletList: mergeBlackList(readPluginList(file, "outletList")),
     featureBlackList: [],
     deviceFeatureBlackList: {}
   };
