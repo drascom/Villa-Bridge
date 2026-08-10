@@ -54,6 +54,7 @@ import { SelfHealStateStore } from "./self-heal.js";
 import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
+import { WeatherLocationStore, WeatherService } from "./weather.js";
 import {
   applyPendingZigbeeNetworkRestore,
   createZigbeeNetworkBackup,
@@ -173,6 +174,17 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   }
 ) : null;
 const recentErrors = new RecentErrorLog(50, config.debug.enabled);
+/**
+ * Hava durumu evde tek kaynaktır: şehir de veri de burada durur, panel yalnız bunu okur.
+ * Konum yapılandırmanın yanındaki `weather-location.json`da; evin koordinatından (`location.json`,
+ * güneş tetikleyicisi) bilerek ayrıdır — biri kurulum ayarı, öbürü "hangi şehrin havası".
+ */
+const weatherService = new WeatherService({
+  store: new WeatherLocationStore(resolve(dirname(configPath), "weather-location.json")),
+  onError: (message) => {
+    recentErrors.record({ operation: "weather", statusCode: 503, message });
+  }
+});
 const nodeRole = resolveVillaBridgeNodeRole();
 const nodeId = resolveVillaBridgeNodeId(nodeRole);
 const discoveryRecord = createVillaBridgeDiscoveryRecord(
@@ -1117,6 +1129,40 @@ app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown; 
   }
 );
 
+/**
+ * Hava durumu — veri ve seçili şehir sunucudan. Okuma ev sakinine açık (yetki tablosunda),
+ * konumu değiştirmek yönetici işi: tablette yapılan seçim evdeki bütün ekranları değiştirir.
+ * İnternet yoksa son bilinen veri `error` notuyla birlikte döner, istek yine 200'dür.
+ */
+app.get("/api/weather", async () => ({ ok: true, ...weatherService.snapshot() }));
+
+app.put<{ Body?: { location?: unknown } }>("/api/weather/location", async (request, reply) => {
+  try {
+    const body = request.body ?? {};
+    return { ok: true, ...await weatherService.setLocation(body.location ?? body) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/**
+ * Şehir araması sunucudan geçer; panel dış servise doğrudan çıkmaz. Hava penceresinin yanında
+ * dünya saati ve ev konumu pencereleri de bunu kullandığı için okuma ev sakinine açıktır.
+ */
+app.get<{ Querystring: { q?: string; language?: string } }>(
+  "/api/locations/search",
+  async (request, reply) => {
+    try {
+      return { ok: true, results: await weatherService.search(request.query.q, request.query.language) };
+    } catch (error) {
+      return reply.code(503).send({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+);
+
 app.put<{ Body?: { automations?: unknown } }>("/api/automations", async (request, reply) => {
   try {
     return { ok: true, automations: await automationsStore.save(request.body?.automations) };
@@ -1522,6 +1568,7 @@ const shutdown = async (): Promise<void> => {
   await automationEngine.settle();
   await automationRunLog.flush();
   peerWatcher?.stop();
+  weatherService.stop();
   await discoveryResponder?.close();
   await source.stop();
   await app.close();
@@ -1583,6 +1630,11 @@ try {
     `Zigbee kaynağı başlatılamadı, düğüm koordinatörsüz sürüyor: ${coordinatorError}`
   );
 }
+// Hava durumu koordinatörden bağımsızdır: Zigbee kaynağı düşse de panel havayı görmeye devam eder.
+// Açılışı beklemeye değmez, arka planda kurulur; konum yoksa hiç dışarıya çıkmaz.
+void weatherService.start().catch((error: unknown) => {
+  console.error(`Hava durumu servisi başlatılamadı: ${String(error)}`);
+});
 const warmDeviceImages = (): void => {
   const models = store.getDevices()
     .map((device) => device.image.model?.trim())

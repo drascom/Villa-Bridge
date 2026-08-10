@@ -10,12 +10,12 @@
     return["name","lqi","status","lastSeen"].includes(key)?{key,direction:direction==="desc"?"desc":"asc"}:null;
   }catch{return null}})();
   const savedThemeMode=(()=>{try{const value=localStorage.getItem("villa-theme");return["light","dark","system"].includes(value)?value:"system"}catch{return"system"}})();
+  /* Hava durumu artık cihazda DEĞİL sunucuda durur (`/api/weather`): aynı evdeki tablet ve
+     tarayıcı tek şehri, tek ölçümü gösterir. Buradaki eski kayıt yalnız bir kerelik göç
+     kaynağıdır — sunucuda konum tanımlı değilse cihazdaki seçim bir kez yukarı taşınır ve yerel
+     kayıt silinir (bkz. `migrateWeatherLocation`). Eski veri önbelleği (`villa-weather-cache`)
+     tümüyle kalktı; önbellek artık sunucunun işi. */
   const savedWeatherLocation=(()=>{try{const value=JSON.parse(localStorage.getItem("villa-weather-location")||"null");return Number.isFinite(value?.latitude)&&Number.isFinite(value?.longitude)?{...value,name:typeof value.name==="string"?value.name.slice(0,80):"",country:typeof value.country==="string"?value.country.slice(0,80):"",admin1:typeof value.admin1==="string"?value.admin1.slice(0,80):""}:null}catch{return null}})();
-  const savedWeatherSnapshot=(()=>{try{
-    const value=JSON.parse(localStorage.getItem("villa-weather-cache")||"null");
-    if(!value?.data?.current||!Number.isFinite(Number(value.updatedAt)))return null;
-    return{data:value.data,updatedAt:Number(value.updatedAt)};
-  }catch{return null}})();
   const onboardingStorageKey="villa-onboarding-complete-v1";
   const dashboardTourStorageKey="villa-dashboard-tour-complete-v1";
   const deviceHintStorageKey="villa-device-hint-complete-v1";
@@ -132,7 +132,10 @@
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
   const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],debugNetworkEvents:[],agentTokens:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,deviceReturnWait:null,lightDevice:null,contextDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,automationAgentBackups:0,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,deviceSort:savedDeviceSort??{key:"name",direction:"asc"},attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
-  const weatherState={location:savedWeatherLocation,data:savedWeatherSnapshot?.data||null,error:null,loading:false,updatedAt:savedWeatherSnapshot?.updatedAt||0};
+  /* `updatedAt` sunucunun veriyi çektiği an, `checkedAt` bu cihazın sunucuya en son sorduğu an.
+     İkisi ayrıdır: veri on dakika önce çekilmiş olabilir ama biz onu saniyeler önce okumuş
+     olabiliriz — "eski mi" sorusu veriye, "yeniden sorayım mı" sorusu okumaya bakar. */
+  const weatherState={location:null,data:null,error:null,loading:false,updatedAt:0,checkedAt:0,request:null};
   const weatherStaleAfter=7200000;
   const weatherIsStale=()=>Boolean(weatherState.data)&&Date.now()-weatherState.updatedAt>weatherStaleAfter;
   const localTimeZone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC"}catch{return "UTC"}})();

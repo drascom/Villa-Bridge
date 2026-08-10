@@ -152,25 +152,32 @@
   $("#matterDialog").addEventListener("close",stopMatterWatch);
   async function startAuthenticatedApplication(){
     if(applicationStarted){
-      const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation()];
+      const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadWeather()];
       if(state.auth.user?.role==="admin")reload.push(loadSettings());
       await Promise.allSettled(reload);
       await migrateLocalGroups();
+      await migrateWeatherLocation();
       return;
     }
     applicationStarted=true;
     setupPullToRefresh();setupQuickMouseScrolling();configureAndroidActions();bindScreensaver();bindWidgetControls();applyWidgetLayout();
-    const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadInstallationOnboarding()];
+    const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadWeather(),loadInstallationOnboarding()];
     if(state.auth.user?.role==="admin")startup.push(loadSettings());
     await Promise.allSettled(startup);
     await migrateLocalGroups();
+    // Sunucuda konum yoksa cihazda kalmış eski seçim bir kez yukarı taşınır; hava okunduktan
+    // SONRA çalışır, yoksa sunucunun kendi konumunu ezerdi.
+    await migrateWeatherLocation();
     if(!onboardingComplete())openOnboarding();
     else requestAnimationFrame(maybeStartDashboardTour);
     setInterval(()=>{if(!document.hidden&&state.auth.authenticated)refresh()},8000);
     scheduleWorldClockTick();
-    setInterval(()=>{if(!document.hidden)refreshWeatherIfNeeded()},1800000);
+    // Hava sunucudan okunuyor: sormak ucuz, kör 30 dakikalık bekleme kalktı.
+    setInterval(()=>{if(!document.hidden)refreshWeatherIfNeeded()},300000);
     setInterval(()=>{if(state.pairing?.open)render()},1000);
-    document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.auth.authenticated)refresh()});
+    // Ekran yeniden görünür olduğunda hava HEMEN tazelenir — uykudan dönen tablet eski değeri
+    // göstermesin.
+    document.addEventListener("visibilitychange",()=>{if(document.hidden||!state.auth.authenticated)return;refresh();loadWeather()});
   }
   async function initialize(){
     applyTheme();

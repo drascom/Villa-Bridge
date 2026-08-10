@@ -65,7 +65,8 @@
       name:result.name.slice(0,80),
       country:typeof result.country==="string"?result.country.slice(0,80):"",
       admin1:typeof result.admin1==="string"?result.admin1.slice(0,80):"",
-      timeZone:typeof result.timezone==="string"?result.timezone.slice(0,80):"",
+      // Sunucu `timeZone` döndürür; ham Open-Meteo kaydında alan `timezone` idi. İkisi de okunur.
+      timeZone:typeof result.timeZone==="string"?result.timeZone.slice(0,80):typeof result.timezone==="string"?result.timezone.slice(0,80):"",
       latitude,
       longitude
     };
@@ -120,16 +121,17 @@
     search.error=null;
     renderLocationSearchResults(kind);
     try{
-      const params=new URLSearchParams({name:query,count:"5",language:state.language,format:"json"});
-      const response=await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`,{cache:"no-store"});
-      if(!response.ok)throw new Error(t("locationSearchUnavailable"));
-      const data=await response.json();
+      // Arama sunucudan geçer: panel hiçbir dış servise doğrudan çıkmaz.
+      const params=new URLSearchParams({q:query,language:state.language});
+      const data=await api(`/api/locations/search?${params}`);
       if(requestId!==search.requestId)return;
       search.results=(Array.isArray(data?.results)?data.results:[]).map(normalizeLocationResult).filter(Boolean);
     }catch(error){
       if(requestId!==search.requestId)return;
       search.results=[];
-      search.error=error?.message||t("locationSearchUnavailable");
+      // Sunucu metni Türkçe; ekranda panelin dili kalsın diye çeviri anahtarı yazılır.
+      console.warn("location-search",error);
+      search.error=t("locationSearchUnavailable");
     }finally{
       if(requestId===search.requestId){
         search.loading=false;
@@ -188,18 +190,39 @@
     // alana dokununca açılır.
     $("#weatherLocationDialog").showModal();
   }
-  function saveWeatherLocation(){
-    try{localStorage.setItem("villa-weather-location",JSON.stringify(weatherState.location))}catch{}
+  /* Şehir seçimi sunucuya yazılır ve oradan bütün ekranlara iner. Yazma yönetici işi olduğu için
+     ev sakininde 403 gelir; hata sessizce yutulmaz, kullanıcıya sunucunun kendi metni gösterilir. */
+  async function chooseWeatherLocation(location){
+    try{
+      const data=await api("/api/weather/location",{method:"PUT",body:JSON.stringify({location})});
+      applyWeatherSnapshot(data);
+      $("#weatherLocationDialog").close();
+      renderWeather();
+      renderLocationSearchResults("weather");
+    }catch(error){showToast(error.message,true)}
   }
-  function chooseWeatherLocation(location){
-    weatherState.location=location;
-    weatherState.data=null;
-    weatherState.error=null;
-    weatherState.updatedAt=0;
-    saveWeatherLocation();
-    saveWeatherSnapshot();
-    $("#weatherLocationDialog").close();
-    loadWeather();
+  /* Bir kerelik göç: cihazda kalmış seçim (ör. "London"), sunucuda hiç konum yokken yukarı
+     taşınır. Taşınamazsa (yönetici değil, ağ yok) yerel kayıt DURUR — bir sonraki açılışta
+     yeniden denenir, kullanıcı seçimini kaybetmez. Veri önbelleği her hâlükârda silinir. */
+  async function migrateWeatherLocation(){
+    try{localStorage.removeItem("villa-weather-cache")}catch{}
+    if(!savedWeatherLocation||weatherState.location)return;
+    try{
+      applyWeatherSnapshot(await api("/api/weather/location",{method:"PUT",body:JSON.stringify({location:savedWeatherLocation})}));
+      try{localStorage.removeItem("villa-weather-location")}catch{}
+      renderWeather();
+    }catch{}
+  }
+  function applyWeatherSnapshot(data){
+    weatherState.location=data?.location||null;
+    weatherState.data=data?.data||null;
+    weatherState.updatedAt=Number(data?.updatedAt)||0;
+    // Sunucudaki hata notu ("internet yok") son bilinen veriyle birlikte gelir; veri varsa blok
+    // yine dolu görünür, notu `renderWeather` yazar. Sunucunun kendi metni Türkçedir ve panelin
+    // dilinden bağımsızdır — ekrana çevrilmiş metin konur, ham hata yalnız konsola düşer.
+    if(data?.error)console.warn("weather",data.error);
+    weatherState.error=data?.error?t("weatherUnavailable"):null;
+    weatherState.checkedAt=Date.now();
   }
   // Hava ikonları panelin geri kalanıyla aynı dili konuşur: 24×24 kutu, dolgusuz, `currentColor`
   // çizgi. Tek karakterlik metin glifleri (☀ ⛅ …) yazı tipine göre değişip bulanık duruyordu.
@@ -386,42 +409,36 @@
     if(!$("#weatherDialog").open)$("#weatherDialog").showModal();
     refreshWeatherIfNeeded();
   }
-  function saveWeatherSnapshot(){
-    try{localStorage.setItem("villa-weather-cache",JSON.stringify({updatedAt:weatherState.updatedAt,data:weatherState.data}))}catch{}
-  }
-  async function loadWeather(){
-    if(!weatherState.location||weatherState.loading)return;
+  /* Tek veri yolu: sunucu. Konumu da veriyi de o söyler, panel bir şey hesaplamaz. Sunucuya
+     ulaşılamazsa elimizdeki son okuma ekranda kalır — blok boşalmaz. */
+  function loadWeather(){
+    // Uçuştaki istek paylaşılır: aynı anda birden çok yerden çağrılsa da (açılış, yeniden çizim,
+    // sekmeye dönüş) tek istek gider ve HEPSİ aynı sonucu bekler. Erken `return` yerine ortak
+    // söz döndürmek, açılıştaki göç adımının sunucunun cevabını gerçekten görmesini sağlar.
+    if(weatherState.request)return weatherState.request;
     weatherState.loading=true;
     renderWeather();
-    const params=new URLSearchParams({
-      latitude:String(weatherState.location.latitude),
-      longitude:String(weatherState.location.longitude),
-      current:"temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m",
-      hourly:"temperature_2m,weather_code,is_day",
-      daily:"weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset",
-      timezone:"auto",
-      forecast_days:"4"
-    });
-    try{
-      const response=await fetch(`https://api.open-meteo.com/v1/forecast?${params}`,{cache:"no-store"});
-      if(!response.ok)throw new Error(t("weatherUnavailable"));
-      const data=await response.json();
-      if(!data?.current)throw new Error(t("weatherUnavailable"));
-      weatherState.data=data;
-      weatherState.error=null;
-      weatherState.updatedAt=Date.now();
-      saveWeatherSnapshot();
-    }catch(error){
-      weatherState.error=error?.message||t("weatherUnavailable");
-      console.warn("weather",error);
-    }finally{
-      weatherState.loading=false;
-      renderWeather();
-    }
+    weatherState.request=(async()=>{
+      try{
+        applyWeatherSnapshot(await api("/api/weather"));
+      }catch(error){
+        weatherState.checkedAt=Date.now();
+        weatherState.error=error?.message||t("weatherUnavailable");
+        console.warn("weather",error);
+      }finally{
+        weatherState.request=null;
+        weatherState.loading=false;
+        renderWeather();
+      }
+    })();
+    return weatherState.request;
   }
   // "Mevcut konumu kullan" kaldırıldı: panel düz HTTP ile servis edildiği için tarayıcının konum
   // servisi güvenli köken şartını karşılamıyor, düğme her zaman sessizce "izin verilmedi"ye düşüyordu.
+  /* Sormak artık ucuz (kendi sunucumuz), ama her yeniden çizimde istek atılmasın diye bir
+     dakikalık taban var. Sayfa yeniden görünür olduğunda `loadWeather` DOĞRUDAN çağrılır. */
+  const weatherPollFloor=60000;
   function refreshWeatherIfNeeded(){
-    if(!weatherState.location||weatherState.loading)return;
-    if(!weatherState.data||Date.now()-weatherState.updatedAt>1800000)loadWeather();
+    if(weatherState.loading)return;
+    if(!weatherState.checkedAt||Date.now()-weatherState.checkedAt>weatherPollFloor)loadWeather();
   }

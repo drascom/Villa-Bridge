@@ -694,7 +694,7 @@
     const dialog=$("#homeLocationDialog");
     if(dialog&&!dialog.open)dialog.showModal();
   }
-  // Hava durumu konumu tarayıcıda saklıdır: ağ yokken de tek dokunuşla evin konumu olabilir.
+  // Hava durumu konumu sunucudan gelir (`/api/weather`): seçilmişse tek dokunuşla evin konumu olur.
   function renderHomeLocationDialog(){
     const reuse=$("#useWeatherLocationForHome");
     if(!reuse)return;
