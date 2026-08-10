@@ -634,7 +634,10 @@
     color:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4c4.3 3.6 6.6 6.5 6.6 9.2a6.6 6.6 0 0 1-13.2 0c0-2.7 2.3-5.6 6.6-9.2Z"/></svg>',
     column:'<svg class="light-column-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M7.5 6.3a7.5 7.5 0 1 0 9 0"/></svg>'
   };
-  const lightPanelHtml=device=>{
+  /* `options.compact`: aynı kumanda hızlı kumanda penceresinde de çizilir. Orada göz (oda kartında
+     göster/gizle) yeri değil — pencereyi açan döşemeyi pencerenin içinden kaldırmak anlamsız;
+     göz cihaz sayfasındaki yerinde durmaya devam eder. Başka hiçbir parça değişmez. */
+  const lightPanelHtml=(device,options={})=>{
     const parts=lightPanelParts(device);
     if(!lightPanelSupported(device,parts))return"";
     const mode=lightPanelMode(device,parts);
@@ -660,7 +663,7 @@
     /* Göz kip düğmelerinin yanında, kumandanın içinde durur. Yeni bileşen yok: satırdakiyle BİREBİR
        aynı `visibilityButton` çağrısı — aynı sınıf, aynı `role="switch"`/`aria-checked`, aynı
        `data-visibility-*` bağlaması. Panoya ekleme/çıkarma davranışı değişmedi, yalnız yeri değişti. */
-    const eyeHtml=lightPanelCoversPower(device,parts)?visibilityButton(device,parts.power):"";
+    const eyeHtml=options.compact!==true&&lightPanelCoversPower(device,parts)?visibilityButton(device,parts.power):"";
     const actionsHtml=modesHtml||eyeHtml?`<div class="light-actions">${modesHtml}${eyeHtml}</div>`:"";
     /* Hazır renklerin altında panelin KENDİ renk seçicisi durur (`.color-picker` + `data-color`):
        serbest renk için ikinci bir arayüz yazılmadı, mevcut olan yeniden kullanıldı. */

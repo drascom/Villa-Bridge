@@ -320,7 +320,7 @@
     applyWidgetLayout();
     touchDashboardEditing();
   }
-  const longPressIgnore=target=>Boolean(target.closest("button,input,select,textarea,a,[data-group-device],[data-group-show-device]"));
+  const longPressIgnore=target=>Boolean(target.closest("button,input,select,textarea,a,[data-group-device],[data-tile-open]"));
   function bindWidgetControls(){
     $$("#widgetRail [data-widget]").filter(widget=>!widget.hidden).forEach(widget=>{
       bindLongPress(widget,()=>{
@@ -345,7 +345,13 @@
   function bindGroupControls(){
     bindDeviceImages();
     $$("[data-group-device]").forEach(button=>button.onclick=()=>runDashboardCommand(button,button.dataset.groupDevice,button.dataset.groupProperty,JSON.parse(button.dataset.groupCommandValue)));
-    $$("[data-group-show-device]").forEach(button=>button.onclick=()=>showDevice(button.dataset.groupShowDevice));
+    /* Döşemenin gövdesi hızlı kumanda penceresini açar; kumandası olmayan cihazda pencere hiç
+       açılmaz, `openQuickControl` doğrudan cihaz detay sayfasına geçer (uyarı verilmez). */
+    $$("[data-tile-open]").forEach(button=>button.onclick=event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      openQuickControl(button.dataset.tileOpen,button.dataset.tileControl);
+    });
     $$("[data-edit-group]").forEach(button=>button.onclick=()=>openGroupEditor(button.dataset.editGroup));
     /* Boyut simgesi cihaza dokunmamalı: olayı burada durduruyoruz, ayrıca simge butonun kardeşi
        (iç içe <button> olamaz) ve düzenleme kipinde döşemenin kendisi pointer-events:none. */
@@ -373,7 +379,9 @@
     });
     observeTileWidths();
     applyAllTileWidths();
-    bindDashboardDeviceActions();
+    /* Döşemede uzun basış KALKTI: tek işi cihaz detayını açmaktı, o iş artık gövdeye ait görünür
+       bir dokunma hedefi (`data-tile-open`). Gizli bir jestin aynı sonucu vermesi için sebep yok.
+       Kart ve grup sekmesi seviyesindeki uzun basış (düzenleme kipi) olduğu gibi duruyor. */
   }
   const groupItemKey=(deviceId,controlId)=>JSON.stringify([deviceId,controlId]);
   /* Arama karşılaştırması Türkçe'ye duyarsız: önce Türkçe küçültme (I→ı, İ→i), sonra aksanlı

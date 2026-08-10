@@ -78,6 +78,8 @@
     "batterySensors": "Cihazlar ve sistem",
     "deviceNeedsAttention": "{name} için kontrol gerekiyor.",
     "quickControl": "Hızlı kontrol",
+    "quickControlDetails": "Ayrıntılar",
+    "openQuickControls": "Kumandayı aç",
     "homeTabsLabel": "Genel görünüm ve gruplar",
     "homeTabsWidget": "Görünüm sekmeleri",
     "homeTabsWidgetLead": "Genel görünüm ve her grup için bir sekme, hep altta durur.",

@@ -78,6 +78,8 @@
     "batterySensors": "Devices and system",
     "deviceNeedsAttention": "{name} needs attention.",
     "quickControl": "Quick control",
+    "quickControlDetails": "Details",
+    "openQuickControls": "Open controls",
     "homeTabsLabel": "Overview and groups",
     "homeTabsWidget": "View tabs",
     "homeTabsWidgetLead": "Overview and one tab per group, always at the bottom.",

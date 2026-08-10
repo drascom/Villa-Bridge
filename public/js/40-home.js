@@ -179,9 +179,81 @@
     if(messageKey){confirmDashboardCommand(deviceId,property,value,messageKey);return}
     command(deviceId,property,value);
   }
-  function bindDashboardDeviceActions(){
-    $$("[data-group-device]").forEach(card=>bindLongPress(card,()=>openDeviceDetail(card.dataset.groupDevice)));
-    $$("[data-group-show-device]").forEach(card=>bindLongPress(card,()=>openDeviceDetail(card.dataset.groupShowDevice)));
+  /* Hızlı kumanda penceresinin üç hâli VERİDEN türetilir; ad ya da model kuralı yoktur:
+       none  → cihazın hiç aç/kapa kumandası yok (kapı/hareket/CO sensörü, buton). Pencere hiç
+               açılmaz ve uyarı da verilmez; doğrudan mevcut cihaz detay sayfası açılır.
+       dim   → panelin ışık kolonunu (`lightPanelHtml`) çizebildiği kanal: dikey kaydırıcı,
+               varsa renk sıcaklığı ve renk seçenekleri.
+       onoff → kalan her aç/kapa kanalı: kaydırıcı yok, tek büyük aç/kapa düğmesi.
+     Kolon yalnız KENDİ sürdüğü kanalı temsil eder; çok kanallı bir cihazın öteki kanalının
+     döşemesinde "onoff" kalır, yoksa orada olmayan bir karartma vaat edilirdi. */
+  function quickControlMode(device,control){
+    if(!dashboardControlAction(control))return"none";
+    const parts=lightPanelParts(device);
+    if(!lightPanelSupported(device,parts)||!(parts.level||parts.temperature))return"onoff";
+    return!parts.power||parts.power.id===control.id?"dim":"onoff";
+  }
+  /* Pencerede sürülen kanal döşemenin kanalıdır: kayıt cihaz kimliği + kontrol kimliğidir,
+     dostane ad değil. Kontrolü olmayan döşemede kimlik `@device` olur ve kanal `null` kalır. */
+  function quickControlEntry(){
+    const stored=state.quickControl;
+    const device=stored?state.devices.find(item=>item.id===stored.id):null;
+    if(!device)return null;
+    const control=stored.controlId&&stored.controlId!==groupDeviceControlId
+      ?device.controls.find(item=>item.id===stored.controlId&&isDashboardControl(item))||null
+      :null;
+    return{device,control};
+  }
+  /* Kısılamayan cihazda kaydırıcı ve renk yok, tek büyük aç/kapa var. Komut yolu değişmiyor:
+     panelin genel `data-command-value` ucu kullanılır, böylece bekleyen komut ve onay isteyen
+     kilit/siren davranışı bugünküyle aynı kalır. */
+  function quickToggleHtml(device,control){
+    const action=dashboardControlAction(control);
+    if(!action)return"";
+    const pending=commandPending(device.id,control.property);
+    const active=pending?!action.active:action.active;
+    const label=pending?t("sendingCommand"):t(active?"on":"off");
+    const disabled=device.preparing===true||pending||device.availability==="offline";
+    return`<div class="quick-toggle-wrap"><button class="quick-toggle${active?" on":""}${pending?" pending":""}" type="button" data-command-value="${commandValue(action.value)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}"${confirmCommandAttribute(control,action)} aria-pressed="${active}" aria-label="${esc(`${device.name} · ${pending?t("sendingCommand"):active?t("off"):t("on")}`)}"${disabled?" disabled":""}>${lightGlyphs.power}<span>${esc(label)}</span></button></div>`;
+  }
+  /* Parmak kolonun üstündeyken ya da bir alan düzenlenirken pencere yeniden çizilmez —
+     `renderDeviceDetail`in `detailBodyBusy` emniyetiyle aynı kural. */
+  const quickControlBusy=()=>{
+    if(state.quickPointerDown)return true;
+    const body=$("#quickControlBody");
+    const active=document.activeElement;
+    return Boolean(body&&active&&body.contains(active)&&active.closest('select,textarea,input:not([type="range"])'));
+  };
+  function renderQuickControl(){
+    const entry=quickControlEntry();
+    if(!entry){closeQuickControl();return}
+    const{device,control}=entry;
+    $("#quickControlTitle").textContent=control?channelDisplayName(device,control):device.name;
+    if(quickControlBusy())return;
+    $("#quickControlBody").innerHTML=quickControlMode(device,control)==="dim"
+      ?lightPanelHtml(device,{compact:true})
+      :quickToggleHtml(device,control);
+    bindCards();
+  }
+  function openQuickControl(deviceId,controlId){
+    const device=state.devices.find(item=>item.id===deviceId);
+    if(!device)return;
+    const control=controlId&&controlId!==groupDeviceControlId
+      ?device.controls.find(item=>item.id===controlId&&isDashboardControl(item))||null
+      :null;
+    if(quickControlMode(device,control)==="none"){openDeviceDetail(deviceId);return}
+    state.quickControl={id:deviceId,controlId:control?control.id:groupDeviceControlId};
+    state.quickPointerDown=false;
+    state.lightPanelMode=null;
+    renderQuickControl();
+    const dialog=$("#quickControlDialog");
+    if(!dialog.open)dialog.showModal();
+    focusModalHeading(dialog.querySelector(".quick-modal"));
+  }
+  function closeQuickControl(){
+    state.quickControl=null;
+    const dialog=$("#quickControlDialog");
+    if(dialog&&dialog.open)dialog.close();
   }
   /* Gerçek eve yazıyoruz: sürüklerken cihaz komutla boğulmasın. Arayüz İYİMSER (parmakla birlikte
      anında boyanır), yazma KISITLI (en çok `lightWriteInterval` ms'de bir ve aynı anda tek uçuşta
@@ -304,9 +376,12 @@
       paint(next);
       write(next,false);
     };
+    /* Kolon iki yüzeyde çizilebiliyor (cihaz sayfası ve hızlı kumanda penceresi); kip değişimi
+       hangisi açıksa onu tazeler, yoksa açık olmayan pencere boşuna yeniden çizilirdi. */
     $$("[data-light-mode-button]").forEach(button=>button.onclick=()=>{
       state.lightPanelMode=button.dataset.lightModeButton;
-      renderDeviceDetail();
+      if($("#quickControlDialog").open)renderQuickControl();
+      else renderDeviceDetail();
     });
     $$("[data-light-preset]").forEach(button=>button.onclick=()=>command(button.dataset.device,button.dataset.property,button.dataset.lightPreset));
   }
@@ -330,7 +405,6 @@
     $$("[data-device-role-select]").forEach(input=>input.onchange=()=>changeDeviceRole(input,input.dataset.deviceRoleSelect,input.dataset.deviceRoleChannel,input.value));
     $$("[data-color]").forEach(input=>input.onchange=()=>command(input.dataset.color,input.dataset.property,input.value));
     bindLightPanel();
-    bindDashboardDeviceActions();
     $$("[data-visibility-device]:not(.tile-eye)").forEach(button=>button.onclick=()=>toggleTileVisibility(button.dataset.visibilityDevice,button.dataset.visibilityControl));
     $$("[data-change-image]").forEach(button=>button.onclick=()=>openImageChooser(button.dataset.changeImage));
     $$("[data-rename]").forEach(button=>button.onclick=event=>{event.preventDefault();event.stopPropagation();openRename(button.dataset.rename)});
@@ -446,6 +520,7 @@
     renderWidgetLists();
     bindCards();
     renderPairingProgress();
+    if($("#quickControlDialog").open)renderQuickControl();
     if($("#lightDialog").open)renderLightDialog();
     if($("#deviceDetailDialog").open)renderDeviceDetail();
   }
@@ -701,7 +776,7 @@
     saveTileWidths();
     applyTileWidths(slot.closest(".group-control-grid"));
   }
-  /* Göz döşemenin kardeşi: döşeme zaten <button>, iç içe buton olamaz. Tıklama cihazı açıp
+  /* Göz döşemenin kardeşi: döşemenin İÇİ zaten iki düğme, iç içe buton olamaz. Tıklama cihazı açıp
      kapatmaz — düzenleme kipinde döşeme `pointer-events:none`, olay da ayrıca durdurulur.
      Kontrolü olmayan cihaz (sensör) da gizlenebilir: anahtarı `@device`. */
   function tileVisibilityHtml(device,control,name){
@@ -730,15 +805,29 @@
       const failed=commandFailed(device.id);
       const shown=pending?!controlAction.active:controlAction?.active===true;
       const visualState=preparing?"preparing":control?(device.availability==="offline"?"offline":shown?"on":"off"):groupDeviceVisualState(device);
-      const action=controlAction?`data-group-device="${esc(device.id)}" data-group-property="${esc(control.property)}" data-group-command-value="${commandValue(controlAction.value)}"${confirmCommandAttribute(control,controlAction)}`:`data-group-show-device="${esc(device.id)}"`;
+      const action=controlAction?`data-group-device="${esc(device.id)}" data-group-property="${esc(control.property)}" data-group-command-value="${commandValue(controlAction.value)}"${confirmCommandAttribute(control,controlAction)}`:"";
       const primaryStatus=primaryStatusForDevice(device,preparing);
       const statusLabel=preparing?t("preparing"):device.availability==="offline"?primaryStatus.label:pending?t("sendingCommand"):controlAction?(shown?t("on"):t("off")):primaryStatus.label;
       const statusTone=preparing?"muted":device.availability==="offline"?"danger":controlAction?(shown?"active":"muted"):primaryStatus.tone;
-      const label=controlAction?`${name} · ${statusLabel} · ${pending?t("sendingCommand"):controlAction.active?t("off"):t("on")}`:`${t("showInDevices")}: ${name} · ${statusLabel}`;
-      const widthKey=tileWidthKey(device.id,control?control.id:groupDeviceControlId);
+      const controlId=control?control.id:groupDeviceControlId;
+      const widthKey=tileWidthKey(device.id,controlId);
       const widthMode=tileWidthPreference(widthKey);
       const wide=widthMode==="wide";
-      const tile=`<button class="group-control-tile ${visualState}${pending?" pending":""}${failed?" command-failed":""}" type="button" ${action} aria-label="${esc(preparing?`${name} · ${t("preparing")}`:label)}"${preparing||(device.availability==="offline"&&Boolean(controlAction))||pending?" disabled":""}><div class="group-control-visual">${deviceStatusIcon(device,{label:statusLabel,tone:statusTone})}</div><div class="group-control-copy"><strong>${esc(name)}</strong><small>${esc(statusLabel)}</small></div>${preparing||pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</button>`;
+      /* Döşemede İKİ dokunma hedefi var: yuvarlak ikon cihazı açıp kapar, gövde (isim + durum)
+         hızlı kumanda penceresini açar. Kap bu yüzden <button> değil <div>: iç içe <button>
+         geçersizdir (aynı gerekçe gözde de yazılı). Görsel sınıflar kapta kaldığı için düzenleme
+         kipinin `pointer-events:none` emniyeti, göz/genişlik düğmeleri ve zemin kuralları
+         değişmeden çalışır. Kumandası olmayan cihazda ikon düğme değil, düz bir işarettir. */
+      const iconHtml=deviceStatusIcon(device,{label:statusLabel,tone:statusTone});
+      const knobLabel=preparing
+        ?`${name} · ${t("preparing")}`
+        :`${name} · ${statusLabel} · ${pending?t("sendingCommand"):controlAction?.active?t("off"):t("on")}`;
+      const knobHtml=controlAction
+        ?`<button class="group-control-visual tile-knob" type="button" ${action} aria-pressed="${shown?"true":"false"}" aria-label="${esc(knobLabel)}"${preparing||device.availability==="offline"||pending?" disabled":""}>${iconHtml}</button>`
+        :`<span class="group-control-visual tile-knob is-static" aria-hidden="true">${iconHtml}</span>`;
+      const openLabel=`${t(quickControlMode(device,control)==="none"?"showDetails":"openQuickControls")}: ${name} · ${statusLabel}`;
+      const bodyHtml=`<button class="tile-body" type="button" data-tile-open="${esc(device.id)}" data-tile-control="${esc(controlId)}" aria-label="${esc(preparing?`${name} · ${t("preparing")}`:openLabel)}"${preparing?" disabled":""}><span class="group-control-copy"><strong>${esc(name)}</strong><small>${esc(statusLabel)}</small></span></button>`;
+      const tile=`<div class="group-control-tile ${visualState}${pending?" pending":""}${failed?" command-failed":""}">${knobHtml}${bodyHtml}${preparing||pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</div>`;
       const hiddenTile=isTileHidden(device.id,control?control.id:null);
       return`<div class="group-control-slot has-eye${wide?" is-wide":""}${hiddenTile?" is-hidden-tile":""}" data-tile-key="${esc(widthKey)}" data-tile-width="${esc(widthMode)}">${tile}${tileWidthToggleHtml(widthKey,wide)}${tileVisibilityHtml(device,control,name)}</div>`;
     }).join("");

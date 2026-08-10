@@ -138,6 +138,15 @@
   bindBackdropClose("#widgetDialog",".add-modal",closeAddDialog);
   bindBackdropClose("#deviceDetailDialog",".device-detail-modal",closeDeviceDetail);
   bindBackdropClose("#lightDialog",".light-modal",()=>$("#lightDialog").close());
+  /* Hızlı kumanda penceresi: kapatma çarpısı, `Esc` ve odak tuzağı `<dialog>`ın kendisinden gelir;
+     açılışta odak başlığa verilir, hiçbir metin alanına gitmez. "Ayrıntılar" yeni bir ekran açmaz —
+     pencereyi kapatıp bugün zaten var olan cihaz detay sayfasını açar. */
+  $("#closeQuickControl").onclick=closeQuickControl;
+  $("#quickControlDialog").addEventListener("close",()=>{state.quickControl=null;state.quickPointerDown=false});
+  $("#quickControlBody").addEventListener("pointerdown",()=>{state.quickPointerDown=true},{passive:true});
+  ["pointerup","pointercancel"].forEach(type=>$("#quickControlBody").addEventListener(type,()=>{state.quickPointerDown=false},{passive:true}));
+  $("#quickControlDetails").onclick=()=>{const id=state.quickControl?.id;closeQuickControl();if(id)openDeviceDetail(id)};
+  bindBackdropClose("#quickControlDialog",".quick-modal",closeQuickControl);
   bindBackdropClose("#matterDialog",".modal",closeMatterDialog);
   bindBackdropClose("#weatherDialog",".modal",()=>$("#weatherDialog").close());
   /* Sağ üst çarpılar: kapatmayı kestirmeden `close()` ile yapmaz, modalin KENDİ kapatma
