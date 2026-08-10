@@ -26,10 +26,23 @@
       --glass-card:rgba(255,255,255,.48);--glass-card-brd:rgba(255,255,255,.66);
       --glass-tile:rgba(255,255,255,.66);--glass-tile-brd:rgba(255,255,255,.86);
       --glass-shadow:0 10px 26px rgba(72,52,28,.14);--glass-blur:18px;
-      /* Durum renkleri anlamını korur; yalnız birer tık saydamlaşır ki cam dilin içinde dursun. */
-      --glass-on:rgba(255,240,199,.88);--glass-on-brd:rgba(225,163,63,.85);
-      --glass-active:rgba(227,243,235,.88);--glass-active-brd:rgba(75,154,116,.8);
-      --glass-alert:rgba(252,231,228,.9);--glass-alert-brd:rgba(201,75,67,.8);
+      /* DURUM = PARLAKLIK MERDİVENİ. Zemin gradyanı yavaşça kaydığı için TON bazlı ayrım
+         güvenilmez (sıcak zemin ile sarı "yanan" döşeme birbirine karışıyordu). Ayrım artık
+         sabit bir parlaklık sırasından gelir: sönük < taban döşeme < aktif/uyarı < YANAN.
+         Renklerin anlamı korunur — yanan sıcak sarı, aktif/hazır yeşil, uyarı kırmızı,
+         çevrimdışı sönük; değişen yalnız her birinin merdivendeki yeri.
+         `--glass-on` neredeyse beyaz sıcak bir ÇEKİRDEK: ekranın en parlak öğesi. Etrafındaki
+         `--glass-on-glow` hafif bir hale/ışıma verir — açık temada zemin zaten aydınlık olduğu
+         için ayrımın büyük kısmını bu hale ve sönük döşemenin geri çekilmesi taşır.
+         `--glass-off` zeminin ALTINA iner (koyu, düşük alfalı örtü): kapalı döşeme geri çekilir,
+         yanan olanla arasındaki mesafe iki temada da açılır. */
+      --glass-on:rgba(255,252,242,.97);--glass-on-brd:rgba(240,178,74,.95);
+      --glass-on-ink:#5f3f08;--glass-on-chip:#ffedc0;--glass-on-chip-ink:#6f4a0b;
+      --glass-on-glow:0 0 0 3px rgba(255,206,124,.42),0 10px 26px rgba(178,114,22,.26);
+      --glass-active:rgba(180,220,200,.93);--glass-active-brd:rgba(56,138,99,.85);--glass-active-ink:#17553a;
+      --glass-alert:rgba(250,199,192,.93);--glass-alert-brd:rgba(190,64,56,.85);--glass-alert-ink:#7f2a25;
+      --glass-off:rgba(92,80,64,.2);--glass-off-brd:rgba(255,255,255,.4);
+      --glass-off-sub:rgba(23,33,29,.74);--glass-off-chip:rgba(255,255,255,.26);
     }
     :root[data-theme="dark"]{
       color-scheme:dark;
@@ -47,9 +60,16 @@
       --glass-card:rgba(14,10,7,.5);--glass-card-brd:rgba(255,255,255,.1);
       --glass-tile:rgba(9,6,4,.62);--glass-tile-brd:rgba(255,255,255,.13);
       --glass-shadow:0 14px 32px rgba(0,0,0,.34);--glass-blur:18px;
-      --glass-on:rgba(73,57,28,.86);--glass-on-brd:rgba(169,119,44,.9);
-      --glass-active:rgba(29,57,44,.86);--glass-active-brd:rgba(61,137,102,.9);
-      --glass-alert:rgba(67,38,34,.88);--glass-alert-brd:rgba(166,70,64,.9);
+      /* Koyu temada "en parlak öğe" mantığı doğrudan çalışır: yanan döşeme neredeyse beyaz sıcak
+         bir levhaya döner, üstündeki yazı koyu kehribar olur. Kapalı döşeme neredeyse siyaha
+         iner — koyu zeminden de bir tık aşağıda kalır. */
+      --glass-on:rgba(255,246,222,.96);--glass-on-brd:rgba(214,152,52,.95);
+      --glass-on-ink:#4a3208;--glass-on-chip:#f7dfa6;--glass-on-chip-ink:#4a3208;
+      --glass-on-glow:0 0 0 3px rgba(255,198,104,.3),0 12px 32px rgba(255,166,50,.3);
+      --glass-active:rgba(33,66,51,.9);--glass-active-brd:rgba(61,137,102,.9);--glass-active-ink:#a8e3c6;
+      --glass-alert:rgba(86,45,40,.92);--glass-alert-brd:rgba(166,70,64,.9);--glass-alert-ink:#ffc0ba;
+      --glass-off:rgba(4,3,2,.74);--glass-off-brd:rgba(255,255,255,.09);
+      --glass-off-sub:rgba(237,245,240,.68);--glass-off-chip:rgba(255,255,255,.06);
     }
     *{box-sizing:border-box}html{scroll-behavior:smooth}
     /* DOKUNMA VURGUSU — odak halkasından AYRI bir şey. Android WebView, dokunulan her düğmenin
@@ -214,15 +234,23 @@
     /* Hızlı erişim şeridinin kendi kartı yok: sekmeler doğrudan zeminin üstünde durur. */
     #home .quick-control-widget{border-color:transparent;background:none;box-shadow:none}
     body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
-    body[data-active-view="home"] #home .quick-card.on,body[data-active-view="home"] #home .group-control-tile.on{border-color:var(--glass-on-brd);background:var(--glass-on)}
-    body[data-active-view="home"] #home .group-control-tile.active{border-color:var(--glass-active-brd);background:var(--glass-active)}
-    body[data-active-view="home"] #home .group-control-tile.alert{border-color:var(--glass-alert-brd);background:var(--glass-alert)}
+    /* PARLAKLIK MERDİVENİ BURADA KURULUR (değerler `--glass-*` kümesinde, iki tema için ayrı).
+       Sıra: sönük/çevrimdışı → taban döşeme → aktif/uyarı → YANAN. Yanan döşeme ekranın en
+       parlak öğesidir ve tek halesi olan öğedir; kapalı döşeme zeminin altına çekilir. Kapalı
+       döşemenin ikinci satırı ve nötr çipi de birlikte sönür, yoksa sönük döşemenin üstünde
+       beyaz bir plaka kalıp yanan döşemeyle yarışıyordu. Yeşil (aktif/hazır) ve kırmızı (uyarı)
+       çipler bilerek DIŞARIDA: anlamları parlaklıkla değil kendi tonlarıyla okunmaya devam eder. */
+    body[data-active-view="home"] #home .group-control-tile.off,body[data-active-view="home"] #home .group-control-tile.offline{border-color:var(--glass-off-brd);background:var(--glass-off)}
+    body[data-active-view="home"] #home .group-control-tile.off .group-control-copy small,body[data-active-view="home"] #home .group-control-tile.offline .group-control-copy small{color:var(--glass-off-sub)}
+    body[data-active-view="home"] #home .group-control-tile .device-status-icon.muted{color:var(--glass-off-sub);background:var(--glass-off-chip);box-shadow:inset 0 0 0 1px var(--glass-off-brd)}
+    body[data-active-view="home"] #home .quick-card.on,body[data-active-view="home"] #home .group-control-tile.on{border-color:var(--glass-on-brd);color:var(--glass-on-ink);background:var(--glass-on);box-shadow:var(--glass-on-glow)}
+    body[data-active-view="home"] #home .group-control-tile.on .device-status-icon{color:var(--glass-on-chip-ink);background:var(--glass-on-chip);box-shadow:inset 0 0 0 1px var(--glass-on-brd)}
+    body[data-active-view="home"] #home .group-control-tile.active{border-color:var(--glass-active-brd);color:var(--glass-active-ink);background:var(--glass-active)}
+    body[data-active-view="home"] #home .group-control-tile.alert{border-color:var(--glass-alert-brd);color:var(--glass-alert-ink);background:var(--glass-alert)}
     body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button,body[data-active-view="home"] #home .home-actions button{box-shadow:var(--home-float-shadow)}
     body[data-active-view="home"] #home .group-widget-actions button,body[data-active-view="home"] #home .icon-button{background:var(--home-control)}
-    /* Koyu temada durum yazısı; dolgu yukarıdaki tema duyarlı `--glass-*` kümesinden gelir. */
-    :root[data-theme="dark"] body[data-active-view="home"] #home .quick-card.on,:root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.on{color:#ffdc96}
-    :root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.active{color:#a8e3c6}
-    :root[data-theme="dark"] body[data-active-view="home"] #home .group-control-tile.alert{color:#ffc0ba}
+    /* Durum yazısı da tema duyarlı `--glass-*-ink` değişkenlerinden gelir (yukarıdaki kurallarda);
+       koyu temaya ayrı bir renk bloğu gerekmiyor. */
     /* Alt sayfalar bu aşamada CAM DİLE GİRMEZ: zemin (`--ground`) orada yarı yarıya söner ve
        kartlar `--home-*` köklerinin opak değerlerini sürdürür — okunurluk riski alınmaz, cam
        dili yalnız ana ekranda denenir. Kancalar aynı olduğu için ileride buranın da geçmesi
@@ -312,9 +340,16 @@
     .quick-modal-body .quick-toggle{color:var(--quick-muted)}
     .quick-modal-body .quick-toggle:not(.on){background:var(--quick-inset);box-shadow:inset 0 0 0 1px var(--quick-line)}
     .quick-modal-body .quick-toggle.on{color:#ffdc96;background:#5d4823;box-shadow:inset 0 0 0 1px #a9772c}
-    /* "Ayrıntılar" tek düğme: sağa yaslı durunca kartın içinde asılı kalıyordu, ortada dengeli. */
-    .quick-modal-actions{display:flex;justify-content:center;margin-top:14px}
-    .quick-modal-actions .secondary{min-height:44px;border:1px solid var(--quick-line);color:var(--quick-ink);background:var(--quick-inset)}
+    /* "Ayrıntılar" artık metin değil, kartın SAĞ ALT köşesindeki dişli: tanıdık simge nereye
+       götürdüğünü tek bakışta anlatıyor. Ad kaybolmaz, `aria-label` ile taşınır. Negatif kenar
+       payları düğmeyi kart dolgusunun içinden köşeye çeker; 44px dokunma hedefi korunur. */
+    .quick-modal-actions{display:flex;justify-content:flex-end;margin:8px -6px -6px 0}
+    .quick-details-button{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid var(--quick-line);border-radius:14px;color:var(--quick-ink);background:var(--quick-inset);cursor:pointer;touch-action:manipulation;transition:.18s}
+    .quick-details-button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .quick-details-button:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.1)}
+    .quick-details-button:active{transform:scale(.94)}
+    .quick-details-button:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
+    @media(prefers-reduced-motion:reduce){.quick-details-button{transition:none}.quick-details-button:active{transform:none}}
     .quick-toggle-wrap{display:grid;place-items:center;padding:10px 0 4px}
     .quick-toggle{width:136px;height:136px;display:grid;place-items:center;align-content:center;gap:9px;padding:0;border:0;border-radius:50%;color:var(--muted);background:var(--surface-soft);box-shadow:inset 0 0 0 1px var(--line);font:750 14px/1 system-ui,sans-serif;touch-action:manipulation;transition:.2s}
     .quick-toggle svg{width:38px;height:38px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -336,12 +371,14 @@
     :root[data-theme="dark"] .device-card:hover{border-color:#52685e}
     :root[data-theme="dark"] .quick-device-icon{color:#a7b3ad;background:#26342d}
     :root[data-theme="dark"] .group-device-choice:has(input:checked){background:#21362c}
-    :root[data-theme="dark"] .group-control-tile.on{border-color:#a9772c;color:#ffdc96;background:#49391c}
-    :root[data-theme="dark"] .group-control-tile.on .group-control-visual .device-status-icon{color:#ffdc96;background:#5d4823;box-shadow:inset 0 0 0 1px #a9772c}
+    /* Koyu temanın döşeme durumları da tek kaynaktan (`--glass-*`) beslenir: ana ekrandaki
+       parlaklık merdiveniyle burada ikinci bir renk kümesi çatışmasın. */
+    :root[data-theme="dark"] .group-control-tile.on{border-color:var(--glass-on-brd);color:var(--glass-on-ink);background:var(--glass-on)}
+    :root[data-theme="dark"] .group-control-tile.on .group-control-visual .device-status-icon{color:var(--glass-on-chip-ink);background:var(--glass-on-chip);box-shadow:inset 0 0 0 1px var(--glass-on-brd)}
     :root[data-theme="dark"] .group-control-tile.active .group-control-visual .device-status-icon{color:#a8e3c6;background:#26493a;box-shadow:inset 0 0 0 1px #3d8966}
     :root[data-theme="dark"] .group-control-tile.alert .group-control-visual .device-status-icon{color:#ffc0ba;background:#55302c;box-shadow:inset 0 0 0 1px #a64640}
-    :root[data-theme="dark"] .group-control-tile.active{border-color:#3d8966;color:#a8e3c6;background:#1d392c}
-    :root[data-theme="dark"] .group-control-tile.alert{border-color:#a64640;color:#ffc0ba;background:#432622}
+    :root[data-theme="dark"] .group-control-tile.active{border-color:var(--glass-active-brd);color:var(--glass-active-ink);background:var(--glass-active)}
+    :root[data-theme="dark"] .group-control-tile.alert{border-color:var(--glass-alert-brd);color:var(--glass-alert-ink);background:var(--glass-alert)}
     :root[data-theme="dark"] .online-text{color:#72d0a5}
     :root[data-theme="dark"] .device-link-level.strong{color:#72d0a5;background:#1d392c}:root[data-theme="dark"] .device-link-level.good{color:#e2b968;background:#3a301b}:root[data-theme="dark"] .device-link-level.weak{color:#ffc0ba;background:#432622}:root[data-theme="dark"] .device-primary-status.active{color:#72d0a5}
     :root[data-theme="dark"] .unknown-text{color:#e2b968}
