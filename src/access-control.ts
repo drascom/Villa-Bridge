@@ -54,6 +54,10 @@ const residentRoutes = new Set([
   // kullanıldığı için okumayla birlikte açılır; dışarıya çıkan tek taraf sunucudur.
   "GET /api/weather",
   "GET /api/locations/search",
+  // Dünya saati şehirleri de evin ayarıdır (duvardaki tablet); okuması ana ekranın parçası olduğu
+  // için ev sakinine açık. **Yazma** (`PUT /api/world-clock`) listede YOKTUR, yönetici ister —
+  // hava konumuyla aynı gerekçe: bir ekranda yapılan düzenleme bütün panelleri değiştirir.
+  "GET /api/world-clock",
   "GET /api/device-image/:model",
   "GET /api/devices/:id/note",
   "PUT /api/devices/:id/note",

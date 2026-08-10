@@ -145,6 +145,11 @@
     {id:"default-istanbul",label:"clockIstanbul",name:"Istanbul",country:"Türkiye",timeZone:"Europe/Istanbul"},
     {id:"default-new-york",label:"clockNewYork",name:"New York",country:"United States",timeZone:"America/New_York"}
   ];
+  /* Şehir listesi artık cihazda DEĞİL sunucuda durur (`/api/world-clock`): duvara asılan tablette
+     her ekranın ayrı şehir listesi tutması anlamsız. Buradaki eski kayıt yalnız bir kerelik göç
+     kaynağıdır — sunucuda liste tanımlı değilse cihazdaki liste bir kez yukarı taşınır ve yerel
+     kayıt silinir (bkz. `migrateWorldClockZones`). Sunucu cevap verene kadar ekranda ne varsa o
+     kalsın diye başlangıç değeri hâlâ buradan gelir. */
   const savedWorldClockZones=(()=>{try{
     const raw=localStorage.getItem("villa-world-clock-zones");
     if(raw===null)return null;
@@ -156,6 +161,9 @@
     }).slice(0,8).map(item=>({id:item.id.slice(0,80),name:item.name.slice(0,80),country:typeof item.country==="string"?item.country.slice(0,80):"",admin1:typeof item.admin1==="string"?item.admin1.slice(0,80):"",timeZone:item.timeZone.slice(0,80),label:typeof item.label==="string"?item.label.slice(0,80):""}));
   }catch{return null}})();
   let worldClockZones=savedWorldClockZones??defaultWorldClockZones;
+  /* Sunucuda liste TANIMLI mı? Boş liste ("hepsini sildim") ile tanımsızlık ayrı durumlardır:
+     göç yalnız tanımsızken çalışır, yoksa silinen şehirler her açılışta geri gelirdi. */
+  let worldClockZonesConfigured=false;
   const locationSearchState={
     clock:{query:"",results:[],loading:false,error:null,requestId:0,timer:null},
     weather:{query:"",results:[],loading:false,error:null,requestId:0,timer:null},

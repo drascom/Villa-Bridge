@@ -55,6 +55,7 @@ import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
 import { WeatherLocationStore, WeatherService } from "./weather.js";
+import { WorldClockStore } from "./world-clock.js";
 import {
   applyPendingZigbeeNetworkRestore,
   createZigbeeNetworkBackup,
@@ -185,6 +186,12 @@ const weatherService = new WeatherService({
     recentErrors.record({ operation: "weather", statusCode: 503, message });
   }
 });
+/**
+ * Dünya saati şehirleri de evin ayarı: hava konumuyla aynı yerde, ayrı bir dosyada durur
+ * (`world-clock.json`). Hava dosyasıyla birleştirilmedi — biri "hangi şehrin havası", öbürü
+ * "saat panelinde hangi şehirler"; ayrı yazılır, ayrı yetkilenir.
+ */
+const worldClockStore = new WorldClockStore(resolve(dirname(configPath), "world-clock.json"));
 const nodeRole = resolveVillaBridgeNodeRole();
 const nodeId = resolveVillaBridgeNodeId(nodeRole);
 const discoveryRecord = createVillaBridgeDiscoveryRecord(
@@ -1162,6 +1169,30 @@ app.get<{ Querystring: { q?: string; language?: string } }>(
     }
   }
 );
+
+/**
+ * Dünya saati şehirleri — hava konumuyla aynı mantık: okuma ev sakinine açık (yetki tablosunda),
+ * yazma yönetici işi. `zones: null` "liste hiç tanımlanmadı" demektir; panel o durumda kendi
+ * varsayılanlarını gösterir ve cihazda kalmış eski listeyi bir kez yukarı taşır.
+ */
+app.get("/api/world-clock", async (_request, reply) => {
+  try {
+    return { ok: true, zones: await worldClockStore.get() };
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.put<{ Body?: { zones?: unknown } }>("/api/world-clock", async (request, reply) => {
+  try {
+    return { ok: true, zones: await worldClockStore.save(request.body?.zones) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
 
 app.put<{ Body?: { automations?: unknown } }>("/api/automations", async (request, reply) => {
   try {

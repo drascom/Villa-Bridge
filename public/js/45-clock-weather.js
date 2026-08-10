@@ -71,8 +71,59 @@
       longitude
     };
   }
-  function saveWorldClockZones(){
-    try{localStorage.setItem("villa-world-clock-zones",JSON.stringify(worldClockZones))}catch{}
+  const knownTimeZone=zone=>{try{new Intl.DateTimeFormat("en",{timeZone:zone}).format(new Date());return true}catch{return false}};
+  function normalizeWorldClockZone(zone){
+    const timeZone=typeof zone?.timeZone==="string"?zone.timeZone.slice(0,80):"";
+    if(!timeZone||!knownTimeZone(timeZone))return null;
+    const name=typeof zone.name==="string"?zone.name.slice(0,80):"";
+    const cut=value=>typeof value==="string"?value.slice(0,80):"";
+    return{id:String(zone.id||`${name}-${timeZone}`).slice(0,80),name,country:cut(zone.country),admin1:cut(zone.admin1),timeZone,label:cut(zone.label)};
+  }
+  function renderWorldClockZones(){
+    renderClockDialogRows();
+    renderLocationSearchResults("clock");
+    renderWorldClock();
+  }
+  /* Şehir listesi evin ayarı: sunucuda durur, cihazda değil. Sunucuya ulaşılamazsa ekrandaki
+     liste olduğu gibi kalır — saat bloğu boşalmaz. */
+  async function loadWorldClockZones(){
+    try{
+      const data=await api("/api/world-clock");
+      if(!Array.isArray(data?.zones))return;
+      worldClockZonesConfigured=true;
+      worldClockZones=data.zones.map(normalizeWorldClockZone).filter(Boolean);
+      renderWorldClockZones();
+    }catch(error){console.warn("world-clock",error)}
+  }
+  /* Yazma yönetici işi olduğu için ev sakininde 403 gelir; hata sessizce yutulmaz, kullanıcıya
+     sunucunun kendi metni gösterilir ve liste eski hâline döner (ekranda yalan durmaz). */
+  async function saveWorldClockZones(zones,silent){
+    const previous=worldClockZones;
+    worldClockZones=zones;
+    renderWorldClockZones();
+    try{
+      const data=await api("/api/world-clock",{method:"PUT",body:JSON.stringify({zones})});
+      worldClockZonesConfigured=true;
+      if(Array.isArray(data?.zones))worldClockZones=data.zones.map(normalizeWorldClockZone).filter(Boolean);
+    }catch(error){
+      worldClockZones=previous;
+      // Göç denemesi sessizdir: ev sakininin ekranında her açılışta "yönetici gerekli" uyarısı
+      // belirmesin, kayıt dursun ve bir dahaki sefere yeniden denensin.
+      if(!silent)showToast(error.message,true);
+      throw error;
+    }finally{
+      renderWorldClockZones();
+    }
+  }
+  /* Bir kerelik göç: cihazda kalmış liste, sunucuda liste hiç tanımlı DEĞİLKEN yukarı taşınır.
+     Taşınamazsa (yönetici değil, ağ yok) yerel kayıt DURUR — bir sonraki açılışta yeniden
+     denenir, kullanıcı listesini kaybetmez. */
+  async function migrateWorldClockZones(){
+    if(!savedWorldClockZones||worldClockZonesConfigured)return;
+    try{
+      await saveWorldClockZones(savedWorldClockZones,true);
+      try{localStorage.removeItem("villa-world-clock-zones")}catch{}
+    }catch{}
   }
   function renderClockDialogRows(){
     const container=$("#clockDialogRows");
@@ -80,11 +131,7 @@
     const now=new Date();
     container.innerHTML=worldClockZones.length?worldClockZones.map(city=>`<div class="hub-row"><div><strong>${esc(locationName(city))}</strong><small>${esc(zoneDay(now,city.timeZone))} · ${esc(locationDetails(city)||city.timeZone)}</small></div><span class="hub-row-value">${esc(zoneTime(now,city.timeZone))}</span><button type="button" data-remove-clock-city="${esc(locationKey(city))}" aria-label="${esc(t("removeCity",{name:locationName(city)}))}"><svg class="location-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg></button></div>`).join(""):`<div class="location-empty">${t("noClockCities")}</div>`;
     $$("[data-remove-clock-city]").forEach(button=>button.onclick=()=>{
-      worldClockZones=worldClockZones.filter(city=>locationKey(city)!==button.dataset.removeClockCity);
-      saveWorldClockZones();
-      renderClockDialogRows();
-      renderLocationSearchResults("clock");
-      renderWorldClock();
+      void saveWorldClockZones(worldClockZones.filter(city=>locationKey(city)!==button.dataset.removeClockCity)).catch(()=>{});
     });
   }
   function renderLocationSearchResults(kind){
@@ -178,11 +225,7 @@
     if(!location.timeZone)return showToast(t("locationTimezoneUnavailable"),true);
     if(worldClockZones.some(city=>locationKey(city)===locationKey(location)))return;
     if(worldClockZones.length>=8)return showToast(t("clockCityLimit"),true);
-    worldClockZones=[...worldClockZones,location];
-    saveWorldClockZones();
-    renderClockDialogRows();
-    renderLocationSearchResults("clock");
-    renderWorldClock();
+    void saveWorldClockZones([...worldClockZones,location]).catch(()=>{});
   }
   function openWeatherLocationManager(){
     resetLocationSearch("weather");

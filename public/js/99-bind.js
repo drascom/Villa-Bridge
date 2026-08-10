@@ -152,22 +152,25 @@
   $("#matterDialog").addEventListener("close",stopMatterWatch);
   async function startAuthenticatedApplication(){
     if(applicationStarted){
-      const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadWeather()];
+      const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones()];
       if(state.auth.user?.role==="admin")reload.push(loadSettings());
       await Promise.allSettled(reload);
       await migrateLocalGroups();
       await migrateWeatherLocation();
+      await migrateWorldClockZones();
       return;
     }
     applicationStarted=true;
     setupPullToRefresh();setupQuickMouseScrolling();configureAndroidActions();bindScreensaver();bindWidgetControls();applyWidgetLayout();
-    const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadWeather(),loadInstallationOnboarding()];
+    const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),loadInstallationOnboarding()];
     if(state.auth.user?.role==="admin")startup.push(loadSettings());
     await Promise.allSettled(startup);
     await migrateLocalGroups();
     // Sunucuda konum yoksa cihazda kalmış eski seçim bir kez yukarı taşınır; hava okunduktan
     // SONRA çalışır, yoksa sunucunun kendi konumunu ezerdi.
     await migrateWeatherLocation();
+    // Aynı kural dünya saati şehirleri için: sunucuda liste yoksa cihazdaki bir kez yukarı taşınır.
+    await migrateWorldClockZones();
     if(!onboardingComplete())openOnboarding();
     else requestAnimationFrame(maybeStartDashboardTour);
     setInterval(()=>{if(!document.hidden&&state.auth.authenticated)refresh()},8000);
