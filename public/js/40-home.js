@@ -128,12 +128,9 @@
   function confirmDashboardCommand(deviceId,property,value,messageKey){
     const device=state.devices.find(item=>item.id===deviceId);
     if(!device)return;
-    state.contextDevice=deviceId;
     state.pendingConfirm={id:deviceId,property,value};
     $("#deviceActionName").textContent=device.name;
     $("#deviceActionLead").textContent=t(messageKey,{name:device.name});
-    $("#confirmDeviceAction").hidden=false;
-    $("#showDeviceDetails").hidden=true;
     const dialog=$("#deviceActionDialog");
     if(!dialog.open)dialog.showModal();
   }

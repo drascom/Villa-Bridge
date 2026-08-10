@@ -519,7 +519,7 @@
     "expandTile": "Butonu genişlet",
     "collapseTile": "Butonu daralt",
     "showDetails": "Detayları Göster",
-    "deviceLongPressLead": "Bu cihazla ne yapmak istediğinizi seçin.",
+    "deviceActionConfirmLead": "Bu komutu onaylayın.",
     "screensaverTitle": "Ekran koruyucu",
     "screensaverHint": "Devam etmek için ekrana dokunun",
     "confirmAction": "Evet, devam et",
