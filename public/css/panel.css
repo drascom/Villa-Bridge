@@ -19,9 +19,23 @@
       /* CAM YÜZEY DİLİ — tek küme, iki temada da aynı adlar.
          `--ground` zeminin kendisi; `--glass-*` ana ekranın yüzeyleri. Ana ekran bu kümeye
          `--home-*` kancalarını yeniden bağlayarak geçer (aşağıda tek yerde), diğer ekranlar
-         opak dilde kalır. Örtü opaklıkları BİLEREK yüksek: metnin kontrastı kartın kendi
-         katmanından gelsin, arkadaki zeminin parlaklığından bağımsız olsun.
-         Oda/grup kartı hafif örtü (`--glass-card`), cihaz döşemesi daha koyu (`--glass-tile`). */
+         opak dilde kalır.
+         İOS CAM DİLİ: kartın İÇİ neredeyse tamamen geçirgendir (`--glass-card` çok düşük
+         alfa) — arkadaki gökyüzü, güneş ve ay kartın içinden görünür. Kartı tanımlayan şey
+         dolgusu değil KENARIDIR: net 1px çerçeve (`--glass-*-brd`), üst kenarda ince parlak
+         ışık çizgisi + alt kenarda hafif koyu iç gölge (`--glass-sheen`, cam kalınlığı
+         hissi) ve geniş yumuşak dış gölge (`--glass-shadow`, kart zeminden ayrılsın).
+         Oda/grup kartı en hafif örtü (`--glass-card`), cihaz döşemesi bir kademe belirgin
+         (`--glass-tile`); ikisi arasındaki fark katman hissini taşır.
+         PARLAKLIK KELEPÇESİ (`--glass-bright`): metnin kontrastı artık dolgudan gelemez,
+         çünkü dolgu yok denecek kadar az. Onun yerine `backdrop-filter` zemini örtüden ÖNCE
+         açık temada bir tık AÇAR (1.14), koyu temada belirgin biçimde KISAR (.7) — gerçek
+         cam malzemenin yaptığı da budur. Zeminin deseni görünmeye devam eder, yalnız
+         parlaklık bandı daralır; böylece gün boyu kayan gökyüzünün altında yazı sabit kalır.
+         `--glass-filter` büyük yüzeyler (kart, pencere) için, `--glass-filter-chip` zemine
+         DOĞRUDAN oturan küçük yüzeyler (alt sekme kartları, üst bardaki yuvarlak düğme)
+         için: aynı malzeme, yarı yarıya bulanıklık — küçük öğede fark edilmez, maliyeti
+         yarılar. Bulanıklık İÇ İÇE GEÇMEZ; katman sayısı aşağıda tek tek sayılıdır. */
       --ground:radial-gradient(120% 90% at 80% 10%,#ffd9a8 0%,rgba(255,217,168,0) 58%),radial-gradient(95% 75% at 12% 6%,#cfd9e6 0%,rgba(207,217,230,0) 62%),radial-gradient(140% 120% at 35% 100%,#e7d3ba 0%,rgba(231,211,186,0) 62%),linear-gradient(168deg,#eef0f2 0%,#e8d8c0 52%,#d9c3a6 100%);
       /* GÜNEŞ DEĞİŞKENLERİ — panel bunları dakikada bir yazar (`applySunGround`, 90-shell.js).
          Burada TANIMLI durmaları şart: `calc()` içinde tanımsız bir değişken bütün gradyanı
@@ -35,9 +49,13 @@
       --moon-x:50%;--moon-y:30%;--moon-disc:0;--moon-glow:0;--moon-size:5.4vmin;--moon-term:50%;
       --moon-lit:#fbf7ea;--moon-dark:rgba(120,134,158,.34);
       --moon-left:var(--moon-dark);--moon-right:var(--moon-lit);--moon-mid:var(--moon-dark);
-      --glass-card:rgba(255,255,255,.48);--glass-card-brd:rgba(255,255,255,.66);
-      --glass-tile:rgba(255,255,255,.66);--glass-tile-brd:rgba(255,255,255,.86);
-      --glass-shadow:0 10px 26px rgba(72,52,28,.14);--glass-blur:18px;
+      --glass-card:rgba(255,255,255,.17);--glass-card-brd:rgba(255,255,255,.92);
+      --glass-tile:rgba(255,255,255,.34);--glass-tile-brd:rgba(255,255,255,.96);
+      --glass-shadow:0 18px 40px rgba(72,52,28,.18);
+      --glass-sheen:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(72,52,28,.14);
+      --glass-blur:26px;--glass-sat:1.6;--glass-bright:1.14;
+      --glass-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
+      --glass-filter-chip:blur(calc(var(--glass-blur) * .5)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
       /* DURUM = PARLAKLIK MERDİVENİ. Zemin gradyanı yavaşça kaydığı için TON bazlı ayrım
          güvenilmez (sıcak zemin ile sarı "yanan" döşeme birbirine karışıyordu). Ayrım artık
          sabit bir parlaklık sırasından gelir: sönük < taban döşeme < aktif/uyarı < YANAN.
@@ -69,11 +87,15 @@
       --hub-muted:#cddcd4;
       --hub-text-shadow:0 1px 3px rgba(0,0,0,.6);
       --hub-divider-line:rgba(255,255,255,.17);
-      /* Koyu temada örtü de KOYU: yazı açık kaldığı için kontrast kartın kendi katmanından gelir. */
+      /* Koyu temada örtü de KOYU ama artık İNCE: kartı kapatan dolgu değil, parlaklık
+         kelepçesi (`--glass-bright:.7`) taşır. Kenar tersine döner — beyaz ışık çizgisi
+         üstte, siyah iç gölge altta; dış gölge daha derin. */
       --ground:radial-gradient(120% 90% at 78% 12%,#b8763a 0%,rgba(184,118,58,0) 55%),radial-gradient(90% 70% at 18% 8%,#6d7f96 0%,rgba(109,127,150,0) 60%),radial-gradient(140% 110% at 30% 100%,#2b1d14 0%,rgba(43,29,20,0) 60%),linear-gradient(168deg,#3d3a3f 0%,#5b4530 46%,#241a12 100%);
-      --glass-card:rgba(14,10,7,.5);--glass-card-brd:rgba(255,255,255,.1);
-      --glass-tile:rgba(9,6,4,.62);--glass-tile-brd:rgba(255,255,255,.13);
-      --glass-shadow:0 14px 32px rgba(0,0,0,.34);--glass-blur:18px;
+      --glass-card:rgba(14,10,7,.24);--glass-card-brd:rgba(255,255,255,.26);
+      --glass-tile:rgba(9,6,4,.34);--glass-tile-brd:rgba(255,255,255,.3);
+      --glass-shadow:0 20px 46px rgba(0,0,0,.44);
+      --glass-sheen:inset 0 1px 0 rgba(255,255,255,.26),inset 0 -1px 0 rgba(0,0,0,.42);
+      --glass-sat:1.5;--glass-bright:.7;
       /* Koyu temada "en parlak öğe" mantığı doğrudan çalışır: yanan döşeme neredeyse beyaz sıcak
          bir levhaya döner, üstündeki yazı koyu kehribar olur. Kapalı döşeme neredeyse siyaha
          iner — koyu zeminden de bir tık aşağıda kalır. */
@@ -289,16 +311,40 @@
        -float-shadow)` kuralları (kartlar, döşemeler, sekmeler, göz/anahtar rozetleri, menü
        düğmesi) yeni dili kendiliğinden alır; tek tek kurala renk gömülmez. Diğer ekranlar
        kök değerlerde — yani opak — kalır. */
-    body[data-active-view="home"]{--home-control:var(--glass-tile);--home-border:var(--glass-tile-brd);--home-float-shadow:var(--glass-shadow)}
+    body[data-active-view="home"]{--home-control:var(--glass-tile);--home-border:var(--glass-tile-brd);--home-float-shadow:var(--glass-sheen),var(--glass-shadow)}
     body[data-active-view="home"] .app-menu-button{color:var(--forest);border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
-    /* Oda/grup kartı ve özet kartları (`Evin durumu`, `Ev hareketleri`) hafif örtü taşır; içindeki
-       cihaz döşemesi bir kademe koyu örtüyle ondan ayrılır — donuk dolguya gerek kalmadan
-       katman farkı okunur. BULANIKLIK YALNIZ ÜST DÜZEY KAPTA: kart ve hub. İçerideki döşeme,
-       satır ve sekme düz yarı saydamdır (bulanık içinde bulanık yığılmaz). */
-    body[data-active-view="home"] #home .widget-card{border-color:var(--glass-card-brd);background:var(--glass-card);box-shadow:var(--glass-shadow);backdrop-filter:blur(var(--glass-blur)) saturate(1.2);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.2)}
+    /* Oda/grup kartı ve özet kartları (`Evin durumu`, `Ev hareketleri`) neredeyse tümüyle
+       geçirgendir; içindeki cihaz döşemesi bir kademe belirgin örtüyle ondan ayrılır — donuk
+       dolguya gerek kalmadan katman farkı okunur.
+       BULANIKLIK KATMANLARI — ana ekranda TOPLAM ÜÇ YER, hiçbiri iç içe değil:
+         1) `.widget-card` — üst düzey kap (rayda aynı anda ~3 kart görünür), tam güç filtre;
+         2) alt şeridin sekme kartları — kendi kartları YOK, doğrudan zemine oturuyorlar,
+            yarı güç (`--glass-filter-chip`) ve yalnız SAYDAM olanlarda (yanan/seçili sekme
+            zaten opak, altındaki bulanıklık görünmezdi — boşuna maliyet);
+         3) üst bardaki yuvarlak düğmeler — aynı gerekçe, yarı güç.
+       Kartın İÇİNDEKİ döşeme, satır ve rozetler düz yarı saydamdır: bulanık içinde bulanık
+       yığmak 7 inç sınıfı tablette karşılığı olmayan bir maliyet. */
+    body[data-active-view="home"] #home .widget-card{border-color:var(--glass-card-brd);background:var(--glass-card);box-shadow:var(--glass-sheen),var(--glass-shadow);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter)}
     /* Hızlı erişim şeridinin kendi kartı yok: sekmeler doğrudan zeminin üstünde durur. */
     #home .quick-control-widget{border-color:transparent;background:none;box-shadow:none}
     body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    /* İKİNCİL YAZI CAM YÜZEYDE TOKEN DEĞİŞTİRİR — yeni renk YOK, panelin kendi
+       `--hub-muted`ı devralınır. Gerekçe: `--muted` (#66716c) DÜZ BEYAZ zeminde bile
+       4.79:1 tavanına sahip; yani sorun saydamlık değil, paletin kendisi. Saat kartı
+       (`.home-hub`) zeminin üstünde durduğu için bu tokena çoktan geçmişti — kartın içi de
+       artık neredeyse zemin olduğuna göre aynı yere düşüyor. Kanca `--muted`ın KENDİSİ
+       olduğu için kart içindeki bütün soluk yazılar (kart alt metni, ara başlık, birim
+       etiketi, olay saati, özet çipi, döşeme alt satırı, sekme alt satırı) tek satırda
+       döner; ileride eklenenler de kendiliğinden.
+       YANAN/SEÇİLİ döşeme DIŞARIDA: onların dolgusu neredeyse opak krem, üstlerindeki yazı
+       zaten kendi mürekkebini (`color:inherit`) kullanıyor — token oraya hiç ulaşmıyor,
+       ulaşsaydı koyu temada açık gri yazı krem zemine düşerdi. */
+    body[data-active-view="home"] #home .widget-card,
+    body[data-active-view="home"] #home .quick-control-widget .quick-card:not(.on):not(.selected):not(.quick-card-add){--muted:var(--hub-muted)}
+    body[data-active-view="home"] #home .quick-control-widget .quick-card:not(.on):not(.selected):not(.quick-card-add),
+    body[data-active-view="home"] #home .home-actions button,
+    body[data-active-view="home"] #home .page-head>.app-menu-button,
+    body[data-active-view="home"] .app-menu-button{backdrop-filter:var(--glass-filter-chip);-webkit-backdrop-filter:var(--glass-filter-chip)}
     /* PARLAKLIK MERDİVENİ BURADA KURULUR (değerler `--glass-*` kümesinde, iki tema için ayrı).
        Sıra: sönük/çevrimdışı → taban döşeme → aktif/uyarı → YANAN. Yanan döşeme ekranın en
        parlak öğesidir ve tek halesi olan öğedir; kapalı döşeme zeminin altına çekilir. Kapalı
@@ -366,7 +412,9 @@
        ekranın parlaklığından bağımsızdır — ana ekran döşemelerinde de gerekçe bu.
        Yeni palet yok: aşağıdaki `--quick-*` değerleri koyu temanın `--glass-*` kümesinin ta
        kendisidir (`--glass-tile`, `--glass-card`, `--glass-tile-brd`, `--glass-shadow`), yalnız
-       temaya göre dönmesinler diye sabitlenmiştir. */
+       temaya göre dönmesinler diye sabitlenmiştir. Cam diline geçerken dolgu burada da
+       inceldi; kontrastı artık örtü değil, `backdrop-filter`ın parlaklık kelepçesi taşıyor
+       (perde + kelepçe birlikte, beyaz yazı için geniş pay bırakır). */
     dialog.quick-dialog{width:min(420px,92vw);max-width:min(420px,92vw);border-radius:26px;background:transparent;box-shadow:none}
     /* Örtü BELİRGİN koyu: pencere öne çıksın diye arkadaki paneli bastırır. Arkası tümüyle
        kapanmaz (yarı saydam), panel hafifçe seçilir ama dikkat dağıtmaz. Bulanıklık yalnız
@@ -374,11 +422,13 @@
        renk alfasından gelir. */
     dialog.quick-dialog::backdrop{background:rgba(8,14,11,.66);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
     .quick-modal{
-      --quick-surface:rgba(9,6,4,.72);--quick-inset:rgba(14,10,7,.5);
-      --quick-line:rgba(255,255,255,.13);--quick-ink:#fff;--quick-muted:rgba(255,255,255,.68);
+      --quick-surface:rgba(9,6,4,.38);--quick-inset:rgba(14,10,7,.3);
+      --quick-line:rgba(255,255,255,.3);--quick-ink:#fff;--quick-muted:rgba(255,255,255,.68);
+      --quick-glass:blur(calc(var(--glass-blur) * 1.3)) saturate(1.4) brightness(.62);
       width:100%;padding:20px 22px 18px;border:1px solid var(--quick-line);border-radius:26px;
-      color:var(--quick-ink);background:var(--quick-surface);box-shadow:0 14px 32px rgba(0,0,0,.34);
-      backdrop-filter:blur(calc(var(--glass-blur) * 1.6)) saturate(1.3);-webkit-backdrop-filter:blur(calc(var(--glass-blur) * 1.6)) saturate(1.3)
+      color:var(--quick-ink);background:var(--quick-surface);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.26),inset 0 -1px 0 rgba(0,0,0,.42),0 20px 46px rgba(0,0,0,.44);
+      backdrop-filter:var(--quick-glass);-webkit-backdrop-filter:var(--quick-glass)
     }
     .quick-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
     .quick-modal-head h2{margin:2px 0 0;font:700 24px/1.15 system-ui,sans-serif;color:var(--quick-ink);overflow-wrap:anywhere}
@@ -1200,7 +1250,7 @@
        denk gelen ikon kaybolmasın. */
     body[data-active-view="home"] #home .home-actions button,
     body[data-active-view="home"] #home .page-head>.app-menu-button,
-    body[data-active-view="home"] .app-menu-button{border:1px solid var(--glass-tile-brd);color:var(--forest);background:var(--glass-tile);box-shadow:var(--glass-shadow)}
+    body[data-active-view="home"] .app-menu-button{border:1px solid var(--glass-tile-brd);color:var(--forest);background:var(--glass-tile);box-shadow:var(--glass-sheen),var(--glass-shadow)}
     body[data-active-view="home"] #home .home-actions button:hover,
     body[data-active-view="home"] #home .page-head>.app-menu-button:hover{border-color:var(--forest);color:var(--forest);background:var(--glass-tile)}
     /* Alarm çalma katmanı gerçek bir `<dialog>`tır: `showModal()` onu üst katmana (top layer)
