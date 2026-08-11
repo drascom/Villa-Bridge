@@ -23,6 +23,10 @@
     $$(".nav-button").forEach(item=>item.classList.toggle("active",item.dataset.view===viewName));
     $$(".view").forEach(view=>view.classList.toggle("active",view.id===viewName));
     document.body.dataset.activeView=viewName;
+    // İşaret KÖKE DE yazılır: gökyüzü katmanları `body`nin sözde öğelerinde ama güneş `html`in
+    // sözde öğesinde duruyor (üç katman, iki taşıyıcı). CSS bir üst öğeyi seçemediği için ana
+    // ekran dışında güneşin de sönmesi ancak kökteki bu ikizle mümkün.
+    document.documentElement.dataset.activeView=viewName;
     if(viewName==="automations"){renderAutomations();loadAutomations().then(renderAutomations).catch(error=>showToast(error.message,true))}
     if(viewName!=="connections")stopMatterWatch();
     if(viewName==="connections")loadMatter();
@@ -143,12 +147,28 @@
       return{rise,set};
     }catch{return null}
   }
+  /* GÖKYÜZÜ ÖNİZLEMESİ — `?sky=preview`. Gün–gece döngüsünü beklemeden görebilmek için bir tam
+     günü ~40 saniyeye sıkıştırır. Kapsamı DAR: yalnız gökyüzünün okuduğu "şimdi" değişir, yani
+     aşama tonlaması, güneş/ay yayı, yıldızlar ve (kip "güneşe göre" ise) tema. Alarm, otomasyon,
+     cihaz durumu, saat bloğu ve hava tahmini kendi gerçek zamanlarını okumaya devam eder.
+     Hiçbir kalıcı durum yazmaz (localStorage'a da sunucuya da); parametre kalkınca iz bırakmaz. */
+  const skyPreview=(()=>{
+    try{return new URLSearchParams(location.search).get("sky")==="preview"}catch{return false}
+  })();
+  const skyPreviewCycle=40000;
+  const skyPreviewStart=Date.now();
+  function skyMinutes(){
+    if(!skyPreview){
+      const now=new Date();
+      return now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
+    }
+    return ((Date.now()-skyPreviewStart)%skyPreviewCycle)/skyPreviewCycle*1440;
+  }
   /* Gündüz mü? Canlı veri varsa o, yoksa önbellek, ikisi de yoksa `null` (bilinmiyor). */
   function sunIsUp(){
     const times=sunGroundTimes()||cachedSunTimes();
     if(!times)return null;
-    const now=new Date();
-    const minutes=now.getHours()*60+now.getMinutes();
+    const minutes=skyMinutes();
     return minutes>=times.rise&&minutes<times.set;
   }
   function resolveThemeMode(){
@@ -253,9 +273,8 @@
       return;
     }
     const altitude=Math.sin(Math.PI*track);
-    // Güneş soldan doğup sağdan batıyor; ay bilerek TERS yönde ilerler.
-    root.style.setProperty("--moon-x",`${(92-84*track).toFixed(2)}%`);
-    root.style.setProperty("--moon-y",`${(82-68*altitude).toFixed(2)}%`);
+    // Güneş soldan doğup sağdan batıyor; ay bilerek TERS yönde ilerler — kol açısı da ters.
+    root.style.setProperty("--moon-angle",`${((.5-track)*180).toFixed(2)}deg`);
     root.style.setProperty("--moon-disc",Math.min(1,altitude*4).toFixed(3));
     const illumination=(1-Math.cos(2*Math.PI*phase))/2;
     root.style.setProperty("--moon-glow",illumination.toFixed(3));
@@ -268,13 +287,33 @@
     // Şişkin evrede (dördünler arası) elips aydınlığı taşır, hilalde karanlığı.
     root.style.setProperty("--moon-mid",phase>.25&&phase<.75?"var(--moon-lit)":"var(--moon-dark)");
   }
+  /* GÖKYÜZÜNÜN AŞAMA AĞIRLIKLARI — şafak · gündüz · batım (gece = kalan pay). Kırılma noktaları
+     gün doğumu/batımına GÖRE tanımlıdır: şafak doğuştan 72 dk önce açılır, 12 dk önce doruğa
+     çıkar, 66 dk sonra tam gündüze döner; batımda aynı şey simetrik olarak tersine işler.
+     Aradaki her an İKİ komşu aşamanın doğrusal karışımıdır — üç aşama aynı anda hiç açık olmaz,
+     bu yüzden geçiş çamurlaşmadan yumuşak kalır. */
+  function skyPhases(minutes,rise,set){
+    const w={dawn:0,day:0,dusk:0};
+    const blend=(from,to,low,high)=>{
+      const t=Math.max(0,Math.min(1,(minutes-from)/(to-from)));
+      if(low)w[low]+=1-t;
+      if(high)w[high]+=t;
+    };
+    if(minutes<=rise-72||minutes>=set+72){/* tam gece: üç ağırlık da sıfır kalır */}
+    else if(minutes<rise-12)blend(rise-72,rise-12,null,"dawn");
+    else if(minutes<rise+66)blend(rise-12,rise+66,"dawn","day");
+    else if(minutes<set-66)w.day=1;
+    else if(minutes<set+12)blend(set-66,set+12,"day","dusk");
+    else blend(set+12,set+72,"dusk",null);
+    return w;
+  }
   function applySunGround(){
     const root=document.documentElement;
     const times=sunGroundTimes();
     if(!times){root.removeAttribute("data-sun-ground");return}
     cacheSunTimes(times);
     const now=new Date();
-    const minutes=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
+    const minutes=skyMinutes();
     const progress=(minutes-times.rise)/(times.set-times.rise);
     // Yükseklik: gündüz yarım sinüs (doğuşta 0, öğlen 1, batışta 0), gece 0.
     const altitude=progress>0&&progress<1?Math.sin(Math.PI*progress):0;
@@ -282,16 +321,32 @@
     const edge=progress<0?times.rise-minutes:progress>1?minutes-times.set:0;
     const twilight=Math.max(0,Math.min(1,1-edge/70));
     const still=reducedMotion();
-    const track=Math.max(0,Math.min(1,progress));
-    root.style.setProperty("--sun-x",still?"50%":`${(8+track*84).toFixed(2)}%`);
-    root.style.setProperty("--sun-y",still?"26%":`${(82-68*altitude).toFixed(2)}%`);
+    // AŞAMALAR. CSS'e giden alfa ham ağırlık DEĞİL zincir alfasıdır: katmanlar üst üste biniyor,
+    // üstteki altındakinin payını yiyor. Kalan pay her adımda bir sonrakine bölünür; böylece
+    // ekranda görünen karışım tam olarak yukarıdaki ağırlıklar olur.
+    const phases=skyPhases(minutes,times.rise,times.set);
+    const nightWeight=Math.max(0,1-phases.dawn-phases.day-phases.dusk);
+    let rest=1-phases.dawn;
+    const dayAlpha=rest>.0005?Math.min(1,phases.day/rest):0;
+    rest-=phases.day;
+    const duskAlpha=rest>.0005?Math.min(1,phases.dusk/rest):0;
+    root.style.setProperty("--sky-a-dawn",phases.dawn.toFixed(3));
+    root.style.setProperty("--sky-a-day",dayAlpha.toFixed(3));
+    root.style.setProperty("--sky-a-dusk",duskAlpha.toFixed(3));
+    // Yıldızlar gecenin payıyla belirir, şafak/batım açılırken söner. Tek bir opaklık; desen
+    // CSS'te üç tekrarlı gradyan katmanı, DOM düğümü yok.
+    root.style.setProperty("--star-a",(nightWeight*.9).toFixed(3));
+    // GÜNEŞ KOLU: doğuşta -90°, tepede 0°, batışta +90°. Ufkun biraz altına da inebilsin diye
+    // ilerleme dar bir payla dışarı taşar; disk zaten orada sönmüş olur.
+    const arc=Math.max(-.12,Math.min(1.12,progress));
+    root.style.setProperty("--sun-angle",`${((arc-.5)*180).toFixed(2)}deg`);
     // `prefers-reduced-motion` açıkken ilerleyen ışık kaynağı hiç çizilmez; tonlama saate göre
     // doğru kalır, yalnız hareket eden öğe kalkar.
     root.style.setProperty("--sun-disc",still?"0":Math.min(1,altitude*4).toFixed(3));
     root.style.setProperty("--sun-glow",(twilight*(still?0.3:0.35+0.65*altitude)).toFixed(3));
-    // Sıcaklık ufka yakınken en yüksek: şafak ve gün batımı sıcak, öğlen nötr/aydınlık.
-    root.style.setProperty("--sun-warm",(twilight*(1-altitude*.9)).toFixed(3));
-    root.style.setProperty("--sun-night",(1-twilight).toFixed(3));
+    // Konum değişimlerinin geçiş süresi = yazma aralığı: açı dakikada bir yazılır ama gözle
+    // sürekli kayar. Önizlemede aralık da süre de kısalır.
+    root.style.setProperty("--sky-step",skyPreview?".14s":"60s");
     // Gece: batıştan doğuşa uzanan aralık. Gece yarısı bu aralığın ORTASI sayılır (takvim
     // gece yarısı değil), böylece ay yayın tepesine gecenin ortasında çıkar.
     const night=minutes>=times.set||minutes<times.rise;
@@ -317,7 +372,9 @@
     applySunGround();
     syncSunTheme();
     const ready=document.documentElement.dataset.sunGround==="on";
-    sunGroundState.timer=setTimeout(scheduleSunGround,ready?60000:15000);
+    // Önizlemede sanal gün 40 sn'de dönüyor: 140 ms'lik adım yaklaşık 5 sanal dakika, yani
+    // gökyüzü basamaklanmadan akar. Normalde dakikada bir yeter.
+    sunGroundState.timer=setTimeout(scheduleSunGround,ready?(skyPreview?140:60000):15000);
   }
   function startSunGround(){
     if(sunGroundState.started)return;

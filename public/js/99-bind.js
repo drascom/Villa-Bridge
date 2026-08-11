@@ -230,6 +230,8 @@
   async function initialize(){
     applyTheme();
     document.body.dataset.activeView="home";
+    // Kökteki ikiz: güneş katmanı `html::before` üstünde duruyor, o da ekran işaretini görsün.
+    document.documentElement.dataset.activeView="home";
     try{await loadLanguages()}
     catch(error){showToast(error.message,true)}
     if(Object.keys(translations).length)applyLanguage();
