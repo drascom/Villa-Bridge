@@ -168,6 +168,7 @@
       --sky-night:linear-gradient(180deg,#0e1521 0%,#0a1017 55%,#101613 100%);
       --glass-bright:.78;
       --glass-shadow:0 20px 46px rgba(0,0,0,.46);
+    }
     *{box-sizing:border-box}html{scroll-behavior:smooth}
     /* DOKUNMA VURGUSU — odak halkasından AYRI bir şey. Android WebView, dokunulan her düğmenin
        üstüne kendi MAVİ dikdörtgenini basar; eylem bitince kaybolur ama her dokunuşta yeniden
