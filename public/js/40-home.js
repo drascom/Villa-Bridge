@@ -10,7 +10,8 @@
       icon:"overview",
       locked:true,
       inOverview:false,
-      sub:t("overviewTabSummary",{cards,hidden})
+      sub:t("overviewTabSummary",{cards,hidden}),
+      on:0
     },...groups.map(group=>{
       const entries=groupControlEntries(group);
       const on=entries.filter(({device,control})=>control?dashboardControlAction(control)?.active===true:["active","alert"].includes(groupDeviceVisualState(device))).length;
@@ -20,7 +21,11 @@
         icon:group.id===lightsGroupId?"light":"group",
         locked:group.locked===true,
         inOverview:groupInOverview(group)&&entries.length>0,
-        sub:`${t("groupTabDevices",{count:entries.length})} · ${on?t("groupSummaryOn",{count:on}):t("groupSummaryAllOff")}`
+        /* Alt satır yalnız cihaz sayısıdır. "Hepsi kapalı" artık yazılmaz: sakin hâl her sekmede
+           tekrarlanan bir cümleydi ve hiçbir şey söylemiyordu. Açık olan varsa sayısı renkli bir
+           göstergeyle çıkar (aşağıdaki `home-tab-live`), yani bilgi kelime yerine renk taşır. */
+        sub:t("groupTabDevices",{count:entries.length}),
+        on
       };
     })];
   }
@@ -29,7 +34,10 @@
     const mark=item.locked
       ?`<span class="home-tab-mark" aria-hidden="true">🔒</span>`
       :item.inOverview?`<span class="home-tab-dot" aria-hidden="true" title="${esc(t("showInOverview"))}"></span>`:"<span></span>";
-    return`<button class="quick-card home-tab${selected?" selected":""}" type="button" role="tab" id="hometab-${esc(item.id)}" aria-selected="${selected?"true":"false"}" tabindex="${selected?"0":"-1"}" aria-controls="${item.id===overviewTabId?"widgetRail":"groupPanel"}" data-home-tab="${esc(item.id)}"><span class="home-tab-body"><span class="quick-device-icon" aria-hidden="true">${deviceIconSvg(item.icon)}</span><span class="home-tab-copy"><span class="device-name">${esc(item.name)}</span><small>${esc(item.sub)}</small></span>${mark}</span></button>`;
+    const live=item.on
+      ?`<span class="home-tab-live" title="${esc(t("groupSummaryOn",{count:item.on}))}" aria-label="${esc(t("groupSummaryOn",{count:item.on}))}">${item.on}</span>`
+      :"";
+    return`<button class="quick-card home-tab${selected?" selected":""}" type="button" role="tab" id="hometab-${esc(item.id)}" aria-selected="${selected?"true":"false"}" tabindex="${selected?"0":"-1"}" aria-controls="${item.id===overviewTabId?"widgetRail":"groupPanel"}" data-home-tab="${esc(item.id)}"><span class="home-tab-body"><span class="quick-device-icon" aria-hidden="true">${deviceIconSvg(item.icon)}</span><span class="home-tab-copy"><span class="device-name">${esc(item.name)}</span><small>${esc(item.sub)}${live}</small></span>${mark}</span></button>`;
   }
   function renderHomeTabs(){
     const items=homeTabItems();
@@ -439,11 +447,21 @@
     counter.hidden=!extra;
     document.body.classList.toggle("has-system-alert",Boolean(message));
   }
+  // Başlıktaki ölçü düğmesini gösterip gizler; düğme yoksa sessizce geçer.
+  function setMetricVisible(metric,visible){
+    const button=$(`[data-home-metric="${metric}"]`);
+    if(button)button.hidden=!visible;
+  }
   function render(){
     const devices=state.devices;
     $$(".add-device").forEach(button=>button.disabled=!state.overviewLoaded);
     $("#deviceCount").textContent=devices.length;
-    $("#alertCount").textContent=devices.filter(isAlert).length;
+    /* Başlık ölçüleri yalnız SÖYLEYECEK bir şey varken durur: sıfır uyarı ve iyi sinyal
+       yazılmaz. Kaybolan bir bilgi yok — ikisi de zaten "sorun yok" demenin uzun hâliydi;
+       uyarılı/zayıf cihazlara Cihazlar görünümünden ulaşılmaya devam edilir. */
+    const alerts=devices.filter(isAlert).length;
+    $("#alertCount").textContent=alerts;
+    setMetricVisible("alerts",alerts>0);
     renderSystemAlertBar();
     const signalPercents=devices.map(linkQualityPercent).filter(value=>value!==null);
     const averageSignal=signalPercents.length?Math.round(signalPercents.reduce((sum,value)=>sum+value,0)/signalPercents.length):null;
@@ -452,10 +470,13 @@
     signalStrength.textContent=signalTone?t(signalToneKeys[signalTone]):"—";
     signalStrength.className=signalTone?`signal-${signalTone}`:"";
     signalStrength.title=averageSignal===null?"":`${averageSignal}%`;
+    setMetricVisible("signal",signalTone==="weak"||signalTone==="fair");
     const onlineDevices=devices.filter(device=>device.availability==="online").length;
     const offlineDevices=devices.filter(device=>device.availability==="offline").length;
     $("#onlineDeviceCount").textContent=String(onlineDevices);
-    $("#offlineDeviceCount").textContent=t("offlineDevices",{count:offlineDevices});
+    const offlineFact=$("#offlineDeviceCount");
+    offlineFact.textContent=t("offlineDevices",{count:offlineDevices});
+    offlineFact.hidden=offlineDevices===0;
     const lowBatteryDevices=devices.filter(hasLowBattery).length;
     const lowBatteryFact=$("#lowBatteryCount");
     lowBatteryFact.textContent=t("lowBatteryDevices",{count:lowBatteryDevices});
@@ -494,12 +515,18 @@
     }).length;
     const openings=devices.filter(device=>device.state?.contact===false).length;
     const motion=devices.filter(device=>device.state?.occupancy===true||device.state?.presence===true).length;
+    /* Üç ayrı cümle ("Tüm ışıklar kapalı / Tüm kapılar kapalı / Hareket yok") yerine üç kompakt
+       gösterge: ikon + sayı. Sakinken sönük ve sessiz dururlar, bir şey olduğunda renklenir ve
+       öne çıkar. Kelime kaybolmadı, göstergenin adına (`title`/`aria-label`) taşındı. */
     const rows=[
-      {count:lightsOn,label:t("summaryLightsOn"),zero:t("summaryAllOff"),tone:lightsOn?"active":"muted"},
-      {count:openings,label:t("summaryOpenings"),zero:t("summaryAllClosed"),tone:openings?"alert":"muted"},
-      {count:motion,label:t("summaryMotion"),zero:t("summaryNoMotion"),tone:motion?"active":"muted"}
+      {icon:"light",count:lightsOn,label:t("summaryLightsOn"),tone:lightsOn?"active":"muted"},
+      {icon:"door",count:openings,label:t("summaryOpenings"),tone:openings?"alert":"muted"},
+      {icon:"motion",count:motion,label:t("summaryMotion"),tone:motion?"active":"muted"}
     ];
-    container.innerHTML=rows.map(row=>`<div class="summary-row ${row.tone}">${row.count?`<strong>${row.count}</strong><span>${esc(row.label)}</span>`:`<em>${esc(row.zero)}</em>`}</div>`).join("");
+    container.innerHTML=rows.map(row=>{
+      const label=`${row.count} ${row.label}`;
+      return`<span class="summary-chip ${row.tone}" title="${esc(label)}" aria-label="${esc(label)}" role="img">${deviceIconSvg(row.icon)}<b>${row.count}</b></span>`;
+    }).join("");
   }
   function widgetListCapacity(selector,fallback){
     const list=$(selector);
@@ -509,24 +536,36 @@
     if(available<70)return fallback;
     return Math.max(fallback,Math.min(14,Math.floor(available/62)));
   }
-  function latestEventPerDevice(events,limit){
+  /* Liste ile sessiz özet AYNI veriden ayrılır. Her cihaz yalnız EN SON olayıyla temsil edilir;
+     o olay bir "her şey yolunda" bildirimiyse (`eventPresentation().quiet` — bkz. 30-device-view.js)
+     satır açılmaz, yalnız alttaki tek satırlık özette sayılır. Ayrım olayın türü ve değerinden
+     çıkar; cihaz adına ya da modeline bakan hiçbir kural yoktur (ürün çok evli). */
+  function activityEventSplit(events,limit){
     const seen=new Set();
     const rows=[];
+    let quiet=0;
     for(const event of events){
       if(seen.has(event.sourceName))continue;
       seen.add(event.sourceName);
-      rows.push({event,presentation:eventPresentation(event)});
-      if(rows.length>=limit)break;
+      const presentation=eventPresentation(event);
+      if(presentation.quiet){quiet++;continue}
+      if(rows.length<limit)rows.push({event,presentation});
     }
-    return rows;
+    return{rows,quiet};
   }
   function renderWidgetLists(){
     const devices=state.devices;
-    const rows=latestEventPerDevice(state.events||[],widgetListCapacity("#activityEvents",5));
-    $("#activityEvents").innerHTML=rows.length?rows.map(row=>{
+    const split=activityEventSplit(state.events||[],widgetListCapacity("#activityEvents",5));
+    /* Satır sadeleşti: ad normal ağırlıkta, durum kelimesi yerine renkli küçük gösterge (olayın
+       kendi işareti + tonu), zaman soluk ve küçük. Kelime `title`/`aria-label`de duruyor. */
+    const list=split.rows.length?split.rows.map(row=>{
       const device=devices.find(item=>item.sourceName===row.event.sourceName);
-      return`<div class="widget-list-row"><strong>${esc(device?.name||row.event.sourceName)}</strong><time>${ago(row.event.at)}</time><span>${row.presentation.icon} ${esc(row.presentation.label)}</span></div>`;
+      const name=device?.name||row.event.sourceName;
+      const label=`${name} · ${row.presentation.label}`;
+      return`<div class="widget-list-row ${row.presentation.tone}" title="${esc(label)}"><span class="event-mark" aria-hidden="true">${row.presentation.icon}</span><strong>${esc(name)}</strong><span class="event-label">${esc(row.presentation.label)}</span><time>${ago(row.event.at)}</time></div>`;
     }).join(""):`<div class="device-meta">${t("noActivity")}</div>`;
+    const quiet=split.quiet?`<div class="activity-quiet">${esc(t("activityQuietSummary",{count:split.quiet}))}</div>`:"";
+    $("#activityEvents").innerHTML=list+quiet;
   }
   function saveWidgetLayout(){
     try{localStorage.setItem("villa-dashboard-widgets",JSON.stringify(state.widgets))}catch{}
@@ -660,9 +699,10 @@
   function groupSummaryHtml(entries){
     const onCount=entries.filter(({device,control})=>control?dashboardControlAction(control)?.active===true:["active","alert"].includes(groupDeviceVisualState(device))).length;
     const offlineCount=entries.filter(({device})=>device.availability==="offline").length;
-    const rows=[onCount
-      ?{tone:"active",text:t("groupSummaryOn",{count:onCount})}
-      :{tone:"muted",text:t("groupSummaryAllOff")}];
+    /* Sakin oda sessizdir: "Hepsi kapalı" yazılmaz (her kartta tekrarlanan, hiçbir şey söylemeyen
+       bir cümleydi). Yalnız açık olan ya da erişilemeyen varsa satır çıkar. */
+    const rows=[];
+    if(onCount)rows.push({tone:"active",text:t("groupSummaryOn",{count:onCount})});
     if(offlineCount)rows.push({tone:"alert",text:t("groupSummaryOffline",{count:offlineCount})});
     return`<span class="group-summary">${rows.map(row=>`<span class="${row.tone}">${esc(row.text)}</span>`).join("")}</span>`;
   }

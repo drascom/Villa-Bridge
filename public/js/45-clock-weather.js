@@ -392,7 +392,10 @@
     // Hava sahnesi yalnız hava bölgesinde durur; saat tarafına ve ekran zeminine bulaşmaz.
     // Bölgenin en üstündeki asıl görseldir (CSS `order` ile konum etiketinin altına oturur).
     // Veri yokken/hata varken görsel kaldırılır, blok yalnız yazıya iner.
-    $("#hubWeatherLocation").textContent=weatherState.location?weatherLocationText():t("weather");
+    /* Hub'da yalnız ŞEHİR yazar. Uzun hâli ("LONDON, ENGLAND, UNITED KINGDOM") saat sütunundaki
+       "London · Yerel saat" satırıyla aynı şeyi ikinci kez söylüyordu; tam adres hava
+       penceresinin başlık satırında (`renderWeatherDialog`) duruyor. */
+    $("#hubWeatherLocation").textContent=weatherState.location?locationName(weatherState.location):t("weather");
     if(!weatherState.data){
       applyWeatherScene("");
       const message=weatherState.loading?t("weatherLoading"):weatherState.error||(weatherState.location?t("weatherUnavailable"):t("weatherNoLocationHint"));

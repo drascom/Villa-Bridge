@@ -16,19 +16,29 @@
     ||isAlert(device);
   // Otomatik onarım izi: cihaz kendini ilan edince köprünün yazdığı `self_heal` olayı.
   const selfHealLabelKeys={attempt:"selfHealAttempt",ok:"selfHealOk",failed:"selfHealFailed"};
+  /* Her olay üç şey söyler: işaret (`icon`), sözü (`label`) ve rengi (`tone`). Dördüncü alan
+     `quiet`, olayın "ev hareketleri" listesinde satır hak edip etmediğini belirler.
+     Ayrım VERİDENDİR — olayın özelliği ve değeri; cihaz adına/modeline bakan hiçbir kural yok:
+       quiet=true  → bir DEĞİŞİM değil, "her şey yolunda" bildirimi: cihaz yeniden erişilebildi,
+                     otomatik onarım denendi/tuttu, pil yeniden normale döndü. Bunlar listeyi
+                     "Hazır · 3 dk önce" satırlarıyla dolduruyordu; artık tek satırlık sessiz
+                     özette sayılırlar.
+       quiet=false → gerçek değişim: düğmeye basıldı, kapı açıldı/kapandı, hareket başladı/bitti,
+                     duman/CO, pil zayıfladı, cihaz erişilemez oldu, onarım başarısız, ışık yandı.
+     `tone` durum renklerinin bilinen anlamını sürdürür: alert kırmızı, active kehribar/yeşil,
+     muted sönük. */
   const eventPresentation=event=>{
     const enabled=event.value===true||String(event.value).toUpperCase()==="ON";
-    if(event.property==="action")return{icon:"◉",label:String(event.value).replaceAll("_"," ")};
-    if(event.property==="contact")return{icon:"⌑",label:event.value?t("doorClosed"):t("doorOpen")};
-    if(event.property==="occupancy"||event.property==="presence")return{icon:"⌁",label:event.value?t("motionDetected"):t("motionClear")};
-    if(event.property==="smoke")return{icon:"△",label:event.value?t("smokeDetected"):t("noSmoke")};
-    if(event.property==="carbon_monoxide")return{icon:"△",label:event.value?t("coDetected"):t("coClear")};
-    if(event.property==="battery_low")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
-    if(event.property==="battery_threshold")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay")};
-    if(event.property==="availability")return{icon:"●",label:event.value==="online"?t("ready"):t("unreachable")};
-    if(event.property==="self_heal")return{icon:"⟳",label:t(selfHealLabelKeys[event.value]||"selfHealAttempt")};
-    if(event.property==="state")return{icon:"◉",label:enabled?t("on"):t("off")};
-    return{icon:"•",label:String(event.value).replaceAll("_"," ")};
+    if(event.property==="action")return{icon:"◉",label:String(event.value).replaceAll("_"," "),tone:"active",quiet:false};
+    if(event.property==="contact")return{icon:"⌑",label:event.value?t("doorClosed"):t("doorOpen"),tone:event.value?"muted":"alert",quiet:false};
+    if(event.property==="occupancy"||event.property==="presence")return{icon:"⌁",label:event.value?t("motionDetected"):t("motionClear"),tone:event.value?"active":"muted",quiet:false};
+    if(event.property==="smoke")return{icon:"△",label:event.value?t("smokeDetected"):t("noSmoke"),tone:event.value?"alert":"muted",quiet:false};
+    if(event.property==="carbon_monoxide")return{icon:"△",label:event.value?t("coDetected"):t("coClear"),tone:event.value?"alert":"muted",quiet:false};
+    if(event.property==="battery_low"||event.property==="battery_threshold")return{icon:"▱",label:event.value?t("batteryLow"):t("batteryOkay"),tone:event.value?"alert":"muted",quiet:!event.value};
+    if(event.property==="availability")return{icon:"●",label:event.value==="online"?t("ready"):t("unreachable"),tone:event.value==="online"?"muted":"alert",quiet:event.value==="online"};
+    if(event.property==="self_heal")return{icon:"⟳",label:t(selfHealLabelKeys[event.value]||"selfHealAttempt"),tone:event.value==="failed"?"alert":"muted",quiet:event.value!=="failed"};
+    if(event.property==="state")return{icon:"◉",label:enabled?t("on"):t("off"),tone:enabled?"active":"muted",quiet:false};
+    return{icon:"•",label:String(event.value).replaceAll("_"," "),tone:"muted",quiet:false};
   };
   // Alt yazı önce sunucunun sınıfına bakar (tahmin ya da kullanıcının seçtiği rol); sınıf
   // belirsizse eski kontrol tabanlı yedeğe düşer, böylece hiçbir cihaz etiketsiz kalmaz.
