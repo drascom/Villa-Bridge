@@ -37,18 +37,25 @@
             basit ve mutlaktır: KARTIN KROMASI ARKASINDAKİ ZEMİNİNKİNDEN DÜŞÜK OLMALI (bugün
             açıkta ~17 / 23, koyuda ~17 / 35). Zeminin deseni ve güneş yerinde kalır — kayan
             yalnız doygunluk, yani cam nötre ve bir tık soğuğa çeker.
-         2) PARLAKLIK (`--glass-bright`): açık temada bir tık AÇAR (1.14), koyu temada KISAR
-            (.74). Bu, okunurluğu taşıyan parçadır ve açık temada payı DÜŞÜRÜLEMEZ: en dar
-            nokta (gece yarısı, sönük döşemenin ikincil yazısı) tam 5.11:1'de duruyor ve
-            kelepçenin her 0.01'i oradan ~0.04 götürüyor. Doygunluk kelepçesi ise okunurluğa
-            bedelsizdir (en dar nokta gecede, orada zemin zaten nötr) — bu yüzden renk
-            düzeltmesinin tamamı 1) üzerinden yapılır, 2)'ye dokunulmadan.
+         2) PARLAKLIK (`--glass-bright`): İKİ TEMADA DA 1'İN ALTINDA (.94 / .74). Buradaki ölçüt
+            de mutlaktır ve doygunluğunkiyle aynı biçimdedir: KARTIN KOMPOZİT PARLAKLIĞI
+            ARKASINDAKİ ZEMİNİNKİNİ GEÇMEZ. Eskiden açık temada 1.14 vardı — cam zemini
+            geçirmek yerine AYDINLATIYORDU: kart, arkasındaki zeminden +5.5…+11.8 L* daha
+            açık duruyordu, yani cam gibi değil ışıklı bir levha gibi okunuyordu. Bugün fark
+            her saatte negatif (açıkta -3.5…-0.4 L*, koyuda -19.3…-4.3), yani arka plan kartın
+            İÇİNDEN görünür. Beyaz örtünün kendisi de parlaklık kattığı için kelepçe 1'in
+            biraz altında durmak zorunda; alfa .17'den .14'e inerek payı azaltır (geçirgenlik
+            ARTAR, bu istenen yön).
+         OKUNURLUK bu yüzden artık kartı parlatmaktan gelmez, üç yerden gelir: (a) döşeme
+         örtüsünün kendi tonu, (b) metin renkleri, (c) kenar/ışık çizgisi. Açık temanın en dar
+         noktası (gece yarısı, sönük döşemenin ikincil yazısı) 5.22:1 — eşiğin üstünde.
          ÖRTÜ NÖTRDÜR: koyuda sıcak-siyah DEĞİL soğuk-nötr siyah (rgb 8,11,15) — kahverengiliğin
-         ikinci kaynağı buydu. Açık temada KART örtüsü saf beyaz kalır (okunurluk payı orada
-         doğuyor), DÖŞEME örtüsü ise bir tık soğuktur (233,241,255): camın "soğutması" gözle
-         asıl burada, en geniş yüzeyde okunur, ve yanan döşemenin sıcak-beyazından uzaklaştığı
-         için yanan↔normal döşeme ayrımını da açar (ΔE en dar saatte 0.8 → 2.3).
-         ALFALAR HİÇ DEĞİŞMEDİ: geçirgenlik seviyesi aynı, değişen yalnız ton.
+         ikinci kaynağı buydu. Açık temada KART örtüsü saf beyaz kalır (kenardaki cam parıltısı
+         oradan doğuyor), DÖŞEME örtüsü ise hem soğuk hem bir kademe DERİN (215,224,240): camın
+         "soğutması" gözle asıl burada, en geniş yüzeyde okunur. Derinleştirme, kart kısılınca
+         kaybolan örtüyü döşemeye taşıyan hamledir — döşeme küçük bir yüzey, oradaki bir tık
+         örtü levha hissi yaratmaz — ve yanan↔normal döşeme ayrımını da açar (ΔE 8.5 → 10.5).
+         ALFALAR ARTMADI: kart bir tık daha geçirgen, döşeme aynı; değişen ton ve kelepçe.
          `--glass-filter` büyük yüzeyler (kart, pencere) için, `--glass-filter-chip` zemine
          DOĞRUDAN oturan küçük yüzeyler (alt sekme kartları, üst bardaki yuvarlak düğme)
          için: aynı malzeme, yarı yarıya bulanıklık — küçük öğede fark edilmez, maliyeti
@@ -66,11 +73,21 @@
       --moon-x:50%;--moon-y:30%;--moon-disc:0;--moon-glow:0;--moon-size:5.4vmin;--moon-term:50%;
       --moon-lit:#fbf7ea;--moon-dark:rgba(120,134,158,.34);
       --moon-left:var(--moon-dark);--moon-right:var(--moon-lit);--moon-mid:var(--moon-dark);
-      --glass-card:rgba(255,255,255,.17);--glass-card-brd:rgba(255,255,255,.92);
-      --glass-tile:rgba(233,241,255,.34);--glass-tile-brd:rgba(255,255,255,.96);
+      /* MANZARA (`--scene-*`) — en alttaki fotoğraf katmanının ayarları, ayrıntı için
+         `html::before`in yanındaki nota bak. Açık temada örtü beyaza yakın (fotoğrafın bandını
+         yukarı, zeminin parlaklığına toplar), gradyanın opaklığı .82. */
+      --scene-blur:34px;--scene-sat:.4;--scene-veil:.82;
+      --scene-wash:linear-gradient(rgba(246,248,252,.62),rgba(246,248,252,.62));
+      --ground-quiet:linear-gradient(rgba(237,240,242,.5),rgba(237,240,242,.5));
+      --glass-card:rgba(255,255,255,.14);--glass-card-brd:rgba(255,255,255,.92);
+      --glass-tile:rgba(215,224,240,.34);--glass-tile-brd:rgba(255,255,255,.96);
       --glass-shadow:0 18px 40px rgba(72,52,28,.18);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(72,52,28,.14);
-      --glass-blur:26px;--glass-sat:.86;--glass-bright:1.14;
+      /* BULANIKLIK HAFİF (26px → 20px). Kartın arkasındaki manzara ZATEN kendi katmanında
+         34px bulanık: kartın bulanıklığı artık ayrıntıyı gizlemek için değil, yalnız cam
+         hissi için var. Daha düşük değer aynı zamanda ucuz — `backdrop-filter` maliyeti
+         yarıçapla büyür ve panel bir tablette dönüyor. */
+      --glass-blur:20px;--glass-sat:.86;--glass-bright:.94;
       --glass-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
       --glass-filter-chip:blur(calc(var(--glass-blur) * .5)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
       /* DURUM = PARLAKLIK MERDİVENİ. Zemin gradyanı yavaşça kaydığı için TON bazlı ayrım
@@ -89,7 +106,11 @@
       --glass-active:rgba(180,220,200,.93);--glass-active-brd:rgba(56,138,99,.85);--glass-active-ink:#17553a;
       --glass-alert:rgba(250,199,192,.93);--glass-alert-brd:rgba(190,64,56,.85);--glass-alert-ink:#7f2a25;
       --glass-off:rgba(92,80,64,.2);--glass-off-brd:rgba(255,255,255,.4);
-      --glass-off-sub:rgba(23,33,29,.74);--glass-off-chip:rgba(255,255,255,.26);
+      /* Sönük döşemenin ikincil yazısı = `--ink`in seyreltilmiş hâli. Kart artık zemini
+         AYDINLATMADIĞI için altındaki yüzey de koyulaştı; eski .74 seyreltme gece yarısı
+         4.27:1'e düşüyordu. .84 aynı mürekkebi bir tık toplar, 5.22:1'e çıkarır — yeni renk
+         yok, yalnız daha az seyreltme. */
+      --glass-off-sub:rgba(23,33,29,.84);--glass-off-chip:rgba(255,255,255,.26);
     }
     :root[data-theme="dark"]{
       color-scheme:dark;
@@ -115,6 +136,12 @@
       --glass-shadow:0 20px 46px rgba(0,0,0,.44);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.26),inset 0 -1px 0 rgba(0,0,0,.42);
       --glass-sat:.85;--glass-bright:.74;
+      /* Koyu temada manzara BİR KADEME DAHA GERİDE: örtü siyaha yakın, gradyanın opaklığı
+         .82 değil .90 — fotoğrafın zemine kalan payı %18 yerine %10. Gece gökyüzü zaten
+         koyu; fotoğrafın açık lekeleri orada çok daha çabuk göze batardı. */
+      --scene-sat:.36;--scene-veil:.9;
+      --scene-wash:linear-gradient(rgba(10,12,16,.66),rgba(10,12,16,.66));
+      --ground-quiet:linear-gradient(rgba(16,21,20,.5),rgba(16,21,20,.5));
       /* Koyu temada "en parlak öğe" mantığı doğrudan çalışır: yanan döşeme neredeyse beyaz sıcak
          bir levhaya döner, üstündeki yazı koyu kehribar olur. Kapalı döşeme neredeyse siyaha
          iner — koyu zeminden de bir tık aşağıda kalır. */
