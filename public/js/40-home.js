@@ -534,7 +534,9 @@
     if(!list||!card)return fallback;
     const available=card.clientHeight-list.offsetTop-10;
     if(available<70)return fallback;
-    return Math.max(fallback,Math.min(14,Math.floor(available/62)));
+    /* Bölen satırın gerçek yüksekliğinden bilerek büyük: satırlar ferahladı (ikon çipi + simetrik
+       dikey boşluk), dar ekranda taşan bir satır göstermektense bir satır az göstermek yeğdir. */
+    return Math.max(fallback,Math.min(14,Math.floor(available/70)));
   }
   /* Liste ile sessiz özet AYNI veriden ayrılır. Her cihaz yalnız EN SON olayıyla temsil edilir;
      o olay bir "her şey yolunda" bildirimiyse (`eventPresentation().quiet` — bkz. 30-device-view.js)
@@ -834,7 +836,7 @@
     /* Gizlenen cihaz sessizce kaybolmaz: kartın altında sayısıyla duyurulur ve satır Cihazlar
        görünümüne (mümkünse o odayı süzerek) götürür. Gizli yoksa satır hiç basılmaz. */
     const hiddenNote=overview&&!state.dashboardEditing&&picked.hidden
-      ?`<button class="ov-hidden-note" type="button" data-hidden-room="${esc(group.id)}">${esc(t("hiddenDevicesNote",{count:picked.hidden}))}</button>`
+      ?`<button class="ov-hidden-note" type="button" data-hidden-room="${esc(group.id)}" aria-label="${esc(t("hiddenDevicesNoteLabel",{count:picked.hidden}))}" title="${esc(t("hiddenDevicesNoteLabel",{count:picked.hidden}))}">${esc(t("hiddenDevicesNote",{count:picked.hidden}))}</button>`
       :"";
     const roomNote=overview&&!state.dashboardEditing&&group.id===noRoomGroupId
       ?`<button class="ov-hidden-note" type="button" data-hidden-room="">${esc(t("noRoomCardHint"))}</button>`
