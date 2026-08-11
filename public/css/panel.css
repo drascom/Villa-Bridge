@@ -27,11 +27,28 @@
          hissi) ve geniş yumuşak dış gölge (`--glass-shadow`, kart zeminden ayrılsın).
          Oda/grup kartı en hafif örtü (`--glass-card`), cihaz döşemesi bir kademe belirgin
          (`--glass-tile`); ikisi arasındaki fark katman hissini taşır.
-         PARLAKLIK KELEPÇESİ (`--glass-bright`): metnin kontrastı artık dolgudan gelemez,
-         çünkü dolgu yok denecek kadar az. Onun yerine `backdrop-filter` zemini örtüden ÖNCE
-         açık temada bir tık AÇAR (1.14), koyu temada belirgin biçimde KISAR (.7) — gerçek
-         cam malzemenin yaptığı da budur. Zeminin deseni görünmeye devam eder, yalnız
-         parlaklık bandı daralır; böylece gün boyu kayan gökyüzünün altında yazı sabit kalır.
+         SÜZME KELEPÇESİ (`--glass-sat` + `--glass-bright`): metnin kontrastı artık dolgudan
+         gelemez, çünkü dolgu yok denecek kadar az. Onun yerine `backdrop-filter` zemini
+         örtüden ÖNCE iki ayrı kelepçeden geçirir.
+         1) DOYGUNLUK (`--glass-sat`, İKİ TEMADA DA 1'İN ALTINDA): gerçek cam arkasındaki rengi
+            geçirir ama SÜZER. Eskiden burada 1.6/1.5 vardı — cam zemini süzmek yerine
+            yoğunlaştırıyordu: sıcak öğle zemininin kroması C*≈23 iken kartın kroması C*≈31'e
+            ÇIKIYORDU. Sonuç açık temada "sarı kâğıt", koyu temada "kahverengi cam"dı. Ölçüt
+            basit ve mutlaktır: KARTIN KROMASI ARKASINDAKİ ZEMİNİNKİNDEN DÜŞÜK OLMALI (bugün
+            açıkta ~17 / 23, koyuda ~17 / 35). Zeminin deseni ve güneş yerinde kalır — kayan
+            yalnız doygunluk, yani cam nötre ve bir tık soğuğa çeker.
+         2) PARLAKLIK (`--glass-bright`): açık temada bir tık AÇAR (1.14), koyu temada KISAR
+            (.74). Bu, okunurluğu taşıyan parçadır ve açık temada payı DÜŞÜRÜLEMEZ: en dar
+            nokta (gece yarısı, sönük döşemenin ikincil yazısı) tam 5.11:1'de duruyor ve
+            kelepçenin her 0.01'i oradan ~0.04 götürüyor. Doygunluk kelepçesi ise okunurluğa
+            bedelsizdir (en dar nokta gecede, orada zemin zaten nötr) — bu yüzden renk
+            düzeltmesinin tamamı 1) üzerinden yapılır, 2)'ye dokunulmadan.
+         ÖRTÜ NÖTRDÜR: koyuda sıcak-siyah DEĞİL soğuk-nötr siyah (rgb 8,11,15) — kahverengiliğin
+         ikinci kaynağı buydu. Açık temada KART örtüsü saf beyaz kalır (okunurluk payı orada
+         doğuyor), DÖŞEME örtüsü ise bir tık soğuktur (233,241,255): camın "soğutması" gözle
+         asıl burada, en geniş yüzeyde okunur, ve yanan döşemenin sıcak-beyazından uzaklaştığı
+         için yanan↔normal döşeme ayrımını da açar (ΔE en dar saatte 0.8 → 2.3).
+         ALFALAR HİÇ DEĞİŞMEDİ: geçirgenlik seviyesi aynı, değişen yalnız ton.
          `--glass-filter` büyük yüzeyler (kart, pencere) için, `--glass-filter-chip` zemine
          DOĞRUDAN oturan küçük yüzeyler (alt sekme kartları, üst bardaki yuvarlak düğme)
          için: aynı malzeme, yarı yarıya bulanıklık — küçük öğede fark edilmez, maliyeti
@@ -50,10 +67,10 @@
       --moon-lit:#fbf7ea;--moon-dark:rgba(120,134,158,.34);
       --moon-left:var(--moon-dark);--moon-right:var(--moon-lit);--moon-mid:var(--moon-dark);
       --glass-card:rgba(255,255,255,.17);--glass-card-brd:rgba(255,255,255,.92);
-      --glass-tile:rgba(255,255,255,.34);--glass-tile-brd:rgba(255,255,255,.96);
+      --glass-tile:rgba(233,241,255,.34);--glass-tile-brd:rgba(255,255,255,.96);
       --glass-shadow:0 18px 40px rgba(72,52,28,.18);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(72,52,28,.14);
-      --glass-blur:26px;--glass-sat:1.6;--glass-bright:1.14;
+      --glass-blur:26px;--glass-sat:.86;--glass-bright:1.14;
       --glass-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
       --glass-filter-chip:blur(calc(var(--glass-blur) * .5)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
       /* DURUM = PARLAKLIK MERDİVENİ. Zemin gradyanı yavaşça kaydığı için TON bazlı ayrım
@@ -88,14 +105,16 @@
       --hub-text-shadow:0 1px 3px rgba(0,0,0,.6);
       --hub-divider-line:rgba(255,255,255,.17);
       /* Koyu temada örtü de KOYU ama artık İNCE: kartı kapatan dolgu değil, parlaklık
-         kelepçesi (`--glass-bright:.7`) taşır. Kenar tersine döner — beyaz ışık çizgisi
-         üstte, siyah iç gölge altta; dış gölge daha derin. */
+         kelepçesi (`--glass-bright`) taşır. Kenar tersine döner — beyaz ışık çizgisi
+         üstte, siyah iç gölge altta; dış gölge daha derin.
+         ÖRTÜNÜN TONU NÖTR-SOĞUK: eski sıcak-siyah (14,10,7 / 9,6,4) öğle vaktinin turuncu
+         zeminiyle birleşince kartı kahverengiye çekiyordu. Alfa aynı, ton nötrlendi. */
       --ground:radial-gradient(120% 90% at 78% 12%,#b8763a 0%,rgba(184,118,58,0) 55%),radial-gradient(90% 70% at 18% 8%,#6d7f96 0%,rgba(109,127,150,0) 60%),radial-gradient(140% 110% at 30% 100%,#2b1d14 0%,rgba(43,29,20,0) 60%),linear-gradient(168deg,#3d3a3f 0%,#5b4530 46%,#241a12 100%);
-      --glass-card:rgba(14,10,7,.24);--glass-card-brd:rgba(255,255,255,.26);
-      --glass-tile:rgba(9,6,4,.34);--glass-tile-brd:rgba(255,255,255,.3);
+      --glass-card:rgba(8,11,15,.24);--glass-card-brd:rgba(255,255,255,.26);
+      --glass-tile:rgba(5,8,11,.34);--glass-tile-brd:rgba(255,255,255,.3);
       --glass-shadow:0 20px 46px rgba(0,0,0,.44);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.26),inset 0 -1px 0 rgba(0,0,0,.42);
-      --glass-sat:1.5;--glass-bright:.7;
+      --glass-sat:.85;--glass-bright:.74;
       /* Koyu temada "en parlak öğe" mantığı doğrudan çalışır: yanan döşeme neredeyse beyaz sıcak
          bir levhaya döner, üstündeki yazı koyu kehribar olur. Kapalı döşeme neredeyse siyaha
          iner — koyu zeminden de bir tık aşağıda kalır. */
@@ -422,9 +441,11 @@
        renk alfasından gelir. */
     dialog.quick-dialog::backdrop{background:rgba(8,14,11,.66);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
     .quick-modal{
-      --quick-surface:rgba(9,6,4,.38);--quick-inset:rgba(14,10,7,.3);
+      --quick-surface:rgba(5,8,11,.38);--quick-inset:rgba(8,11,15,.3);
       --quick-line:rgba(255,255,255,.3);--quick-ink:#fff;--quick-muted:rgba(255,255,255,.68);
-      --quick-glass:blur(calc(var(--glass-blur) * 1.3)) saturate(1.4) brightness(.62);
+      /* Doygunluk kelepçesi koyu temanınkiyle aynı dilde (<1, süzer — yoğunlaştırmaz);
+         parlaklık .62'de kalır, beyaz yazının payını o taşıyor. Örtüler nötr-soğuk. */
+      --quick-glass:blur(calc(var(--glass-blur) * 1.3)) saturate(.85) brightness(.62);
       width:100%;padding:20px 22px 18px;border:1px solid var(--quick-line);border-radius:26px;
       color:var(--quick-ink);background:var(--quick-surface);
       box-shadow:inset 0 1px 0 rgba(255,255,255,.26),inset 0 -1px 0 rgba(0,0,0,.42),0 20px 46px rgba(0,0,0,.44);
