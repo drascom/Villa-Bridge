@@ -485,6 +485,7 @@
     "appearance": "Appearance",
     "themeLight": "Light",
     "themeDark": "Dark",
+    "themeSun": "By the sun",
     "themeSystem": "System",
     "runtimeTitle": "Villa Bridge runtime",
     "runtimeLead": "Stop Zigbee, MQTT and Matter together when this tablet must release the home network.",

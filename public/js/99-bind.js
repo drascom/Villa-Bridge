@@ -33,7 +33,9 @@
   $$("[data-theme-mode]").forEach(button=>button.onclick=()=>setThemeMode(button.dataset.themeMode));
   $$("[data-theme-toggle]").forEach(button=>button.onclick=()=>setThemeMode(document.documentElement.dataset.theme==="dark"?"light":"dark"));
   $$("[data-language-cycle]").forEach(button=>button.onclick=cycleLanguage);
-  const handleSystemThemeChange=()=>{if(state.themeMode==="system")applyTheme()};
+  /* "Güneşe göre" kipi de dinler: gün doğumu/batımı hiç bilinmiyorsa o kip sistem tercihine
+     düşüyor, o hâlde sistem değişince yeniden boyanmalı. */
+  const handleSystemThemeChange=()=>{if(state.themeMode==="system"||state.themeMode==="sun")applyTheme()};
   if(themeMedia){
     if(typeof themeMedia.addEventListener==="function")themeMedia.addEventListener("change",handleSystemThemeChange);
     else if(typeof themeMedia.addListener==="function")themeMedia.addListener(handleSystemThemeChange);

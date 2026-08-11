@@ -123,19 +123,73 @@
     try{localStorage.setItem("villa-device-columns",String(columns))}catch{}
     applyDeviceLayout();
   }
-  function applyTheme(){
-    const resolved=state.themeMode==="system"?(themeMedia?.matches?"dark":"light"):state.themeMode;
+  /* "GÜNEŞE GÖRE" TEMA — gündüz açık, gece koyu; eşik gün doğumu/batımı. Saatler zaten hava
+     servisinden geliyor (`sunGroundTimes`), panel kendi astronomi hesabını yapmaz. Veri hiç
+     yoksa kip sessizce sistem tercihine düşer, yani panel her hâlükârda doğru boyanır.
+     ÖNBELLEK: sayfa açılırken (`index.html` `<head>` içindeki tema betiği) hava verisi henüz
+     gelmemiştir; yanlış temanın bir kare yanıp sönmemesi için son bilinen gün doğumu/batımı
+     dakikaları burada `localStorage`'a yazılır ve o betik ilk kareyi bundan boyar. */
+  const sunTimesCacheKey="villa-sun-times";
+  function cacheSunTimes(times){
+    if(!times)return;
+    try{localStorage.setItem(sunTimesCacheKey,JSON.stringify({rise:times.rise,set:times.set}))}catch{}
+  }
+  function cachedSunTimes(){
+    try{
+      const saved=JSON.parse(localStorage.getItem(sunTimesCacheKey)||"null");
+      const rise=Number(saved?.rise);
+      const set=Number(saved?.set);
+      if(!Number.isFinite(rise)||!Number.isFinite(set)||set-rise<60)return null;
+      return{rise,set};
+    }catch{return null}
+  }
+  /* Gündüz mü? Canlı veri varsa o, yoksa önbellek, ikisi de yoksa `null` (bilinmiyor). */
+  function sunIsUp(){
+    const times=sunGroundTimes()||cachedSunTimes();
+    if(!times)return null;
+    const now=new Date();
+    const minutes=now.getHours()*60+now.getMinutes();
+    return minutes>=times.rise&&minutes<times.set;
+  }
+  function resolveThemeMode(){
+    if(state.themeMode==="light"||state.themeMode==="dark")return state.themeMode;
+    if(state.themeMode==="sun"){
+      const daylight=sunIsUp();
+      if(daylight!==null)return daylight?"light":"dark";
+    }
+    return themeMedia?.matches?"dark":"light";
+  }
+  /* Otomatik geçiş sert olmasın: eşiği geçerken kök kısa süre `data-theme-fade` taşır ve
+     renkler yumuşar (kural `panel.css` içinde). Yalnız KENDİLİĞİNDEN olan geçişte kurulur —
+     elle seçim anında değişir — ve `prefers-reduced-motion` açıkken hiç kurulmaz. */
+  let themeFadeTimer=null;
+  function startThemeFade(){
+    clearTimeout(themeFadeTimer);
+    document.documentElement.dataset.themeFade="on";
+    themeFadeTimer=setTimeout(()=>{
+      themeFadeTimer=null;
+      delete document.documentElement.dataset.themeFade;
+    },1100);
+  }
+  function applyTheme(options={}){
+    const resolved=resolveThemeMode();
+    const previous=document.documentElement.dataset.theme;
+    if(options.fade===true&&previous&&previous!==resolved&&!reducedMotion())startThemeFade();
     document.documentElement.dataset.theme=resolved;
     document.documentElement.style.colorScheme=resolved;
     document.querySelector('meta[name="theme-color"]').content=resolved==="dark"?"#101514":"#edf0f2";
+    const resolvedLabel=t(resolved==="dark"?"themeDark":"themeLight");
     $$("[data-theme-mode]").forEach(button=>{
-      const active=button.dataset.themeMode===state.themeMode;
+      const mode=button.dataset.themeMode;
+      const active=mode===state.themeMode;
       button.classList.toggle("active",active);
       button.setAttribute("aria-pressed",String(active));
-      button.title=t(`theme${button.dataset.themeMode[0].toUpperCase()}${button.dataset.themeMode.slice(1)}`);
+      const label=t(`theme${mode[0].toUpperCase()}${mode.slice(1)}`);
+      // Otomatik kiplerde (sistem · güneşe göre) SEÇİLEN kip ile o an UYGULANAN tema ayrı
+      // şeylerdir; etkin düğme ikisini birden söylesin ki kullanıcı nerede olduğunu görsün.
+      button.title=active&&(mode==="sun"||mode==="system")?`${label}: ${resolvedLabel}`:label;
     });
     $$(".theme-switch").forEach(group=>group.setAttribute("aria-label",t("appearance")));
-    const resolvedLabel=t(resolved==="dark"?"themeDark":"themeLight");
     $$("[data-theme-toggle]").forEach(button=>{
       button.setAttribute("aria-label",`${t("appearance")}: ${resolvedLabel}`);
       button.title=`${t("appearance")}: ${resolvedLabel}`;
@@ -171,10 +225,54 @@
     if(rise===null||set===null||set-rise<60)return null;
     return{rise,set};
   }
+  /* GECE AYI — BİLEREK DEKORATİF, ASTRONOMİ DEĞİL.
+     Gerçek ay güneş battığında doğmaz: her gün ~50 dakika geç doğar, gecelerin çoğunu ancak
+     bir bölümünü gökyüzünde geçirerek tamamlar ve sık sık GÜNDÜZ de gökyüzündedir. Kullandığımız
+     hava servisi ay doğuşu/batışı vermiyor, panelin kendi astronomi hesabı da yok. Bu yüzden
+     ayın KONUMU kurgudur: güneşin yayının gece yarısını taklit eder (batışta bir kenardan doğar,
+     gece ortasında tepeye çıkar, gün doğumunda öbür kenardan batar). Doğruluk iddiası yoktur.
+     EVRE ise gerçek veriye dayanır ve takvimle uyumludur: bilinen bir yeni ay anından sinodik
+     ay boyunca (29,53 gün) sayılır. Terminatör (aydınlık/karanlık sınırı) yarım ELİPSTİR — bu
+     yüzden CSS'te iki katman var: yarım-yarım aydınlık/karanlık taban + genişliği evreyle
+     daralan elips. Ayın kendi ışığı yalnız YEREL bir hale (`--moon-glow`, CSS'te `box-shadow`);
+     zeminin genel parlaklık bandına dokunmaz, yani durum döşemelerinin merdiveni bozulmaz. */
+  const synodicMonth=29.530588853*86400000;
+  const knownNewMoon=Date.UTC(2000,0,6,18,14);
+  const moonPhase=at=>{
+    const turns=(at-knownNewMoon)/synodicMonth;
+    // 0 yeni ay · .25 ilk dördün · .5 dolunay · .75 son dördün
+    return turns-Math.floor(turns);
+  };
+  function applyMoon(root,options){
+    const{visible,track,phase,still}=options;
+    if(!visible||still){
+      // `prefers-reduced-motion` açıkken hareket eden gök cismi hiç çizilmez; gece tonlaması
+      // ve tema saate göre doğru kalır, yalnız hareketli öğe kalkar (güneşle aynı kural).
+      root.style.setProperty("--moon-disc","0");
+      root.style.setProperty("--moon-glow","0");
+      return;
+    }
+    const altitude=Math.sin(Math.PI*track);
+    // Güneş soldan doğup sağdan batıyor; ay bilerek TERS yönde ilerler.
+    root.style.setProperty("--moon-x",`${(92-84*track).toFixed(2)}%`);
+    root.style.setProperty("--moon-y",`${(82-68*altitude).toFixed(2)}%`);
+    root.style.setProperty("--moon-disc",Math.min(1,altitude*4).toFixed(3));
+    const illumination=(1-Math.cos(2*Math.PI*phase))/2;
+    root.style.setProperty("--moon-glow",illumination.toFixed(3));
+    // Elipsin yarıçapı dördünlerde sıfıra iner (düz kenar), yeni ay/dolunayda diske eşitlenir.
+    root.style.setProperty("--moon-term",`${(Math.abs(Math.cos(2*Math.PI*phase))*50).toFixed(2)}%`);
+    // Büyürken (yeni ay → dolunay) aydınlık taraf sağdadır, küçülürken solda.
+    const waxing=phase<.5;
+    root.style.setProperty("--moon-left",waxing?"var(--moon-dark)":"var(--moon-lit)");
+    root.style.setProperty("--moon-right",waxing?"var(--moon-lit)":"var(--moon-dark)");
+    // Şişkin evrede (dördünler arası) elips aydınlığı taşır, hilalde karanlığı.
+    root.style.setProperty("--moon-mid",phase>.25&&phase<.75?"var(--moon-lit)":"var(--moon-dark)");
+  }
   function applySunGround(){
     const root=document.documentElement;
     const times=sunGroundTimes();
     if(!times){root.removeAttribute("data-sun-ground");return}
+    cacheSunTimes(times);
     const now=new Date();
     const minutes=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
     const progress=(minutes-times.rise)/(times.set-times.rise);
@@ -194,11 +292,30 @@
     // Sıcaklık ufka yakınken en yüksek: şafak ve gün batımı sıcak, öğlen nötr/aydınlık.
     root.style.setProperty("--sun-warm",(twilight*(1-altitude*.9)).toFixed(3));
     root.style.setProperty("--sun-night",(1-twilight).toFixed(3));
+    // Gece: batıştan doğuşa uzanan aralık. Gece yarısı bu aralığın ORTASI sayılır (takvim
+    // gece yarısı değil), böylece ay yayın tepesine gecenin ortasında çıkar.
+    const night=minutes>=times.set||minutes<times.rise;
+    const nightSpan=1440-times.set+times.rise;
+    const elapsed=minutes>=times.set?minutes-times.set:minutes+1440-times.set;
+    applyMoon(root,{
+      visible:night,
+      track:Math.max(0,Math.min(1,elapsed/nightSpan)),
+      phase:moonPhase(now.getTime()),
+      still,
+    });
     root.dataset.sunGround="on";
+  }
+  /* Kip "güneşe göre" iken tema da dakikada bir yoklanır: eşiği geçtiğimizde zemin tonlaması
+     ve tema BİRLİKTE kayar, arada tutarsız bir kare olmaz. */
+  function syncSunTheme(){
+    if(state.themeMode!=="sun")return;
+    if(document.documentElement.dataset.theme===resolveThemeMode())return;
+    applyTheme({fade:true});
   }
   function scheduleSunGround(){
     clearTimeout(sunGroundState.timer);
     applySunGround();
+    syncSunTheme();
     const ready=document.documentElement.dataset.sunGround==="on";
     sunGroundState.timer=setTimeout(scheduleSunGround,ready?60000:15000);
   }
@@ -208,7 +325,7 @@
     scheduleSunGround();
   }
   function setThemeMode(mode){
-    if(!["light","dark","system"].includes(mode))return;
+    if(!["light","dark","sun","system"].includes(mode))return;
     state.themeMode=mode;
     try{localStorage.setItem("villa-theme",state.themeMode)}catch{}
     applyTheme();

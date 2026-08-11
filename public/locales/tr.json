@@ -485,6 +485,7 @@
     "appearance": "Görünüm",
     "themeLight": "Açık",
     "themeDark": "Koyu",
+    "themeSun": "Güneşe göre",
     "themeSystem": "Sistem",
     "runtimeTitle": "Villa Bridge çalışma sistemi",
     "runtimeLead": "Bu tablet ev ağını serbest bırakacağı zaman Zigbee, MQTT ve Matter’ı birlikte durdurun.",

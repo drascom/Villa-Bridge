@@ -10,8 +10,24 @@
   <script>
     (()=>{try{
       const saved=localStorage.getItem("villa-theme");
-      const mode=["light","dark","system"].includes(saved)?saved:"system";
-      const dark=mode==="dark"||(mode==="system"&&window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+      const mode=["light","dark","sun","system"].includes(saved)?saved:"system";
+      /* "Güneşe göre" kipinde İLK KARE doğru boyanmalı: hava servisi bu anda henüz cevap
+         vermedi, yani gün doğumu/batımı elimizde yok. Panel son bilinen saatleri (yerel saatte,
+         dakika cinsinden) `villa-sun-times` altında önbelleğe alıyor; burada onu okuyup temayı
+         daha ilk boyamada doğru seçiyoruz. Önbellek yoksa eski davranışa — sistem tercihine —
+         düşülür, yani kip hiçbir koşulda paneli kilitlemez. */
+      let sunDark=null;
+      if(mode==="sun"){
+        const times=JSON.parse(localStorage.getItem("villa-sun-times")||"null");
+        const rise=Number(times?.rise);
+        const set=Number(times?.set);
+        if(Number.isFinite(rise)&&Number.isFinite(set)&&set-rise>=60){
+          const now=new Date();
+          const minutes=now.getHours()*60+now.getMinutes();
+          sunDark=minutes<rise||minutes>=set;
+        }
+      }
+      const dark=mode==="dark"||(mode!=="light"&&(sunDark!==null?sunDark:window.matchMedia?.("(prefers-color-scheme: dark)").matches===true));
       const resolved=dark?"dark":"light";
       document.documentElement.dataset.theme=resolved;
       document.documentElement.style.colorScheme=resolved;
@@ -28,6 +44,7 @@
       <div class="theme-switch" role="group" aria-label="Appearance">
         <button data-theme-mode="light" data-i18n="themeLight" aria-pressed="false">Light</button>
         <button data-theme-mode="dark" data-i18n="themeDark" aria-pressed="false">Dark</button>
+        <button data-theme-mode="sun" data-i18n="themeSun" aria-pressed="false">By the sun</button>
         <button data-theme-mode="system" data-i18n="themeSystem" aria-pressed="false">System</button>
       </div>
       <div class="language-switch" role="group" aria-label="Language"><button data-language="en" class="active">EN</button><button data-language="tr">TR</button></div>
@@ -177,7 +194,7 @@
       <button class="nav-button" type="button" data-view="settings" data-admin-only><span class="nav-gear">⚙</span><span data-i18n="navSettings">Settings</span></button>
     </nav>
     <div class="app-menu-utilities">
-      <div class="app-menu-utility"><span class="app-menu-utility-label" data-i18n="appearance">Appearance</span><div class="theme-switch" role="group" data-i18n-aria="appearance" aria-label="Appearance"><button type="button" data-theme-mode="light" data-i18n="themeLight" aria-pressed="false">Light</button><button type="button" data-theme-mode="dark" data-i18n="themeDark" aria-pressed="false">Dark</button><button type="button" data-theme-mode="system" data-i18n="themeSystem" aria-pressed="false">System</button></div></div>
+      <div class="app-menu-utility"><span class="app-menu-utility-label" data-i18n="appearance">Appearance</span><div class="theme-switch" role="group" data-i18n-aria="appearance" aria-label="Appearance"><button type="button" data-theme-mode="light" data-i18n="themeLight" aria-pressed="false">Light</button><button type="button" data-theme-mode="dark" data-i18n="themeDark" aria-pressed="false">Dark</button><button type="button" data-theme-mode="sun" data-i18n="themeSun" aria-pressed="false">By the sun</button><button type="button" data-theme-mode="system" data-i18n="themeSystem" aria-pressed="false">System</button></div></div>
       <div class="app-menu-utility"><span class="app-menu-utility-label" data-i18n="language">Language</span><div class="language-switch" role="group" data-i18n-aria="language" aria-label="Language"><button type="button" data-language="en" class="active">EN</button><button type="button" data-language="tr">TR</button></div></div>
     </div>
     <div class="app-menu-foot">
