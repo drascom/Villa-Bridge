@@ -221,11 +221,12 @@
   /* GÜNEŞİ İZLEYEN ZEMİN. Panel kendi güneş hesabını YAPMAZ: gün doğumu/batımı zaten hava
      servisinden geliyor (`weatherState.data.daily.sunrise/sunset`, sunucu `timezone=auto` ile
      çekiyor) ve saatler konumun yerel saatinde, ofsetsiz ISO metni olarak duruyor — tabletin
-     kendi saatiyle doğrudan karşılaştırılır. Veri yoksa işaret konmaz, zemin sabit sürümde kalır.
+     kendi saatiyle doğrudan karşılaştırılır. Veri yoksa `fallbackSunTimes()` devreye girer —
+     zemin, güneş ve ay yine çizilir, yalnız saatler yaklaşıktır.
      Yeniden hesap DAKİKADA BİR: güneş bir dakikada ekranın ~%0,8'i kadar ilerler, yani bakarken
      hareket görünmez ama gün içinde zeminin değiştiği fark edilir. Veri henüz gelmediyse daha
      sık yoklanır ki açılıştan sonra zemin geç kalmasın. */
-  const sunGroundState={timer:null,started:false};
+  const sunGroundState={timer:null,started:false,live:false};
   const sunGroundMinutes=text=>{
     const match=/T(\d{2}):(\d{2})/.exec(String(text||""));
     return match?Number(match[1])*60+Number(match[2]):null;
@@ -245,6 +246,28 @@
     if(rise===null||set===null||set-rise<60)return null;
     return{rise,set};
   }
+  /* YEDEK GÜN DOĞUMU/BATIMI — ASTRONOMİK İDDİA YOK. Hava servisi henüz cevap vermediyse ya da
+     hiç konum seçilmediyse eskiden `data-sun-ground` HİÇ konmuyordu: gökyüzü tek renk kalıyor,
+     güneş ve ay hiç çizilmiyordu. Kullanıcının "güneş-ay animasyonu olmamış" şikâyetinin sebebi
+     buydu. Artık makul bir yedeğe düşülür: konumun enlemi biliniyorsa yılın gününden basit bir
+     eğim (deklinasyon) yaklaşımıyla gün uzunluğu bulunur — zaman denklemi, boylam kayması ve
+     kırılma HESABA KATILMAZ, hata onlarca dakika olabilir, sorun değil: bu bir dekor.
+     Enlem de yoksa 06:30 / 20:30 kullanılır. Gerçek veri gelir gelmez devralır. */
+  const fallbackSunTimes=()=>{
+    const latitude=Number(state.homeLocation?.latitude??weatherState.location?.latitude);
+    if(Number.isFinite(latitude)&&Math.abs(latitude)<=65){
+      const now=new Date();
+      const dayOfYear=Math.floor((now-new Date(now.getFullYear(),0,0))/86400000);
+      const declination=.4093*Math.sin(2*Math.PI*(dayOfYear-81)/365);
+      const cosHourAngle=-Math.tan(latitude*Math.PI/180)*Math.tan(declination);
+      if(Math.abs(cosHourAngle)<1){
+        // Yerel güneş öğlesi 12:00 sayılır; yarım gün uzunluğu dakikaya çevrilir.
+        const halfDay=Math.acos(cosHourAngle)*720/Math.PI;
+        if(halfDay>=30)return{rise:720-halfDay,set:720+halfDay};
+      }
+    }
+    return{rise:390,set:1230};
+  };
   /* GECE AYI — BİLEREK DEKORATİF, ASTRONOMİ DEĞİL.
      Gerçek ay güneş battığında doğmaz: her gün ~50 dakika geç doğar, gecelerin çoğunu ancak
      bir bölümünü gökyüzünde geçirerek tamamlar ve sık sık GÜNDÜZ de gökyüzündedir. Kullandığımız
@@ -264,10 +287,9 @@
     return turns-Math.floor(turns);
   };
   function applyMoon(root,options){
-    const{visible,track,phase,still}=options;
-    if(!visible||still){
-      // `prefers-reduced-motion` açıkken hareket eden gök cismi hiç çizilmez; gece tonlaması
-      // ve tema saate göre doğru kalır, yalnız hareketli öğe kalkar (güneşle aynı kural).
+    const{visible,track,phase}=options;
+    if(!visible){
+      // Gündüz ay yok. (`prefers-reduced-motion` artık diski SİLMEZ; nabız ve kayma CSS'te durur.)
       root.style.setProperty("--moon-disc","0");
       root.style.setProperty("--moon-glow","0");
       return;
@@ -309,9 +331,12 @@
   }
   function applySunGround(){
     const root=document.documentElement;
-    const times=sunGroundTimes();
-    if(!times){root.removeAttribute("data-sun-ground");return}
-    cacheSunTimes(times);
+    // Sıra: canlı hava verisi → son bilinen (önbellek) → yedek yaklaşım. Önbelleğe YALNIZ canlı
+    // veri yazılır, yedek oraya sızmaz. Hangisi kullanılırsa kullanılsın gökyüzü çizilir.
+    const live=sunGroundTimes();
+    if(live)cacheSunTimes(live);
+    sunGroundState.live=Boolean(live);
+    const times=live||cachedSunTimes()||fallbackSunTimes();
     const now=new Date();
     const minutes=skyMinutes();
     const progress=(minutes-times.rise)/(times.set-times.rise);
@@ -320,7 +345,6 @@
     // Alacakaranlık: ufkun altındaki ilk 70 dakikada gökyüzü hâlâ renkli, sonra tam gece.
     const edge=progress<0?times.rise-minutes:progress>1?minutes-times.set:0;
     const twilight=Math.max(0,Math.min(1,1-edge/70));
-    const still=reducedMotion();
     // AŞAMALAR. CSS'e giden alfa ham ağırlık DEĞİL zincir alfasıdır: katmanlar üst üste biniyor,
     // üstteki altındakinin payını yiyor. Kalan pay her adımda bir sonrakine bölünür; böylece
     // ekranda görünen karışım tam olarak yukarıdaki ağırlıklar olur.
@@ -340,10 +364,10 @@
     // ilerleme dar bir payla dışarı taşar; disk zaten orada sönmüş olur.
     const arc=Math.max(-.12,Math.min(1.12,progress));
     root.style.setProperty("--sun-angle",`${((arc-.5)*180).toFixed(2)}deg`);
-    // `prefers-reduced-motion` açıkken ilerleyen ışık kaynağı hiç çizilmez; tonlama saate göre
-    // doğru kalır, yalnız hareket eden öğe kalkar.
-    root.style.setProperty("--sun-disc",still?"0":Math.min(1,altitude*4).toFixed(3));
-    root.style.setProperty("--sun-glow",(twilight*(still?0.3:0.35+0.65*altitude)).toFixed(3));
+    // Disk `prefers-reduced-motion` açıkken de ÇİZİLİR (eskiden siliniyordu): hareketi CSS
+    // durduruyor, gök cismini yok etmeye gerek yok.
+    root.style.setProperty("--sun-disc",Math.min(1,altitude*4).toFixed(3));
+    root.style.setProperty("--sun-glow",(twilight*(0.35+0.65*altitude)).toFixed(3));
     // Konum değişimlerinin geçiş süresi = yazma aralığı: açı dakikada bir yazılır ama gözle
     // sürekli kayar. Önizlemede aralık da süre de kısalır.
     root.style.setProperty("--sky-step",skyPreview?".14s":"60s");
@@ -356,7 +380,6 @@
       visible:night,
       track:Math.max(0,Math.min(1,elapsed/nightSpan)),
       phase:moonPhase(now.getTime()),
-      still,
     });
     root.dataset.sunGround="on";
   }
@@ -371,7 +394,9 @@
     clearTimeout(sunGroundState.timer);
     applySunGround();
     syncSunTheme();
-    const ready=document.documentElement.dataset.sunGround==="on";
+    // "Hazır" artık işarete değil CANLI veriye bakar: işaret yedekle de konuyor, ama hava
+    // servisi henüz cevap vermediyse yine sık yoklanmalı.
+    const ready=sunGroundState.live===true;
     // Önizlemede sanal gün 40 sn'de dönüyor: 140 ms'lik adım yaklaşık 5 sanal dakika, yani
     // gökyüzü basamaklanmadan akar. Normalde dakikada bir yeter.
     sunGroundState.timer=setTimeout(scheduleSunGround,ready?(skyPreview?140:60000):15000);

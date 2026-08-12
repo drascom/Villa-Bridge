@@ -24,7 +24,8 @@
          Kartı tanımlayan şey yine dolgusu değil KENARIDIR: net 1px çerçeve (`--glass-*-brd`),
          üst kenarda ince parlak ışık çizgisi + alt kenarda koyu iç gölge (`--glass-sheen`,
          cam kalınlığı hissi) ve geniş yumuşak dış gölge (`--glass-shadow`). İç hâlâ geçirgen:
-         .4/.52 alfa ile arkadaki gökyüzü, güneş ve ay kartın içinden seçilir. Oda/grup kartı
+         kartın dolgusu .44/.24 (açık/koyu tema) alfada durur, arkadaki gökyüzü, güneş ve ay
+         kartın içinden gerçekten seçilir — kart bir levha değil bir CAM. Oda/grup kartı
          en hafif örtü (`--glass-card`), cihaz döşemesi bir kademe belirgin (`--glass-tile`);
          ikisi arasındaki fark katman hissini taşır.
          SÜZME KELEPÇESİ (`--glass-sat` + `--glass-bright`, ikisi de 1'in ALTINDA): gerçek cam
@@ -60,11 +61,14 @@
          doygun bir batım kırmızısına ya da gece lacivertine inseydi o blok okunmaz olurdu
          (ölçüm: `contrast-check.mjs`, "gökyüzü/hub" satırı). Aşamalar bu yüzden burada tonla
          anlatılır, parlaklıkla değil: bant hep aydınlık kalır, değişen sıcaklık ve renk.
-         Dramatik gökyüzü koyu temanın işi — "güneşe göre" kipinde batımda zaten oraya geçilir. */
-      --sky-dawn:linear-gradient(180deg,rgba(250,222,198,var(--sky-a-dawn)) 0%,rgba(244,200,178,var(--sky-a-dawn)) 46%,rgba(228,192,188,var(--sky-a-dawn)) 100%);
-      --sky-day:linear-gradient(168deg,rgba(238,240,242,var(--sky-a-day)) 0%,rgba(232,216,192,var(--sky-a-day)) 52%,rgba(217,195,166,var(--sky-a-day)) 100%);
-      --sky-dusk:linear-gradient(180deg,rgba(250,218,188,var(--sky-a-dusk)) 0%,rgba(238,188,160,var(--sky-a-dusk)) 46%,rgba(208,180,184,var(--sky-a-dusk)) 100%);
-      --sky-night:linear-gradient(180deg,#c2cbd8 0%,#aab5c4 55%,#9aa4b0 100%);
+         Dramatik gökyüzü koyu temanın işi — "güneşe göre" kipinde batımda zaten oraya geçilir.
+         GÜNDÜZ ARTIK MAVİ (eski bej taban gitti): referans pen'in renk yolculuğu mavi gündüz →
+         turuncu-pembe şafak/batım → lacivert gece. Açık temada gece bandı yine AYDINLIK kalır
+         (lacivert olsaydı kartsız hub yazısı okunmazdı); koyulaşma koyu temanın işi. */
+      --sky-dawn:linear-gradient(180deg,rgba(255,222,190,var(--sky-a-dawn)) 0%,rgba(250,194,176,var(--sky-a-dawn)) 46%,rgba(226,188,206,var(--sky-a-dawn)) 100%);
+      --sky-day:linear-gradient(168deg,rgba(207,231,247,var(--sky-a-day)) 0%,rgba(172,209,238,var(--sky-a-day)) 52%,rgba(206,226,232,var(--sky-a-day)) 100%);
+      --sky-dusk:linear-gradient(180deg,rgba(255,214,172,var(--sky-a-dusk)) 0%,rgba(246,176,146,var(--sky-a-dusk)) 46%,rgba(212,174,198,var(--sky-a-dusk)) 100%);
+      --sky-night:linear-gradient(180deg,#b7c4dc 0%,#a2b0cb 55%,#909eb6 100%);
       --star-color:255,255,255;--star-warm:255,247,232;--star-cool:222,236,255;
       --star-field:
         radial-gradient(circle 1.1px at 22% 31%,rgba(var(--star-color),calc(var(--star-a) * .9)) 0 40%,rgba(var(--star-color),0) 100%),
@@ -87,14 +91,17 @@
          sütunu bunu gösteriyor). Yayı aşağı indirmek diskin sol sütuna girdiği pencereyi
          ekranın en alt şeridine sıkıştırır — orada blok bitmiş olur. */
       --sky-arm:clamp(260px,74vh,760px);--sky-step:60s;
-      --sun-angle:0deg;--sun-size:5.2vmin;--sun-disc:0;--sun-glow:0;
-      --sun-core:#fffdf2;--sun-rim:rgba(255,228,170,.5);--sun-halo:255,206,140;
+      /* DİSK BÜYÜK VE SICAK — referans pen'in ölçüsü (15vw) ve renk yolculuğu (#f90 → #fc0 → #ff0).
+         Eski 5.2vmin'lik beyazımsı nokta bej gökyüzünde seçilmiyordu; kullanıcının şikâyeti buydu.
+         `vmin` bilerek: tablet yatay da dikey de dönüyor, disk iki yönde de aynı büyüklükte kalsın. */
+      --sun-angle:0deg;--sun-size:12.5vmin;--sun-disc:0;--sun-glow:0;
+      --sun-core:#ff9d10;--sun-mid:#ffc61a;--sun-rim:rgba(255,247,102,.85);--sun-halo:255,214,102;
       /* AY DEĞİŞKENLERİ — varsayılan "ay yok" (`--moon-disc:0`), panel geceleyin yazar.
          `--moon-lit`/`--moon-dark` temaya göre değişir, açı ve evre JS'ten gelir. Karanlık
          taraf bilerek YARI SAYDAM: arkasındaki gökyüzü görünür (gerçek gökyüzünde de ayın
          karanlık limbi silik seçilir), böylece diskin sönmüş yarısı gri bir leke olmaz. */
-      --moon-angle:0deg;--moon-disc:0;--moon-glow:0;--moon-size:4.6vmin;--moon-term:50%;
-      --moon-lit:#fbf7ea;--moon-dark:rgba(120,134,158,.34);
+      --moon-angle:0deg;--moon-disc:0;--moon-glow:0;--moon-size:9vmin;--moon-term:50%;
+      --moon-lit:#fffdf1;--moon-dark:rgba(120,134,158,.34);
       --moon-left:var(--moon-dark);--moon-right:var(--moon-lit);--moon-mid:var(--moon-dark);
       /* CAM KÜMESİ İKİ TEMADA DA KOYU — TEK AİLE. Bu, turun ikinci kararı: kart da döşeme de
          koyu yarı saydam çip, üstündeki yazı açık. Gerekçe üç başlık:
@@ -108,7 +115,16 @@
          gökyüzü paletini değiştirir. Durum renkleri de tek küme: yanan sıcak krem (ekranın en
          parlak öğesi), aktif koyu yeşil + açık yeşil yazı, uyarı koyu kırmızı + açık kırmızı
          yazı, kapalı neredeyse siyah. Anlamlar korunur, değişen yalnız zemin yönü. */
-      --glass-card:rgba(12,16,22,.5);--glass-card-brd:rgba(255,255,255,.3);
+      /* KART GERÇEKTEN ŞEFFAF — turun üçüncü kararı, kullanıcının şikâyeti üzerine: eski .5 dolgu
+         + .62 parlaklık kelepçesi birlikte arkayı neredeyse tamamen kesiyordu, kart siyah bir
+         levha gibi okunuyordu. Artık kartın kendi kelepçesi var (`--glass-card-bright`), döşeme
+         ve küçük çipler eski `--glass-bright` değerinde KALIR — kullanıcı onları beğendi.
+         AÇIK TEMADA ALFA DAHA YÜKSEK, çünkü orada gökyüzü parlak: dolgu koyu çipin açık yazısını
+         taşıyabilecek kadar kalmalı. Koyu temada gökyüzü zaten karanlık, orada .24'e kadar inilir.
+         `--glass-card-veil` yalnız kartın ÜST şeridini koyultur (başlığın arkası); gövde
+         geçirgen kalır, gökyüzü ve güneş kartın içinden okunur. */
+      --glass-card:rgba(10,14,20,.44);--glass-card-brd:rgba(255,255,255,.36);
+      --glass-card-veil:linear-gradient(180deg,rgba(4,8,14,.2) 0%,rgba(4,8,14,0) 34%);
       --glass-tile:rgba(42,50,61,.6);--glass-tile-brd:rgba(255,255,255,.26);
       --glass-shadow:0 18px 40px rgba(6,10,16,.34);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.26),inset 0 -1px 0 rgba(0,0,0,.34);
@@ -116,8 +132,8 @@
          gökyüzü zaten yumuşak gradyanlardan oluşuyor, gizlenecek ayrıntı yok; bulanıklık
          yalnız cam hissi için var. Düşük yarıçap aynı zamanda ucuz — `backdrop-filter`
          maliyeti yarıçapla büyür ve panel bir tablette dönüyor. */
-      --glass-blur:16px;--glass-sat:.9;--glass-bright:.62;
-      --glass-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
+      --glass-blur:16px;--glass-sat:.9;--glass-bright:.62;--glass-card-bright:.78;
+      --glass-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(var(--glass-card-bright));
       --glass-filter-chip:blur(calc(var(--glass-blur) * .5)) saturate(var(--glass-sat)) brightness(var(--glass-bright));
       /* DURUM = PARLAKLIK MERDİVENİ, artık AŞAĞIDAN yukarı. Koyu çip ailesinde taban zaten
          karanlık: sıra kapalı < taban döşeme < aktif/uyarı < YANAN. Renklerin anlamı korunur
@@ -157,16 +173,19 @@
       --hub-muted:#cddcd4;
       --hub-text-shadow:0 1px 3px rgba(0,0,0,.82),0 0 12px rgba(0,0,0,.7);
       --hub-divider-line:rgba(255,255,255,.17);
-      /* KOYU TEMANIN GÖKYÜZÜ — aynı dört aşama, karartılmış palet. "Gündüz" burada panelin
-         eski sıcak zemin tabanıdır (değişmedi, ölçülmüş bir renk); gece neredeyse siyah-mavi,
-         yıldızlar asıl burada okunur. Cam kümesi ARTIK TEMAYA GÖRE DÖNMEZ (kökte tek küme);
-         koyu temada değişen tek şey parlaklık kelepçesi: zemin zaten karanlık olduğu için
-         camın ayrıca kısması gerekmiyor, .84 → .78. */
-      --sky-dawn:linear-gradient(180deg,rgba(58,56,80,var(--sky-a-dawn)) 0%,rgba(111,84,80,var(--sky-a-dawn)) 48%,rgba(138,94,60,var(--sky-a-dawn)) 100%);
-      --sky-day:linear-gradient(168deg,rgba(61,58,63,var(--sky-a-day)) 0%,rgba(91,69,48,var(--sky-a-day)) 46%,rgba(36,26,18,var(--sky-a-day)) 100%);
-      --sky-dusk:linear-gradient(180deg,rgba(44,42,60,var(--sky-a-dusk)) 0%,rgba(120,70,47,var(--sky-a-dusk)) 46%,rgba(51,32,15,var(--sky-a-dusk)) 100%);
-      --sky-night:linear-gradient(180deg,#0e1521 0%,#0a1017 55%,#101613 100%);
-      --glass-bright:.78;
+      /* KOYU TEMANIN GÖKYÜZÜ — aynı dört aşama, DRAMATİK palet: gündüz derin mavi, şafak mor →
+         kızıl → turuncu, batım turuncu → koyu kızıl, gece lacivert-siyah. Referans pen'in renk
+         yolculuğu asıl burada karşılığını bulur; açık tema okunurluk yüzünden pastel kalır.
+         Yıldızlar da asıl burada okunur. Cam kümesi ARTIK TEMAYA GÖRE DÖNMEZ (kökte tek küme);
+         koyu temada değişen yalnız iki parlaklık kelepçesi ve kartın dolgu alfası: zemin zaten
+         karanlık olduğu için kart burada .24'e kadar açılabilir, gökyüzü içinden geçer. */
+      --sky-dawn:linear-gradient(180deg,rgba(60,58,104,var(--sky-a-dawn)) 0%,rgba(140,86,86,var(--sky-a-dawn)) 48%,rgba(196,116,58,var(--sky-a-dawn)) 100%);
+      --sky-day:linear-gradient(168deg,rgba(46,94,142,var(--sky-a-day)) 0%,rgba(31,68,110,var(--sky-a-day)) 46%,rgba(20,42,72,var(--sky-a-day)) 100%);
+      --sky-dusk:linear-gradient(180deg,rgba(48,46,92,var(--sky-a-dusk)) 0%,rgba(168,80,52,var(--sky-a-dusk)) 46%,rgba(86,36,24,var(--sky-a-dusk)) 100%);
+      --sky-night:linear-gradient(180deg,#0b1330 0%,#070c1e 55%,#05080f 100%);
+      --glass-bright:.78;--glass-card-bright:.92;
+      --glass-card:rgba(8,12,20,.24);
+      --glass-card-veil:linear-gradient(180deg,rgba(2,5,10,.24) 0%,rgba(2,5,10,0) 34%);
       --glass-shadow:0 20px 46px rgba(0,0,0,.46);
     }
     *{box-sizing:border-box}html{scroll-behavior:smooth}
@@ -204,21 +223,27 @@
        tepesinde eskiden görünen kırılma böylece yok oluyor. `--sky-step` süreli geçiş, dakikada
        bir yazılan açıyı sürekli bir kaymaya çevirir.
        Hale `box-shadow`: YEREL kalır, gökyüzünün genel parlaklık bandını kaydırmaz — durum
-       döşemelerinin merdiveni bozulmaz. `prefers-reduced-motion` açıkken disk hiç çizilmez
-       (`--sun-disc` 0) ve geçiş kapanır; gökyüzünün saate göre tonlaması aynen sürer. */
-    html::before{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 42%,var(--sun-rim) 74%,rgba(255,226,170,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .2));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear}
+       döşemelerinin merdiveni bozulmaz. Referans pen'deki NABIZ da burada: hale iki durak
+       arasında gidip gelir (`alternate infinite`). Pen'in 2 sn'si bir duvar panelinde huzursuz
+       eder, 5,5 sn nefes gibi okunur. Nabız yalnız haleyi oynatır, diskin kendisini değil.
+       `prefers-reduced-motion` açıkken DİSK KALIR (eskiden tümden siliniyordu, artık silinmiyor):
+       yalnız nabız ve geçiş durur, konum ve tonlama saate göre doğru sürer. */
+    html::before{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(255,247,102,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-pulse 5.5s ease-in-out alternate infinite}
+    @keyframes panel-sun-pulse{from{box-shadow:0 0 calc(var(--sun-size) * 2.6) calc(var(--sun-size) * .9) rgba(var(--sun-halo),calc(var(--sun-glow) * .3))}to{box-shadow:0 0 calc(var(--sun-size) * 1.5) calc(var(--sun-size) * .45) rgba(var(--sun-halo),calc(var(--sun-glow) * .16))}}
     /* AY — güneşle aynı kol tekniği, ters yön. Tek farkı: disk radyal simetrik DEĞİL (evre
        çizgisi var), o yüzden kolun dönüşü diskin üstünde geri alınır — `rotate(-açı)` olmasa
        terminatör yayla birlikte yatardı. Evre iki katmanla çizilir:
          1) taban — disk yarı aydınlık yarı karanlık (hangi yarı, `--moon-left/right`),
          2) elips — terminatör; yatay yarıçapı evreyle 0'a inip diske geri açılır.
        Dördünde elips sıfırlanır (düz kenar), yeni ay/dolunayda diski kaplar. Hale `box-shadow`
-       olduğu için YEREL. `--moon-disc` sıfırken (gündüz, ya da `prefers-reduced-motion`)
+       olduğu için YEREL ve güneşinki gibi NABIZ atar. `--moon-disc` sıfırken (yani gündüz)
        opaklık sıfır olur, hale dahil hiçbir şey görünmez. */
-    body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 99%,transparent 100%),linear-gradient(90deg,var(--moon-left) 0 50%,var(--moon-right) 50% 100%);box-shadow:0 0 calc(var(--moon-size) * 1.7) calc(var(--moon-size) * .5) rgba(216,228,250,calc(var(--moon-glow) * .16));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear}
+    body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 99%,transparent 100%),linear-gradient(90deg,var(--moon-left) 0 50%,var(--moon-right) 50% 100%);box-shadow:0 0 calc(var(--moon-size) * 1.7) calc(var(--moon-size) * .5) rgba(226,236,255,calc(var(--moon-glow) * .2));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-pulse 5s ease-in-out alternate infinite}
+    @keyframes panel-moon-pulse{from{box-shadow:0 0 calc(var(--moon-size) * 1.9) calc(var(--moon-size) * .6) rgba(226,236,255,calc(var(--moon-glow) * .26))}to{box-shadow:0 0 calc(var(--moon-size) * 1.1) calc(var(--moon-size) * .3) rgba(226,236,255,calc(var(--moon-glow) * .13))}}
     body:not([data-active-view="home"])::after{opacity:calc(var(--moon-disc) * .5)}
     :root:not([data-active-view="home"])::before{opacity:calc(var(--sun-disc) * .5)}
-    @media(prefers-reduced-motion:reduce){body::after,html::before{transition:none}}
+    /* Hareket azaltma: nabız ve kayma durur, DİSK durur — gök cismi silinmez, yalnız kıpırdamaz. */
+    @media(prefers-reduced-motion:reduce){body::after,html::before{transition:none;animation:none}}
     /* OTOMATİK TEMA GEÇİŞİ — "Güneşe göre" kipinde eşik geçilirken kök kısa süre bu işareti
        taşır ve renkler sert değil yumuşak döner. Evrensel seçici bilerek DAR bir pencerede
        açık: günde en çok iki kez, ~1 sn; sonra JS işareti kaldırır. Elle tema seçiminde ve
@@ -227,9 +252,10 @@
     /* GÖKYÜZÜNÜN ÖLÇÜLERİ — hava servisinin gün doğumu/batımı geldiğinde panel köke
        `data-sun-ground="on"` yazar ve dakikada bir şu değişkenleri günceller: aşama ağırlıkları
        (`--sky-a-dawn/-day/-dusk`), yıldız opaklığı (`--star-a`), güneş ve ayın kol açısı
-       (`--sun-angle`/`--moon-angle`), disk ve hale opaklıkları. Veri yoksa (konum seçilmemiş,
-       internet yok) işaret hiç konmaz; kökteki varsayılanlar "gündüz, gök cismi yok" olduğu
-       için panel yine doğru boyanır.
+       (`--sun-angle`/`--moon-angle`), disk ve hale opaklıkları. Hava verisi yoksa (konum
+       seçilmemiş, internet yok) panel YEDEK saatlere düşer ve işareti yine koyar — gök cismi
+       her hâlükârda çizilir. Kökteki varsayılanlar ("gündüz, gök cismi yok") yalnız JS henüz
+       çalışmadan önceki ilk kareyi boyar.
        OKUNURLUK: durum ayrımı (yanan > aktif/uyarı > taban > sönük) artık gökyüzünün
        parlaklığından BAĞIMSIZ — çipler iki temada da koyu cam, kontrast çipin kendi
        katmanından geliyor. Aşama gradyanlarının serbestçe şafaktan geceye gezebilmesinin
@@ -382,7 +408,7 @@
          3) üst bardaki yuvarlak düğmeler — aynı gerekçe, yarı güç.
        Kartın İÇİNDEKİ döşeme, satır ve rozetler düz yarı saydamdır: bulanık içinde bulanık
        yığmak 7 inç sınıfı tablette karşılığı olmayan bir maliyet. */
-    body[data-active-view="home"] #home .widget-card{border-color:var(--glass-card-brd);background:var(--glass-card);box-shadow:var(--glass-sheen),var(--glass-shadow);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter)}
+    body[data-active-view="home"] #home .widget-card{border-color:var(--glass-card-brd);background-color:var(--glass-card);background-image:var(--glass-card-veil);box-shadow:var(--glass-sheen),var(--glass-shadow);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter)}
     /* Hızlı erişim şeridinin kendi kartı yok: sekmeler doğrudan zeminin üstünde durur. */
     #home .quick-control-widget{border-color:transparent;background:none;box-shadow:none}
     body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
