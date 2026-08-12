@@ -352,11 +352,26 @@
          ayrı bir `backdrop-filter` geçişi demek — tablette 60fps'in en pahalı düşmanı. Arkada
          yumuşatılacak DETAY da yok (gökyüzü zaten sürekli gradyan), yani bedeli olan karşılığı
          olmayan bir katman olurdu. Geçirgenlik alfadan geliyor. */
-      --glass-tile:rgba(9,13,20,.46);
+      /* DENEME (kullanıcı isteği): yukarıdaki alfaların HEPSİ YARIYA indirildi — .46→.23,
+         .7→.35, .76→.38, .78→.39. Amaç tek: gökyüzü döşemenin içinden çok daha fazla okunsun.
+         Pigmentlere dokunulmadı, yalnız örtü inceldi.
+         Ölçüm (öğle gökyüzü rgb(172,209,238) üstünde, bileşke bağıl parlaklık):
+           kapalı .242 < uyarı .275 < aktif .291 < taban .352 < YANAN ~.88
+         — MERDİVENİN SIRASI KORUNDU, hepsi birlikte yukarı kaydı.
+         Beyaz metnin kontrastı bu incelmeyle taban döşemede 2.61:1'e, ikinci satırda 2.22:1'e
+         düştü (3:1'in ALTI). Dolguyu geri koyulaştırmak istenen şeyi (saydamlık) geri alırdı;
+         onun yerine aşağıda YALNIZ gündüz canlı kipte harfin arkasına çok hafif bir kontur
+         konuyor (bkz. `--glass-tile-text-shadow`). */
+      --glass-tile:rgba(9,13,20,.23);
       --glass-sub:rgba(233,243,239,.95);
-      --glass-off:rgba(4,6,10,.7);
-      --glass-active:rgba(28,60,46,.76);
-      --glass-alert:rgba(82,40,36,.78);
+      --glass-off:rgba(4,6,10,.35);
+      --glass-active:rgba(28,60,46,.38);
+      --glass-alert:rgba(82,40,36,.39);
+      /* HARFİN KENDİ KONTURU — plaka DEĞİL. 1px ofset + 2px bulanıklık, döşemenin kendi koyu
+         pigmentinden; harfin kenarını tutar, gölge olarak okunmaz ve döşemeyi koyulaştırmaz.
+         Yalnız beyaz yazı taşıyan döşemelerde kullanılır; yanan döşemenin koyu yazısı bunu
+         almaz. */
+      --glass-tile-text-shadow:0 1px 2px rgba(4,8,14,.55);
     }
     :root[data-sky="live"][data-theme="dark"]{
       /* GECE. Yön aynı, taraf değişti: gökyüzü karanlık olduğu için cam da KOYU kalır ve
@@ -373,10 +388,22 @@
       --glass-plate-line:var(--sky-plate-line,rgba(226,226,226,.16));--glass-plate-inset:var(--sky-plate-inset,rgba(226,226,226,.07));
       --hub-muted:var(--glass-plate-sub);
       --glass-plate-shadow:var(--sky-plate-shadow,0 1px 2px rgba(0,0,0,.5));
-      /* GECE DÖŞEMESİ OLDUĞU GİBİ KALIR (kökteki `--glass-tile` .6) — yani gündüzün .46'sından
-         DAHA DOLGUN. Gerekçe simetrik: gündüz sorun döşemenin gökyüzüne göre fazla koyu
-         olmasıydı; gece gökyüzü zaten karanlık, döşeme incelirse ayrışmayı KAYBEDER. */
+      /* GECE DE AYNI ORANDA İNCELDİ (kullanıcı isteği, deneme). Eskiden bu blok hiçbir şey
+         yazmıyor, kökteki koyu tema değerlerini olduğu gibi alıyordu; artık aynı dörtlüyü
+         YARI alfayla burada tekrar yazıyor — .6→.3, .78→.39, .88→.44, .9→.45.
+         Kökteki değerler DEĞİŞMEDİ, yani `data-sky="fixed"` (Light/Dark) hiç etkilenmez.
+         Gece gökyüzü zaten karanlık olduğu için beyaz yazının kontrastı bu incelmeden sonra
+         bile geniş: taban döşemede derin gecede ~17:1, gecenin en aydınlık ucunda (alacakaranlık)
+         ~8.9:1. Kontur gerekmez, konmadı. */
+      --glass-tile:rgba(42,50,61,.3);
+      --glass-off:rgba(2,4,7,.39);
+      --glass-active:rgba(28,60,46,.44);
+      --glass-alert:rgba(82,40,36,.45);
     }
+    /* Konturun kapsamı: canlı kipte BEYAZ yazı taşıyan döşemeler. Yanan döşeme (koyu kehribar
+       yazı) dışarıda. Değişken yalnız GÜNDÜZ canlı blokta tanımlı olduğu için gecede ve
+       `data-sky="fixed"` sisteminde kural `none`a düşer, hiçbir şey değişmez. */
+    :root[data-sky="live"] body[data-active-view="home"] #home :where(.group-control-tile:not(.on),.quick-card:not(.on)){text-shadow:var(--glass-tile-text-shadow,none)}
     /* AKIŞ — dakikada bir yazılan renk basamak gibi görünmesin diye geçiş süresi yazma
        aralığının kendisidir (`--sky-step`, güneş açısında kullanılanla aynı mantık: 60s,
        önizlemede .14s). Kapsam yalnız KENDİ `color`unu yazan serbest metin öğeleri; döşeme,
