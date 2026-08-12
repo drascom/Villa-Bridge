@@ -211,7 +211,13 @@
          değerleri (`--glass-tile*`, durum aileleri) aynen KALIR: değişen yalnız kap. */
       --glass-card:rgba(255,255,255,.04);--glass-card-brd:rgba(17,22,28,.17);--glass-card-veil:none;
       --glass-tile:rgba(255,255,255,.72);--glass-tile-brd:rgba(17,22,28,.09);
-      --glass-shadow:0 8px 22px rgba(20,28,38,.09);
+      /* DAR VE KESKİN GÖLGE — yan yana duran düğmeler arasındaki "tünel"in ilacı. Eski gölge
+         `0 8px 22px`ti: 22px bulanıklık kenardan ~11px dışarı taşar, oysa şeritteki ve
+         ızgaradaki gerçek boşluk 6–12px. İki komşunun gölgesi aradaki boşlukta ÜST ÜSTE
+         binip tek bir koyu bant kuruyordu. Yarıçap 3px'e iner (taşma ~1.5px, en dar 6px
+         boşlukta bile komşuya değmez); silikleşmesin diye alfa .09 → .14 çıkar. Düğme
+         havada süzülmüyor, zeminin bir tık üstünde duruyor. */
+      --glass-shadow:0 1px 3px rgba(20,28,38,.14);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.7),inset 0 -1px 0 rgba(17,22,28,.05);
       /* iOS'ta cam doygunluğu ARTIRIR, karartmaz: `saturate` 1'in ÜSTÜNDE, `brightness` 1.
          Katman sayısı değişmedi — aynı iki `backdrop-filter`, yalnız katsayılar. */
@@ -249,7 +255,10 @@
          kenar .13'ten .20'ye çıkar ki kartın sınırı koyu zeminde de tek başına okunsun. */
       --glass-card:rgba(255,255,255,.03);--glass-card-brd:rgba(255,255,255,.2);--glass-card-veil:none;
       --glass-tile:rgba(255,255,255,.11);--glass-tile-brd:rgba(255,255,255,.17);
-      --glass-shadow:0 12px 28px rgba(0,0,0,.42);
+      /* Aynı karar koyu temada daha da gerekliydi: `0 12px 28px` siyahın .42'si, neredeyse
+         siyah zeminde komşuyla toplanınca düğmelerin ARASI düğmelerden koyu kalıyordu.
+         Yarıçap 4px (taşma ~2px), alfa .5 — dar, keskin, düğmenin altında. */
+      --glass-shadow:0 2px 4px rgba(0,0,0,.5);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.24);
       --glass-sat:1.6;--glass-bright:1;--glass-card-bright:1;
       /* Mürekkep, yanan/aktif/uyarı renkleri kökün koyu cam kümesinden gelir — anlamları
@@ -840,6 +849,11 @@
     :root[data-theme="dark"] .quick-card.selected .quick-device-icon{color:#a8e3c6;background:#26493a;box-shadow:inset 0 0 0 1px #3d8966}
     .quick-card-add{flex:0 0 auto;width:clamp(58px,6.2vw,70px);min-width:58px;justify-content:center;padding:5px clamp(8px,1vw,12px);border:1px solid var(--forest);color:var(--on-forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}
     body[data-active-view="home"] #home .quick-card-add{border-color:var(--forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}
+    /* "Yeni grup" düğmesinin gölgesi tokendan değil, kuralın içinden geliyor (yeşil tonlu) —
+       o yüzden dar/keskin karar burada ayrıca yazılır. Renk aynı yeşil, yalnız yarıçap
+       18px'ten 4px'e iner ki yanındaki sekmeyle arasındaki 6–10px boşlukta bant kurmasın.
+       `:not(:focus-visible)` odak halkasını (aşağıdaki kural) dışarıda bırakır. */
+    :root[data-sky="fixed"] body[data-active-view="home"] #home .quick-card-add:not(:focus-visible){box-shadow:0 2px 4px rgba(24,77,59,.3)}
     .quick-card-add .quick-add-icon{width:clamp(30px,3.2vw,36px);height:clamp(30px,3.2vw,36px);display:grid;place-items:center}
     .quick-card-add .device-type-svg{width:clamp(20px,2.1vw,24px);height:clamp(20px,2.1vw,24px);stroke-width:2.4}
     .quick-card-add:focus-visible,body[data-active-view="home"] #home .quick-card-add:focus-visible{outline:3px solid var(--on-forest);outline-offset:-6px;box-shadow:0 0 0 3px var(--forest)}
@@ -870,6 +884,10 @@
        genişlik simgesinin solunda durur — ikisi de aynı kipte görünür, üst üste binmez. */
     .tile-eye{position:absolute;z-index:6;right:56px;top:6px;width:44px;height:44px;display:none;place-items:center;padding:0;border:1px solid var(--line);border-radius:999px;color:var(--forest);background:var(--surface);box-shadow:0 6px 16px rgba(12,32,24,.18);touch-action:manipulation}
     body[data-active-view="home"] #home .tile-eye{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    /* Düzenleme kipinde göz ve genişlik düğmeleri kartın sağ üstünde 6px arayla YAN YANA durur —
+       komşusu `--home-float-shadow` üzerinden zaten daralmıştı, bu kendi gölgesini yazdığı için
+       geride kalıyordu. Sabit sistemde o da aynı dar/keskin gölgeye iner. */
+    :root[data-sky="fixed"] body[data-active-view="home"] #home .tile-width-toggle{box-shadow:var(--glass-shadow)}
     .tile-eye svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
     .tile-eye[aria-checked="false"]{color:var(--muted);border-color:var(--line);background:var(--surface-soft)}
     .tile-eye:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
