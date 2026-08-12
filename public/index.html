@@ -30,6 +30,10 @@
       const dark=mode==="dark"||(mode!=="light"&&(sunDark!==null?sunDark:window.matchMedia?.("(prefers-color-scheme: dark)").matches===true));
       const resolved=dark?"dark":"light";
       document.documentElement.dataset.theme=resolved;
+      /* Görünüm sistemi de İLK KAREDE belli olmalı: hareketli gökyüzü yalnız "güneşe göre"
+         kipinin işidir, diğer kiplerde sabit zemin çizilir. İşaret geç konsaydı sabit kipte
+         gökyüzü bir kare yanıp sönerdi. Panel bunu sonra `applyTheme` içinde tazeler. */
+      document.documentElement.dataset.sky=mode==="sun"?"live":"fixed";
       document.documentElement.style.colorScheme=resolved;
       document.querySelector('meta[name="theme-color"]').content=dark?"#101514":"#edf0f2";
     }catch{}})();

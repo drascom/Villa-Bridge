@@ -196,6 +196,11 @@
     const previous=document.documentElement.dataset.theme;
     if(options.fade===true&&previous&&previous!==resolved&&!reducedMotion())startThemeFade();
     document.documentElement.dataset.theme=resolved;
+    // İKİ GÖRÜNÜM SİSTEMİ. `data-sky` kökte hangi sistemin geçerli olduğunu söyler: hareketli
+    // gökyüzü (aşamalar, yıldızlar, güneş/ay, kayma) YALNIZ "güneşe göre" kipinde çalışır,
+    // diğer tüm kiplerde panel sabit sisteme düşer. Tema (`data-theme`) bundan bağımsızdır —
+    // sabit sistemde de light ve dark ikisi de var. CSS tarafı `panel.css` içinde.
+    document.documentElement.dataset.sky=state.themeMode==="sun"?"live":"fixed";
     document.documentElement.style.colorScheme=resolved;
     document.querySelector('meta[name="theme-color"]').content=resolved==="dark"?"#101514":"#edf0f2";
     const resolvedLabel=t(resolved==="dark"?"themeDark":"themeLight");
@@ -214,9 +219,9 @@
       button.setAttribute("aria-label",`${t("appearance")}: ${resolvedLabel}`);
       button.title=`${t("appearance")}: ${resolvedLabel}`;
     });
-    // Zemin de görünümün parçası: güneş takibi ilk tema uygulamasında başlar (bir kez), sonraki
-    // çağrılarda zaten dönen zamanlayıcıya dokunmaz.
-    startSunGround();
+    // Zemin de görünümün parçası: güneş takibi kipe göre kurulur ya da durdurulur (aşağıda),
+    // zaten doğru durumdaysa hiçbir şey yapmaz.
+    syncSunGround();
   }
   /* GÜNEŞİ İZLEYEN ZEMİN. Panel kendi güneş hesabını YAPMAZ: gün doğumu/batımı zaten hava
      servisinden geliyor (`weatherState.data.daily.sunrise/sunset`, sunucu `timezone=auto` ile
@@ -405,6 +410,21 @@
     if(sunGroundState.started)return;
     sunGroundState.started=true;
     scheduleSunGround();
+  }
+  /* SABİT SİSTEMDE HİÇBİR ŞEY DÖNMEZ. Gökyüzü, güneş ve ay yalnız "güneşe göre" kipinin
+     öğeleri; başka kipte CSS onları zaten çizmiyor, burada da dakikalık hesabı durduruyoruz —
+     boşuna iş dönmesin. Kip geri döndüğünde takip aynı yerden kurulur, ilk çağrı değerleri
+     hemen yeniden yazar. */
+  function stopSunGround(){
+    if(!sunGroundState.started)return;
+    clearTimeout(sunGroundState.timer);
+    sunGroundState.timer=null;
+    sunGroundState.started=false;
+    delete document.documentElement.dataset.sunGround;
+  }
+  function syncSunGround(){
+    if(state.themeMode==="sun")startSunGround();
+    else stopSunGround();
   }
   function setThemeMode(mode){
     if(!["light","dark","sun","system"].includes(mode))return;

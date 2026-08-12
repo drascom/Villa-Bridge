@@ -145,9 +145,9 @@
       --glass-on-chip:#f6dea6;--glass-on-chip-ink:#4a3208;
       --glass-on-glow:0 0 0 3px rgba(255,202,112,.34),0 12px 30px rgba(214,140,32,.3);
       --glass-active:rgba(28,60,46,.88);--glass-active-brd:rgba(74,152,114,.9);
-      --glass-active-ink:#b4ecd0;--glass-active-sub:rgba(180,236,208,.82);
+      --glass-active-ink:#b4ecd0;--glass-active-sub:rgba(180,236,208,.82);--glass-active-chip:rgba(38,73,58,.9);
       --glass-alert:rgba(82,40,36,.9);--glass-alert-brd:rgba(180,80,72,.9);
-      --glass-alert-ink:#ffc8c2;--glass-alert-sub:rgba(255,200,194,.82);
+      --glass-alert-ink:#ffc8c2;--glass-alert-sub:rgba(255,200,194,.82);--glass-alert-chip:rgba(85,48,44,.9);
       --glass-off:rgba(2,4,7,.78);--glass-off-brd:rgba(255,255,255,.12);
       --glass-off-sub:rgba(226,236,232,.7);--glass-off-chip:rgba(255,255,255,.09);
       /* CAM YÜZEYİN MÜREKKEP KÜMESİ — koyu çipin İÇİNDE geçerli olan palet. Kural tek yerde
@@ -188,6 +188,74 @@
       --glass-card-veil:linear-gradient(180deg,rgba(2,5,10,.24) 0%,rgba(2,5,10,0) 34%);
       --glass-shadow:0 20px 46px rgba(0,0,0,.46);
     }
+    /* ————— SABİT SİSTEM (Light · Dark · System) —————
+       Yukarıdaki cam kümesi HAREKETLİ sistem için kuruldu: gökyüzü şafaktan geceye gezerken
+       kontrastın kaymaması için kart iki temada da KOYU. Sabit sistemde zemin oynamıyor, o
+       yüzden orada iOS "Liquid Glass" dili geçerli: kart mümkün olduğunca AÇIK/şeffafa yakın,
+       renk kartta değil BUTONDA VE YAZIDA yaşar. İki blok da tam kümeyi yazar ki hangi tema
+       seçilirse seçilsin öbürünün değeri sızmasın; `:not([data-theme="dark"])` ve
+       `[data-theme="dark"]` eşit özgüllükte ve birbirini dışlar.
+       Zemin tek katman: `--paper` + çok hafif tek bir ışık lekesi (`--ground-wash`). Desen,
+       fotoğraf, animasyon ve zamanlayıcı YOK — hepsi hareketli sistemde kalır. */
+    :root[data-sky="fixed"]:not([data-theme="dark"]){
+      /* iOS'un gruplu liste zemini: çok açık nötr gri, kartlar onun üstünde beyaza yakın. */
+      --paper:#f2f3f7;--surface:#fff;--surface-soft:#eceef3;--line:rgba(17,22,28,.09);
+      --card-shadow:0 1px 3px rgba(20,28,38,.07);--shadow:0 10px 26px rgba(20,28,38,.08);
+      --ground-wash:radial-gradient(120% 78% at 50% -12%,rgba(255,255,255,.92) 0%,rgba(255,255,255,0) 62%);
+      /* Sabit zeminde hub yazısının ağır gölgeye ihtiyacı yok: zemin sakin, mürekkep koyu. */
+      --hub-text-shadow:none;--hub-muted:#4c5854;--hub-divider-line:rgba(17,22,28,.12);
+      --home-glass:rgba(17,22,28,.05);--home-action-line:rgba(23,33,29,.22);
+      /* AÇIK CAM: beyaza yakın yarı saydam dolgu, saç teli kenar, üstte sheen, küçük yumuşak
+         gölge. Kartın üst şeridini koyultan örtü burada gereksiz — kapalı. */
+      --glass-card:rgba(255,255,255,.62);--glass-card-brd:rgba(17,22,28,.07);--glass-card-veil:none;
+      --glass-tile:rgba(255,255,255,.72);--glass-tile-brd:rgba(17,22,28,.09);
+      --glass-shadow:0 8px 22px rgba(20,28,38,.09);
+      --glass-sheen:inset 0 1px 0 rgba(255,255,255,.7),inset 0 -1px 0 rgba(17,22,28,.05);
+      /* iOS'ta cam doygunluğu ARTIRIR, karartmaz: `saturate` 1'in ÜSTÜNDE, `brightness` 1.
+         Katman sayısı değişmedi — aynı iki `backdrop-filter`, yalnız katsayılar. */
+      --glass-sat:1.7;--glass-bright:1;--glass-card-bright:1;
+      /* Açık camın içinde mürekkep KOYU; küçük metin de AA payını korur. */
+      --glass-ink:#17211d;--glass-ink-soft:#3c4842;--glass-sub:#5f6b66;
+      --glass-line:rgba(17,22,28,.1);--glass-inset:rgba(17,22,28,.05);
+      --glass-accent:#12503b;--glass-accent-soft:rgba(24,77,59,.1);--glass-accent-ink:#fff;
+      --glass-danger:#9d2f2a;--glass-danger-soft:rgba(184,58,53,.12);
+      /* DURUM RENGİ DÜĞMEDE: kart sakin kalır, yanan/aktif/uyarı/kapalı ayrımını döşemenin
+         kendi dolgusu ve yazısı verir. Merdiven açık zeminde de aynı sırayla okunur —
+         yanan (kehribar dolgu, tek haleli öğe) > aktif/uyarı (renkli pastel) > taban (beyaz
+         cam) > kapalı (neredeyse görünmez örtü + sönük yazı). */
+      --glass-on:rgba(255,205,120,.9);--glass-on-brd:rgba(206,138,26,.7);
+      --glass-on-ink:#4a3105;--glass-on-sub:rgba(74,49,5,.82);
+      --glass-on-chip:#e79a18;--glass-on-chip-ink:#33210a;
+      --glass-on-glow:0 0 0 3px rgba(240,175,60,.28),0 10px 24px rgba(205,135,25,.22);
+      --glass-active:rgba(214,241,227,.88);--glass-active-brd:rgba(35,120,86,.5);
+      --glass-active-ink:#0e5238;--glass-active-sub:rgba(14,82,56,.86);--glass-active-chip:#c2e7d3;
+      --glass-alert:rgba(253,222,218,.9);--glass-alert-brd:rgba(176,62,54,.48);
+      --glass-alert-ink:#8c2620;--glass-alert-sub:rgba(140,38,32,.86);--glass-alert-chip:#f8ccc6;
+      --glass-off:rgba(255,255,255,.4);--glass-off-brd:rgba(17,22,28,.06);
+      /* Kapalı döşeme SÖNÜK ama okunur: alfa .52'de alt satır AA'nın altına düşüyordu (3.4:1),
+         .64'te 4.9:1 — döşeme yine merdivenin en altında kalır, yazısı kaybolmaz. */
+      --glass-off-sub:rgba(23,33,29,.64);--glass-off-chip:rgba(17,22,28,.05);
+    }
+    :root[data-sky="fixed"][data-theme="dark"]{
+      /* iOS'un koyu zemini: neredeyse siyah, hafif SOĞUK gri. */
+      --paper:#0c0e11;--surface:#161a1f;--surface-soft:#1d2228;--line:rgba(255,255,255,.1);
+      --card-shadow:0 1px 3px rgba(0,0,0,.4);--shadow:0 14px 34px rgba(0,0,0,.45);
+      --ground-wash:radial-gradient(120% 78% at 50% -12%,rgba(126,152,190,.1) 0%,rgba(126,152,190,0) 64%);
+      --hub-text-shadow:none;--hub-muted:#b6c4be;--hub-divider-line:rgba(255,255,255,.14);
+      --home-glass:rgba(255,255,255,.07);--home-action-line:rgba(237,245,240,.34);
+      /* KOYU TEMADA KART SİYAH LEVHA DEĞİL: zeminin üstünde ince AÇIK örtü. Dolgu beyazın
+         .07–.11 bandında, kenar .13–.17; kartı tanımlayan şey yine kenarı ve sheen'i. */
+      --glass-card:rgba(255,255,255,.07);--glass-card-brd:rgba(255,255,255,.13);--glass-card-veil:none;
+      --glass-tile:rgba(255,255,255,.11);--glass-tile-brd:rgba(255,255,255,.17);
+      --glass-shadow:0 12px 28px rgba(0,0,0,.42);
+      --glass-sheen:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.24);
+      --glass-sat:1.6;--glass-bright:1;--glass-card-bright:1;
+      /* Mürekkep, yanan/aktif/uyarı renkleri kökün koyu cam kümesinden gelir — anlamları
+         hareketli sistemle AYNI. Değişen yalnız "kapalı": siyah plaka yerine geri çekilmiş
+         ince örtü, yoksa açık kartların arasında delik gibi duruyordu. */
+      --glass-off:rgba(255,255,255,.03);--glass-off-brd:rgba(255,255,255,.09);
+      --glass-off-sub:rgba(226,236,232,.64);--glass-off-chip:rgba(255,255,255,.07);
+    }
     *{box-sizing:border-box}html{scroll-behavior:smooth}
     /* DOKUNMA VURGUSU — odak halkasından AYRI bir şey. Android WebView, dokunulan her düğmenin
        üstüne kendi MAVİ dikdörtgenini basar; eylem bitince kaybolur ama her dokunuşta yeniden
@@ -213,10 +281,18 @@
        sıfır DOM düğümü ve sıfır JS döngüsü. (Referanstaki 300 `div` yerine bu seçildi.)
        Ana ekran dışındaki ekranlar opak kart dilini sürdürdüğü için gökyüzü orada sakinleşir. */
     body{background-color:var(--paper);background-image:none}
-    body::before{content:"";position:fixed;z-index:-3;inset:-6%;display:block;background-color:transparent;background-image:var(--sky);background-size:197px 163px,269px 211px,149px 131px,cover,cover,cover,cover;background-repeat:repeat,repeat,repeat,no-repeat,no-repeat,no-repeat,no-repeat;pointer-events:none;will-change:transform;animation:panel-ground-drift 90s ease-in-out infinite}
-    body:not([data-active-view="home"])::before{opacity:.5}
+    /* İKİ GÖRÜNÜM SİSTEMİ — kökteki `data-sky` işareti hangisinin geçerli olduğunu söyler:
+       `live` YALNIZ "güneşe göre" kipinde (hareketli gökyüzü, güneş/ay, yıldız, kayma),
+       `fixed` diğer tüm kiplerde (Light · Dark · System). İşareti panel yazar (`applyTheme`,
+       90-shell.js) ve ilk kareyi kaçırmamak için `index.html` başlık betiği de yazar.
+       Sabit sistemde aşağıdaki üç katmanın hiçbiri KURULMAZ: sözde öğelerin `content`i yok,
+       yani ne boyama ne animasyon ne de `transform` maliyeti doğar. Tema (`data-theme`) ayrı
+       eksende kalır — sabit sistemde de light ve dark ikisi de vardır. */
+    :root[data-sky="fixed"] body{background-image:var(--ground-wash,none)}
+    :root[data-sky="live"] body::before{content:"";position:fixed;z-index:-3;inset:-6%;display:block;background-color:transparent;background-image:var(--sky);background-size:197px 163px,269px 211px,149px 131px,cover,cover,cover,cover;background-repeat:repeat,repeat,repeat,no-repeat,no-repeat,no-repeat,no-repeat;pointer-events:none;will-change:transform;animation:panel-ground-drift 90s ease-in-out infinite}
+    :root[data-sky="live"] body:not([data-active-view="home"])::before{opacity:.5}
     @keyframes panel-ground-drift{0%{transform:scale(1) translate3d(0,0,0)}50%{transform:scale(1.05) translate3d(-1.2%,.9%,0)}100%{transform:scale(1) translate3d(0,0,0)}}
-    @media(prefers-reduced-motion:reduce){body::before{animation:none}}
+    @media(prefers-reduced-motion:reduce){:root[data-sky="live"] body::before{animation:none}}
     /* GÜNEŞ — DÖNEN KOLUN UCUNDA. Öğe ufkun ortasına (`left:50%`, `top:88%`) çakılıdır;
        `rotate(açı) translateY(calc(-1 * kol))` onu o noktanın çevresinde gerçek bir YAY
        üzerinde gezdirir. Konum yalnız TEK bir açıdan gelir, iki ayrı eksenden değil — yayın
@@ -228,7 +304,7 @@
        eder, 5,5 sn nefes gibi okunur. Nabız yalnız haleyi oynatır, diskin kendisini değil.
        `prefers-reduced-motion` açıkken DİSK KALIR (eskiden tümden siliniyordu, artık silinmiyor):
        yalnız nabız ve geçiş durur, konum ve tonlama saate göre doğru sürer. */
-    html::before{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(255,247,102,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-pulse 5.5s ease-in-out alternate infinite}
+    :root[data-sky="live"]::before{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(255,247,102,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-pulse 5.5s ease-in-out alternate infinite}
     @keyframes panel-sun-pulse{from{box-shadow:0 0 calc(var(--sun-size) * 2.6) calc(var(--sun-size) * .9) rgba(var(--sun-halo),calc(var(--sun-glow) * .3))}to{box-shadow:0 0 calc(var(--sun-size) * 1.5) calc(var(--sun-size) * .45) rgba(var(--sun-halo),calc(var(--sun-glow) * .16))}}
     /* AY — güneşle aynı kol tekniği, ters yön. Tek farkı: disk radyal simetrik DEĞİL (evre
        çizgisi var), o yüzden kolun dönüşü diskin üstünde geri alınır — `rotate(-açı)` olmasa
@@ -238,12 +314,12 @@
        Dördünde elips sıfırlanır (düz kenar), yeni ay/dolunayda diski kaplar. Hale `box-shadow`
        olduğu için YEREL ve güneşinki gibi NABIZ atar. `--moon-disc` sıfırken (yani gündüz)
        opaklık sıfır olur, hale dahil hiçbir şey görünmez. */
-    body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 99%,transparent 100%),linear-gradient(90deg,var(--moon-left) 0 50%,var(--moon-right) 50% 100%);box-shadow:0 0 calc(var(--moon-size) * 1.7) calc(var(--moon-size) * .5) rgba(226,236,255,calc(var(--moon-glow) * .2));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-pulse 5s ease-in-out alternate infinite}
+    :root[data-sky="live"] body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 99%,transparent 100%),linear-gradient(90deg,var(--moon-left) 0 50%,var(--moon-right) 50% 100%);box-shadow:0 0 calc(var(--moon-size) * 1.7) calc(var(--moon-size) * .5) rgba(226,236,255,calc(var(--moon-glow) * .2));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-pulse 5s ease-in-out alternate infinite}
     @keyframes panel-moon-pulse{from{box-shadow:0 0 calc(var(--moon-size) * 1.9) calc(var(--moon-size) * .6) rgba(226,236,255,calc(var(--moon-glow) * .26))}to{box-shadow:0 0 calc(var(--moon-size) * 1.1) calc(var(--moon-size) * .3) rgba(226,236,255,calc(var(--moon-glow) * .13))}}
-    body:not([data-active-view="home"])::after{opacity:calc(var(--moon-disc) * .5)}
-    :root:not([data-active-view="home"])::before{opacity:calc(var(--sun-disc) * .5)}
+    :root[data-sky="live"] body:not([data-active-view="home"])::after{opacity:calc(var(--moon-disc) * .5)}
+    :root[data-sky="live"]:not([data-active-view="home"])::before{opacity:calc(var(--sun-disc) * .5)}
     /* Hareket azaltma: nabız ve kayma durur, DİSK durur — gök cismi silinmez, yalnız kıpırdamaz. */
-    @media(prefers-reduced-motion:reduce){body::after,html::before{transition:none;animation:none}}
+    @media(prefers-reduced-motion:reduce){:root[data-sky="live"] body::after,:root[data-sky="live"]::before{transition:none;animation:none}}
     /* OTOMATİK TEMA GEÇİŞİ — "Güneşe göre" kipinde eşik geçilirken kök kısa süre bu işareti
        taşır ve renkler sert değil yumuşak döner. Evrensel seçici bilerek DAR bir pencerede
        açık: günde en çok iki kez, ~1 sn; sonra JS işareti kaldırır. Elle tema seçiminde ve
@@ -467,8 +543,8 @@
     body[data-active-view="home"] #home .group-control-tile.alert{border-color:var(--glass-alert-brd);color:var(--glass-alert-ink);background:var(--glass-alert)}
     /* Aktif/uyarı döşemelerinin ikon rozeti de koyu aileye iner: açık temanın açık yeşil/pembe
        plakası koyu döşemenin üstünde yamalı duruyordu. Renk anlamı aynı, yön değişti. */
-    body[data-active-view="home"] #home .group-control-tile.active .device-status-icon{color:var(--glass-active-ink);background:rgba(38,73,58,.9);box-shadow:inset 0 0 0 1px var(--glass-active-brd)}
-    body[data-active-view="home"] #home .group-control-tile.alert .device-status-icon{color:var(--glass-alert-ink);background:rgba(85,48,44,.9);box-shadow:inset 0 0 0 1px var(--glass-alert-brd)}
+    body[data-active-view="home"] #home .group-control-tile.active .device-status-icon{color:var(--glass-active-ink);background:var(--glass-active-chip);box-shadow:inset 0 0 0 1px var(--glass-active-brd)}
+    body[data-active-view="home"] #home .group-control-tile.alert .device-status-icon{color:var(--glass-alert-ink);background:var(--glass-alert-chip);box-shadow:inset 0 0 0 1px var(--glass-alert-brd)}
     /* Kartın içinde kalan SABİT AÇIK plakalar: bunlar tokenla değil düz hex ile yazılmış
        (nötr cihaz rozeti, özet çipi, uyarı rozeti). Koyu çipin üstünde açık birer yama gibi
        duruyorlardı; burada aynı cam diline iniyorlar. Renk anlamları korunur — uyarı yine
@@ -746,7 +822,7 @@
     .quick-card.selected .home-tab-copy small{color:inherit;opacity:.78}
     /* Seçili sekme de koyu cam ailesinin yeşili: dolgu koyu, mürekkep açık — iki temada aynı. */
     body[data-active-view="home"] #home .quick-card.selected{border-color:var(--glass-active-brd);color:var(--glass-active-ink);background:var(--glass-active)}
-    body[data-active-view="home"] #home .quick-card.selected .quick-device-icon{color:var(--glass-active-ink);background:rgba(38,73,58,.9);box-shadow:inset 0 0 0 1px var(--glass-active-brd)}
+    body[data-active-view="home"] #home .quick-card.selected .quick-device-icon{color:var(--glass-active-ink);background:var(--glass-active-chip);box-shadow:inset 0 0 0 1px var(--glass-active-brd)}
     :root[data-theme="dark"] .quick-card.selected{border-color:#3d8966;color:#a8e3c6;background:#26493a}
     :root[data-theme="dark"] .quick-card.selected .quick-device-icon{color:#a8e3c6;background:#26493a;box-shadow:inset 0 0 0 1px #3d8966}
     .quick-card-add{flex:0 0 auto;width:clamp(58px,6.2vw,70px);min-width:58px;justify-content:center;padding:5px clamp(8px,1vw,12px);border:1px solid var(--forest);color:var(--on-forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}
