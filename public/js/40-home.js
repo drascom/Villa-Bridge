@@ -42,7 +42,7 @@
   function renderHomeTabs(){
     const items=homeTabItems();
     if(!items.some(item=>item.id===state.homeTab))state.homeTab=overviewTabId;
-    $("#homeTabs").innerHTML=items.map(homeTabHtml).join("");
+    $("#homeTabList").innerHTML=items.map(homeTabHtml).join("");
     $$("[data-home-tab]").forEach(button=>button.onclick=()=>selectHomeTab(button.dataset.homeTab));
     $("#createHomeGroup").onclick=()=>openGroupEditor();
   }
@@ -59,7 +59,8 @@
     tab.scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"nearest",inline:"nearest"});
     tab.focus();
   }
-  /* Şeritte ok/Home/End ile gezinme; "+ yeni grup" düğmesi tablist'in dışında kalır. */
+  /* Şeritte ok/Home/End ile gezinme. "+ yeni grup" düğmesi kaydırma kabının içinde ama
+     tablist'in (`#homeTabList`) DIŞINDA durur: sekme değil, o yüzden gezinmeye de girmez. */
   function moveHomeTabFocus(key){
     const tabs=$$("#homeTabs [data-home-tab]");
     if(!tabs.length)return;

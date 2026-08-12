@@ -84,9 +84,11 @@
           <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
           <div class="strip-row">
             <button id="quickScrollLeft" class="quick-scroll-hint scroll-hint-left" type="button" hidden aria-label="More tabs to the left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
-            <div id="homeTabs" class="device-grid quick-grid grid-view" role="tablist" data-i18n-aria="homeTabsLabel" aria-label="Overview and groups"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></div>
+            <div id="homeTabs" class="device-grid quick-grid grid-view">
+              <button id="createHomeGroup" class="quick-card quick-card-add" type="button" data-i18n-aria="createDeviceGroup" aria-label="Create device group"><span class="quick-add-icon" aria-hidden="true"><svg class="device-type-svg" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
+              <div id="homeTabList" class="home-tab-list" role="tablist" data-i18n-aria="homeTabsLabel" aria-label="Overview and groups"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></div>
+            </div>
             <button id="quickScrollRight" class="quick-scroll-hint scroll-hint-right" type="button" hidden aria-label="More tabs to the right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
-            <button id="createHomeGroup" class="quick-card quick-card-add" type="button" data-i18n-aria="createDeviceGroup" aria-label="Create device group"><span class="quick-add-icon" aria-hidden="true"><svg class="device-type-svg" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
           </div>
         </section>
         <section id="groupPanel" class="widget-card group-widget group-panel" role="tabpanel" tabindex="-1" hidden></section>
