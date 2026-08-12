@@ -22,7 +22,6 @@
     if(opener&&opener.isConnected&&opener.offsetParent!==null)opener.focus();
   });
   $("#appMenuDialog").addEventListener("click",event=>{if(event.target===$("#appMenuDialog"))closeAppMenu()});
-  $$("[data-home-metric]").forEach(button=>button.onclick=()=>navigateHomeMetric(button.dataset.homeMetric));
   $$("[data-device-layout]").forEach(button=>button.onclick=()=>setDeviceLayout(button.dataset.deviceLayout));
   window.addEventListener("resize",()=>{if(state.deviceLayout==="grid")applyDeviceColumns(state.deviceColumns)},{passive:true});
   function syncSearchClear(){$("#clearSearch").hidden=$("#search").value.length===0}

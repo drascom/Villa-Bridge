@@ -447,30 +447,13 @@
     counter.hidden=!extra;
     document.body.classList.toggle("has-system-alert",Boolean(message));
   }
-  // Başlıktaki ölçü düğmesini gösterip gizler; düğme yoksa sessizce geçer.
-  function setMetricVisible(metric,visible){
-    const button=$(`[data-home-metric="${metric}"]`);
-    if(button)button.hidden=!visible;
-  }
   function render(){
     const devices=state.devices;
     $$(".add-device").forEach(button=>button.disabled=!state.overviewLoaded);
-    $("#deviceCount").textContent=devices.length;
-    /* Başlık ölçüleri yalnız SÖYLEYECEK bir şey varken durur: sıfır uyarı ve iyi sinyal
-       yazılmaz. Kaybolan bir bilgi yok — ikisi de zaten "sorun yok" demenin uzun hâliydi;
-       uyarılı/zayıf cihazlara Cihazlar görünümünden ulaşılmaya devam edilir. */
-    const alerts=devices.filter(isAlert).length;
-    $("#alertCount").textContent=alerts;
-    setMetricVisible("alerts",alerts>0);
+    /* Başlıktaki "Cihaz / Uyarı / Sinyal" şeridi kalktı; yerini ev durumunun ikonlu özeti
+       (`#homeSummary`, `renderHomeSummary`) aldı. Kaybolan bilgi yok: kritik uyarılar zaten üstteki
+       sistem şeridinde, uyarılı ve zayıf sinyalli cihazlar Cihazlar görünümünde duruyor. */
     renderSystemAlertBar();
-    const signalPercents=devices.map(linkQualityPercent).filter(value=>value!==null);
-    const averageSignal=signalPercents.length?Math.round(signalPercents.reduce((sum,value)=>sum+value,0)/signalPercents.length):null;
-    const signalStrength=$("#signalAverage");
-    const signalTone=averageSignal===null?null:signalToneForPercent(averageSignal);
-    signalStrength.textContent=signalTone?t(signalToneKeys[signalTone]):"—";
-    signalStrength.className=signalTone?`signal-${signalTone}`:"";
-    signalStrength.title=averageSignal===null?"":`${averageSignal}%`;
-    setMetricVisible("signal",signalTone==="weak"||signalTone==="fair");
     const onlineDevices=devices.filter(device=>device.availability==="online").length;
     const offlineDevices=devices.filter(device=>device.availability==="offline").length;
     $("#onlineDeviceCount").textContent=String(onlineDevices);
@@ -557,7 +540,10 @@
   }
   function renderWidgetLists(){
     const devices=state.devices;
-    const split=activityEventSplit(state.events||[],widgetListCapacity("#activityEvents",5));
+    /* Taban 3 satır: olay listesi artık birleşik kartın ALT bölümü. Kart ne kadar yer bırakırsa o
+       kadar satır çizilir (`widgetListCapacity` kartın kalan boyunu ölçer); ölçüm yapılamadığında
+       kart iki bölümün toplamı kadar uzamasın diye taban düşük tutulur. */
+    const split=activityEventSplit(state.events||[],widgetListCapacity("#activityEvents",3));
     /* Satır sadeleşti: ad normal ağırlıkta, durum kelimesi yerine renkli küçük gösterge (olayın
        kendi işareti + tonu), zaman soluk ve küçük. Kelime `title`/`aria-label`de duruyor. */
     const list=split.rows.length?split.rows.map(row=>{

@@ -1,6 +1,4 @@
   const isAlert=device=>Array.isArray(device.alerts)&&device.alerts.length>0;
-  const signalToneForPercent=percent=>percent<25?"weak":percent<50?"fair":percent<75?"good":"strong";
-  const signalToneKeys={weak:"homeSignalLow",fair:"homeSignalMedium",good:"homeSignalGood",strong:"homeSignalHigh"};
   const criticalAlert=device=>Array.isArray(device.alerts)?device.alerts.find(alert=>alert?.severity==="critical")||null:null;
   const criticalAlertKeys={smoke:"smokeAlarmDevice",carbon_monoxide:"carbonMonoxideAlarmDevice"};
   const batteryPercent=device=>typeof device.state?.battery==="number"?Math.round(Math.max(0,Math.min(100,device.state.battery))):null;

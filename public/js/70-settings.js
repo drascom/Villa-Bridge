@@ -250,7 +250,7 @@
     renderOnboarding();
   }
   const dashboardTourSteps=()=>[
-    {target:'[data-home-metric="devices"]',title:"tourStatusTitle",text:"tourStatusLead"},
+    {target:"#homeSummary",fallback:"#home .home-heading",title:"tourStatusTitle",text:"tourStatusLead"},
     {target:"#homeTabs",title:"tourQuickTitle",text:"tourQuickLead"},
     {target:"#addWidget",title:"tourAddTitle",text:"tourAddLead"},
     {target:"#editDashboard",title:"tourEditTitle",text:"tourEditLead"},
@@ -339,7 +339,6 @@
     const errors=state.debugErrors;
     $("#debugLogTitle").textContent=t("recentErrors",{count:errors.length});
     $("#debugErrorList").innerHTML=errors.length?errors.map(error=>`<article class="debug-error-row"><strong>${esc(error.operation)} · HTTP ${esc(error.statusCode)}</strong><time datetime="${esc(error.timestamp)}">${ago(error.timestamp)}</time><p>${esc(error.message)}</p></article>`).join(""):`<div class="debug-empty">${t("noDebugErrors")}</div>`;
-    $("#alertCount").textContent=state.devices.filter(isAlert).length;
     renderSystemAlertBar();
   }
   function renderDebugSettings(){

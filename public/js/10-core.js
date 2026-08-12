@@ -82,17 +82,16 @@
   const savedHiddenGroups=new Set(savedVisibilityCache?savedVisibilityCache.hiddenGroups:[]);
   const dashboardWidgetTypes={
     quick:{title:"homeTabsWidget",lead:"homeTabsWidgetLead"},
-    summary:{title:"summaryWidget",lead:"summaryWidgetLead"},
-    activity:{title:"activityWidget",lead:"activityWidgetLead"}
+    summary:{title:"summaryWidget",lead:"summaryWidgetLead"}
   };
-  const defaultDashboardWidgets=["quick","summary","activity"];
+  const defaultDashboardWidgets=["quick","summary"];
   const fixedDashboardWidgets=new Set(["quick"]);
-  /* "Ev durumu" ile "Cihaz erişilebilirliği" tek kartta birleşti: katalogda tek giriş, tek ekle/kaldır.
-     Kayıtlı düzenlerde iki eski kimlik de bulunabilir; `availability` artık `summary`ye eşlenir.
-     Kural — eski kimliklerden en az biri düzende açıksa birleşik kart açık gelir, ikisi de
-     kaldırılmışsa kaldırılmış kalır. Konum: eskiden hangisi öndeyse o. Ölü kimlik ne düzende ne de
-     kaldırılmışlar listesinde bırakılır. */
-  const legacyDashboardWidgetIds={availability:"summary"};
+  /* "Ev durumu", "Cihaz erişilebilirliği" ve "Ev hareketleri" tek kartta birleşti: katalogda tek
+     giriş, tek ekle/kaldır. Kayıtlı düzenlerde üç eski kimlik de bulunabilir; `availability` ve
+     `activity` artık `summary`ye eşlenir. Kural — eski kimliklerden en az biri düzende açıksa
+     birleşik kart açık gelir, hepsi kaldırılmışsa kaldırılmış kalır. Konum: eskiden hangisi
+     öndeyse o. Ölü kimlik ne düzende ne de kaldırılmışlar listesinde bırakılır. */
+  const legacyDashboardWidgetIds={availability:"summary",activity:"summary"};
   function mergeLegacyDashboardWidgets(widgets,removed){
     const target=id=>Object.hasOwn(legacyDashboardWidgetIds,id)?legacyDashboardWidgetIds[id]:id;
     const merged=[];

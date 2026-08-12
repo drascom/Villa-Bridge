@@ -53,28 +53,6 @@
       setTimeout(()=>card.classList.remove("focused"),1800);
     });
   }
-  function navigateHomeMetric(metric){
-    if(metric==="alerts"){
-      const alertDevice=state.devices.find(isAlert);
-      if(alertDevice){showDevice(alertDevice.id);return}
-      if(state.settings?.debug?.enabled===true&&state.debugErrors.length){
-        activateView("settings");
-        requestAnimationFrame(()=>$("#debugCard").scrollIntoView({behavior:"smooth",block:"start"}));
-        return;
-      }
-    }
-    if(metric==="signal"){
-      const weakest=[...state.devices]
-        .filter(device=>rawLinkQuality(device)!==null)
-        .sort((a,b)=>rawLinkQuality(a)-rawLinkQuality(b))[0];
-      if(weakest){showDevice(weakest.id);return}
-    }
-    activateView("devices");
-    $("#search").value="";
-    filterDevices();
-    bindCards();
-    requestAnimationFrame(()=>$("#allDevices").scrollIntoView({behavior:"smooth",block:"start"}));
-  }
   function applyDeviceLayout(){
     [$("#allDevices"),$("#attentionDevices")].forEach(container=>{
       container.classList.toggle("devices-grid-view",state.deviceLayout==="grid");
