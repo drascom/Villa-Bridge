@@ -205,9 +205,11 @@
       /* Sabit zeminde hub yazısının ağır gölgeye ihtiyacı yok: zemin sakin, mürekkep koyu. */
       --hub-text-shadow:none;--hub-muted:#4c5854;--hub-divider-line:rgba(17,22,28,.12);
       --home-glass:rgba(17,22,28,.05);--home-action-line:rgba(23,33,29,.22);
-      /* AÇIK CAM: beyaza yakın yarı saydam dolgu, saç teli kenar, üstte sheen, küçük yumuşak
-         gölge. Kartın üst şeridini koyultan örtü burada gereksiz — kapalı. */
-      --glass-card:rgba(255,255,255,.62);--glass-card-brd:rgba(17,22,28,.07);--glass-card-veil:none;
+      /* KART = ÇERÇEVE, LEVHA DEĞİL. Sabit zemin oynamadığı için kartın kendi dolgusuna gerek
+         yok: dolgu .04 alfada sadece bir nefes, kartı okutan tek şey KENARI. Kenar bu yüzden
+         .07'den .17'ye çıkar — dolgu gidince saç teli kenar da kayboluyordu. Döşeme/çip
+         değerleri (`--glass-tile*`, durum aileleri) aynen KALIR: değişen yalnız kap. */
+      --glass-card:rgba(255,255,255,.04);--glass-card-brd:rgba(17,22,28,.17);--glass-card-veil:none;
       --glass-tile:rgba(255,255,255,.72);--glass-tile-brd:rgba(17,22,28,.09);
       --glass-shadow:0 8px 22px rgba(20,28,38,.09);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.7),inset 0 -1px 0 rgba(17,22,28,.05);
@@ -243,9 +245,9 @@
       --ground-wash:radial-gradient(120% 78% at 50% -12%,rgba(126,152,190,.1) 0%,rgba(126,152,190,0) 64%);
       --hub-text-shadow:none;--hub-muted:#b6c4be;--hub-divider-line:rgba(255,255,255,.14);
       --home-glass:rgba(255,255,255,.07);--home-action-line:rgba(237,245,240,.34);
-      /* KOYU TEMADA KART SİYAH LEVHA DEĞİL: zeminin üstünde ince AÇIK örtü. Dolgu beyazın
-         .07–.11 bandında, kenar .13–.17; kartı tanımlayan şey yine kenarı ve sheen'i. */
-      --glass-card:rgba(255,255,255,.07);--glass-card-brd:rgba(255,255,255,.13);--glass-card-veil:none;
+      /* KART = ÇERÇEVE (light ile aynı karar): dolgu beyazın .03'ünde, yani neredeyse yok;
+         kenar .13'ten .20'ye çıkar ki kartın sınırı koyu zeminde de tek başına okunsun. */
+      --glass-card:rgba(255,255,255,.03);--glass-card-brd:rgba(255,255,255,.2);--glass-card-veil:none;
       --glass-tile:rgba(255,255,255,.11);--glass-tile-brd:rgba(255,255,255,.17);
       --glass-shadow:0 12px 28px rgba(0,0,0,.42);
       --glass-sheen:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.24);
@@ -485,6 +487,17 @@
        Kartın İÇİNDEKİ döşeme, satır ve rozetler düz yarı saydamdır: bulanık içinde bulanık
        yığmak 7 inç sınıfı tablette karşılığı olmayan bir maliyet. */
     body[data-active-view="home"] #home .widget-card{border-color:var(--glass-card-brd);background-color:var(--glass-card);background-image:var(--glass-card-veil);box-shadow:var(--glass-sheen),var(--glass-shadow);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter)}
+    /* SABİT SİSTEMDE KARTIN ÜÇ KATMANI DÜŞER — dolgu kalkınca üçü de anlamsız:
+         · sheen (üst ışık çizgisi + alt iç gölge) cam KALINLIĞINI anlatır; kalınlığı olmayan
+           bir çerçevede ikinci bir kenar gibi görünüp asıl kenarla yarışıyordu;
+         · dış gölge havada duran bir LEVHANIN gölgesidir; levha yok;
+         · `backdrop-filter` arkasındaki şeyi bulanıklaştırır — sabit zemin düz renk + tek
+           yumuşak ışık lekesi, bulanıklaştıracak DETAY yok. Yani bedeli olan ama karşılığı
+           olmayan bir katman: kaldırıldı, ana ekranda bulanıklık maliyeti sıfıra iner.
+       Kapsam bilerek dar: yalnız `data-sky="fixed"` ve yalnız `.widget-card`. Hareketli
+       sistemde gökyüzü kartın ARKASINDA gerçekten oynadığı için orada üçü de yerinde kalır;
+       döşemeler/çipler `--home-float-shadow` üzerinden eskisi gibi devam eder. */
+    :root[data-sky="fixed"] body[data-active-view="home"] #home .widget-card{box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
     /* Hızlı erişim şeridinin kendi kartı yok: sekmeler doğrudan zeminin üstünde durur. */
     #home .quick-control-widget{border-color:transparent;background:none;box-shadow:none}
     body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
