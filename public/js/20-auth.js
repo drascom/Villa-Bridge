@@ -23,6 +23,9 @@
     if(!state.auth.authenticated)closeAppMenu();
     $("#authAccountName").textContent=state.auth.user?.username||"—";
     $("#authRoleBadge").textContent=t(resident?"homeUser":"administrator");
+    // Menü levhasının kimlik satırı: kim girmiş, hangi rolle. Oturum yoksa satır boşalır ve
+    // kendi kuralıyla (`.app-menu-role:empty`) gizlenir.
+    $("#appMenuRole").textContent=state.auth.user?t("signedInAs",{role:t(resident?"homeUser":"administrator")}):"";
     $$("[data-auth-logout]").forEach(button=>{button.setAttribute("aria-label",t("signOut"));button.title=t("signOut")});
     if(resident&&["automations","connections","settings"].includes(document.body.dataset.activeView))activateView("home");
   }
