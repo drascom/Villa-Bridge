@@ -566,7 +566,20 @@
        Dark'ta koyu cam + açık mürekkep; renk butonda ve yazıda), hareketli sistemde ise levha
        gün boyu AYNI koyu camda kalır (aşağıdaki `data-sky="live"` kancası). Gölge dar ve keskin:
        `--glass-shadow` zaten öyle. */
-    dialog.app-menu-dialog{width:min(94vw,438px);max-width:min(94vw,438px);max-height:calc(100dvh - 32px);margin:auto auto max(16px,env(safe-area-inset-bottom));border-radius:26px;background:transparent;box-shadow:none}
+    /* DİKEY SİMETRİ: levha kısa kesilmez, üstteki boşluk kadar altta da boşluk bırakıp aradaki
+       alanı doldurur. Tek ölçü `--menu-inset-y` üstte ve altta aynen kullanılır; çentik/gezinme
+       çubuğu varsa `env(safe-area-inset-bottom)` yalnız ALT tarafa EKLENİR (görsel boşluk yine
+       eşit görünür, levha çubuğun altına girmez). Yükseklik ikisinin toplamı kadar kısaltılır.
+       `clamp` kısa ekranda (yatay tablet ~600px) boşluğu kendiliğinden daraltır. */
+    dialog.app-menu-dialog{
+      --menu-inset-y:clamp(12px,2.4vh,24px);
+      --menu-inset-bottom:calc(var(--menu-inset-y) + env(safe-area-inset-bottom,0px));
+      width:min(94vw,438px);max-width:min(94vw,438px);
+      height:calc(100dvh - var(--menu-inset-y) - var(--menu-inset-bottom));
+      max-height:calc(100dvh - var(--menu-inset-y) - var(--menu-inset-bottom));
+      margin:var(--menu-inset-y) auto var(--menu-inset-bottom);
+      border-radius:26px;background:transparent;box-shadow:none
+    }
     dialog.app-menu-dialog::backdrop{background:rgba(8,14,11,.5);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
     /* Açılış: levha aşağıdan bir tık yükselir. `prefers-reduced-motion` açıkken hiç oynamaz. */
     dialog.app-menu-dialog[open]{animation:app-menu-rise .3s cubic-bezier(.22,.8,.3,1)}
@@ -579,7 +592,7 @@
       --menu-accent:var(--glass-accent);--menu-accent-soft:var(--glass-accent-soft);--menu-accent-ink:var(--glass-accent-ink);
       --menu-danger:var(--glass-danger);
       /* Levha ekranı taşarsa KENDİ İÇİNDE kayar; arkadaki sayfaya zincir kurulmaz. */
-      max-height:calc(100dvh - 32px);display:flex;flex-direction:column;gap:14px;padding:16px;
+      height:100%;max-height:100%;display:flex;flex-direction:column;gap:14px;padding:16px;
       border:1px solid var(--menu-brd);border-radius:26px;color:var(--menu-ink);background:var(--menu-surface);
       box-shadow:var(--glass-sheen),var(--glass-shadow);
       backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);
@@ -590,6 +603,13 @@
     /* HAREKETLİ SİSTEM: çipin gündüz iyice inceltilmiş dolgusu (.23) burada kullanılmaz — levha
        gün boyu aynı koyu camda durur, mürekkebi kökün açık çip ailesinden gelir. */
     :root[data-sky="live"] dialog.app-menu-dialog>.app-menu-modal{--menu-surface:rgba(9,13,20,.74);--menu-brd:rgba(255,255,255,.22)}
+    /* İçerik levhadan kısa kalırsa artan boşluk TEK yerde toplanır: gezinme listesinden sonra.
+       Böylece başlık + gezinme üstte, ince çizgiyle ayrılan alt yığın (görünüm/dil + durum ve
+       Sign out) levhanın dibinde durur. Boşluk her satırın arasına dağıtılmaz; öğeler birbirinden
+       kopmaz ve hiçbir ayraç çizgisi ortada askıda kalmaz. Öğeler ezilmesin diye `flex:none`:
+       taşma olduğunda içerik sıkışmaz, levha kendi içinde kayar. */
+    dialog.app-menu-dialog>.app-menu-modal>*{flex:none}
+    dialog.app-menu-dialog>.app-menu-modal>.app-menu-utilities{margin-top:auto}
     .app-menu-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
     .app-menu-who{min-width:0;display:flex;align-items:center;gap:9px}
     .app-menu-head .brand-mark{width:30px;height:30px;flex:none;color:var(--menu-accent-ink);background:var(--menu-accent);font:800 15px/1 system-ui,sans-serif}
@@ -1573,10 +1593,10 @@
       dialog#deviceDetailDialog{height:100dvh;max-height:100dvh}
       dialog#deviceDetailDialog>.modal{height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:clamp(14px,3vh,26px);padding-bottom:calc(20px + env(safe-area-inset-bottom))}
       /* İKİNCİ İSTİSNA — Villa menüsü. Ortak kural her pencereyi ekrana yayıyor; menü ise artık
-         alttan gelen DAR bir levha (bkz. "A — Sheet" bloğu). Ölçüsü ve alta yaslanması burada
-         geri verilir; taşarsa levha kendi içinde kayar, sayfa değil. */
-      dialog#appMenuDialog{width:min(94vw,438px)!important;max-width:min(94vw,438px)!important;height:auto;max-height:calc(100dvh - 32px);margin:auto auto max(16px,env(safe-area-inset-bottom));border-radius:26px}
-      dialog#appMenuDialog>.modal{height:auto;max-height:calc(100dvh - 32px);padding:16px}
+         DAR ve dikeyde SİMETRİK bir levha (bkz. "A — Sheet" bloğu). Ölçüsü ve eşit üst/alt boşluğu
+         burada aynen geri verilir (iki blok tutarlı); taşarsa levha kendi içinde kayar, sayfa değil. */
+      dialog#appMenuDialog{width:min(94vw,438px)!important;max-width:min(94vw,438px)!important;height:calc(100dvh - var(--menu-inset-y) - var(--menu-inset-bottom));max-height:calc(100dvh - var(--menu-inset-y) - var(--menu-inset-bottom));margin:var(--menu-inset-y) auto var(--menu-inset-bottom);border-radius:26px}
+      dialog#appMenuDialog>.modal{height:100%;max-height:100%;padding:16px}
       dialog#appMenuDialog>.modal>*{width:auto;max-width:none;margin-left:0;margin-right:0}
       /* TEK İSTİSNA — hızlı kumanda. Ortak kural her diyaloğu ekrana yayar; bu pencere ise bilerek
          KÜÇÜK ve ORTADA durur (cihaza tek dokunuşluk kumanda, tam ekran bir sayfa değil). `margin:auto`
