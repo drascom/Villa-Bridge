@@ -463,16 +463,30 @@
        ŞEKİL `clip-path` POLİGONU, gömülü SVG değil: SVG `data:` URI'nin dolgu rengi bir
        DEĞİŞKENDEN gelemezdi, oysa silüetin gökyüzüyle birlikte nefes alması isteniyor.
        Poligon tek bir dikdörtgen boyamanın maskesi — sabit maliyet, sıfır düğüm, sıfır JS.
-       Birkaç tepe yeter: panelin dili sade, detaylı manzara değil.
+       YÜKSEKLİK ÖLÇÜLDÜ, seçilmedi: eskiden `min(22vh,240px)` idi, tepe kartların ARKASINA
+       giriyor ve kartın alt kenarında kesiliyordu — ekranda dağ değil "gri kama" okunuyordu.
+       Artık tavan tam olarak ana ekranın alta ayırdığı rezerv: yatayda `main` alt dolgusu ve
+       `#home.active` yükseklik hesabı 94px + güvenli alan bırakır (dar kipte 104px), alttaki
+       grup şeridinin tepesi ise ~80px + güvenli alanda kalır. Silüetin tavanı 94px + güvenli
+       alan seçildi: şeridin biraz ÜSTÜNDE biter, kartların altına hiç girmez, dolayısıyla
+       kesilecek bir kenar yoktur. Kutu 6px aşağı taşar (`bottom:-6px`) ki blur ekranın alt
+       kenarında saydamlık sızdırmasın.
+       SIRT: tek keskin üçgen yerine sekiz farklı yükseklikte zirve, boyu sağa doğru artan bir
+       hat — güneş yayı sağda battığı için en yüksek iki zirve de sağda. Sol uç tabana inip
+       yatay maskeyle söner: sert dikey kesim yok. Derinlik İKİNCİ DÜĞÜMLE değil, hava
+       perspektifiyle verildi: dikey gradyan eteği koyu, zirveleri yarı yarıya siliktir — ayrı
+       bir sıra çizmek ikinci bir sözde öğe/boyama isterdi, bu bedava. Köşeler 0,7px blur ile
+       yumuşar; öğe durağan olduğu için filtre bir kez birleştirilir.
        RENK GÖKYÜZÜNE BAĞLI: tek koyu ton, alfası gün ışığı ekseninden (`--sky-lum`, 0 derin
-       gece · 1 öğle) türer. Parlak gökte silüet netleşir (.28), gökyüzü karardıkça geri çekilir
-       (.10) — böylece HER SAATTE gökyüzünden bir tık koyu kalır, hiçbir saatte siyah bir bant
-       olmaz. Eksen zaten kökte yazılı, yeni JS/ölçüm yok; `--sky-lum` henüz yazılmadıysa
-       yedek 1 (panelin genel varsayılanı gündüz).
+       gece · 1 öğle) türer. Parlak gökte silüet netleşir (etek .23), gökyüzü karardıkça geri
+       çekilir (.10) — böylece HER SAATTE gökyüzünden bir tık koyu kalır, hiçbir saatte siyah
+       bir bant olmaz. Alfa bir tık düşürüldü: amaç "uzaktaki tepe", "gri levha" değil. Eksen
+       zaten kökte yazılı, yeni JS/ölçüm yok; `--sky-lum` henüz yazılmadıysa yedek 1 (panelin
+       genel varsayılanı gündüz).
        HAREKET YOK: dağ sabit, animasyonu ve geçişi yok — `prefers-reduced-motion` bu öğeyi
        hiç ilgilendirmiyor. Sabit sistemde (`data-sky="fixed"`) kural HİÇ eşleşmez: dağ çizilmez,
        yani orada ne boyama ne maskeleme maliyeti doğar. */
-    :root[data-sky="live"]::after{content:"";position:fixed;z-index:-1;right:0;bottom:0;display:block;width:min(48vw,900px);height:min(22vh,240px);pointer-events:none;background:rgba(12,19,29,calc(.1 + var(--sky-lum,1) * .18));clip-path:polygon(0 100%,7% 87%,19% 63%,29% 74%,42% 41%,52% 57%,66% 19%,77% 45%,88% 31%,100% 54%,100% 100%)}
+    :root[data-sky="live"]::after{content:"";position:fixed;z-index:-1;right:0;bottom:-6px;display:block;width:min(78vw,1500px);height:calc(94px + env(safe-area-inset-bottom) + 6px);pointer-events:none;background:linear-gradient(to top,rgba(12,19,29,calc(.1 + var(--sky-lum,1) * .13)) 0 34%,rgba(12,19,29,calc(.05 + var(--sky-lum,1) * .065)) 100%);clip-path:polygon(0 100%,5% 95%,12% 76%,17% 86%,25% 60%,30% 72%,38% 46%,44% 63%,50% 33%,55% 54%,62% 19%,67% 49%,73% 33%,78% 44%,85% 15%,90% 38%,96% 25%,100% 42%,100% 100%);filter:blur(.7px);-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%);mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%)}
     /* Ana ekran dışında gökyüzü yarıya söner; dağ da onunla birlikte geri çekilir. */
     :root[data-sky="live"]:not([data-active-view="home"])::after{opacity:.5}
     /* OTOMATİK TEMA GEÇİŞİ — "Güneşe göre" kipinde eşik geçilirken kök kısa süre bu işareti
