@@ -291,17 +291,25 @@
        DEĞİŞMEYENLER, bilerek: `--glass-tile*`, `--glass-bright` (çip kelepçesi) ve bütün durum
        aileleri (`--glass-on/active/alert/off`) — döşeme ve butonlar iki zamanda da KOYU kalır,
        yazıları beyaz, yanan döşemenin halesi yerinde. Gökyüzü gradyanları, güneş/ay diski ve
-       yay hareketi bu blokların dışında. */
+       yay hareketi bu blokların dışında.
+       MÜREKKEP DE SAATE GÖRE — sabit ton listesi YOK. `applySunGround` (90-shell.js) dakikada
+       bir gökyüzünün gerçek parlaklığını (`--sky-lum`, 0..1) hesaplar ve kartın bütün nötr
+       tonlarını ondan türetip köke yazar: `--sky-plate-ink/-ink-soft/-sub/-line/-inset` ve
+       kartın dolgusu `--sky-plate-fill`. Aşağıdaki iki blok o sayıları yalnız BAĞLAR; yedek
+       değerler ilk kare içindir (JS henüz yazmadan). Adlar bilerek `--sky-*` önekli: JS onları
+       kökün SATIR İÇİ stiline yazıyor, `--glass-plate-*` adıyla yazsaydı sabit sisteme de
+       sızardı — orada renkler sabit kalmalı.
+       Renk karışımı CSS'te YAPILMAZ (`color-mix` eski Android WebView'de yok, panelin genel
+       kuralı); hazır renk JS'ten gelir, CSS yalnız akışı (`transition`) taşır. */
     :root[data-sky="live"]:not([data-theme="dark"]){
-      /* GÜNDÜZ. Dolgu bir "nefes" kadar BEYAZ (.16): kartı o tanımlamaz, kenarı tanımlar —
-         gökyüzü, güneş ve bulut deseni kartın içinden okunmaya devam eder. Kenar bu yüzden
-         koyu saç teli (.24): parlak pastel gökte tek başına ayrışan tek şey odur.
+      /* GÜNDÜZ. Dolgu bir "nefes" kadar BEYAZ: kartı o tanımlamaz, kenarı tanımlar — gökyüzü,
+         güneş ve yıldız deseni kartın içinden okunmaya devam eder. Alfası sabit değil, gökyüzü
+         karardıkça .12'den .26'ya çıkar (JS); koyu mürekkebin payını ayakta tutan kaldıraç bu.
+         Kenar koyu saç teli (.24): parlak pastel gökte tek başına ayrışan tek şey odur.
          PARLAKLIK KELEPÇESİ TERSİNE DÖNDÜ (.78 → 1.04). Eski kelepçe kartın açık YAZISINI
          taşımak için karartıyordu; yazı artık koyu, dolayısıyla kart gökyüzünden bir tık AÇIK
-         olmalı ki koyu mürekkebin payı gökyüzünün en koyu bandında da bozulmasın (ölçüm:
-         açık temanın en koyu bandı #909eb6 üstünde gövde metni 4,98:1 — AA). Doygunluk 1'in
-         ÜSTÜNE çıkar (.9 → 1.3): iOS camı rengi süzmez, yoğunlaştırır. */
-      --glass-card:rgba(255,255,255,.16);--glass-card-brd:rgba(17,22,28,.24);
+         olmalı. Doygunluk 1'in ÜSTÜNE çıkar (.9 → 1.3): iOS camı rengi süzmez, yoğunlaştırır. */
+      --glass-card:var(--sky-plate-fill,rgba(255,255,255,.16));--glass-card-brd:rgba(17,22,28,.24);
       --glass-blur:12px;--glass-sat:1.3;--glass-card-bright:1.04;
       /* DAR GÖLGE — sabit sistemde yapılanın aynısı. Ölçülen en dar gerçek boşluk 6px
          (`#home .strip-row` dar ekranda `clamp(6px,2vw,10px)`); kart rayında ve döşeme
@@ -309,33 +317,52 @@
          taşıyor, iki komşunun gölgesi aradaki boşlukta birleşip tünel kuruyordu. 3px taşma
          ~1,5px: 6px'lik boşlukta bile komşuya değmez. Silikleşmesin diye alfa .34 → .18. */
       --glass-shadow:0 1px 3px rgba(16,24,34,.18);
-      /* Kartın üstündeki serbest metin KOYUYA döner; çipin içi (yukarıdaki `--glass-ink`
-         ailesi) açık kalır. `--forest`/`--danger` karşılıkları da döner, yoksa özet çipinin
-         açık nane yeşili aydınlık kartın üstünde kaybolurdu. */
-      --glass-plate-ink:#111a17;--glass-plate-ink-soft:#243029;--glass-plate-sub:#34423c;
-      --glass-plate-line:rgba(17,22,28,.16);--glass-plate-inset:rgba(17,22,28,.06);
+      /* Nötr tonlar saatten gelir (gündüz ailesi hep KOYU, gri 15–41 arasında gezer).
+         `--forest`/`--danger` karşılıkları sabit kalır: onlar parlaklık değil ANLAM taşıyor,
+         yalnız aydınlık kartta kaybolmasınlar diye koyu tarafa çekildi. */
+      --glass-plate-ink:var(--sky-plate-ink,#23231f);--glass-plate-ink-soft:var(--sky-plate-ink-soft,#353531);
+      --glass-plate-sub:var(--sky-plate-sub,#474743);
+      --glass-plate-line:var(--sky-plate-line,rgba(17,22,28,.16));--glass-plate-inset:var(--sky-plate-inset,rgba(17,22,28,.07));
       --glass-plate-accent:#0f4b37;--glass-plate-accent-soft:rgba(24,77,59,.12);--glass-plate-accent-ink:#fff;
       --glass-plate-danger:#8d2a25;--glass-plate-danger-soft:rgba(184,58,53,.14);
-      /* GEÇİŞ ANI (şafak/batım) — kararın gerekçesi: eşiği geçtiğimiz saniyede gökyüzü orta
-         tonlarda geziyor ve metin hem koyu hem açık olamaz. Ağır siyah gölge İSTEMİYORUZ
-         (iOS'ta da yok, camı çamurlaştırır); bunun yerine hub'ın kartsız yazısında ZATEN
-         kullanılan tekniğin en hafifi: 1px ofset, 2px bulanıklık, ters yönde yarı saydam bir
-         kontur. Harfin kenarını ayakta tutar, gölge olarak okunmaz. Asıl yükü `data-theme-fade`
-         taşıyor — renkler .9 sn içinde yumuşak dönüyor, bu yalnız o pencerenin sigortası. */
+      --hub-muted:var(--glass-plate-sub);
+      /* AİLE DEĞİŞİMİ ANI (gün doğumu/batımı) — gerekçe: hiçbir renk L≈.18 parlaklıktaki bir
+         zeminde 4,5:1 vermez, yani mürekkebin koyudan açığa SÜREKLİ geçmesi zorunlu olarak
+         okunmayan bir bandın içinden geçer. Bu yüzden süreklilik ailenin İÇİNDE tam, basamak
+         ise tek ve zaten var olan eşiğe oturtuldu; o .9 sn'lik `data-theme-fade` penceresinin
+         sigortası da bu çok hafif kontur. Ağır siyah gölge İSTEMİYORUZ (iOS'ta da yok): 1px
+         ofset, 2px bulanıklık, ters yönde yarı saydam — hub'ın kartsız yazısında zaten
+         kullanılan tekniğin en hafifi. Harfin kenarını tutar, gölge olarak okunmaz. */
       --glass-plate-shadow:0 1px 2px rgba(255,255,255,.55);
     }
     :root[data-sky="live"][data-theme="dark"]{
-      /* GECE. Yön aynı, taraf değişti: gökyüzü karanlık olduğu için cam da KOYU kalır —
-         dolgu .24 → .18'e iner (daha geçirgen), kenar .36 → .26'ya iner ama dolgu gidince
-         asıl okunan o olduğu için saç teli olarak görünür durumda kalır. Parlaklık kelepçesi
-         (.92) ve doygunluk (.9) DEĞİŞMEZ: batımın turuncu bandı (dark `--sky-dusk` ortası
-         rgb(168,80,52)) kartın arkasından geçerken açık yazının payını o kelepçe taşıyor
-         (ölçüm: gövde metni 5,5:1 — AA). */
-      --glass-card:rgba(6,10,16,.18);--glass-card-brd:rgba(255,255,255,.26);
+      /* GECE. Yön aynı, taraf değişti: gökyüzü karanlık olduğu için cam da KOYU kalır ve
+         mürekkep AÇIK ailededir (gri 219–250). Dolgu yine saatten gelir ama ters yönde: gece
+         göğü aydınlandıkça (batımın turuncu bandı, dark `--sky-dusk` ortası rgb(168,80,52))
+         örtü .16'dan .42'ye koyulaşır — açık yazının payını ayakta tutan kaldıraç bu. Kenar
+         .36 → .26'ya iner; dolgu gidince asıl okunan o olduğu için saç teli olarak kalır.
+         Parlaklık kelepçesi (.92) ve doygunluk (.9) DEĞİŞMEZ. */
+      --glass-card:var(--sky-plate-fill,rgba(6,10,16,.18));--glass-card-brd:rgba(255,255,255,.26);
       --glass-blur:12px;
       --glass-shadow:0 2px 4px rgba(0,0,0,.5);
+      --glass-plate-ink:var(--sky-plate-ink,#e2e2e2);--glass-plate-ink-soft:var(--sky-plate-ink-soft,#d3d3d3);
+      --glass-plate-sub:var(--sky-plate-sub,#c3c3c3);
+      --glass-plate-line:var(--sky-plate-line,rgba(226,226,226,.16));--glass-plate-inset:var(--sky-plate-inset,rgba(226,226,226,.07));
+      --hub-muted:var(--glass-plate-sub);
       --glass-plate-shadow:0 1px 2px rgba(0,0,0,.5);
     }
+    /* AKIŞ — dakikada bir yazılan renk basamak gibi görünmesin diye geçiş süresi yazma
+       aralığının kendisidir (`--sky-step`, güneş açısında kullanılanla aynı mantık: 60s,
+       önizlemede .14s). Kapsam yalnız KENDİ `color`unu yazan serbest metin öğeleri; döşeme,
+       buton ve durum döşemeleri bilerek DIŞARIDA — onların rengi duruma göre anında dönmeli,
+       60 sn'lik bir geçiş "ışık yandı" geri bildirimini öldürürdü. Rengini yazmayan alt öğeler
+       zaten kalıtımla akıyor, ayrıca kural gerekmiyor. Aile değişimi anında `data-theme-fade`
+       kuralı `!important` ile bunu ezip .9 sn'ye indirir. */
+    :root[data-sky="live"] body[data-active-view="home"] #home :where(.widget-card,.widget-card>h2,.widget-card>p,.group-widget-head h2,.widget-value strong,.widget-value span,.widget-subhead,.widget-section-divider,.summary-chip,.group-summary span,.activity-quiet,.fact,.home-hub,.hub-time,.hub-seconds,.hub-date,.hub-sub,.hub-label,.hub-city,.hub-city b,.hub-w-temp,.hub-w-cond,.hub-w-stats,.hub-alarm,.hub-hint){transition:color var(--sky-step) linear,background-color var(--sky-step) linear,text-shadow var(--sky-step) linear}
+    /* SAAT/HAVA BLOĞU da aynı sayıdan beslenir. Kartı yok, doğrudan gökyüzünün üstünde duruyor;
+       yani "gökyüzünün tersi mürekkep" kuralının en saf uygulandığı yer burası. `--hub-muted`
+       yukarıda bağlandı, `--ink`/`--line` bu satırda. */
+    :root[data-sky="live"] body[data-active-view="home"] #home .home-hub{--ink:var(--glass-plate-ink);--line:var(--glass-plate-line);--muted:var(--glass-plate-sub)}
     *{box-sizing:border-box}html{scroll-behavior:smooth}
     /* DOKUNMA VURGUSU — odak halkasından AYRI bir şey. Android WebView, dokunulan her düğmenin
        üstüne kendi MAVİ dikdörtgenini basar; eylem bitince kaybolur ama her dokunuşta yeniden
