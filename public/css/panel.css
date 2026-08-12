@@ -335,6 +335,28 @@
          (iOS'ta da yok): 1px ofset, 2px bulanıklık, yarı saydam — hub'ın kartsız yazısında
          zaten kullanılan tekniğin en hafifi. Harfin kenarını tutar, gölge olarak okunmaz. */
       --glass-plate-shadow:var(--sky-plate-shadow,0 1px 2px rgba(255,255,255,.55));
+      /* DÖŞEME DOLGUSU GÜNDÜZ GEÇİRGENLEŞİR — kullanıcının şikâyeti ("butonların arkası çok
+         koyu"): açık mavi gökyüzünün üstünde döşemeler siyah levha gibi duruyordu. Yazı BEYAZ
+         KALIYOR (kullanıcının isteği), yani dolgu beyaz metni taşıyacak kadar koyu olmak
+         zorunda; oynayabildiğimiz tek şey ne kadarının GÖKYÜZÜNDEN geldiği.
+         Yöntem: pigment neredeyse siyaha iner, alfa belirgin düşer. Aynı bileşke parlaklığı
+         daha AZ örtüyle kurmak yerine bilerek bir tık daha açık bir bileşke seçildi — gökyüzü
+         payı %40'tan %54'e çıkıyor, gradyan ve güneş döşemenin içinden okunuyor.
+         Ölçüm (öğle gökyüzü rgb(172,209,238) üstünde, bileşke bağıl parlaklık):
+           kapalı .054 (eski .029) < uyarı .087 (.054) < aktif .102 (.064) < taban .176 (.159)
+           < YANAN ~.88 — MERDİVENİN SIRASI BİREBİR KORUNDU, hepsi birlikte yukarı kaydı.
+         Beyaz metnin en dar kontrastı taban döşemede: 4.66:1 (eski 5.01:1, AA üstü). Döşemenin
+         ikinci satırı (`--glass-sub`) bu yüzden bir tık doyar: 3.69:1 → 3.89:1, yani eskisinden
+         İYİ. Yanan döşeme (krem + kehribar hale) ekranın en parlak öğesi olmayı sürdürür.
+         BULANIKLIK EKLENMEDİ, bilerek: döşeme sayfada onlarca kez tekrar eden öğe ve her biri
+         ayrı bir `backdrop-filter` geçişi demek — tablette 60fps'in en pahalı düşmanı. Arkada
+         yumuşatılacak DETAY da yok (gökyüzü zaten sürekli gradyan), yani bedeli olan karşılığı
+         olmayan bir katman olurdu. Geçirgenlik alfadan geliyor. */
+      --glass-tile:rgba(9,13,20,.46);
+      --glass-sub:rgba(233,243,239,.95);
+      --glass-off:rgba(4,6,10,.7);
+      --glass-active:rgba(28,60,46,.76);
+      --glass-alert:rgba(82,40,36,.78);
     }
     :root[data-sky="live"][data-theme="dark"]{
       /* GECE. Yön aynı, taraf değişti: gökyüzü karanlık olduğu için cam da KOYU kalır ve
@@ -351,6 +373,9 @@
       --glass-plate-line:var(--sky-plate-line,rgba(226,226,226,.16));--glass-plate-inset:var(--sky-plate-inset,rgba(226,226,226,.07));
       --hub-muted:var(--glass-plate-sub);
       --glass-plate-shadow:var(--sky-plate-shadow,0 1px 2px rgba(0,0,0,.5));
+      /* GECE DÖŞEMESİ OLDUĞU GİBİ KALIR (kökteki `--glass-tile` .6) — yani gündüzün .46'sından
+         DAHA DOLGUN. Gerekçe simetrik: gündüz sorun döşemenin gökyüzüne göre fazla koyu
+         olmasıydı; gece gökyüzü zaten karanlık, döşeme incelirse ayrışmayı KAYBEDER. */
     }
     /* AKIŞ — dakikada bir yazılan renk basamak gibi görünmesin diye geçiş süresi yazma
        aralığının kendisidir (`--sky-step`, güneş açısında kullanılanla aynı mantık: 60s,
@@ -361,7 +386,7 @@
        `!important` ile bunu ezip .9 sn'ye indirir; mürekkep artık orada zıplamadığı için bu
        pencere onun için fark etmez — eşikte dönen öbür şeyler (kenar, çip, alt sayfa) için
        duruyor. */
-    :root[data-sky="live"] body[data-active-view="home"] #home :where(.widget-card,.widget-card>h2,.widget-card>p,.group-widget-head h2,.widget-value strong,.widget-value span,.widget-subhead,.widget-section-divider,.summary-chip,.group-summary span,.activity-quiet,.fact,.home-hub,.hub-time,.hub-seconds,.hub-date,.hub-sub,.hub-label,.hub-city,.hub-city b,.hub-w-temp,.hub-w-cond,.hub-w-stats,.hub-alarm,.hub-hint){transition:color var(--sky-step) linear,background-color var(--sky-step) linear,text-shadow var(--sky-step) linear}
+    :root[data-sky="live"] body[data-active-view="home"] #home :where(.widget-card,.widget-card>h2,.widget-card>p,.group-widget-head h2,.widget-value strong,.widget-value span,.widget-subhead,.widget-section-divider,.summary-chip,.group-summary span,.activity-quiet,.fact,.widget-list-row,.widget-list-row strong,.widget-list-row time,.widget-list-row .event-mark,.home-hub,.hub-time,.hub-seconds,.hub-date,.hub-sub,.hub-label,.hub-city,.hub-city b,.hub-w-temp,.hub-w-cond,.hub-w-stats,.hub-alarm,.hub-hint){transition:color var(--sky-step) linear,background-color var(--sky-step) linear,text-shadow var(--sky-step) linear}
     /* SAAT/HAVA BLOĞU da aynı sayıdan beslenir. Kartı yok, doğrudan gökyüzünün üstünde duruyor;
        yani "gökyüzünün tersi mürekkep" kuralının en saf uygulandığı yer burası. `--hub-muted`
        yukarıda bağlandı, `--ink`/`--line` bu satırda. */
@@ -430,6 +455,26 @@
     :root[data-sky="live"]:not([data-active-view="home"])::before{opacity:calc(var(--sun-disc) * .5)}
     /* Hareket azaltma: nabız ve kayma durur, DİSK durur — gök cismi silinmez, yalnız kıpırdamaz. */
     @media(prefers-reduced-motion:reduce){:root[data-sky="live"] body::after,:root[data-sky="live"]::before{transition:none;animation:none}}
+    /* DAĞ SİLÜETİ — sağ alt köşeye yaslı, tek sözde öğe, YENİ DOM DÜĞÜMÜ YOK. Boşta duran
+       `html::after` kullanıldı; katman sırası bu yüzden tek satırda okunuyor:
+         gökyüzü (-3) · güneş + ay (-2) · DAĞ (-1) · panel içeriği (0).
+       Yani disk dağın ARKASINDAN batar/doğar (istenen etki), ama dağ hiçbir yazının önüne
+       geçmez. Güneş yayı batışta sağ tarafa indiği için silüet de sağa yaslandı.
+       ŞEKİL `clip-path` POLİGONU, gömülü SVG değil: SVG `data:` URI'nin dolgu rengi bir
+       DEĞİŞKENDEN gelemezdi, oysa silüetin gökyüzüyle birlikte nefes alması isteniyor.
+       Poligon tek bir dikdörtgen boyamanın maskesi — sabit maliyet, sıfır düğüm, sıfır JS.
+       Birkaç tepe yeter: panelin dili sade, detaylı manzara değil.
+       RENK GÖKYÜZÜNE BAĞLI: tek koyu ton, alfası gün ışığı ekseninden (`--sky-lum`, 0 derin
+       gece · 1 öğle) türer. Parlak gökte silüet netleşir (.28), gökyüzü karardıkça geri çekilir
+       (.10) — böylece HER SAATTE gökyüzünden bir tık koyu kalır, hiçbir saatte siyah bir bant
+       olmaz. Eksen zaten kökte yazılı, yeni JS/ölçüm yok; `--sky-lum` henüz yazılmadıysa
+       yedek 1 (panelin genel varsayılanı gündüz).
+       HAREKET YOK: dağ sabit, animasyonu ve geçişi yok — `prefers-reduced-motion` bu öğeyi
+       hiç ilgilendirmiyor. Sabit sistemde (`data-sky="fixed"`) kural HİÇ eşleşmez: dağ çizilmez,
+       yani orada ne boyama ne maskeleme maliyeti doğar. */
+    :root[data-sky="live"]::after{content:"";position:fixed;z-index:-1;right:0;bottom:0;display:block;width:min(48vw,900px);height:min(22vh,240px);pointer-events:none;background:rgba(12,19,29,calc(.1 + var(--sky-lum,1) * .18));clip-path:polygon(0 100%,7% 87%,19% 63%,29% 74%,42% 41%,52% 57%,66% 19%,77% 45%,88% 31%,100% 54%,100% 100%)}
+    /* Ana ekran dışında gökyüzü yarıya söner; dağ da onunla birlikte geri çekilir. */
+    :root[data-sky="live"]:not([data-active-view="home"])::after{opacity:.5}
     /* OTOMATİK TEMA GEÇİŞİ — "Güneşe göre" kipinde eşik geçilirken kök kısa süre bu işareti
        taşır ve renkler sert değil yumuşak döner. Evrensel seçici bilerek DAR bir pencerede
        açık: günde en çok iki kez, ~1 sn; sonra JS işareti kaldırır. Elle tema seçiminde ve
@@ -608,7 +653,15 @@
     :root[data-sky="fixed"] body[data-active-view="home"] #home .widget-card{box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
     /* Hızlı erişim şeridinin kendi kartı yok: sekmeler doğrudan zeminin üstünde durur. */
     #home .quick-control-widget{border-color:transparent;background:none;box-shadow:none}
-    body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile,body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    /* Olay satırı bu listede DEĞİL: ana ekranda dolgusu hiç yok (aşağıdaki mürekkep kuralının
+       yanında gerekçesi yazılı). Buradan çıkması ayrıca satır ARASI ayracı da düzeltir —
+       çizgi artık çipin beyazımsı kenarını (`--home-border`) değil kartın `--line`ını, yani
+       dinamik mürekkep ailesinin ayracını kullanıyor. */
+    body[data-active-view="home"] #home .quick-card,body[data-active-view="home"] #home .group-control-tile{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    /* Sabit sistem BİREBİR eskisi gibi kalsın diye ayracın oradaki rengi tek satırla geri
+       verilir: `data-sky="fixed"` bu turda hiç değişmiyor, düzeltme yalnız hareketli kipin
+       sorunuydu. */
+    :root[data-sky="fixed"] body[data-active-view="home"] #home .widget-list-row{border-color:var(--home-border)}
     /* KOYU ÇİPİN İÇİ TOKEN DEĞİŞTİRİR — kurala tek tek renk gömmek yerine panelin KENDİ
        tokenları çipin içinde yeniden bağlanır. Kanca `--ink`/`--muted`/`--line`/`--surface*`/
        `--forest*`/`--danger*`ın KENDİSİ olduğu için çipin içindeki her öğe — başlık, alt
@@ -626,10 +679,15 @@
        çipin dolgusu kendisine ait ve her koşulda koyudur, kartın dolgusu ise neredeyse yok —
        kartın üstündeki serbest metin doğrudan gökyüzüne bakar. Kart `--glass-plate-*` ailesini
        kullanır; o aile varsayılan olarak buradaki `--glass-*` ailesinin TA KENDİSİDİR ve yalnız
-       hareketli sistemin GÜNDÜZÜNDE koyuya döner — yani sabit sistemde hiçbir şey değişmez. */
+       hareketli sistemin GÜNDÜZÜNDE koyuya döner — yani sabit sistemde hiçbir şey değişmez.
+       OLAY SATIRI (`.widget-list-row`) BU KÜMEDEN ÇIKTI — kullanıcının ikinci şikâyeti
+       ("kartın bir tanesinde yazılar beyaz kalmış"). Satırın dolgusu VAR sanılıyordu; oysa
+       ana ekranda `[data-widget="activity"] .widget-list-row` bilerek `background:transparent`,
+       yani satır doğrudan kartın (ve gökyüzünün) üstünde duran SERBEST metin. Kural bu yüzden
+       tek cümleyle yazılır ve dosyanın geri kalanına da uygulanır: KENDİ KOYU ZEMİNİ OLAN
+       çip/buton → beyaz yazı, ZEMİNİ OLMAYAN serbest metin → dinamik mürekkep. */
     body[data-active-view="home"] #home .quick-control-widget .quick-card:not(.on):not(.selected):not(.quick-card-add),
     body[data-active-view="home"] #home .group-control-tile:not(.on):not(.active):not(.alert),
-    body[data-active-view="home"] #home .widget-list-row,
     body[data-active-view="home"] #home .home-actions button,
     body[data-active-view="home"] #home .page-head>.app-menu-button,
     body[data-active-view="home"] .app-menu-button{
@@ -652,12 +710,23 @@
       --danger:var(--glass-plate-danger);--danger-soft:var(--glass-plate-danger-soft);
       color:var(--glass-plate-ink);text-shadow:var(--glass-plate-shadow)
     }
-    /* Kartın İÇİNDEKİ dolgulu yüzeyler çip ailesinde KALIR. Döşeme, olay satırı ve grup
-       başlığındaki düğmeler kendi dolgularını (`--glass-tile`, durum aileleri) taşır — o dolgu
-       gündüz de gece de KOYU, dolayısıyla hem glifleri hem geçiş konturu levha ailesinden değil
-       çip ailesinden okunmalı. Aksi hâlde gündüz koyu düğmenin üstüne koyu glif düşerdi. */
-    body[data-active-view="home"] #home .widget-card :where(.group-control-tile,.widget-list-row,.quick-card,.group-widget-actions button,.icon-button){text-shadow:none}
-    body[data-active-view="home"] #home .widget-card :where(.group-widget-actions button,.icon-button){--ink:var(--glass-ink);--muted:var(--glass-sub);--forest:var(--glass-accent);--forest-soft:var(--glass-accent-soft);--on-forest:var(--glass-accent-ink)}
+    /* Kartın İÇİNDEKİ dolgulu yüzeyler çip ailesinde KALIR. Döşeme, grup başlığındaki düğmeler,
+       "n gizli" şeridi, "Genel görünümde göster" anahtarı ve döşemenin üstüne binen düzenleme
+       düğmeleri (göz · genişlik) kendi dolgularını (`--glass-tile`, durum aileleri) taşır — o
+       dolgu gündüz de gece de KOYU, dolayısıyla hem glifleri hem geçiş konturu levha ailesinden
+       değil çip ailesinden okunmalı. Aksi hâlde gündüz koyu düğmenin üstüne koyu glif düşerdi.
+       Genişlik düğmesinin (`.tile-width-toggle`) kendi dolgusu saydam ama KOYU DÖŞEMENİN
+       ÜSTÜNDE duruyor — zemini o, o yüzden o da bu listede.
+       İkinci kural `color` YAZMAZ, yalnız tokenları döndürür: bu öğeler kendi renklerini
+       (`var(--forest)`, `var(--muted)`) zaten yazıyor, tokenın dönmesi yeter — yeşil glif
+       yeşil kalır, yalnız ailesi koyu zemine uygun olanla değişir. */
+    body[data-active-view="home"] #home .widget-card :where(.group-control-tile,.quick-card,.group-widget-actions button,.icon-button,.ov-hidden-note,.ov-switch,.tile-eye,.tile-width-toggle){text-shadow:none}
+    body[data-active-view="home"] #home .widget-card :where(.group-widget-actions button,.icon-button,.ov-hidden-note,.ov-switch,.tile-eye,.tile-width-toggle){
+      --ink:var(--glass-ink);--ink-soft:var(--glass-ink-soft);--muted:var(--glass-sub);
+      --line:var(--glass-line);--surface:var(--glass-inset);--surface-soft:var(--glass-inset);
+      --forest:var(--glass-accent);--forest-soft:var(--glass-accent-soft);--on-forest:var(--glass-accent-ink);
+      --danger:var(--glass-danger);--danger-soft:var(--glass-danger-soft)
+    }
     /* Kartın İÇİNDEKİ durum döşemeleri ortak mürekkebi geri verir: dolguları açık/renkli,
        yazıları kendi `--glass-*-ink`i. `--muted` da onunla birlikte döner ki alt satır
        kaybolmasın (yanan döşemede koyu kehribar, aktifte açık yeşil, uyarıda açık kırmızı). */
@@ -948,7 +1017,6 @@
        daireyi sürdürsün diye biçimi burada tekrar edilir. */body[data-active-view="home"] #home .page-head>.app-menu-button{width:var(--head-action-h);height:var(--head-action-h);min-width:var(--head-action-h);border:0;border-radius:50%;color:var(--ink);background:transparent;box-shadow:none}body[data-active-view="home"] #home .page-head>.app-menu-button:hover{color:var(--forest);background:transparent;outline:2px solid var(--forest-soft);outline-offset:1px}#home #editDashboard.secondary{color:var(--forest)}#home .home-action-glyph,#devices .page-action-glyph{display:block}#home .home-action-label,#devices #refreshButton .page-action-label{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}#devices .page-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px}#refreshButton{display:grid}}
     @media(orientation:portrait) and (max-width:560px){main{--page-gutter:14px;padding:12px var(--page-gutter) 96px}.topbar{margin-bottom:14px}.page-head{margin-bottom:22px}#home .home-title-line{align-items:flex-start;justify-content:flex-start;flex-wrap:wrap;gap:8px}#home .home-metrics{width:100%;justify-content:flex-start}.toolbar-actions{justify-content:flex-end}.connection-card,.ha-setup-details,.setting-card{padding:18px}.connection-card-head{gap:10px}.connection-brand{width:48px;height:48px}.connection-brand svg,.connection-brand .home-assistant-logo{width:44px;height:44px}.connection-action{min-width:0;max-width:calc(100% - 58px);padding:10px 12px;font-size:12px}.ha-actions button,.ha-guide-actions button{width:100%;min-width:0}.ha-value{align-items:flex-start;flex-direction:column}.ha-value code{text-align:left}.runtime-card{align-items:stretch;flex-direction:column}.runtime-card button{width:100%}.zigbee-tools{grid-template-columns:1fr}.zigbee-tools-icon{width:42px;height:42px}.zigbee-tool{align-items:stretch;flex-direction:column}.zigbee-tool button{width:100%}.zigbee-tool-actions{display:grid;grid-template-columns:1fr 1fr}.zigbee-group-create{align-items:stretch;flex-direction:column}.zigbee-group-create button{width:100%}.zigbee-group-row-head{grid-template-columns:1fr auto}.zigbee-group-row-head input{grid-column:1/-1}.zigbee-binding-actions{grid-template-columns:1fr 1fr}.zigbee-binding-actions select{grid-column:1/-1}.network-graph-head{align-items:stretch;flex-direction:column}.network-legend{justify-content:flex-start}.group-control-tile{gap:10px;padding:8px 6px}.group-control-visual .device-status-icon{width:44px;height:44px}}
     @media(max-width:560px){.settings-server-notice{grid-template-columns:36px minmax(0,1fr);padding:14px}.settings-server-notice svg{width:26px;height:26px}.settings-server-address{grid-column:2;justify-self:start}}
-    body[data-active-view="home"] #home [data-widget="activity"] .widget-list-row{background:transparent;box-shadow:none}
     .quick-grid.grid-view .quick-card{width:max-content;min-width:144px;flex-basis:auto}
     #homeTabs{cursor:grab}#homeTabs.mouse-dragging,#homeTabs.mouse-dragging *{cursor:grabbing!important}
     /* Alt şerit artık sekme çubuğu: solda kaydırılabilir sekme listesi, sağda sabit "yeni grup". */
