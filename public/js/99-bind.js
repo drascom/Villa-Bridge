@@ -10,9 +10,10 @@
   };
   $$(".nav-button").forEach(button=>button.onclick=()=>activateView(button.dataset.view));
   $$("[data-app-menu]").forEach(button=>button.onclick=()=>toggleAppMenu(button));
-  // Alt sayfa başlıklarındaki "Genel görünüm" ve ana ekrandaki "Otomasyon" düğmeleri:
-  // pencere açmaz, doğrudan görünüm değiştirir. `.nav-button` DEĞİL — o sınıf menü ızgarasının
-  // biçimini ve `active` işaretini taşıyor.
+  // Ana ekrandaki "Otomasyon" gibi kestirme düğmeler: pencere açmaz, doğrudan görünüm değiştirir.
+  // `.nav-button` DEĞİL — o sınıf menü ızgarasının biçimini ve `active` işaretini taşıyor.
+  // (Alt sayfa başlıklarındaki düğme artık ana ekrana atmıyor, menüyü açıyor — yukarıdaki
+  // `[data-app-menu]` kancası hepsini birden bağlıyor; ana ekrana dönüş menüdeki Home satırında.)
   $$("[data-view-link]").forEach(button=>button.onclick=()=>activateView(button.dataset.viewLink));
   $("#closeAppMenu").onclick=closeAppMenu;
   $("#appMenuDialog").addEventListener("close",()=>{
