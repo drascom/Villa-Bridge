@@ -334,48 +334,61 @@
     else blend(set+12,set+72,"dusk",null);
     return w;
   }
-  /* AŞAMALARIN GERÇEK PARLAKLIĞI — `--sky` yığınındaki gradyanların WCAG bağıl parlaklığı
-     (üç durağın ortalaması), tema başına. Değerler elle seçilmiş "güzel sayılar" değil,
-     `panel.css` içindeki gradyan duraklarından hesaplandı; gradyan değişirse bu tablo da
-     yeniden hesaplanmalı. Açık temanın aşamaları bilerek pastel olduğu için hepsi .43'ün
-     üstünde, koyu temanınkiler .15'in altında kalır. */
-  const skyPhaseLum={
-    light:{dawn:.653,day:.703,dusk:.578,night:.438},
-    dark:{dawn:.141,day:.061,dusk:.070,night:.005},
-  };
-  /* KARTIN MÜREKKEBİ SAATE GÖRE TÜRER — sabit ton listesi yok. Girdi tek sayı: gökyüzünün o
-     anki parlaklığı (`--sky-lum`, aşama ağırlıkları × yukarıdaki tablo). Çıktı, kartın üstündeki
-     SERBEST metnin (başlık, "Evin durumu" sayıları/etiketleri, hub saat/hava, ayraçlar) tüm
-     nötr tonları. Döşeme/buton mürekkebi buraya DAHİL DEĞİL: onların kendi koyu dolgusu var,
-     yazıları her koşulda beyaz kalır.
-     EŞLEME KESKİN VE OMUZLUDUR, doğrusal değil: parlaklık her temanın kendi bandına göre
-     0..1'e normalize edilir (`clamp`), yani uçlarda mürekkep DOYAR ve yalnız bandın içinde
-     kayar. Gündüz ailesi hep KOYU (gri 15–41), gece ailesi hep AÇIK (gri 219–250); bir aileden
-     ötekine geçiş gün doğumu/batımı eşiğinde olur ve `data-theme-fade` ile .9 sn'de yumuşar.
-     NEDEN AİLE İÇİNDE SÜREKLİ, EŞİKTE BASAMAK: hiçbir renk L≈.18 parlaklıktaki bir zeminde
-     4,5:1 vermez. Mürekkebin açıktan koyuya SÜREKLİ geçmesi zorunlu olarak o bandın içinden
-     geçer; yani "her an AA" ile "her an sürekli" aynı anda sağlanamaz. Bu yüzden süreklilik
-     ailenin içinde tam, basamak ise tek ve zaten var olan eşiğe (gün doğumu/batımı) oturtuldu.
-     KART DOLGUSU DA AYNI SAYIDAN TÜRER ve ters yönde çalışır: gökyüzü mürekkebin aleyhine
-     kaydıkça örtü koyulaşır (gece .16 → .42) ya da beyazlaşır (gündüz .12 → .26). AA payını
-     ayakta tutan kaldıraç budur — ölçülen en dar an gece 4,97:1, gündüz 6,11:1. */
-  function applyPlateInk(root,lum,warm,night){
+  /* GÜN IŞIĞI EKSENİ — TEK VE SÜREKLİ, tema başına tablo YOK. Aşama ağırlıkları bu tabloyla
+     çarpılır, 0..1 arası tek sayı çıkar: 0 = derin gece, 1 = öğle. Sayı YALNIZ zamana bağlıdır,
+     `data-theme`e değil; yani gün doğumu/batımı eşiğinde tema dönerken bile akış kesilmez.
+     .409 rastgele değil: eşik anında ağırlıklar dawn .846 / day .154 olduğu için
+     .846 × .409 + .154 = .500 eder — eksen tam gün doğumunda (ve simetriğiyle batımında)
+     ORTASINDAN geçer. Mürekkebin en kritik anı böylece eşiğe oturur, eşiğin bir yanına değil.
+     TARİHÇE: burada eskiden gradyanlardan ölçülmüş tema başına parlaklık tablosu vardı
+     (light .653/.703/.578/.438 · dark .141/.061/.070/.005). Gökyüzü eşikte GERÇEKTEN basamak
+     yapıyor (tema gradyanları değişiyor); mürekkebi o ölçüme bağlamak basamağı mürekkebe de
+     taşıyordu. Kullanıcının kararı: panele ara ara bakılıyor, AA tabanı yerine tam süreklilik. */
+  const skyPhaseLight={dawn:.409,day:1,dusk:.409,night:0};
+  /* KARTIN MÜREKKEBİ SAATE GÖRE TÜRER — sabit ton listesi yok, tema ailesi de yok. Girdi tek
+     sayı: gün ışığı ekseni (`--sky-lum`, yukarıdaki tablo). Çıktı, kartın üstündeki SERBEST
+     metnin (başlık, "Evin durumu" sayıları/etiketleri, hub saat/hava, ayraçlar) tüm nötr
+     tonları + kart dolgusu ve harf konturu. Döşeme/buton mürekkebi buraya DAHİL DEĞİL:
+     onların kendi koyu dolgusu var, yazıları her koşulda beyaz kalır.
+     EŞLEME TEK PARÇA VE OMUZLUDUR, doğrusal değil: eksen `gain` kadar gerilip smootherstep'ten
+     geçer, yani uçlarda DÜZ (mürekkep doyar: gece gri 250, gündüz gri 15), ortada DİK. Eşikte
+     basamak YOKTUR — hiçbir değer `night`/tema koluna bakmaz.
+     ORTA BANTTA KONTRAST DÜŞER, BU KABUL EDİLDİ: açıktan koyuya sürekli geçen bir mürekkep
+     zorunlu olarak zeminle eşitlendiği bir andan geçer. Amaç AA garantisi değil o anı KISA
+     tutmak; iki ucuz sigorta kaldı: (1) omuz — mürekkep ekseni ortada hızlı geçer (~57 dk),
+     dolgu ve kontur tarafını daha da hızlı seçer (~22 dk); (2) `--sky-plate-shadow` ters yönde
+     ince kontur (1px ofset, 2px bulanıklık), ağır siyah gölge YOK.
+     KART DOLGUSUNUN TERS NEFESİ KORUNDU: örtü uçlarda incedir (.12 — öğle ve derin gece,
+     gökyüzü mürekkebin lehine) ve eşiğe yaklaştıkça kalınlaşır (.42), yani gökyüzü mürekkebin
+     aleyhine kaydıkça kart payı büyür. Eskiden bu iki ayrı aile kuralıydı (gündüz beyaz
+     .12→.26, gece siyah .16→.42); artık tek çan eğrisi ikisini de kapsıyor. */
+  function applyPlateInk(root,lum,warm){
     const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
     const paint=(r,g,b,a)=>`rgba(${Math.round(cl(r,0,255))},${Math.round(cl(g,0,255))},${Math.round(cl(b,0,255))},${a})`;
+    // OMUZ: ekseni ortadan gerip smootherstep'e sokar. gain ne kadar büyükse orta bant o kadar
+    // dar. Mürekkep geniş süpürür (göze basamak gibi görünmesin), dolgu/kontur dar süpürür
+    // (mürekkeple aynı anda orta gride takılıp birbirini yemesinler).
+    const shape=(v,gain)=>{const u=cl((v-.5)*gain+.5,0,1);return u*u*u*(u*(u*6-15)+10);};
+    const ink=shape(lum,2.6);
+    const side=shape(lum,6);
     // Sıcaklık payı: şafak/batım ağırlığı. Mürekkep o anda kırmızıya doğru bir tık kayar —
-    // parlaklığı neredeyse hiç değiştirmez (kontrast hesabı bozulmaz), ama ton gökyüzüyle uyar.
-    const base=night
-      ?{g:(.86+.12*cl((lum-.02)/.18,0,1))*255,tint:[warm*8,warm*2,-warm*10],soft:-15,sub:-31,
-        fill:[6,10,16],alpha:.16+.26*cl((lum-.02)/.18,0,1)}
-      :{g:(.06+.10*cl((lum-.42)/.36,0,1))*255,tint:[warm*14,warm*4,-warm*6],soft:18,sub:36,
-        fill:[255,255,255],alpha:.12+.14*(1-cl((lum-.42)/.36,0,1))};
-    const r=base.g+base.tint[0],gg=base.g+base.tint[1],b=base.g+base.tint[2];
+    // parlaklığı neredeyse hiç değiştirmez, ama ton gökyüzüyle uyar.
+    const g=250-235*ink;
+    const r=g+warm*12,gg=g+warm*3,b=g-warm*8;
+    // İkincil tonlar (soft · sub) her zaman ZEMİNE doğru kaçar: gündüzün koyu mürekkebinde
+    // açılır, gecenin açık mürekkebinde koyulaşır. Yön tek sayıdan gelir (-1..+1), eşikte
+    // sıfırdan geçer — hiyerarşi orada birkaç dakika siliktir, bilerek.
+    const away=2*side-1;
     root.style.setProperty("--sky-plate-ink",paint(r,gg,b,1));
-    root.style.setProperty("--sky-plate-ink-soft",paint(r+base.soft,gg+base.soft,b+base.soft,1));
-    root.style.setProperty("--sky-plate-sub",paint(r+base.sub,gg+base.sub,b+base.sub,1));
+    root.style.setProperty("--sky-plate-ink-soft",paint(r+17*away,gg+17*away,b+17*away,1));
+    root.style.setProperty("--sky-plate-sub",paint(r+34*away,gg+34*away,b+34*away,1));
     root.style.setProperty("--sky-plate-line",paint(r,gg,b,.16));
     root.style.setProperty("--sky-plate-inset",paint(r,gg,b,.07));
-    root.style.setProperty("--sky-plate-fill",paint(base.fill[0],base.fill[1],base.fill[2],base.alpha.toFixed(3)));
+    // Dolgu ve kontur mürekkebin KARŞI tarafındadır: gece koyu (8,12,18 — hafif soğuk),
+    // gündüz beyaz. Alfa çanı ham eksenden gelir, yani gün boyu yavaşça nefes alır.
+    const fill=8+247*side,cool=1-side;
+    root.style.setProperty("--sky-plate-fill",paint(fill,fill+4*cool,fill+10*cool,(.12+.3*(1-Math.abs(2*lum-1))).toFixed(3)));
+    root.style.setProperty("--sky-plate-shadow",`0 1px 2px ${paint(fill,fill,fill,.52)}`);
   }
   function applySunGround(){
     const root=document.documentElement;
@@ -408,15 +421,13 @@
     // Yıldızlar gecenin payıyla belirir, şafak/batım açılırken söner. Tek bir opaklık; desen
     // CSS'te üç tekrarlı gradyan katmanı, DOM düğümü yok.
     root.style.setProperty("--star-a",(nightWeight*.9).toFixed(3));
-    // GÖKYÜZÜNÜN O ANKİ PARLAKLIĞI — aşama ağırlıkları × aşamanın gerçek gradyan parlaklığı.
-    // Tema `dataset.theme`den değil `resolveThemeMode()`ten okunur: eşiği geçtiğimiz dakikada
-    // gökyüzü de mürekkep de YENİ temanın tablosuyla hesaplansın, arada yanlış bir kare olmasın.
-    // Sayı köke yazılır (`--sky-lum`) ve kartın bütün nötr tonları ondan türer.
-    const nightTheme=resolveThemeMode()==="dark";
-    const band=nightTheme?skyPhaseLum.dark:skyPhaseLum.light;
-    const skyLum=phases.dawn*band.dawn+phases.day*band.day+phases.dusk*band.dusk+nightWeight*band.night;
+    // GÜN IŞIĞI EKSENİ — aşama ağırlıkları × tek tablo. Temaya BAKMAZ (eskiden bakıyordu);
+    // yalnız zamanın fonksiyonu olduğu için eşikte kesilmez. Sayı köke yazılır (`--sky-lum`)
+    // ve kartın bütün nötr tonları, dolgusu ve konturu ondan türer.
+    const skyLum=phases.dawn*skyPhaseLight.dawn+phases.day*skyPhaseLight.day
+      +phases.dusk*skyPhaseLight.dusk+nightWeight*skyPhaseLight.night;
     root.style.setProperty("--sky-lum",skyLum.toFixed(3));
-    applyPlateInk(root,skyLum,Math.min(1,phases.dawn+phases.dusk),nightTheme);
+    applyPlateInk(root,skyLum,Math.min(1,phases.dawn+phases.dusk));
     // GÜNEŞ KOLU: doğuşta -90°, tepede 0°, batışta +90°. Ufkun biraz altına da inebilsin diye
     // ilerleme dar bir payla dışarı taşar; disk zaten orada sönmüş olur.
     const arc=Math.max(-.12,Math.min(1.12,progress));
@@ -449,10 +460,10 @@
   }
   function scheduleSunGround(){
     clearTimeout(sunGroundState.timer);
-    // SIRA ÖNEMLİ: önce tema yoklanır. Eşiği geçtiğimiz an `syncSunTheme` köke `data-theme-fade`
-    // koyar; mürekkep ve kart dolgusu ondan SONRA yazılınca aile değişimi .9 sn'lik yumuşak
-    // geçişe düşer. Ters sırada mürekkep, dakikalık akış için kurulmuş 60 sn'lik geçişle
-    // karşı aileye doğru ağır ağır sürünürdü — tam da okunurluğun daraldığı bant.
+    // SIRA: önce tema yoklanır, sonra gökyüzü. Mürekkebin buna artık İHTİYACI YOK (tek sürekli
+    // eşleme temaya bakmıyor), ama eşikte hâlâ dönen şeyler var — döşeme/çip renkleri, kart
+    // kenarı, alt sayfalar — ve `syncSunTheme` onlar için köke `data-theme-fade` koyuyor.
+    // Sıra korunsun ki o kare içinde tema ile gökyüzü aynı dakikayı anlatsın.
     syncSunTheme();
     applySunGround();
     // "Hazır" artık işarete değil CANLI veriye bakar: işaret yedekle de konuyor, ama hava
