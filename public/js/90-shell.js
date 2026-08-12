@@ -498,6 +498,10 @@
     state.themeMode=mode;
     try{localStorage.setItem("villa-theme",state.themeMode)}catch{}
     applyTheme();
+    // Kip seçildi, menünün işi bitti: sonuç zaten menünün ARKASINDA görünüyor, açık kalan
+    // pencere kullanıcının seçtiği görünümü kendi kapatıyordu. Dil değişiminde bilerek
+    // kapanmıyoruz — orada peş peşe deneme yapılıyor.
+    closeAppMenu();
   }
   function applyLanguage(){
     document.documentElement.lang=state.language;

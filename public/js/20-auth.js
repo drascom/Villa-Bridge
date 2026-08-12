@@ -18,6 +18,9 @@
     document.body.classList.toggle("resident-session",resident);
     document.body.classList.toggle("auth-locked",!state.auth.authenticated);
     $(".shell").inert=!state.auth.authenticated;
+    // Oturum bittiyse (düğmeyle çıkış ya da süre dolması) menü açık kalmasın: giriş kutusunun
+    // önünde duran, artık hiçbir şey yapmayan bir pencere olurdu. Kapalıysa bu çağrı boştur.
+    if(!state.auth.authenticated)closeAppMenu();
     $("#authAccountName").textContent=state.auth.user?.username||"—";
     $("#authRoleBadge").textContent=t(resident?"homeUser":"administrator");
     $$("[data-auth-logout]").forEach(button=>{button.setAttribute("aria-label",t("signOut"));button.title=t("signOut")});
