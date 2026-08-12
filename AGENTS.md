@@ -12,7 +12,12 @@ is edited directly: markup in `public/index.html`, styles in
 shared scope, load order = the `<script src>` order in `index.html`, with
 `99-bind.js` always last). A new panel file must be added to `index.html` and
 `panelAssetRoutes` in `src/index.ts` together; `scripts/panel-graph.mjs` guards
-that.
+that. The panel's look runs on two view systems selected by the `data-sky`
+attribute on the root element: `fixed` (Light · Dark · System — flat ground, no
+sky animation) and `live` (the "by the sun" mode — phased sky gradient, sun and
+moon on a rotating arm, card ink derived from the time of day). `data-theme`
+stays on its own axis, and every surface is written through one glass token
+family (`--glass-*`), so never hard-code colors into individual rules.
 Deployment units and the Matterbridge alias hook are in `deploy/`; safe defaults
 are in `config/default.yaml`.
 

@@ -16,27 +16,25 @@
       --hub-muted:#2f3a35;
       --hub-text-shadow:0 1px 2px rgba(255,255,255,.85),0 0 12px rgba(255,255,255,.7);
       --hub-divider-line:rgba(23,33,29,.17);
-      /* CAM YÜZEY DİLİ — tek küme, iki temada da aynı adlar VE aynı değerler.
-         `--sky` gökyüzünün kendisi; `--glass-*` ana ekranın yüzeyleri. Ana ekran bu kümeye
-         `--home-*` kancalarını yeniden bağlayarak geçer (aşağıda tek yerde), diğer ekranlar
-         opak dilde kalır.
-         İOS CAM DİLİ KORUNUR, YÖN DEĞİŞTİ: kart artık AÇIK değil KOYU yarı saydam bir çip.
-         Kartı tanımlayan şey yine dolgusu değil KENARIDIR: net 1px çerçeve (`--glass-*-brd`),
-         üst kenarda ince parlak ışık çizgisi + alt kenarda koyu iç gölge (`--glass-sheen`,
-         cam kalınlığı hissi) ve geniş yumuşak dış gölge (`--glass-shadow`). İç hâlâ geçirgen:
-         kartın dolgusu .44/.24 (açık/koyu tema) alfada durur, arkadaki gökyüzü, güneş ve ay
-         kartın içinden gerçekten seçilir — kart bir levha değil bir CAM. Oda/grup kartı
-         en hafif örtü (`--glass-card`), cihaz döşemesi bir kademe belirgin (`--glass-tile`);
-         ikisi arasındaki fark katman hissini taşır.
-         SÜZME KELEPÇESİ (`--glass-sat` + `--glass-bright`, ikisi de 1'in ALTINDA): gerçek cam
-         arkasındaki rengi geçirir ama SÜZER. Doygunluk ölçütü mutlaktır — KARTIN KROMASI
-         ARKASINDAKİ GÖKYÜZÜNÜNKİNDEN DÜŞÜK OLMALI; parlaklık ölçütü de öyle — KARTIN KOMPOZİT
-         PARLAKLIĞI GÖKYÜZÜNÜNKİNİ GEÇMEZ, yani kart ışıklı bir levha değil koyu bir cam olarak
-         okunur. Koyu örtüde bu ikisi kendiliğinden sağlanır; kelepçe yine de duruyor çünkü
-         gökyüzü öğle vakti çok parlak ve doygun olabiliyor.
-         OKUNURLUK ARTIK GÖKYÜZÜNDEN BAĞIMSIZ: koyu çip + açık yazı, gökyüzü şafaktan geceye
-         gezerken de aynı kontrastı verir. Kritik nokta gün içinde kaymıyor — ölçüm tablosu
-         `contrast-check.mjs` içinde.
+      /* CAM YÜZEY DİLİ — TEK AD KÜMESİ, DEĞERİ AKTİF SİSTEM YAZAR. `--sky` gökyüzünün kendisi;
+         `--glass-*` ana ekranın yüzeyleri. Ana ekran bu kümeye `--home-*` kancalarını yeniden
+         bağlayarak geçer (aşağıda tek yerde), diğer ekranlar opak dilde kalır.
+         Buradaki değerler yalnız TABANDIR: kökte `data-sky` henüz yokken (ilk kare) geçerli
+         olan koyu çip ailesi. Sonrasında ya sabit sistem (`data-sky="fixed"`, Light/Dark) ya da
+         hareketli sistem (`data-sky="live"`, güneşe göre) aynı adları kendi bloğunda yeniden
+         yazar — adlar tek yerde durduğu için kurallara renk gömülmez.
+         KARTI TANIMLAYAN ŞEY DOLGUSU DEĞİL KENARIDIR, üç sistemde de: net 1px çerçeve
+         (`--glass-*-brd`), üst kenarda ince parlak ışık çizgisi + alt kenarda koyu iç gölge
+         (`--glass-sheen`, cam kalınlığı hissi) ve dar keskin dış gölge (`--glass-shadow`).
+         İç geçirgen kalır — kart bir levha değil bir CAM. Oda/grup kartı en hafif örtü
+         (`--glass-card`), cihaz döşemesi bir kademe belirgin (`--glass-tile`); ikisi arasındaki
+         fark katman hissini taşır.
+         SÜZME KELEPÇESİ (`--glass-sat` + `--glass-bright`): cam arkasındaki rengi geçirir ama
+         SÜZER. Yönü sisteme göre değişir — koyu camda 1'in altında (kart gökyüzünden koyu
+         okunsun), açık camda 1'in üstünde (iOS camı rengi karartmaz, yoğunlaştırır).
+         OKUNURLUK İKİ YOLDAN SAĞLANIR: sabit sistemde zemin oynamadığı için panelin kendi
+         light/dark dili yeter; hareketli sistemde gökyüzü şafaktan geceye gezdiği için cam
+         GÖKYÜZÜNÜN TARAFINI TUTAR (parlak gökte açık cam + koyu yazı, karanlık gökte tersi).
          `--glass-filter` büyük yüzeyler (kart, pencere) için, `--glass-filter-chip` gökyüzüne
          DOĞRUDAN oturan küçük yüzeyler (alt sekme kartları, üst bardaki yuvarlak düğme)
          için: aynı malzeme, yarı yarıya bulanıklık — küçük öğede fark edilmez, maliyeti
@@ -59,7 +57,7 @@
       /* AÇIK TEMANIN AŞAMALARI PASTELDİR, DRAMATİK DEĞİL — bilerek. Saat/hava bloğunun kartı
          yok, doğrudan gökyüzünün üstünde duruyor ve açık temada mürekkebi KOYU; gökyüzü
          doygun bir batım kırmızısına ya da gece lacivertine inseydi o blok okunmaz olurdu
-         (ölçüm: `contrast-check.mjs`, "gökyüzü/hub" satırı). Aşamalar bu yüzden burada tonla
+         (kartsız hub yazısının kontrast ölçümü). Aşamalar bu yüzden burada tonla
          anlatılır, parlaklıkla değil: bant hep aydınlık kalır, değişen sıcaklık ve renk.
          Dramatik gökyüzü koyu temanın işi — "güneşe göre" kipinde batımda zaten oraya geçilir.
          GÜNDÜZ ARTIK MAVİ (eski bej taban gitti): referans pen'in renk yolculuğu mavi gündüz →
@@ -103,24 +101,13 @@
       --moon-angle:0deg;--moon-disc:0;--moon-glow:0;--moon-size:9vmin;--moon-term:50%;
       --moon-lit:#fffdf1;--moon-dark:rgba(120,134,158,.34);
       --moon-left:var(--moon-dark);--moon-right:var(--moon-lit);--moon-mid:var(--moon-dark);
-      /* CAM KÜMESİ İKİ TEMADA DA KOYU — TEK AİLE. Bu, turun ikinci kararı: kart da döşeme de
-         koyu yarı saydam çip, üstündeki yazı açık. Gerekçe üç başlık:
-           1) Okunurluk arkadaki gökyüzünden BAĞIMSIZ olur. Gökyüzü artık şafaktan geceye dört
-              aşama geziyor; açık örtülü bir kartın kontrastı zeminle birlikte kayardı, koyu
-              örtülü kartınki kaymaz — metrik tabloda en dar nokta gün boyunca sabit kalıyor.
-           2) Panelde bu dil ZATEN VAR: hızlı kumanda penceresi (`.quick-modal`) iki temada da
-              koyu cam. Kartların bir kısmını açık, bir kısmını koyu bırakmak savruk olurdu.
-           3) Apple Home'un parlak duvar kâğıdı üstünde koyu çip kullanmasının sebebi de bu.
-         Tema artık camın RENGİNİ değil, yalnız parlaklık kelepçesini (`--glass-bright`) ve
-         gökyüzü paletini değiştirir. Durum renkleri de tek küme: yanan sıcak krem (ekranın en
-         parlak öğesi), aktif koyu yeşil + açık yeşil yazı, uyarı koyu kırmızı + açık kırmızı
-         yazı, kapalı neredeyse siyah. Anlamlar korunur, değişen yalnız zemin yönü. */
-      /* KART KENDİ AİLESİNDEN AYRILDI. Aşağıdaki iki sistem de (`data-sky="fixed"` ve
-         `data-sky="live"`) kartın dolgusunu/kenarını/gölgesini KENDİ bloğunda yazar; buradaki
-         çift yalnız `data-sky` daha kökte yokken (ilk kare) geçerli olan tabandır ve koyu çip
-         ailesiyle uyumlu kalsın diye koyu durur.
-         Kartın üst şeridini koyultan eski `--glass-card-veil` KALKTI: kart artık bir levha
-         değil bir ÇERÇEVE, gövdesini karartan ikinci bir katman taşımıyor. */
+      /* TABAN AİLE KOYU ÇİPTİR — ilk kare için. Kart da döşeme de koyu yarı saydam, üstündeki
+         yazı açık; hızlı kumanda penceresi (`.quick-modal`) zaten bu dilde, o yüzden `data-sky`
+         yazılana kadarki kısa an tutarlı görünür. Sabit ve hareketli sistem aşağıda kartın
+         dolgusunu, kenarını ve gölgesini kendi bloğunda yeniden yazar.
+         DURUM RENKLERİ TEK KÜME ve anlamları hiçbir sistemde değişmez: yanan sıcak kehribar
+         (ekranın en parlak, tek haleli öğesi) > aktif yeşil > uyarı kırmızı > kapalı sönük.
+         Değişen yalnız her birinin zemin yönü. */
       --glass-card:rgba(10,14,20,.44);--glass-card-brd:rgba(255,255,255,.36);
       --glass-tile:rgba(42,50,61,.6);--glass-tile-brd:rgba(255,255,255,.26);
       --glass-shadow:0 18px 40px rgba(6,10,16,.34);
@@ -201,10 +188,9 @@
       --glass-shadow:0 20px 46px rgba(0,0,0,.46);
     }
     /* ————— SABİT SİSTEM (Light · Dark · System) —————
-       Yukarıdaki cam kümesi HAREKETLİ sistem için kuruldu: gökyüzü şafaktan geceye gezerken
-       kontrastın kaymaması için kart iki temada da KOYU. Sabit sistemde zemin oynamıyor, o
-       yüzden orada iOS "Liquid Glass" dili geçerli: kart mümkün olduğunca AÇIK/şeffafa yakın,
-       renk kartta değil BUTONDA VE YAZIDA yaşar. İki blok da tam kümeyi yazar ki hangi tema
+       Burada zemin oynamıyor: tema kullanıcının seçtiği şeydir, gökyüzü yok. O yüzden iOS
+       "Liquid Glass" dili doğrudan geçerli — kart mümkün olduğunca AÇIK/şeffafa yakın, renk
+       kartta değil BUTONDA VE YAZIDA yaşar. İki blok da tam kümeyi yazar ki hangi tema
        seçilirse seçilsin öbürünün değeri sızmasın; `:not([data-theme="dark"])` ve
        `[data-theme="dark"]` eşit özgüllükte ve birbirini dışlar.
        Zemin tek katman: `--paper` + çok hafif tek bir ışık lekesi (`--ground-wash`). Desen,
@@ -934,7 +920,7 @@
     /* Yapışkan araç çubuğu kaydırılan kartların üstünden geçer: sayfanın en opak yüzeyi odur. */
     body:not([data-active-view="home"]) .view .toolbar{background:#e2e8ea}
     :root[data-theme="dark"] body:not([data-active-view="home"]) .view .toolbar{background:#0b100f}
-    /* Sayfa başlığı doğrudan fotoğrafın üstünde durur: hub'daki gibi tema başına hale. */
+    /* Alt sayfalarda başlık kendi zemininin üstünde durur: hub'daki gibi tema başına hale. */
     body:not([data-active-view="home"]) .page-head-title h1{text-shadow:0 1px 2px rgba(255,255,255,.5)}
     :root[data-theme="dark"] body:not([data-active-view="home"]) .page-head-title h1{text-shadow:0 1px 3px rgba(0,0,0,.62)}
     /* Koyu temada başlık düğmeleri ters çevrilir. `--forest-soft` orada #203d32 — alt sayfaların
@@ -1179,7 +1165,8 @@
     .quick-card.selected{border-color:#4b9a74;color:#18583d;background:#e3f3eb}
     .quick-card.selected .quick-device-icon{color:#18583d;background:#d3ecdf;box-shadow:inset 0 0 0 1px rgba(75,154,116,.5)}
     .quick-card.selected .home-tab-copy small{color:inherit;opacity:.78}
-    /* Seçili sekme de koyu cam ailesinin yeşili: dolgu koyu, mürekkep açık — iki temada aynı. */
+    /* Seçili sekme durum ailesinin yeşilini alır (`--glass-active*`): dolgu ve mürekkep hangi
+       sistem/tema geçerliyse oradan gelir, kurala renk gömülmez. */
     body[data-active-view="home"] #home .quick-card.selected{border-color:var(--glass-active-brd);color:var(--glass-active-ink);background:var(--glass-active)}
     body[data-active-view="home"] #home .quick-card.selected .quick-device-icon{color:var(--glass-active-ink);background:var(--glass-active-chip);box-shadow:inset 0 0 0 1px var(--glass-active-brd)}
     :root[data-theme="dark"] .quick-card.selected{border-color:#3d8966;color:#a8e3c6;background:#26493a}
@@ -1757,7 +1744,7 @@
     }
     /* ANA EKRAN EYLEM DÜĞMELERİ — saydam hap.
        Pano düğmesi ekle · düzenle · otomasyon (`#home .home-actions`): dolgu kalktı, ikonu
-       fotoğrafın üstünde ince bir çerçeve ve ters renkli hale ayakta tutar — aydınlıkta koyu
+       zeminin üstünde ince bir çerçeve ve ters renkli hale ayakta tutar — aydınlıkta koyu
        kenar + beyaz hale, karanlıkta açık kenar + koyu hale; ikonun kendi gölgesi de tema
        başına yazılı — renk karıştıran işlev kullanılmaz, ölçüler clamp ile verilir.
        Dokunma hedefi küçülmez: 44px taban her kırılma noktasında korunur, yalnız görünüm
