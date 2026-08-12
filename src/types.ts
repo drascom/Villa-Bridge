@@ -120,6 +120,12 @@ export interface DeviceImageCandidate {
 
 export interface DeviceImageView {
   model: string | null;
+  /**
+   * Bu modelin görseli GERÇEKTEN var mı? `true` önbellekte duruyor, `false` upstream'de yok
+   * (panel `<img>` kurmaz, istek hiç atılmaz), `null` henüz denenmedi — panel eskisi gibi dener.
+   * Değeri `resolveDeviceImage` bilmez; HTTP katmanı görsel önbelleğinden doldurur.
+   */
+  available: boolean | null;
   candidates: DeviceImageCandidate[];
   selectionRequired: boolean;
   userSelected: boolean;

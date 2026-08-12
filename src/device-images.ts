@@ -96,6 +96,8 @@ export function resolveDeviceImage(
       : canonicalModel;
   return {
     model: selected ?? null,
+    // Burada ağ/önbellek bilgisi yok: doldurmak HTTP katmanının işi (bkz. `visibleDevices`).
+    available: null,
     candidates,
     selectionRequired: candidates.length > 1 && !canonicalModels.has(key) && !deviceSelected && !modelSelected,
     userSelected: deviceSelected || modelSelected,

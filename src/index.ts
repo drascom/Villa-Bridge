@@ -70,6 +70,9 @@ const aliases = await loadAliases(config.aliasesFile);
 const configPath = resolve(process.env.VILLA_BRIDGE_CONFIG ?? "config/default.yaml");
 const imagesStore = new DeviceImagesStore(resolve(dirname(configPath), "device-images.json"));
 const imageCache = new DeviceImageCache(resolve(dirname(configPath), "device-image-cache"));
+// Disk önbelleği açılışta bir kez taranır: hangi modelin görseli var, hangisi upstream'de yok.
+// Bu olmadan her yeniden başlatmadan sonra panel yok olan görselleri yeniden isterdi.
+await imageCache.load();
 let imagePreferences = await imagesStore.get();
 const deviceEventsStore = new DeviceEventsStore(resolve(dirname(configPath), "device-events.json"));
 // Kullanıcının seçtiği cihaz rolleri — IEEE adresine göre, yapılandırmanın yanındaki JSON'da.
@@ -498,6 +501,10 @@ app.get("/api/discovery", async () => ({ ...discoveryRecord, sentAt: Date.now() 
 // `/api/*` yolları oturum ister. Pratikte gelen rol admin ya da resident'tır.
 const visibleDevices = (role: AuthRole | undefined) => store.getDevices().map((device) => ({
   ...device,
+  // Görsel varlığı cihaz modelinden türetilemez: model adı geçerli olsa da upstream'de o görsel
+  // olmayabilir (ör. `TS0601_u8ouaqsz`). Bilgiyi yalnız önbellek bilir, panele burada taşınır ki
+  // görseli olmayan cihaz için `<img>` hiç kurulmasın — konsolda 404 birikmesin.
+  image: { ...device.image, available: imageCache.availability(device.image.model) },
   controls: role === "resident"
     ? device.controls.filter((control) => control.adminOnly !== true)
     : device.controls

@@ -1,6 +1,6 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { writeFileAtomic } from "./atomic-file.js";
+import { writeFileAtomic, writeJsonAtomic } from "./atomic-file.js";
 
 const safeModelPattern = /^[A-Za-z0-9._-]{1,64}$/;
 
@@ -26,7 +26,12 @@ const transientRetryCeilingMs = 30 * 60_000;
 interface NegativeCacheEntry {
   retryAt: number;
   attempts: number;
+  /** Upstream açıkça 404 dedi (ağ hatası değil): bu bilgi diske yazılır, yeniden başlatmayı aşar. */
+  permanent: boolean;
 }
+
+/** Kalıcı "bu modelin görseli yok" listesi; önbellek dizininin içinde durur. */
+const missingIndexFile = "missing.json";
 
 interface DownloadResult {
   image: { extension: string; body: Buffer } | null;
@@ -44,7 +49,10 @@ const extensionForContentType = (header: string | null): string | null => {
 
 export class DeviceImageCache {
   private readonly missing = new Map<string, NegativeCacheEntry>();
+  /** Diskte gerçekten görseli olan modeller — panelin "istek atmaya değer mi" sorusu bundan yanıtlanır. */
+  private readonly present = new Set<string>();
   private warming = false;
+  private loaded = false;
 
   constructor(
     private readonly directory: string,
@@ -52,6 +60,57 @@ export class DeviceImageCache {
     private readonly warmPauseMs = 250,
     private readonly now: () => number = Date.now
   ) {}
+
+  /**
+   * Diskteki önbelleği bir kez tarar: hangi modelin görseli var, hangisi upstream'de yok.
+   * Yeniden başlatmadan sonra bu bilgi olmasaydı panel her açılışta yok olan görselleri
+   * yeniden isteyip 404 alırdı — konsol kirlenir, upstream boşuna yorulurdu.
+   */
+  async load(): Promise<void> {
+    if (this.loaded) return;
+    this.loaded = true;
+    try {
+      for (const name of await readdir(this.directory)) {
+        const dot = name.lastIndexOf(".");
+        if (dot <= 0) continue;
+        const model = name.slice(0, dot);
+        const extension = name.slice(dot + 1);
+        if (!extensions.some((candidate) => candidate.extension === extension)) continue;
+        if (safeModelPattern.test(model)) this.present.add(model);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.error(`Cihaz görseli önbelleği taranamadı: ${String(error)}`);
+      }
+    }
+    try {
+      const raw: unknown = JSON.parse(await readFile(resolve(this.directory, missingIndexFile), "utf8"));
+      if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+        for (const [model, retryAt] of Object.entries(raw as Record<string, unknown>)) {
+          if (!safeModelPattern.test(model) || this.present.has(model)) continue;
+          if (typeof retryAt !== "number" || retryAt <= this.now()) continue;
+          this.missing.set(model, { retryAt, attempts: 0, permanent: true });
+        }
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.error(`Cihaz görseli yokluk listesi okunamadı: ${String(error)}`);
+      }
+    }
+  }
+
+  /**
+   * Panel için tek soru: bu model için `<img>` kurulsun mu?
+   * `true` görsel var, `false` upstream'de yok (istek hiç atılmasın), `null` henüz bilinmiyor
+   * (istek atılır — mevcut davranış korunur, ilk denemeyi bir şey engellemez).
+   */
+  availability(model: string | null | undefined): boolean | null {
+    const key = model?.trim();
+    if (!key || !safeModelPattern.test(key)) return null;
+    if (this.present.has(key)) return true;
+    const entry = this.missing.get(key);
+    return entry?.permanent === true && entry.retryAt > this.now() ? false : null;
+  }
 
   /**
    * Verilen modelleri arka planda önden indirir. Aynı anda tek tur çalışır,
@@ -86,14 +145,18 @@ export class DeviceImageCache {
   async get(model: string): Promise<DeviceImage | null> {
     if (!safeModelPattern.test(model) || model === "." || model === "..") return null;
     const cached = await this.readFromDisk(model);
-    if (cached) return cached;
+    if (cached) {
+      this.present.add(model);
+      return cached;
+    }
     if (this.blocked(model)) return null;
     const { image, transient } = await this.download(model);
     if (!image) {
       this.rememberFailure(model, transient);
       return null;
     }
-    this.missing.delete(model);
+    this.present.add(model);
+    if (this.missing.delete(model)) void this.persistMissing();
     await this.writeToDisk(model, image.extension, image.body);
     return { contentType: contentTypeFor(image.extension), body: image.body };
   }
@@ -106,12 +169,29 @@ export class DeviceImageCache {
 
   private rememberFailure(model: string, transient: boolean): void {
     if (!transient) {
-      this.missing.set(model, { retryAt: this.now() + notFoundRetryMs, attempts: 0 });
+      this.missing.set(model, { retryAt: this.now() + notFoundRetryMs, attempts: 0, permanent: true });
+      // Yalnız kalıcı yokluk diske yazılır. Geçici hata (internet yok, zaman aşımı) yazılmaz:
+      // yeniden başlatmadan sonra o modele bir şans daha verilsin.
+      void this.persistMissing();
       return;
     }
     const attempts = (this.missing.get(model)?.attempts ?? 0) + 1;
     const delay = Math.min(transientRetryMs * 2 ** (attempts - 1), transientRetryCeilingMs);
-    this.missing.set(model, { retryAt: this.now() + delay, attempts });
+    this.missing.set(model, { retryAt: this.now() + delay, attempts, permanent: false });
+  }
+
+  private async persistMissing(): Promise<void> {
+    const now = this.now();
+    const index: Record<string, number> = {};
+    for (const [model, entry] of this.missing) {
+      if (entry.permanent && entry.retryAt > now) index[model] = entry.retryAt;
+    }
+    try {
+      await mkdir(this.directory, { recursive: true });
+      await writeJsonAtomic(resolve(this.directory, missingIndexFile), index, { mode: 0o600 });
+    } catch (error) {
+      console.error(`Cihaz görseli yokluk listesi yazılamadı: ${String(error)}`);
+    }
   }
 
   private async readFromDisk(model: string): Promise<DeviceImage | null> {

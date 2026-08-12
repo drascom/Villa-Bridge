@@ -94,6 +94,17 @@
     return`<svg class="device-type-svg" viewBox="0 0 24 24" aria-hidden="true">${icons[kind]||icons.sensor}</svg>`;
   };
   const deviceTypeIcon=(device,control)=>deviceIconSvg(deviceIconKind(device,control));
+  /* CİHAZIN GÖRSEL ANAHTARI — model kodudur, IEEE değil: `/api/device-image/:model` upstream
+     kataloğuna bakar, katalog cihazı değil MODELİ tanır. Ama model adının geçerli olması görselin
+     VAR olduğu anlamına gelmez (ör. `TS0601_u8ouaqsz` katalogda yok). Sunucu bunu önbellekten
+     bilir ve `image.available===false` diye söyler; o durumda `<img>` HİÇ kurulmaz — istek
+     atılmaz, konsol 404 ile dolmaz, yerine tür ikonu geçer.
+     `available` henüz bilinmiyorsa (null) davranış eskisi gibidir: istek atılır, `onerror`
+     yakalar. Böylece daha önce görünen hiçbir görsel kaybolmaz. */
+  const deviceImageModel=device=>{
+    if(!device.image)return device.model;
+    return device.image.available===false?null:device.image.model;
+  };
   const deviceVisualFor=(device,imageModel)=>{
     const fallback=`<span class="device-fallback"${imageModel?" hidden":""}>${deviceTypeIcon(device)}</span>`;
     if(!imageModel)return`<div class="device-visual">${fallback.replace(" hidden","")}</div>`;
@@ -103,7 +114,7 @@
   // Sinyal rozeti ve yeniden adlandırma kalemi başlıktaki adın yanında durur; gövdede ayrı satır yok.
   const deviceDetailMetaHtml=device=>`${linkQualityBadge(device)}<button class="device-name-edit" type="button" data-admin-only data-rename="${esc(device.id)}" aria-label="${esc(t("changeName"))}" title="${esc(t("changeName"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L19 9l-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg></button>`;
   const deviceDetailPhoto=device=>{
-    const imageModel=device.image?device.image.model:device.model;
+    const imageModel=deviceImageModel(device);
     if(!imageModel)return"";
     return`<div class="device-detail-photo" data-device-photo hidden><img class="device-photo" src="/api/device-image/${encodeURIComponent(imageModel)}" alt="" data-device-image data-model="${esc(imageModel)}"><button class="image-edit-overlay" type="button" data-admin-only data-change-image="${esc(device.id)}" aria-label="${esc(t("changeImage"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h4l2-2h4l2 2h4v15H4V5Z"/><circle cx="12" cy="12" r="4"/></svg><span>${t("changeImage")}</span></button></div>`;
   };
@@ -438,7 +449,7 @@
       :`<span class="device-table-seen">${esc(t("deviceTableLastSeen"))}: —</span>`;
     return`<tr tabindex="0" data-device-card="${esc(device.id)}" data-name="${esc(device.name.toLowerCase())}"${device.availability==="offline"?' class="device-row-offline"':""} aria-label="${esc(`${device.name} · ${availability.label}`)}">
       <td class="device-table-index">${index+1}</td>
-      <td class="device-table-visual">${deviceVisualFor(device,device.image?device.image.model:device.model)}</td>
+      <td class="device-table-visual">${deviceVisualFor(device,deviceImageModel(device))}</td>
       <td class="device-table-name">${esc(device.name)}</td>
       <td class="device-table-uid">${esc(device.id)}${shortAddress}</td>
       <td class="device-table-text">${device.vendor?esc(device.vendor):deviceTableDash}</td>
