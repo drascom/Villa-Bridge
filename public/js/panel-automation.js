@@ -5,7 +5,6 @@
   // §8.1 — kilit ve siren bir otomasyon eylemi olamaz, listede hiç görünmez.
   const isAutomationControl=control=>control.kind==="switch"&&control.adminOnly!==true;
   const automationControls=device=>isProtectedDevice(device)?[]:(device?.controls||[]).filter(isAutomationControl);
-  const isAutomationTarget=device=>automationControls(device).length>0;
   // §8.2 — döngü korumasının kanonik anahtarı: IEEE adresi + kanal (MQTT özelliği); dost isim değil.
   const automationChannelKey=(deviceId,property)=>`${String(deviceId||"").toLowerCase()}|${String(property||"")}`;
   const automationControlValue=(control,on)=>on?(control.valueOn??"ON"):(control.valueOff??"OFF");

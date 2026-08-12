@@ -643,7 +643,6 @@
     return[lightsAutoGroup(),...state.groups,...(noRoom.items.length?[noRoom]:[])];
   };
   const dashboardGroupById=id=>dashboardGroups().find(group=>group.id===id)||null;
-  const groupEntryControlId=entry=>entry.control?entry.control.id:groupDeviceControlId;
   /* Varsayılan GÖRÜNÜR: oda kartı grubun tüm cihazlarını gösterir. Kullanıcı tek tek gizler;
      gizlenenler kartın altında sayısıyla duyurulur, böylece kaybolmuş sayılmazlar. */
   function overviewGroupEntries(entries){

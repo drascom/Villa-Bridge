@@ -429,11 +429,6 @@
     });
     $$("[data-light-color]").forEach(input=>input.onchange=()=>command(input.dataset.lightColor,input.dataset.property,input.value));
   }
-  function openLightControls(id){
-    state.lightDevice=id;
-    renderLightDialog();
-    $("#lightDialog").showModal();
-  }
   const detailBodyBusy=()=>{
     if(state.detailPointerDown)return true;
     const active=document.activeElement;
