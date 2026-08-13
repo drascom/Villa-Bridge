@@ -34,6 +34,17 @@
          kipinin işidir, diğer kiplerde sabit zemin çizilir. İşaret geç konsaydı sabit kipte
          gökyüzü bir kare yanıp sönerdi. Panel bunu sonra `applyTheme` içinde tazeler. */
       document.documentElement.dataset.sky=mode==="sun"?"live":"fixed";
+      /* Arka plan ayarları (`villa-sky`) da İLK KAREDE geçerli olmalı: kayıt sonradan okunsaydı
+         panel bir kare varsayılan kuşağı gösterip üstüne kullanıcının seçimini basardı ve bu
+         göze çarpardı. Asıl doğrulama panelin `loadSkySettings`'inde; burada yalnız işaretler
+         konur, bozuk değer sessizce atlanır ve CSS varsayılanı yerinde kalır. */
+      const sky=JSON.parse(localStorage.getItem("villa-sky")||"null");
+      if(sky&&typeof sky==="object"){
+        if(["off","a","b","c"].includes(sky.milkyway))document.documentElement.dataset.milkyway=sky.milkyway;
+        if(Number.isFinite(Number(sky.density)))document.documentElement.style.setProperty("--mw-a",String(Math.min(1,Math.max(0,Number(sky.density)))));
+        if(typeof sky.mountain==="boolean")document.documentElement.dataset.mountain=sky.mountain?"on":"off";
+        if(Number.isFinite(Number(sky.mountainHeight)))document.documentElement.style.setProperty("--mountain-h",`${Math.min(190,Math.max(40,Math.round(Number(sky.mountainHeight))))}px`);
+      }
       document.documentElement.style.colorScheme=resolved;
       document.querySelector('meta[name="theme-color"]').content=dark?"#101514":"#edf0f2";
     }catch{}})();
@@ -182,6 +193,55 @@
         <div class="debug-log-panel debug-network-panel"><div class="debug-log-toolbar"><strong id="debugNetworkTitle">Device network events</strong><div class="debug-log-actions"><button id="refreshDebugNetworkEvents" class="quiet" type="button" data-i18n="refreshErrors">Refresh</button></div></div><p class="debug-network-lead" data-i18n="deviceNetworkEventsLead">Joins, drops and deletions stay here even after a restart.</p><div id="debugNetworkList" class="debug-network-list"></div></div>
       </article>
     </section>
+
+    <!-- ARKA PLAN — yönetici sayfası DEĞİL: herkes açabilir, hiçbir şey sunucuya yazılmaz.
+         Yukarıdaki `#settings` ile karıştırılmasın; burada yalnız "Güneşe göre" görünümünün
+         gökyüzü ayarları var ve hepsi bu cihazda kalır (`localStorage`). -->
+    <section id="skySettings" class="view">
+      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navBackground">Background</h1></div></header>
+      <p class="sky-settings-lead" data-i18n="skySettingsLead">These settings change the “By the sun” view only — Light, Dark and System stay plain.</p>
+      <div id="skyModeNotice" class="sky-mode-notice" role="note" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><p data-i18n="skyModeNoticeLead">The moving sky is off right now, so nothing here is visible. Switch the appearance to “By the sun” to see it.</p><button id="skyModeSwitch" class="secondary" type="button" data-i18n="skyModeNoticeAction">Switch to “By the sun”</button></div>
+      <div class="sky-settings-grid">
+        <article class="setting-card sky-settings-card">
+          <h2 data-i18n="skyMilkyWay">Milky Way</h2>
+          <p data-i18n="skyMilkyWayLead">A faint band across the night sky. It fades away by itself as the sun comes up.</p>
+          <div class="sky-choice-row" role="group" data-i18n-aria="skyMilkyWay" aria-label="Milky Way">
+            <button type="button" data-sky-milkyway="off" aria-pressed="false"><b data-i18n="skyMilkyWayOff">Off</b><span data-i18n="skyMilkyWayOffLead">Plain star field</span></button>
+            <button type="button" data-sky-milkyway="a" aria-pressed="false"><b data-i18n="skyMilkyWayA">Thin thread</b><span data-i18n="skyMilkyWayALead">Barely there</span></button>
+            <button type="button" data-sky-milkyway="b" aria-pressed="false"><b data-i18n="skyMilkyWayB">Balanced</b><span data-i18n="skyMilkyWayBLead">Split by a dark rift</span></button>
+            <button type="button" data-sky-milkyway="c" aria-pressed="false"><b data-i18n="skyMilkyWayC">Wide dust</b><span data-i18n="skyMilkyWayCLead">Broad, stars gather inside</span></button>
+          </div>
+          <div class="sky-slider-row">
+            <label for="skyDensity" data-i18n="skyDensity">Brightness</label>
+            <input id="skyDensity" type="range" min="0" max="100" step="1" value="65">
+            <output id="skyDensityValue" class="sky-readout" for="skyDensity">65%</output>
+          </div>
+        </article>
+        <article class="setting-card sky-settings-card">
+          <h2 data-i18n="skyStars">Stars</h2>
+          <p data-i18n="skyStarsLead">How bright the stars burn at night. They still follow the hour, so daylight always clears them.</p>
+          <div class="sky-slider-row">
+            <label for="skyStarGain" data-i18n="skyStarBrightness">Star brightness</label>
+            <input id="skyStarGain" type="range" min="0" max="150" step="5" value="100">
+            <output id="skyStarGainValue" class="sky-readout" for="skyStarGain">100%</output>
+          </div>
+        </article>
+        <article class="setting-card sky-settings-card">
+          <h2 data-i18n="skyMountain">Mountains</h2>
+          <p data-i18n="skyMountainLead">The dark ridge along the bottom edge of the screen.</p>
+          <label class="sky-toggle"><input id="skyMountainOn" type="checkbox" checked><span data-i18n="skyMountainShow">Show the ridge</span></label>
+          <div class="sky-slider-row">
+            <label for="skyMountainHeight" data-i18n="skyMountainHeight">Height</label>
+            <input id="skyMountainHeight" type="range" min="40" max="190" step="2" value="94">
+            <output id="skyMountainHeightValue" class="sky-readout" for="skyMountainHeight">94 px</output>
+          </div>
+        </article>
+      </div>
+      <div class="settings-actions sky-settings-actions">
+        <p class="settings-note" data-i18n="skySettingsNote">Saved on this tablet only. Nothing is sent to the server, and other devices keep their own background.</p>
+        <button id="skyResetButton" class="secondary" type="button" data-i18n="skyResetDefaults">Reset to defaults</button>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -198,6 +258,13 @@
     </nav>
     <div class="app-menu-utilities">
       <div class="app-menu-utility app-menu-utility-stack"><span class="app-menu-utility-label" data-i18n="appearance">Appearance</span><div class="theme-switch" role="group" data-i18n-aria="appearance" aria-label="Appearance"><button type="button" data-theme-mode="light" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg><span data-i18n="themeLight">Light</span></button><button type="button" data-theme-mode="dark" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8.2 8.2 0 1 0 10.5 10.5Z"/></svg><span data-i18n="themeDark">Dark</span></button><button type="button" data-theme-mode="sun" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><span data-i18n="themeSun">By the sun</span></button><button type="button" data-theme-mode="system" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/></svg><span data-i18n="themeSystem">System</span></button></div></div>
+      <!-- Tema segmentinin hemen ALTINDA duran gezinme satırı: gökyüzü ayarları ayrı bir sayfa.
+           Yönetici kısıtı YOK (`data-admin-only` bilerek konmadı) — hiçbir şey sunucuya yazılmaz.
+           `.app-menu-nav` sarmalayıcısı yalnız biçim için: satır üstteki menü satırlarıyla aynı
+           dili (ikon + başlık + açıklama) taşısın diye. -->
+      <div class="app-menu-nav app-menu-nav-appearance">
+        <button class="nav-button" type="button" data-view="skySettings"><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="17" cy="6.5" r="2.5"/><path d="M3 19h18"/><path d="m3 19 5.5-8 3.5 4.6L14.5 12l6.5 7"/></svg></span><span class="app-menu-text"><b data-i18n="navBackground">Background</b><span data-i18n="navBackgroundLead">Milky Way, stars and the ridge</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
       <div class="app-menu-utility"><span class="app-menu-utility-label" data-i18n="language">Language</span><div class="language-switch" role="group" data-i18n-aria="language" aria-label="Language"><button type="button" data-language="en" class="active">EN</button><button type="button" data-language="tr">TR</button></div></div>
     </div>
     <div class="app-menu-foot">

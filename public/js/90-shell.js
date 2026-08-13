@@ -200,6 +200,92 @@
     // Zemin de görünümün parçası: güneş takibi kipe göre kurulur ya da durdurulur (aşağıda),
     // zaten doğru durumdaysa hiçbir şey yapmaz.
     syncSunGround();
+    // Arka plan sayfasındaki "hareketli gökyüzü kapalı" uyarısı kipe bakar, tazelensin.
+    renderSkySettings();
+  }
+  /* ————— ARKA PLAN AYARLARI — CİHAZ BAZINDA, SUNUCUYA YAZILMAZ —————
+     "Güneşe göre" görünümünün üç ayarı (Samanyolu kuşağı, yıldız parlaklığı, dağ silüeti)
+     `villa-sky` altında `localStorage`'da durur — tema (`villa-theme`) hangi desendeyse aynısı.
+     Bozuk ya da eksik değer sessizce varsayılana düşer; panel hiçbir koşulda ayarsız kalmaz.
+     PARALEL BİR SİSTEM KURULMAZ: her ayar ya mevcut bir değişkeni sürer (`--mw-a`, `--star-a`,
+     `--mountain-h`) ya da kökteki bir işareti çevirir (`data-milkyway`, `data-mountain`). Sabit
+     görünüm (Light · Dark · System) hiç etkilenmez — CSS oradaki katmanları zaten kurmuyor. */
+  const skySettingsKey="villa-sky";
+  const skySettingsDefaults={milkyway:"b",density:.65,starGain:1,mountain:true,mountainHeight:94};
+  const skyMilkywayChoices=["off","a","b","c"];
+  const skySettings={...skySettingsDefaults};
+  /* Yıldız alfasının GECE PAYI. `applySunGround` dakikada bir yazar; kullanıcı çarpanı
+     oynatırken bütün güneş hesabını yeniden döndürmeyelim diye burada saklanır — kaydırıcı
+     kımıldadığında tek bir `--star-a` yazımı yetiyor. */
+  let skyStarBase=0;
+  const skyNumber=(value,min,max,fallback)=>{
+    const number=Number(value);
+    return Number.isFinite(number)?Math.min(max,Math.max(min,number)):fallback;
+  };
+  function loadSkySettings(){
+    let saved=null;
+    try{saved=JSON.parse(localStorage.getItem(skySettingsKey)||"null")}catch{saved=null}
+    const source=saved&&typeof saved==="object"?saved:{};
+    skySettings.milkyway=skyMilkywayChoices.includes(source.milkyway)?source.milkyway:skySettingsDefaults.milkyway;
+    skySettings.density=skyNumber(source.density,0,1,skySettingsDefaults.density);
+    skySettings.starGain=skyNumber(source.starGain,0,1.5,skySettingsDefaults.starGain);
+    skySettings.mountain=typeof source.mountain==="boolean"?source.mountain:skySettingsDefaults.mountain;
+    skySettings.mountainHeight=Math.round(skyNumber(source.mountainHeight,40,190,skySettingsDefaults.mountainHeight));
+  }
+  /* Boyama ANINDA, kayıt GECİKMELİ: kaydırıcı sürüklenirken her karede diske yazmanın anlamı
+     yok, ama gökyüzü aynı karede değişmeli. */
+  let skySettingsSaveTimer=null;
+  function saveSkySettings(){
+    clearTimeout(skySettingsSaveTimer);
+    skySettingsSaveTimer=setTimeout(()=>{
+      skySettingsSaveTimer=null;
+      try{localStorage.setItem(skySettingsKey,JSON.stringify(skySettings))}catch{}
+    },300);
+  }
+  /* Yıldız alfası = GECENİN PAYI × kullanıcının çarpanı. Gece payı olduğu gibi durduğu için
+     ayar gündüzü aydınlatmaz, yalnız gecenin tavanını oynatır. Samanyolu alfaları da aynı
+     değişkenle çarpılı olduğu için kuşak yıldızlarla birlikte kısılır. */
+  function applyStarGain(){
+    document.documentElement.style.setProperty("--star-a",(skyStarBase*skySettings.starGain).toFixed(3));
+  }
+  function applySkySettings(){
+    const root=document.documentElement;
+    root.dataset.milkyway=skySettings.milkyway;
+    root.style.setProperty("--mw-a",skySettings.density.toFixed(2));
+    root.dataset.mountain=skySettings.mountain?"on":"off";
+    root.style.setProperty("--mountain-h",`${skySettings.mountainHeight}px`);
+    applyStarGain();
+  }
+  function renderSkySettings(){
+    if(!$("#skyModeNotice"))return;
+    const percent=value=>`${Math.round(value*100)}%`;
+    $$("[data-sky-milkyway]").forEach(button=>{
+      button.setAttribute("aria-pressed",String(button.dataset.skyMilkyway===skySettings.milkyway));
+    });
+    // Sürüklenen kaydırıcının değeri geri yazılmaz; yoksa parmağın altında zıplar.
+    const density=$("#skyDensity");
+    if(document.activeElement!==density)density.value=String(Math.round(skySettings.density*100));
+    $("#skyDensityValue").textContent=percent(skySettings.density);
+    const starGain=$("#skyStarGain");
+    if(document.activeElement!==starGain)starGain.value=String(Math.round(skySettings.starGain*100));
+    $("#skyStarGainValue").textContent=percent(skySettings.starGain);
+    $("#skyMountainOn").checked=skySettings.mountain;
+    const height=$("#skyMountainHeight");
+    if(document.activeElement!==height)height.value=String(skySettings.mountainHeight);
+    $("#skyMountainHeightValue").textContent=t("skyPixels",{count:skySettings.mountainHeight});
+    // Sabit görünümdeyken bu sayfanın hiçbir ayarı ekranda görünmez; kullanıcıya söyle ve
+    // tek dokunuşluk çıkışı ver.
+    $("#skyModeNotice").hidden=state.themeMode==="sun";
+  }
+  /* Tek giriş: değeri yaz → hemen boya → gecikmeli kaydet → arayüzü tazele. */
+  function updateSkySettings(patch){
+    Object.assign(skySettings,patch);
+    applySkySettings();
+    saveSkySettings();
+    renderSkySettings();
+  }
+  function resetSkySettings(){
+    updateSkySettings({...skySettingsDefaults});
   }
   /* GÜNEŞİ İZLEYEN ZEMİN. Panel kendi güneş hesabını YAPMAZ: gün doğumu/batımı zaten hava
      servisinden geliyor (`weatherState.data.daily.sunrise/sunset`, sunucu `timezone=auto` ile
@@ -397,8 +483,10 @@
     root.style.setProperty("--sky-a-day",dayAlpha.toFixed(3));
     root.style.setProperty("--sky-a-dusk",duskAlpha.toFixed(3));
     // Yıldızlar gecenin payıyla belirir, şafak/batım açılırken söner. Tek bir opaklık; desen
-    // CSS'te üç tekrarlı gradyan katmanı, DOM düğümü yok.
-    root.style.setProperty("--star-a",(nightWeight*.9).toFixed(3));
+    // CSS'te tekrarlı gradyan katmanları, DOM düğümü yok. Kullanıcının parlaklık çarpanı
+    // (arka plan ayarları) bunun ÜSTÜNE binsin diye gece payı ayrıca saklanır.
+    skyStarBase=nightWeight*.9;
+    applyStarGain();
     // GÜN IŞIĞI EKSENİ — aşama ağırlıkları × tek tablo. Temaya BAKMAZ (eskiden bakıyordu);
     // yalnız zamanın fonksiyonu olduğu için eşikte kesilmez. Sayı köke yazılır (`--sky-lum`)
     // ve kartın bütün nötr tonları, dolgusu ve konturu ondan türer.

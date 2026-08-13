@@ -33,6 +33,16 @@
   $$("[data-theme-mode]").forEach(button=>button.onclick=()=>setThemeMode(button.dataset.themeMode));
   $$("[data-theme-toggle]").forEach(button=>button.onclick=()=>setThemeMode(document.documentElement.dataset.theme==="dark"?"light":"dark"));
   $$("[data-language-cycle]").forEach(button=>button.onclick=cycleLanguage);
+  /* ARKA PLAN AYARLARI. Kaydırıcılar `input` ile ANINDA boyar (canlı önizleme), kayıt
+     `updateSkySettings` içinde gecikmeli — sürüklerken kare başına iş yalnız birkaç değişken
+     yazımı, yeniden düzen yok. */
+  $$("[data-sky-milkyway]").forEach(button=>button.onclick=()=>updateSkySettings({milkyway:button.dataset.skyMilkyway}));
+  $("#skyDensity").oninput=()=>updateSkySettings({density:Number($("#skyDensity").value)/100});
+  $("#skyStarGain").oninput=()=>updateSkySettings({starGain:Number($("#skyStarGain").value)/100});
+  $("#skyMountainOn").onchange=()=>updateSkySettings({mountain:$("#skyMountainOn").checked});
+  $("#skyMountainHeight").oninput=()=>updateSkySettings({mountainHeight:Number($("#skyMountainHeight").value)});
+  $("#skyResetButton").onclick=resetSkySettings;
+  $("#skyModeSwitch").onclick=()=>setThemeMode("sun");
   /* "Güneşe göre" kipi de dinler: gün doğumu/batımı hiç bilinmiyorsa o kip sistem tercihine
      düşüyor, o hâlde sistem değişince yeniden boyanmalı. */
   const handleSystemThemeChange=()=>{if(state.themeMode==="system"||state.themeMode==="sun")applyTheme()};
@@ -229,6 +239,10 @@
     document.addEventListener("visibilitychange",()=>{if(document.hidden||!state.auth.authenticated)return;refresh();loadWeather()});
   }
   async function initialize(){
+    // Arka plan ayarları temadan ÖNCE okunur: `applyTheme` güneş takibini kurabiliyor ve o da
+    // ilk karede `--star-a`'yı kullanıcının çarpanıyla yazsın.
+    loadSkySettings();
+    applySkySettings();
     applyTheme();
     document.body.dataset.activeView="home";
     // Kökteki ikiz: güneş katmanı `html::before` üstünde duruyor, o da ekran işaretini görsün.
