@@ -1,3 +1,17 @@
+  /* Favoriler kartı: içi oda kartıyla AYNI döşemelerden oluşur (`groupTileSlotHtml`), yalnız
+     kaynağı oda üyeliği değil yıldız kaydı. Kart iskeleti `index.html` içinde durur (grup kartıyla
+     aynı `group-widget` yapısı: başlık satırı + ızgara), böylece yükseklik/kaydırma davranışı da
+     bedava gelir — kart tek widget yüksekliğinde kalır, taşan döşemeler ızgarada kaydırılır.
+     Boşken ızgaranın yerini tek satırlık bir açıklama alır: kullanıcı yıldızı nerede bulacağını
+     okur. Silinen cihaz ya da kalkmış kanal `favoriteEntries` içinde zaten düşmüştür. */
+  function renderFavoritesWidget(){
+    const grid=$("#favoriteTiles");
+    if(!grid)return;
+    const entries=favoriteEntries();
+    grid.innerHTML=entries.length
+      ?entries.map(({device,control})=>groupTileSlotHtml(device,control)).join("")
+      :`<div class="group-empty">${esc(t("favoritesEmpty"))}</div>`;
+  }
   function widgetCatalogItemHtml(entry){
       const {id,title,lead,groupId}=entry;
       // Oda kartı için "açık mı" sorusunun cevabı görünürlük kaydında; sıra listesinde değil.
@@ -95,7 +109,10 @@
   const scrollKeepers=()=>[$("#homeTabs"),$("#widgetRail")].filter(Boolean);
   /* Döşeme ızgaraları her turda yeniden yazıldığı için düğüm kimliği kaybolur: dikey konum
      grubun kendi kimliğiyle (panelde "panel") saklanır ve yeniden sorgulanarak geri verilir. */
-  const gridScrollKey=grid=>grid.closest("[data-group-widget]")?.dataset.groupWidget||(grid.closest("#groupPanel")?"panel":null);
+  const gridScrollKey=grid=>grid.closest("[data-group-widget]")?.dataset.groupWidget
+    ||(grid.closest("#groupPanel")?"panel":null)
+    ||grid.closest("[data-widget]")?.dataset.widget
+    ||null;
   function captureScrollPositions(){
     const grids=new Map();
     for(const grid of $$(".group-control-grid")){
@@ -120,6 +137,7 @@
     const scrollPositions=captureScrollPositions();
     reconcileWidgetLayout();
     renderGroupWidgets();
+    renderFavoritesWidget();
     const widgets=Object.fromEntries($$("[data-widget]").map(widget=>[widget.dataset.widget,widget]));
     Object.values(widgets).forEach(widget=>widget.hidden=true);
     for(const id of ["quick"]){

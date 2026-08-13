@@ -1660,6 +1660,8 @@
     .tile-star:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     .widget-board.editing .tile-star{display:grid}
     .widget-board.editing .group-control-slot.has-eye>.group-control-tile{padding-top:56px}
+    /* Favoriler kartı oda kartının iskeletini kullanır; boş hâli ızgaranın tüm genişliğini kaplar. */
+    .group-control-grid>.group-empty{grid-column:1/-1;margin-top:0}
     /* Döşemenin iki dokunma hedefi: yuvarlak ikon aç/kapar, gövde hızlı kumandayı açar. Kap artık
        <div> olduğu için odak halkası kapta değil, iki düğmenin kendisinde doğar; kapın görsel
        sınıfları (on/active/alert/pending) ve düzenleme kipindeki `pointer-events:none` aynen kalır.

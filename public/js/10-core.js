@@ -100,7 +100,8 @@
   }catch{return[]}})());
   const dashboardWidgetTypes={
     quick:{title:"homeTabsWidget",lead:"homeTabsWidgetLead"},
-    summary:{title:"summaryWidget",lead:"summaryWidgetLead"}
+    summary:{title:"summaryWidget",lead:"summaryWidgetLead"},
+    favorites:{title:"favoritesWidget",lead:"favoritesWidgetLead"}
   };
   const defaultDashboardWidgets=["quick","summary"];
   const fixedDashboardWidgets=new Set(["quick"]);

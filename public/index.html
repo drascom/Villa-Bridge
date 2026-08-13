@@ -119,6 +119,14 @@
             <div class="widget-section-divider" role="presentation"></div>
             <h3 class="widget-subhead" data-i18n="activityWidget">Home activity</h3><div id="activityEvents" class="widget-list"></div>
           </article>
+          <!-- Favoriler: iskeleti oda kartıyla aynı (başlık satırı + döşeme ızgarası), içini
+               `renderFavoritesWidget` doldurur. `data-group-widget` YOKTUR — o işaret oda
+               kartlarına ait ve her turda silinip yeniden basılmalarını sağlıyor. -->
+          <article class="dashboard-widget widget-card group-widget favorites-widget" data-widget="favorites" hidden>
+            <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
+            <div class="group-widget-head"><div><h2 data-i18n="favoritesWidget">Favourites</h2><p data-i18n="favoritesWidgetLead">The devices you starred, in one place.</p></div></div>
+            <div id="favoriteTiles" class="group-control-grid"></div>
+          </article>
           <div id="widgetEmpty" class="widget-empty" hidden><span data-i18n="widgetEmpty">Your dashboard is empty.</span> <button class="secondary" data-open-widget-catalog data-i18n="addWidget">＋ Add</button> <button class="quiet" data-open-group-create data-i18n="createGroupAction">＋ Create</button></div>
         </div>
         <button id="widgetScrollLeft" class="widget-scroll-hint scroll-hint-left" type="button" hidden aria-label="More widgets to the left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
