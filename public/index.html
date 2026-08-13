@@ -219,7 +219,9 @@
            evresi yalnız ÖNİZLEMEdir: kaydedilmez, sayfadan çıkınca kendiliğinden kapanır. -->
       <div class="sky-controls">
         <article class="sky-block">
-          <div class="sky-block-head"><h2 data-i18n="skyPreviewHour">Hour</h2><output id="skyPreviewValue" class="sky-readout" for="skyPreviewHour">12:00</output></div>
+          <!-- Saat satırı bir taşıma denetimi gibi: oynat/duraklat + okunur saat. Tek düğme iki
+               durum taşır (`aria-pressed`), ikon CSS'te ona göre değişir. -->
+          <div class="sky-block-head"><h2 data-i18n="skyPreviewHour">Hour</h2><div class="sky-head-actions"><button id="skyPreviewPlay" class="sky-play" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="sky-play-glyph" d="M8 5.5 18 12 8 18.5Z"/><path class="sky-pause-glyph" d="M9.5 5.5v13M14.5 5.5v13"/></svg><span id="skyPreviewPlayLabel" data-i18n="skyPreviewPlay">Play</span></button><output id="skyPreviewValue" class="sky-readout" for="skyPreviewHour">12:00</output></div></div>
           <input id="skyPreviewHour" type="range" min="0" max="1439" step="5" value="720" data-i18n-aria="skyPreviewHour" aria-label="Hour">
           <div class="sky-chips" role="group" data-i18n-aria="skyPreviewHour" aria-label="Hour">
             <button type="button" data-sky-jump="dawn" data-i18n="skyPreviewDawn">Sunrise</button>

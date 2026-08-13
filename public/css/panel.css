@@ -1003,8 +1003,20 @@
        1024×640'ta beş modül yan yana sığar, 1100px altında üçe, 900px altında akışa düşer. */
     .sky-controls{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:stretch;margin-bottom:10px}
     .sky-block{min-width:0;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--card-shadow)}
-    .sky-block-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+    .sky-block-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px}
     .sky-block-head h2{margin:0;font:700 15px/1.2 system-ui,sans-serif}
+    /* Saat bloğunun taşıma satırı: oynat/duraklat + okunur saat birlikte durur, blok darsa
+       başlığın altına sarar (taşma yok). Düğme 44px dokunma hedefini korur; ikon oynatken üçgen,
+       akarken çift çubuk — ikisi de aynı `svg`nin içinde, görünürlüğü `aria-pressed` seçiyor. */
+    .sky-head-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+    .sky-play{min-height:44px;min-width:44px;display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--forest);border-radius:11px;color:var(--forest);background:var(--surface-soft);font:750 12px/1.2 system-ui,sans-serif}
+    .sky-play svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .sky-play .sky-pause-glyph{display:none}
+    .sky-play[aria-pressed="true"]{color:var(--on-forest);background:var(--forest)}
+    .sky-play[aria-pressed="true"] .sky-play-glyph{display:none}
+    .sky-play[aria-pressed="true"] .sky-pause-glyph{display:inline}
+    .sky-play:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
+    .sky-play:disabled{opacity:.45}
     .sky-block-note{margin:0;color:var(--muted);font-size:12px;line-height:1.35}
     /* Bloğun kendi okuması (ay evresinin adı gibi) başlığın yanına sığmaz — kendi satırında,
        sararak durur. Kaydırıcı satırdaki kısa `%`/`px` okumaları `.sky-readout`ta kalır. */

@@ -46,6 +46,9 @@
   /* SAAT ÖNİZLEMESİ. Kaydırıcı gökyüzünü sürüklendiği dakikada dondurur, hızlı sıçramalar gerçek
      gün doğumu/batımından hesaplanır, "şimdiye dön" ve rozet önizlemeyi kapatır. Hiçbir yere
      kaydedilmez; arka plan sayfasından çıkınca `activateView` zaten kapatıyor. */
+  /* OYNAT/DURAKLAT: aynı 40 sn'lik döngüyü (`?sky=preview` ile ortak) açar/kapatır; duraklatınca
+     saat bulunduğu dakikada donar. Kaydırıcıya ya da sıçrama çipine dokunmak akışı bitirir. */
+  $("#skyPreviewPlay").onclick=()=>setSkyPlay(!skyPlay.on);
   $("#skyPreviewHour").oninput=()=>setSkyScrub(Number($("#skyPreviewHour").value));
   $$("[data-sky-jump]").forEach(button=>button.onclick=()=>setSkyScrub(skyScrubMarks()[button.dataset.skyJump]));
   $("#skyPreviewNow").onclick=()=>setSkyScrub(null);

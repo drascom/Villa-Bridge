@@ -29,8 +29,11 @@
     document.documentElement.dataset.activeView=viewName;
     if(viewName==="automations"){renderAutomations();loadAutomations().then(renderAutomations).catch(error=>showToast(error.message,true))}
     // Saat önizlemesi yalnız arka plan sayfasında yaşar: sayfadan çıkan kullanıcı paneli donmuş
-    // bir gökyüzüyle bırakmasın diye çıkışta kendiliğinden kapanır.
-    if(viewName!=="skySettings")setSkyScrub(null);
+    // bir gökyüzüyle (ya da akan bir günle) bırakmasın diye çıkışta kendiliğinden kapanır.
+    // TEK İSTİSNA `?sky=preview`: o adres bilerek bir gösteri kipidir, sayfalar arasında
+    // gezerken de dönmeye devam eder — ama denetimlerine bir kez dokunuldu mu sıradan bir akış
+    // gibi davranır ve bu kural onu da kapsar (`skyPlay.url`, 90-shell içinde).
+    if(viewName!=="skySettings"&&!skyPlay.url)setSkyScrub(null);
     // Önizleme sahnesi gizliyken ölçülemez (genişliği sıfırdır); sayfa görünür olur olmaz ölçülür.
     if(viewName==="skySettings")requestAnimationFrame(measureSkyStage);
     if(viewName!=="connections")stopMatterWatch();
@@ -139,7 +142,17 @@
     try{return new URLSearchParams(location.search).get("sky")==="preview"}catch{return false}
   })();
   const skyPreviewCycle=40000;
-  const skyPreviewStart=Date.now();
+  /* AKIŞ (OYNAT) — TEK MEKANİZMA. Yukarıdaki `?sky=preview` bu 40 sn'lik döngüyü sayfa açılışında
+     başlatıyordu; artık aynı döngünün ikinci anahtarı arka plan sayfasındaki oynat/duraklat
+     düğmesi. İKİNCİ BİR SAYAÇ YOK: her iki yol da `skyPlay.on` bayrağını kaldırır ve sanal dakika
+     hep aynı formülden çıkar (`skyMinutes`).
+     `origin`, döngünün 00:00'a denk geldiği andır. URL yolunda sayfa açılışıdır (eski davranış
+     birebir korunur: gün gece yarısından başlar); düğmeyle başlatıldığında o an ekranda hangi
+     dakika varsa ona sabitlenir, yani akış saatin BULUNDUĞU yerden devam eder.
+     `url` yalnız "URL'den başlamış ve kullanıcı hiç dokunmamış" akışı işaretler — o akış bir
+     gösteri kipidir, sayfalar arası gezinirken de dönmeye devam eder; düğmeyle başlatılan akış
+     ise arka plan sayfasından çıkınca durur. Kalıcı hiçbir şey yazılmaz. */
+  const skyPlay={on:skyPreview,url:skyPreview,origin:Date.now(),frame:0,painted:0};
   /* AYNI KAPSAMIN ELLE SÜRÜLENİ — arka plan sayfasındaki saat kaydırıcısı. `?sky=preview` bir
      günü 40 sn'ye sıkıştırır ama istenen anda DURMAZ; bu kaydırıcı gökyüzünün "şimdi"sini tek
      bir dakikaya DONDURUR, böylece gündüz vakti gece manzarasına bakılabilir. Kapsam yine dar:
@@ -151,14 +164,14 @@
      TEK "ÖNİZLEME DURUMU": saat donması (`active`/`minutes`) ile ay evresi geçersiz kılması
      (`phase`, `null` = gerçek takvim evresi) aynı nesnede durur ve BİRLİKTE kapanır. */
   const skyScrub={active:false,minutes:720,settle:false,phase:null};
-  const skyScrubOn=()=>skyScrub.active||skyScrub.phase!==null;
+  const skyScrubOn=()=>skyScrub.active||skyScrub.phase!==null||skyPlay.on;
   function skyMinutes(){
+    // Akış açıkken saat DONMUŞ olamaz (akışı başlatmak donmayı, saate dokunmak akışı bitirir),
+    // bu yüzden sıralamanın çakışacağı bir durum yok.
+    if(skyPlay.on)return (((Date.now()-skyPlay.origin)%skyPreviewCycle+skyPreviewCycle)%skyPreviewCycle)/skyPreviewCycle*1440;
     if(skyScrub.active)return skyScrub.minutes;
-    if(!skyPreview){
-      const now=new Date();
-      return now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
-    }
-    return ((Date.now()-skyPreviewStart)%skyPreviewCycle)/skyPreviewCycle*1440;
+    const now=new Date();
+    return now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
   }
   const skyClock=minutes=>{
     const total=((Math.round(minutes)%1440)+1440)%1440;
@@ -180,9 +193,73 @@
   /* Tek giriş: dakika ver → dondur, `null` ver → gerçek saate dön. `null` bütün önizlemeyi
      kapatır (ay evresi geçersiz kılması dahil) — ikisi tek durum gibi davranır. Gökyüzü ve (kip
      "güneşe göre" ise) tema aynı karede yeniden yazılır; başka hiçbir sistem haberdar edilmez. */
+  /* AKIŞIN KARE SÜRÜCÜSÜ. Kare başına iş ikiye ayrılır: akan sayılar (kaydırıcı, saat okunuru,
+     rozet) HER karede tazelenir — akış basamaklı görünmesin diye; gökyüzünün değişkenleri ise
+     ~140 ms'de bir yazılır, çünkü `--sky-step` akarken zaten .14s'lik bir geçiş taşıyor ve aradaki
+     kareleri kendisi dolduruyor (aynı sayı `?sky=preview`in eski hızlı adımıydı — 140 ms ≈ 5
+     sanal dakika). Hiçbir karede düzen ölçümü yok, yalnız değişken/metin yazımı.
+     `requestAnimationFrame` sekme ya da uygulama görünmezken hiç çağrılmaz: `document.hidden`
+     durumunda akış kendiliğinden durur, pil yakmaz. Geri dönüldüğünde sanal saat gerçek geçen
+     süre kadar ilerlemiş olur — döngü zamanın fonksiyonu, sayaç değil. */
+  const skyPlayStep=140;
+  function skyPlayTick(now){
+    if(!skyPlay.on||!sunGroundState.started){skyPlay.frame=0;return}
+    skyPlay.frame=requestAnimationFrame(skyPlayTick);
+    if(now-skyPlay.painted>=skyPlayStep){
+      skyPlay.painted=now;
+      syncSunTheme();
+      applySunGround();
+      renderSkyScrub();
+      return;
+    }
+    renderSkyClock();
+  }
+  function skyPlayFrames(){
+    if(skyPlay.on&&sunGroundState.started&&!skyPlay.frame)skyPlay.frame=requestAnimationFrame(skyPlayTick);
+  }
+  /* Akışı DURDURAN tek kapı. Kullanıcının her dokunuşu (saat kaydırıcısı, sıçrama çipi, "şimdi",
+     duraklat, kip değişimi, sayfadan çıkış) buradan geçer; `url` işareti de burada düşer, yani
+     URL'den gelen gösteri kipi bir kez elle karışıldıktan sonra sıradan bir akış gibi davranır. */
+  function skyPlayStop(){
+    if(!skyPlay.on)return false;
+    skyPlay.on=false;
+    skyPlay.url=false;
+    if(skyPlay.frame)cancelAnimationFrame(skyPlay.frame);
+    skyPlay.frame=0;
+    return true;
+  }
+  /* Tek giriş: aç → sanal gün 40 saniyede döner, bulunduğu dakikadan başlar. Kapat → akış o
+     dakikada DONAR (kullanıcı baktığı manzarayı kaybetmesin; donmuş saat zaten var olan önizleme
+     durumu, "şimdi" ile tek dokunuşta bırakılır).
+     `prefers-reduced-motion`: düğme her koşulda çalışır. Karar şu — bu hareket kendiliğinden
+     başlamıyor, kullanıcının açıkça istediği bir gösterimdir; habersiz hareket dayatılmadığı
+     için kısıtlamanın konusu değil. Kendiliğinden başlayan tek yol `?sky=preview` ve o da elle
+     yazılan bir adres. */
+  function setSkyPlay(on){
+    if(on===skyPlay.on)return;
+    if(on&&state.themeMode!=="sun")return;
+    if(on){
+      skyPlay.origin=Date.now()-skyMinutes()/1440*skyPreviewCycle;
+      skyPlay.painted=0;
+      skyPlay.on=true;
+      skyPlay.url=false;
+      // Akış donmuş saati devralır; ay evresi geçersiz kılması AYRI denetimdir, dokunulmaz.
+      skyScrub.active=false;
+      skyPlayFrames();
+    }else{
+      const minutes=skyMinutes();
+      skyPlayStop();
+      skyScrub.active=true;
+      skyScrub.minutes=Math.max(0,Math.min(1439,Math.round(minutes)));
+    }
+    if(sunGroundState.started){syncSunTheme();applySunGround()}
+    renderSkySettings();
+  }
   function setSkyScrub(minutes){
+    // Saate ELLE dokunmak akışı bitirir: denetim kullanıcıdadır, akış onun elinden almaz.
+    const played=skyPlayStop();
     if(minutes===null){
-      if(!skyScrubOn())return;
+      if(!skyScrubOn()&&!played)return;
       skyScrub.active=false;
       skyScrub.phase=null;
       skyScrub.settle=true;
@@ -263,7 +340,7 @@
     // Sabit görünümde (Light · Dark · System) gökyüzü hiç çizilmiyor; saat önizlemesinin
     // gösterecek bir şeyi kalmadığı için sessizce kapanır. Yalnız bayrak düşürülür — gökyüzünü
     // aşağıdaki `syncSunGround` zaten durduruyor.
-    if(skyScrubOn()&&state.themeMode!=="sun"){skyScrub.active=false;skyScrub.phase=null;skyScrub.settle=false}
+    if(skyScrubOn()&&state.themeMode!=="sun"){skyPlayStop();skyScrub.active=false;skyScrub.phase=null;skyScrub.settle=false}
     const resolved=resolveThemeMode();
     const previous=document.documentElement.dataset.theme;
     if(options.fade===true&&previous&&previous!==resolved&&!reducedMotion())startThemeFade();
@@ -408,12 +485,22 @@
   /* Kaydırıcı, okunur saat, rozet ve "şimdiye dön"ün durumu. Önizleme kapalıyken kaydırıcı
      GERÇEK saati gösterir, yani kullanıcı nereden başladığını görür. Sabit görünümde bütün
      denetimler kapatılır. */
-  function renderSkyScrub(){
+  /* AKAN SAYILAR — akış sırasında kare başına çalışan tek parça: kaydırıcının konumu, saat
+     okunuru ve rozetin saati. Sürüklenen kaydırıcının değeri geri yazılmaz (parmağın altında
+     zıplamasın). Düğmelerin etkin/pasif durumu buraya girmez; o iş `renderSkyScrub`ta. */
+  function renderSkyClock(){
     const slider=$("#skyPreviewHour");
     if(!slider)return;
     const minutes=skyMinutes();
     if(document.activeElement!==slider)slider.value=String(Math.round(minutes));
-    $("#skyPreviewValue").textContent=skyClock(minutes);
+    const clock=skyClock(minutes);
+    $("#skyPreviewValue").textContent=clock;
+    $("#skyPreviewBadgeTime").textContent=clock;
+  }
+  function renderSkyScrub(){
+    const slider=$("#skyPreviewHour");
+    if(!slider)return;
+    renderSkyClock();
     const off=state.themeMode!=="sun";
     slider.disabled=off;
     $$("[data-sky-jump]").forEach(button=>{button.disabled=off});
@@ -421,7 +508,22 @@
     $("#skyPreviewCard").classList.toggle("is-off",off);
     const badge=$("#skyPreviewBadge");
     badge.hidden=!skyScrubOn();
-    $("#skyPreviewBadgeTime").textContent=skyClock(minutes);
+    // OYNAT/DURAKLAT. Tek düğme iki durum taşır: `aria-pressed` hem ekran okuyucuya hem CSS'e
+    // (ikon değişimi) durumu söyler, etiket anahtarı `data-i18n`de kalır ki dil değişince
+    // `applyLanguage` doğru metni yeniden yazsın.
+    const play=$("#skyPreviewPlay");
+    if(play){
+      play.disabled=off;
+      play.setAttribute("aria-pressed",String(skyPlay.on));
+      const key=skyPlay.on?"skyPreviewPause":"skyPreviewPlay";
+      const label=$("#skyPreviewPlayLabel");
+      if(label.dataset.i18n!==key||label.textContent!==t(key)){
+        label.dataset.i18n=key;
+        label.textContent=t(key);
+      }
+      const hint=t("skyPreviewPlayHint");
+      if(play.title!==hint)play.title=hint;
+    }
     // AY EVRESİ. Kaydırıcı 0..100 tutar (bir sinodik ayın yüzdesi); okunur ad + aydınlanma
     // yüzdesidir. Önizleme kapalıyken gerçek takvim evresini gösterir, yani kullanıcı nereden
     // başladığını görür.
@@ -701,7 +803,7 @@
     // sürekli kayar. Önizlemede aralık da süre de kısalır; saat kaydırıcısı sürüklenirken
     // gökyüzü parmağı takip etmeli, önizleme kapanırken de gerçek saate 60 sn'de değil hızla
     // dönmeli (`settle`, yalnız o tek kare için).
-    const step=skyPreview||skyScrub.active?".14s":skyScrub.settle?".6s":"60s";
+    const step=skyPlay.on||skyScrub.active?".14s":skyScrub.settle?".6s":"60s";
     skyScrub.settle=false;
     root.style.setProperty("--sky-step",step);
     // Gece: batıştan doğuşa uzanan aralık. Gece yarısı bu aralığın ORTASI sayılır (takvim
@@ -737,16 +839,17 @@
     // "Hazır" artık işarete değil CANLI veriye bakar: işaret yedekle de konuyor, ama hava
     // servisi henüz cevap vermediyse yine sık yoklanmalı.
     const ready=sunGroundState.live===true;
-    // Önizlemede sanal gün 40 sn'de dönüyor: 140 ms'lik adım yaklaşık 5 sanal dakika, yani
-    // gökyüzü basamaklanmadan akar. Normalde dakikada bir yeter.
-    // Saat elle dondurulmuşsa 40 sn'lik döngünün hızlı adımına gerek yok: gökyüzü zaten sabit.
-    const fast=skyPreview&&!skyScrub.active;
-    sunGroundState.timer=setTimeout(scheduleSunGround,ready?(fast?140:60000):15000);
+    // Akış (40 sn'lik sanal gün) artık kendi kare sürücüsünde dönüyor — buradaki zamanlayıcının
+    // hızlanmasına gerek yok; dakikada bir yoklamak yeter, veri henüz gelmediyse daha sık.
+    sunGroundState.timer=setTimeout(scheduleSunGround,ready?60000:15000);
   }
   function startSunGround(){
     if(sunGroundState.started)return;
     sunGroundState.started=true;
     scheduleSunGround();
+    // Kip "güneşe göre"ye dönerken akış açık kalmışsa (ya da `?sky=preview` ile açıldıysa)
+    // kareler burada başlar: sürücü yalnız gökyüzü çizilirken çalışır.
+    skyPlayFrames();
   }
   /* SABİT SİSTEMDE HİÇBİR ŞEY DÖNMEZ. Gökyüzü, güneş ve ay yalnız "güneşe göre" kipinin
      öğeleri; başka kipte CSS onları zaten çizmiyor, burada da dakikalık hesabı durduruyoruz —
@@ -754,6 +857,7 @@
      hemen yeniden yazar. */
   function stopSunGround(){
     if(!sunGroundState.started)return;
+    skyPlayStop();
     clearTimeout(sunGroundState.timer);
     sunGroundState.timer=null;
     sunGroundState.started=false;
