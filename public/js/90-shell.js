@@ -145,8 +145,11 @@
      saat kazanır); önizleme kapanınca döngü kaldığı yerden akmaya devam eder.
      KALICI HİÇBİR ŞEY YAZMAZ ve üç yolla kapanır: "şimdiye dön", arka plan sayfasından çıkış
      (`activateView`), sayfanın yenilenmesi. `settle` yalnız kapanış karesi içindir — dönüş
-     hareketi 60 sn sürmesin diye adım süresini bir kereliğine kısaltır. */
-  const skyScrub={active:false,minutes:720,settle:false};
+     hareketi 60 sn sürmesin diye adım süresini bir kereliğine kısaltır.
+     TEK "ÖNİZLEME DURUMU": saat donması (`active`/`minutes`) ile ay evresi geçersiz kılması
+     (`phase`, `null` = gerçek takvim evresi) aynı nesnede durur ve BİRLİKTE kapanır. */
+  const skyScrub={active:false,minutes:720,settle:false,phase:null};
+  const skyScrubOn=()=>skyScrub.active||skyScrub.phase!==null;
   function skyMinutes(){
     if(skyScrub.active)return skyScrub.minutes;
     if(!skyPreview){
@@ -172,12 +175,14 @@
       midnight:((times.set+times.rise+1440)/2)%1440,
     };
   }
-  /* Tek giriş: dakika ver → dondur, `null` ver → gerçek saate dön. Gökyüzü ve (kip "güneşe
-     göre" ise) tema aynı karede yeniden yazılır; başka hiçbir sistem haberdar edilmez. */
+  /* Tek giriş: dakika ver → dondur, `null` ver → gerçek saate dön. `null` bütün önizlemeyi
+     kapatır (ay evresi geçersiz kılması dahil) — ikisi tek durum gibi davranır. Gökyüzü ve (kip
+     "güneşe göre" ise) tema aynı karede yeniden yazılır; başka hiçbir sistem haberdar edilmez. */
   function setSkyScrub(minutes){
     if(minutes===null){
-      if(!skyScrub.active)return;
+      if(!skyScrubOn())return;
       skyScrub.active=false;
+      skyScrub.phase=null;
       skyScrub.settle=true;
     }else{
       const value=Number(minutes);
@@ -186,6 +191,43 @@
       skyScrub.minutes=Math.max(0,Math.min(1439,Math.round(value)));
     }
     if(sunGroundState.started){syncSunTheme();applySunGround()}
+    renderSkySettings();
+  }
+  /* AY EVRESİ ÖNİZLEMESİ. `moonPhase()` bozulmaz; üstüne ince bir geçersiz kılma katmanı konur —
+     saat için `skyMinutes()`e yapılanın aynısı. Gökyüzüne giden evre HER ZAMAN buradan okunur,
+     yani önizleme kapalıyken gerçek takvim evresi geçer. Kalıcı hiçbir şey yazılmaz. */
+  function skyMoonPhase(){
+    return skyScrub.phase===null?moonPhase(Date.now()):skyScrub.phase;
+  }
+  const moonIllumination=phase=>(1-Math.cos(2*Math.PI*phase))/2;
+  /* Evrenin adı 8 dilimdir; dördün/yeni ay/dolunay dilimleri dar tutulur ki "ilk dördün" yalnız
+     gerçekten dördüne yakınken yazsın. */
+  const moonPhaseNames=["skyMoonNew","skyMoonWaxingCrescent","skyMoonFirstQuarter","skyMoonWaxingGibbous",
+    "skyMoonFull","skyMoonWaningGibbous","skyMoonLastQuarter","skyMoonWaningCrescent"];
+  const moonPhaseName=phase=>moonPhaseNames[Math.round(((phase%1)+1)%1*8)%8];
+  /* Önizleme saati gecede mi? Aynı kaynak sırası ve aynı "gece" tanımı `applySunGround` ile. */
+  function skyIsNight(){
+    const times=sunGroundTimes()||cachedSunTimes()||fallbackSunTimes();
+    const minutes=skyMinutes();
+    return minutes>=times.set||minutes<times.rise;
+  }
+  /* Tek giriş: evre ver → dondur, `null` ver → gerçek takvim evresine dön.
+     GÜNDÜZ KURALI: ay yalnız gece çizilir (`--moon-disc` gündüz 0), yani gündüz bir evre seçmek
+     ekranda hiçbir şey değiştirmezdi. Bu yüzden evre seçilirken önizleme saati gündüzdeyse saat
+     kendiliğinden "gecenin ortası"na alınır (mevcut sıçramanın birebir aynı hesabı). Sessiz
+     değil: kartın açıklama satırı bunu söylüyor. */
+  function setSkyPhase(phase){
+    if(phase===null){
+      if(skyScrub.phase===null)return;
+      skyScrub.phase=null;
+      skyScrub.settle=true;
+    }else{
+      const value=Number(phase);
+      if(!Number.isFinite(value))return;
+      skyScrub.phase=((value%1)+1)%1;
+      if(!skyIsNight()){setSkyScrub(skyScrubMarks().midnight);return}
+    }
+    if(sunGroundState.started)applySunGround();
     renderSkySettings();
   }
   /* Gündüz mü? Canlı veri varsa o, yoksa önbellek, ikisi de yoksa `null` (bilinmiyor). */
@@ -219,7 +261,7 @@
     // Sabit görünümde (Light · Dark · System) gökyüzü hiç çizilmiyor; saat önizlemesinin
     // gösterecek bir şeyi kalmadığı için sessizce kapanır. Yalnız bayrak düşürülür — gökyüzünü
     // aşağıdaki `syncSunGround` zaten durduruyor.
-    if(skyScrub.active&&state.themeMode!=="sun"){skyScrub.active=false;skyScrub.settle=false}
+    if(skyScrubOn()&&state.themeMode!=="sun"){skyScrub.active=false;skyScrub.phase=null;skyScrub.settle=false}
     const resolved=resolveThemeMode();
     const previous=document.documentElement.dataset.theme;
     if(options.fade===true&&previous&&previous!==resolved&&!reducedMotion())startThemeFade();
@@ -340,11 +382,25 @@
     const off=state.themeMode!=="sun";
     slider.disabled=off;
     $$("[data-sky-jump]").forEach(button=>{button.disabled=off});
-    $("#skyPreviewNow").disabled=off||!skyScrub.active;
+    $("#skyPreviewNow").disabled=off||!skyScrubOn();
     $("#skyPreviewCard").classList.toggle("is-off",off);
     const badge=$("#skyPreviewBadge");
-    badge.hidden=!skyScrub.active;
+    badge.hidden=!skyScrubOn();
     $("#skyPreviewBadgeTime").textContent=skyClock(minutes);
+    // AY EVRESİ. Kaydırıcı 0..100 tutar (bir sinodik ayın yüzdesi); okunur ad + aydınlanma
+    // yüzdesidir. Önizleme kapalıyken gerçek takvim evresini gösterir, yani kullanıcı nereden
+    // başladığını görür.
+    const phaseSlider=$("#skyPreviewPhase");
+    if(!phaseSlider)return;
+    const phase=skyMoonPhase();
+    if(document.activeElement!==phaseSlider)phaseSlider.value=String(Math.round(phase*100));
+    $("#skyPreviewPhaseValue").textContent=t("skyPreviewPhaseValue",{
+      phase:t(moonPhaseName(phase)),
+      percent:Math.round(moonIllumination(phase)*100),
+    });
+    phaseSlider.disabled=off;
+    $$("[data-sky-moon]").forEach(button=>{button.disabled=off});
+    $("#skyPreviewMoonNow").disabled=off||skyScrub.phase===null;
   }
   /* Tek giriş: değeri yaz → hemen boya → gecikmeli kaydet → arayüzü tazele. */
   function updateSkySettings(patch){
@@ -555,7 +611,6 @@
     if(live)cacheSunTimes(live);
     sunGroundState.live=Boolean(live);
     const times=live||cachedSunTimes()||fallbackSunTimes();
-    const now=new Date();
     const minutes=skyMinutes();
     const progress=(minutes-times.rise)/(times.set-times.rise);
     // Yükseklik: gündüz yarım sinüs (doğuşta 0, öğlen 1, batışta 0), gece 0.
@@ -615,7 +670,8 @@
     applyMoon(root,{
       visible:night,
       track:Math.max(0,Math.min(1,elapsed/nightSpan)),
-      phase:moonPhase(now.getTime()),
+      // Evre önizleme katmanından okunur: açıksa seçilen evre, kapalıysa gerçek takvim evresi.
+      phase:skyMoonPhase(),
     });
     root.dataset.sunGround="on";
   }

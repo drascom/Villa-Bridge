@@ -50,6 +50,13 @@
   $$("[data-sky-jump]").forEach(button=>button.onclick=()=>setSkyScrub(skyScrubMarks()[button.dataset.skyJump]));
   $("#skyPreviewNow").onclick=()=>setSkyScrub(null);
   $("#skyPreviewBadge").onclick=()=>setSkyScrub(null);
+  /* AY EVRESİ ÖNİZLEMESİ. Kaydırıcı bir sinodik ayı 0..100 olarak sürer, sıçramalar dördünlere
+     oturur, "gerçek evre" yalnız evreyi bırakır (saat donmuşsa donmuş kalır); rozet ve "şimdiye
+     dön" ikisini birden kapatır. */
+  $("#skyPreviewPhase").oninput=()=>setSkyPhase(Number($("#skyPreviewPhase").value)/100);
+  const skyMoonMarks={new:0,first:.25,full:.5,last:.75};
+  $$("[data-sky-moon]").forEach(button=>button.onclick=()=>setSkyPhase(skyMoonMarks[button.dataset.skyMoon]));
+  $("#skyPreviewMoonNow").onclick=()=>setSkyPhase(null);
   /* "Güneşe göre" kipi de dinler: gün doğumu/batımı hiç bilinmiyorsa o kip sistem tercihine
      düşüyor, o hâlde sistem değişince yeniden boyanmalı. */
   const handleSystemThemeChange=()=>{if(state.themeMode==="system"||state.themeMode==="sun")applyTheme()};

@@ -219,6 +219,25 @@
           <button type="button" data-sky-jump="midnight" data-i18n="skyPreviewMidnight">Middle of the night</button>
           <button id="skyPreviewNow" type="button" data-i18n="skyPreviewNow">Back to now</button>
         </div>
+        <!-- AY EVRESİ. Aynı önizleme durumunun ikinci ekseni: saat "ne zaman"ı, bu "ayın hangi
+             evresi"ni dondurur. Ay yalnız gece çizildiği için gündüzde evre seçmek saati
+             kendiliğinden gecenin ortasına alır — açıklama satırı bunu söylüyor. -->
+        <div class="sky-preview-moon">
+          <h3 data-i18n="skyPreviewMoon">Moon phase</h3>
+          <p data-i18n="skyPreviewMoonLead">Slide through a whole month of moons instead of waiting for one. The moon only shows at night, so picking a phase during the day moves the hour to the middle of the night for you.</p>
+          <div class="sky-slider-row">
+            <label for="skyPreviewPhase" data-i18n="skyPreviewPhaseLabel">Phase</label>
+            <input id="skyPreviewPhase" type="range" min="0" max="100" step="1" value="0">
+            <output id="skyPreviewPhaseValue" class="sky-readout" for="skyPreviewPhase">Full moon · 100% lit</output>
+          </div>
+          <div class="sky-preview-jumps" role="group" data-i18n-aria="skyPreviewMoon" aria-label="Moon phase">
+            <button type="button" data-sky-moon="new" data-i18n="skyMoonNew">New moon</button>
+            <button type="button" data-sky-moon="first" data-i18n="skyMoonFirstQuarter">First quarter</button>
+            <button type="button" data-sky-moon="full" data-i18n="skyMoonFull">Full moon</button>
+            <button type="button" data-sky-moon="last" data-i18n="skyMoonLastQuarter">Last quarter</button>
+            <button id="skyPreviewMoonNow" type="button" data-i18n="skyPreviewMoonNow">Real phase</button>
+          </div>
+        </div>
       </article>
       <div class="sky-settings-grid">
         <article class="setting-card sky-settings-card">
