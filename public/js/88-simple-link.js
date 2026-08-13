@@ -1,14 +1,32 @@
-  const linkClusterNames=["genOnOff","genLevelCtrl"];
-  const endpointClusterNames=(endpoint,direction)=>((direction==="out"?endpoint.outputClusters:endpoint.inputClusters)||[]).map(String);
-  const linkSourceEndpoint=device=>(device.endpoints||[]).find(endpoint=>endpointClusterNames(endpoint,"out").includes("genOnOff"));
-  const linkTargetEndpoint=device=>(device.endpoints||[]).find(endpoint=>endpointClusterNames(endpoint,"in").includes("genOnOff"));
-  const isLinkStarter=device=>(device.actionTypes||[]).length>0||Boolean(linkSourceEndpoint(device));
+  // Küme kimliği iki dilde gelir: gölge kipinde Zigbee2MQTT AD ("genOnOff"), doğrudan kipte
+  // zigbee-herdsman SAYI (6) yollar. Yalnız ada bakan eski kural doğrudan kipte hiçbir kaynak
+  // bulamıyordu; iki yazım da tanınır.
+  const linkClusterIds={genOnOff:6,genLevelCtrl:8};
+  const linkClusterNames=Object.keys(linkClusterIds);
+  const endpointClusters=(endpoint,direction)=>(direction==="out"?endpoint.outputClusters:endpoint.inputClusters)||[];
+  const endpointHasCluster=(endpoint,direction,name)=>endpointClusters(endpoint,direction)
+    .some(cluster=>String(cluster)===name||Number(cluster)===linkClusterIds[name]);
+  const linkSourceEndpoint=device=>(device.endpoints||[])
+    .find(endpoint=>linkClusterNames.some(name=>endpointHasCluster(endpoint,"out",name)));
+  const linkTargetEndpoint=device=>(device.endpoints||[]).find(endpoint=>endpointHasCluster(endpoint,"in","genOnOff"));
+  /* Doğrudan bağlama (Zigbee binding) yalnız kaynağın ÇIKIŞ kümesinden kurulabilir. Bir kumanda
+     tuş olayını satıcıya özel bir komutla GİRİŞ kümesi üzerinden yolluyorsa (Tuya sahne
+     anahtarları böyledir) bağlama kurulsa bile hiçbir komut gitmez. Böyle kumandalar listeden
+     atılmaz — kullanıcı kendi kumandasını burada arar — ama seçilince köprü yoluna (kural)
+     devredilir. Kural jeneriktir: model ya da satıcı listesi yok, yalnız cihazın bildirdiği
+     kümelere bakılır. */
+  const canBindDirectly=device=>Boolean(linkSourceEndpoint(device));
+  const isButtonStarter=device=>(device?.buttons||[]).length>0||(device?.actionTypes||[]).length>0;
+  const isLinkStarter=device=>canBindDirectly(device)||isButtonStarter(device);
   const isProtectedDevice=device=>(device.controls||[]).some(control=>control.kind==="lock"||control.kind==="siren");
   const isLinkTarget=device=>!isProtectedDevice(device)&&(device.controls||[]).some(control=>control.kind==="switch"||control.kind==="level");
   function linkClustersFor(source,target){
-    const outputs=new Set((source.endpoints||[]).flatMap(endpoint=>endpointClusterNames(endpoint,"out")));
-    const inputs=target?new Set((target.endpoints||[]).flatMap(endpoint=>endpointClusterNames(endpoint,"in"))):null;
-    return linkClusterNames.filter(cluster=>outputs.has(cluster)&&(!inputs||inputs.has(cluster)));
+    const from=source.endpoints||[];
+    const to=target?target.endpoints||[]:null;
+    return linkClusterNames.filter(name=>
+      from.some(endpoint=>endpointHasCluster(endpoint,"out",name))
+      &&(!to||to.some(endpoint=>endpointHasCluster(endpoint,"in",name)))
+    );
   }
   function simpleLinks(){
     const rows=new Map();
@@ -74,8 +92,25 @@
     let choices="";
     if(firstStep){
       const starters=state.devices.filter(isLinkStarter).sort(byName);
+      // İki küme: doğrudan bağlanabilenler ve yalnız köprü üzerinden çalışabilenler. İkincisi
+      // gizlenmez — kullanıcı kumandasını burada arar — ama seçilince kural yoluna devredilir.
+      const groups=[
+        {devices:starters.filter(canBindDirectly),head:"simpleLinkDirectGroup",direct:true},
+        {devices:starters.filter(device=>!canBindDirectly(device)),head:"simpleLinkBridgeGroup",direct:false}
+      ].filter(group=>group.devices.length>0);
+      const labelled=groups.length>1;
       choices=starters.length
-        ?starters.map(device=>simpleLinkChoiceHtml(device.id,"device",device.name,deviceKind(device),device.id===link.sourceId)).join("")
+        ?groups.map(group=>{
+          const head=labelled?`<p class="automation-group-head">${esc(t(group.head))}</p>`:"";
+          const rows=group.devices.map(device=>simpleLinkChoiceHtml(
+            device.id,
+            "device",
+            device.name,
+            group.direct?deviceKind(device):automationJoin(deviceKind(device),t("simpleLinkBridgeOnly")),
+            device.id===link.sourceId
+          )).join("");
+          return`${head}${rows}`;
+        }).join("")
         :`<div class="empty">${t("simpleLinkNoStarters")}</div>`;
     }else{
       const targets=state.devices
@@ -104,10 +139,32 @@
     save.hidden=firstStep;
     save.disabled=!ready;
   }
+  /* Doğrudan bağlanamayan kumanda seçilince kullanıcı çıkmaza düşmesin: bağlantı penceresi
+     kapanır ve kural sihirbazı aynı kumanda düğme tetikleyicisi olarak seçilmiş hâlde açılır.
+     Komut o zaman köprü üzerinden gider — Villa Bridge basışı duyar ve hedefe kendisi yazar.
+     Farkı: doğrudan bağlantı köprü kapalıyken de çalışır, köprü yolu çalışan bir sisteme
+     muhtaçtır ama her kumandada çalışır. */
+  function handOffToRule(deviceId){
+    $("#simpleLinkDialog").close();
+    openAutomationWizard();
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    wizard.triggerKind="button";
+    wizard.triggerQuery="";
+    wizard.triggerTab="all";
+    wizard.stage="trigDevice";
+    renderAutomationWizard();
+    chooseAutomationTriggerDevice(deviceId);
+    showToast(t("simpleLinkBridgeHandoff"));
+  }
   function chooseSimpleLink(id,type){
     const link=state.simpleLink;
     if(!link)return;
-    if(link.step===1){link.sourceId=id;link.targetId=null;link.step=2}
+    if(link.step===1){
+      const source=state.devices.find(device=>device.id===id);
+      if(source&&!canBindDirectly(source)){handOffToRule(id);return}
+      link.sourceId=id;link.targetId=null;link.step=2;
+    }
     else{link.targetId=id;link.targetType=type}
     renderSimpleLink();
   }

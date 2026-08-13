@@ -219,6 +219,37 @@ function writableFeatures(exposes: unknown): WritableFeature[] {
   return [...features.values()].sort((left, right) => left.property.localeCompare(right.property, "en"));
 }
 
+/**
+ * Doğrudan Zigbee bağlamasında (binding) komut taşıyabilen kümeler: sahne, aç/kapa, seviye, renk.
+ * `zigbee-herdsman` sayı, Zigbee2MQTT ad verir; iki yazım da tanınır.
+ */
+const bindableClusterIds: ReadonlySet<number> = new Set([5, 6, 8, 768]);
+const bindableClusterNames: ReadonlySet<string> = new Set([
+  "genScenes", "genOnOff", "genLevelCtrl", "lightingColorCtrl"
+]);
+
+/**
+ * Bağlama yalnız kaynağın **çıkış** (client) kümesinden kurulabilir — cihaz o kümeyi
+ * bildirmiyorsa bağlama kurulsa bile hiçbir komut gitmez. Bazı kumandalar tuş olayını
+ * satıcıya özel bir komutla `genOnOff` **giriş** kümesi üzerinden yollar; onlar hiç
+ * bağlanamaz, yolları köprü üzerinden otomasyondur. Kural jeneriktir: model ya da satıcı
+ * listesi yok, yalnız cihazın kendi bildirdiği kümelere bakılır.
+ */
+export function hasBindableOutputCluster(device: DeviceView, endpointId?: number): boolean {
+  return (device.endpoints ?? [])
+    .filter((endpoint) => endpointId === undefined || endpoint.id === endpointId)
+    .some((endpoint) =>
+      endpoint.outputClusters.some((cluster) =>
+        typeof cluster === "number"
+          ? bindableClusterIds.has(cluster)
+          : bindableClusterNames.has(cluster)
+      )
+    );
+}
+
+/** Cihaz başına saklanan en fazla gözlenmiş basış değeri; bozuk cihaz listeyi şişirmesin. */
+const maximumObservedActions = 64;
+
 /** Olay akışına (ve otomasyon tetikleyicilerine) giren taban özellikler. */
 const interestingEventProperties = new Set([
   "action", "state", "contact", "occupancy", "presence", "smoke",
@@ -345,6 +376,13 @@ export class DeviceStore {
   private lowBatteryThreshold = 15;
   private readonly events: DeviceEventView[];
   /**
+   * Cihazın **gerçekten yaydığı** `action` değerleri, konu adına göre. Cihaz tanımı (`exposes`)
+   * tek kaynak olamaz: desteklenmeyen ya da eksik tanımlanmış bir kumandada `action` sözlüğü hiç
+   * gelmez veya değer listesi boştur; o zaman düğme türetilmez, otomasyon sihirbazında da hiç
+   * görünmez. Yayında görülen değer bunu kapatır — model listesi değil, cihazın kendi kanıtı.
+   */
+  private readonly observedActions = new Map<string, Set<string>>();
+  /**
    * Cihaz görünümünü etkileyen her mutasyonda artar. Memo bu sayaca bağlıdır: sayaç aynıysa
    * altta hiçbir şey değişmemiştir ve liste yeniden kurulmaz (200 cihaz × 64 kural darboğazı).
    */
@@ -372,6 +410,9 @@ export class DeviceStore {
   ) {
     this.aliases = aliases;
     this.events = initialEvents.slice(0, 200);
+    // Görülen basışlar olay günlüğüyle birlikte diske yazılır; yeniden başlatmada düğmeler
+    // ilk basışı beklemeden geri gelsin diye defter oradan tohumlanır.
+    for (const event of this.events) this.rememberAction(event.sourceName, event.property, event.value);
     const invalidate = (): void => this.invalidate();
     observeMapMutations(aliases, invalidate);
     observeMapMutations(roles, invalidate);
@@ -514,6 +555,7 @@ export class DeviceStore {
         const isAction = property === "action" || property.startsWith("action_");
         if (!isAction && eventScalar(property, previous[property]) === value) continue;
         if (isAction && typeof value === "string" && value.trim() === "") continue;
+        if (isAction && this.rememberAction(topic, property, value)) this.topology += 1;
         const event: DeviceEventView = { sourceName: topic, property, value, at: at.toISOString() };
         if (isInterestingEventProperty(property)) events.push(event);
         if (isAutomationEventProperty(property)) automationEvents.push(event);
@@ -627,6 +669,27 @@ export class DeviceStore {
    * öbürü etkilenmez. Dinleyicinin hatası akışı kesmesin diye çağrı burada tutulmaz — çağıran
    * (index.ts) kendi hata yakalayıcısını kurar.
    */
+  /**
+   * Yayında görülen bir `action` değerini cihazın defterine yazar. Yeni bir değer eklendiyse
+   * `true` döner — o zaman düğme topolojisi değişmiştir. Defter cihaz başına sınırlıdır:
+   * bozuk/konuşkan bir cihaz listeyi şişirmesin.
+   */
+  private rememberAction(sourceName: string, property: string, value: unknown): boolean {
+    if (property !== "action" && !property.startsWith("action_")) return false;
+    if (typeof value !== "string") return false;
+    const action = value.trim();
+    if (action.length === 0 || action.length > 64) return false;
+    let seen = this.observedActions.get(sourceName);
+    if (!seen) {
+      seen = new Set<string>();
+      this.observedActions.set(sourceName, seen);
+    }
+    if (seen.has(action)) return false;
+    if (seen.size >= maximumObservedActions) return false;
+    seen.add(action);
+    return true;
+  }
+
   private emitAutomationEvents(events: DeviceEventView[]): void {
     if (events.length === 0 || !this.automationListener) return;
     this.automationListener(events.slice());
@@ -698,7 +761,13 @@ export class DeviceStore {
         const name = this.aliases.get(id) ?? sourceName;
         const exposes = device.definition?.exposes;
         const features = featureNames(exposes);
-        const actionTypes = featureValues(exposes, "action");
+        // Sözlük + kanıt: cihaz tanımının bildirdiği basışlar ile cihazın gerçekten yaydıkları
+        // birleşir. Tanımı olmayan/eksik kumandalar böylece ilk basıştan sonra düğme kazanır,
+        // tanımı sağlam olanlarda ise liste aynen eskisi gibi kalır.
+        const actionTypes = [...new Set([
+          ...featureValues(exposes, "action"),
+          ...(this.observedActions.get(sourceName) ?? [])
+        ])].sort();
         const writable = writableFeatures(exposes);
         const image = deviceIdentity(
           id,

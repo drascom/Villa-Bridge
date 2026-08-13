@@ -20,7 +20,7 @@ import { DeviceImagesStore } from "./device-images.js";
 import { DeviceEventsStore } from "./device-events.js";
 import { DeviceNotesStore } from "./device-notes.js";
 import { loadDeviceRoles, removeDeviceRole, setDeviceRole } from "./device-roles.js";
-import { DeviceStore } from "./device-store.js";
+import { DeviceStore, hasBindableOutputCluster } from "./device-store.js";
 import { lastExternalConverterLoad } from "./external-converters.js";
 import {
   HomeFavoritesStore,
@@ -708,6 +708,27 @@ app.post<{
     || !validEndpoint(toEndpoint)
   ) {
     return reply.code(400).send({ ok: false, error: "Bağlama isteği geçersiz." });
+  }
+  // Kurulamayacak bağlama sessizce kaydedilmesin. Gölge kipinde istek Zigbee2MQTT'ye gidip
+  // hiçbir şey yapmadan "tamam" dönebiliyordu; kullanıcı bağlantıyı kurdum sanıp düğmenin
+  // çalışmamasıyla baş başa kalıyordu. Çözme (`bind:false`) hiç engellenmez — eski bir kaydı
+  // kaldırmak her zaman serbest olmalı.
+  if (request.body.bind === true) {
+    const fromDevice = store.getDevices().find((device) => device.id === fromId);
+    if (
+      fromDevice
+      && !hasBindableOutputCluster(
+        fromDevice,
+        fromEndpoint === undefined ? undefined : Number(fromEndpoint)
+      )
+    ) {
+      return reply.code(422).send({
+        ok: false,
+        code: "not_bindable",
+        error: "Bu cihaz doğrudan bağlanamaz: komut taşıyan bir çıkış kümesi bildirmiyor. "
+          + "Bunun yerine bir kural kurun — düğmeye basılınca köprü komutu gönderir."
+      });
+    }
   }
   try {
     await source.bindDevice(
