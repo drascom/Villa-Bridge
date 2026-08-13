@@ -150,16 +150,14 @@
       --sun-angle:0deg;--sun-size:12.5vmin;--sun-disc:0;--sun-glow:0;
       --sun-core:#ff9d10;--sun-mid:#ffc61a;--sun-rim:rgba(255,247,102,.85);--sun-halo:255,214,102;
       /* AY DEĞİŞKENLERİ — varsayılan "ay yok" (`--moon-disc:0`), panel geceleyin yazar.
-         `--moon-lit` temaya göre değişir, açı ve evre JS'ten gelir. `--moon-dark` ARTIK
-         BOYAMA DEĞİL: karanlık limb gerçek gökyüzünde seçilmez, o yüzden burada varsayılan
-         `transparent`tır. Diskin kendisi `mix-blend-mode:screen` ile çizilir (aşağıdaki
-         `@supports`), orada `--moon-dark` çok koyu bir tona döner — screen altında siyah
-         GÖRÜNMEZDİR, yani karanlık yarım gökyüzünün kendisi olarak kalır ve yalnız ihmal
-         edilebilir bir "dünya ışığı" izi bırakır. Karışım desteklenmiyorsa saydam kalır;
-         eski gri levha hiçbir durumda geri gelmez. */
+         KARANLIK YARIM ARTIK HİÇ BOYANMIYOR ve bunun için ne katışım ne de maske var: aydınlık
+         şekil doğrudan GEOMETRİDEN çıkıyor (aşağıdaki `body::after`). Bu yüzden `--moon-dark`
+         diye bir değişken de kalmadı — boyanmayan bir şeyin rengi olmaz.
+         `--moon-hinge` + `--moon-side` evrenin YÖNÜNÜ taşır (büyürken sağ yarı, küçülürken sol),
+         `--moon-mid` şişkin evrede terminatör elipsinin aydınlık olup olmadığını söyler. */
       --moon-angle:0deg;--moon-disc:0;--moon-glow:0;--moon-size:15.5vmin;--moon-term:50%;
-      --moon-lit:#fff;--moon-dark:transparent;
-      --moon-left:var(--moon-dark);--moon-right:var(--moon-lit);--moon-mid:var(--moon-dark);
+      --moon-lit:#fff;
+      --moon-hinge:0%;--moon-side:100%;--moon-mid:transparent;
       /* TABAN AİLE KOYU ÇİPTİR — ilk kare için. Kart da döşeme de koyu yarı saydam, üstündeki
          yazı açık; hızlı kumanda penceresi (`.quick-modal`) zaten bu dilde, o yüzden `data-sky`
          yazılana kadarki kısa an tutarlı görünür. Sabit ve hareketli sistem aşağıda kartın
@@ -224,9 +222,9 @@
       --paper:#101514;--surface:#1b2320;--surface-soft:#232d29;--ink:#edf5f0;--ink-soft:#c6d4cd;--muted:#a6b6ad;--line:#33433b;
       --forest:#71c6a2;--forest-soft:#203d32;--on-forest:#0b1c15;--sun:#f0b65c;--danger:#f07a72;--danger-soft:#40211f;--shadow:0 18px 54px rgba(0,0,0,.28);--card-shadow:0 2px 10px rgba(0,0,0,.18);
       --home-glass:rgba(226,239,232,.09);--home-control:#1b2320;--home-border:#33433b;--home-float-shadow:0 2px 10px rgba(0,0,0,.18);
-      /* Koyu gökyüzünde de aydınlık yüz TAM BEYAZ: `screen` katışımı altında beyaz tavandır,
-         daha parlak bir ay ancak buradan çıkar. Karanlık limb burada da boyanmaz. */
-      --moon-lit:#fff;--moon-dark:transparent;
+      /* Koyu gökyüzünde de aydınlık yüz TAM BEYAZ — ay gökyüzünün en parlak öğesidir.
+         Karanlık limb burada da boyanmaz (hiçbir temada boyanmıyor). */
+      --moon-lit:#fff;
       /* Karanlık temada kenar açık renge döner. */
       --home-action-line:rgba(237,245,240,.42);--home-action-halo:none;--home-action-glyph-shadow:none;
       /* Koyu temada hale koyu olur: açık yazı, zeminin turuncu/açık lekelerinin üstünde de ayrışır. */
@@ -649,68 +647,71 @@
        tepesinde eskiden görünen kırılma böylece yok oluyor. `--sky-step` süreli geçiş, dakikada
        bir yazılan açıyı sürekli bir kaymaya çevirir.
        Hale `box-shadow`: YEREL kalır, gökyüzünün genel parlaklık bandını kaydırmaz — durum
-       döşemelerinin merdiveni bozulmaz. Referans pen'deki NABIZ da burada: hale iki durak
-       arasında gidip gelir (`alternate infinite`). Pen'in 2 sn'si bir duvar panelinde huzursuz
-       eder, 5,5 sn nefes gibi okunur. Nabız yalnız haleyi oynatır, diskin kendisini değil.
+       döşemelerinin merdiveni bozulmaz.
+       HALE NABIZ DEĞİL SOLUKTUR (kullanıcı: "titrek ışık gibi titreyerek gelip gidiyor, öyle
+       olmasın; yavaşça büyüyüp yavaşça küçülen bir hale olsun"). İki şey değişti:
+         · SÜRE 5,5 sn → 16 sn (`alternate` ile tam tur 32 sn) — göz artık ritmi saymıyor.
+         · ALFA SABİT: eski karelerde opaklık .3 ↔ .16 arasında gidiyordu, titreme hissi asıl
+           oradan geliyordu. Artık iki durakta da alfa taban kuralın değeriyle aynı (`.26`);
+           değişen yalnız ÖLÇÜ — bulanıklık yarıçapı ve yayılım. Işık miktarı sabit kalıp
+           yalnız yayıldığı alan nefes alıyor.
+       Animasyon hâlâ tek bir `box-shadow`; yeni katman, yeni DOM düğümü, `filter` yok.
        `prefers-reduced-motion` açıkken DİSK KALIR (eskiden tümden siliniyordu, artık silinmiyor):
-       yalnız nabız ve geçiş durur, konum ve tonlama saate göre doğru sürer. */
-    :root[data-sky="live"]::before{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(255,247,102,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-pulse 5.5s ease-in-out alternate infinite}
-    @keyframes panel-sun-pulse{from{box-shadow:0 0 calc(var(--sun-size) * 2.6) calc(var(--sun-size) * .9) rgba(var(--sun-halo),calc(var(--sun-glow) * .3))}to{box-shadow:0 0 calc(var(--sun-size) * 1.5) calc(var(--sun-size) * .45) rgba(var(--sun-halo),calc(var(--sun-glow) * .16))}}
+       yalnız soluk ve geçiş durur, konum ve tonlama saate göre doğru sürer. Durduğu yerde taban
+       kuralın halesi görünür ve o hale iki durağın tam ortasıdır — donmuş kare çirkin olmaz. */
+    :root[data-sky="live"]::before{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(255,247,102,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-breath 16s ease-in-out alternate infinite}
+    @keyframes panel-sun-breath{from{box-shadow:0 0 calc(var(--sun-size) * 1.9) calc(var(--sun-size) * .62) rgba(var(--sun-halo),calc(var(--sun-glow) * .26))}to{box-shadow:0 0 calc(var(--sun-size) * 2.9) calc(var(--sun-size) * .98) rgba(var(--sun-halo),calc(var(--sun-glow) * .26))}}
     /* AY — güneşle aynı kol tekniği, AYNI YÖN (soldan doğar, sağdan batar; açıyı JS yazar).
-       Tek farkı: disk radyal simetrik DEĞİL (evre
-       çizgisi var), o yüzden kolun dönüşü diskin üstünde geri alınır — `rotate(-açı)` olmasa
-       terminatör yayla birlikte yatardı. Evre iki katmanla çizilir:
-         1) taban — disk yarı aydınlık yarı karanlık (hangi yarı, `--moon-left/right`),
-         2) elips — terminatör; yatay yarıçapı evreyle 0'a inip diske geri açılır.
-       Dördünde elips sıfırlanır (düz kenar), yeni ay/dolunayda diski kaplar. Hale `box-shadow`
-       olduğu için YEREL ve güneşinki gibi NABIZ atar. `--moon-disc` sıfırken (yani gündüz)
-       opaklık sıfır olur, hale dahil hiçbir şey görünmez.
+       Tek farkı: disk radyal simetrik DEĞİL (evre çizgisi var), o yüzden kolun dönüşü diskin
+       üstünde geri alınır — `rotate(-açı)` olmasa terminatör yayla birlikte yatardı.
+       `--moon-disc` sıfırken (yani gündüz) opaklık sıfır olur, hale dahil hiçbir şey görünmez.
 
-       KARANLIK YARIM NEDEN ÇİZİLMİYOR: eskiden karanlık taraf yarı saydam gri boyanıyordu ve
-       ay gökyüzünde "iki renkli bir pul" gibi duruyordu. Gerçekte karanlık limb neredeyse hiç
-       görünmez. Çözüm MASKE DEĞİL, KATIŞIM: disk `mix-blend-mode:screen` ile çizilir. Screen
-       altında SİYAH GÖRÜNMEZDİR (arkasındaki gökyüzü aynen kalır), açık ton ise ışık ekler —
-       ay ışığının kendisi de zaten toplamalıdır. Böylece iki katmanlı geometri (yarım disk +
-       terminatör elipsi) OLDUĞU GİBİ korunur, yalnız karanlık tarafın boyası yok olur:
-         · hilalde elips karanlıktır → aydınlık yarımdan hilali OYAR (maske compositing'i
-           gerekmeden, çünkü siyah zaten görünmez),
-         · şişkin evrede elips aydınlıktır → aydınlık yarıma eklenir,
-         · dördünde elips sıfırlanır → düz kenarlı yarım ay,
-         · YENİ AYDA elips tüm diski karanlıkla kaplar ve `--moon-glow` de sıfıra iner →
-           ay pratik olarak kaybolur (istenen davranış).
-       `--moon-dark` sıfır değil, çok koyu bir tondur: screen'in ekleyeceği ~%3 ışık gerçek
-       "dünya ışığı"nın (earthshine) ihmal edilebilir izidir. Karışım desteklenmezse değişken
-       `transparent` kalır (kökteki varsayılan) — o zaman hilal oyulmaz ama gri levha da geri
-       gelmez. Kural yalnız `data-sky="live"` içindir; sabit kip ayı hiç çizmez.
+       KATIŞIM KALDIRILDI — ÇÜNKÜ CANLIDA SİYAH LEKE ÇİZİYORDU. Önceki sürüm karanlık yarımı
+       çok koyu bir tonla boyayıp `mix-blend-mode:screen` ile görünmez kılmayı deniyordu. Screen
+       yalnız KENDİ KATIŞIM ÖBEĞİNİN arkaplanıyla karışır; panelde kartların `backdrop-filter`'ı
+       (29 ayrı kural) tarayıcıyı ayrı bir "backdrop kökü"ne zorluyor, ay ise gökyüzüyle aynı
+       öbekte kalmıyor. Karışım sessizce kimliğe düşünce screen'in girdisi saydam-siyah oluyor:
+       sonuç, boyanın OLDUĞU GİBİ ekrana gitmesi — yani gökyüzünden koyu bir disk ve kenarında
+       ince bir açık yay. Kullanıcının gördüğü tam olarak buydu; semptomun `--moon-dark`ın ham
+       değeri olması teşhisin kendisidir. Bu yüzden çizim artık HİÇBİR katışım moduna, yığın
+       bağlamına, `isolation`a veya `backdrop-filter`a bağlı değil.
 
-       AY NEDEN BÜYÜDÜ VE PARLADI (kullanıcı: "çok soluk ve silik, güneş gibi parlasın, daha
-       büyük olsun"): TEKNİK DEĞİŞMEDİ, screen katışımı korundu — çünkü karanlık yarımın
-       görünmezliği tam olarak ondan geliyor ve maskeye geçmek iki katmanı çıkarma (`crescent`)
-       ile toplama (`gibbous`) arasında evreye göre çevirmeyi, yani `mask-composite`i gerektirirdi;
-       o özellik tabletin eski WebView'ında güvenilir değil. Bunun yerine screen'in TAVANINA
-       çıkıldı ve varlık ölçüden geldi:
-         · `--moon-lit` her iki temada da TAM BEYAZ (#fff). Screen altında beyaz en yüksek
-           çıktıdır (1-(1-1)(1-b)=1), yani disk artık gökyüzü ne olursa olsun tam parlak.
-         · `--moon-size` 9vmin → 15.5vmin: ay artık güneşten (12.5vmin) BÜYÜK.
-         · Hale alfası .2 → .5 (nabız .26/.13 → .58/.32), yarıçapı ise diske oranla bir tık
-           daraltıldı (1.7/.5 → 1.5/.42) — büyüyen diskle birlikte hale de büyüdüğü için mutlak
-           yayılım zaten arttı. Hale hâlâ `box-shadow`, yani YEREL: gökyüzünün genel parlaklık
-           bandına, `--sky-lum`'a ve durum döşemelerinin merdivenine dokunmaz.
-         · `--moon-dark` bir tık daha koyuldu: disk büyüdüğü için screen'in eklediği earthshine
-           izi de büyüyecekti, karanlık yarım görünmez kalsın diye kısıldı.
-       Evre geometrisi AYNEN duruyor: terminatör elipsi yatay yarıçapını `--moon-term` YÜZDESİ
-       ile alır (diskin genişliğinin oranı), bu yüzden disk büyüdükçe elips de orantılı büyür —
-       yarım ayda hâlâ tam yarım disk, hilalde hilal, yeni ayda kayıp. */
-    :root[data-sky="live"] body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 99%,transparent 100%),linear-gradient(90deg,var(--moon-left) 0 50%,var(--moon-right) 50% 100%);box-shadow:0 0 calc(var(--moon-size) * 1.5) calc(var(--moon-size) * .42) rgba(232,240,255,calc(var(--moon-glow) * .5));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-pulse 5s ease-in-out alternate infinite}
-    @keyframes panel-moon-pulse{from{box-shadow:0 0 calc(var(--moon-size) * 1.7) calc(var(--moon-size) * .5) rgba(232,240,255,calc(var(--moon-glow) * .58))}to{box-shadow:0 0 calc(var(--moon-size) * 1) calc(var(--moon-size) * .26) rgba(232,240,255,calc(var(--moon-glow) * .32))}}
-    /* Katışım desteği varsa: disk toplamalı çizilir ve karanlık taraf ölçülebilir biçimde
-       görünmez olur. Değişkenler aynı özgüllükte yeniden yazılır (bu blok sonra geldiği için
-       kazanır), böylece açık ve koyu temanın kendi satırlarına dokunmaya gerek kalmaz. */
-    @supports (mix-blend-mode:screen){
-      :root{--moon-dark:#04060b}
-      :root[data-theme="dark"]{--moon-dark:#030509}
-      :root[data-sky="live"] body::after{mix-blend-mode:screen}
-    }
+       YENİ TEKNİK — KARANLIK TARAF HİÇ BOYANMIYOR, AYDINLIK ŞEKİL GEOMETRİDEN ÇIKIYOR.
+       Mockup'ın B varyantı (`moon-mock.html` · `.moon-b`) aynı fikri MASKE ile kuruyordu; orada
+       zorunluydu, çünkü aydınlık yüz bir DOKUYDU ve doku ancak kesilebilirdi. Burada aydınlık
+       yüz düz renk, o yüzden kesme işini gradyanın kendisi yapabiliyor — ve maskeden kaçınmanın
+       somut bir sebebi var: `mask-image` öğenin TÜM boyamasını kırpar, `box-shadow` dahil; ayın
+       halesi maskeyle birlikte yok olurdu (maske alanı öntanımlı olarak kenar kutusudur).
+       İki arka plan katmanı, ikisi de `no-repeat`:
+         1) ŞİŞKİNLİK (üstte) — terminatör elipsi, rengi `--moon-mid`: şişkin evrede aydınlık,
+            hilalde SAYDAM. Kutunun tamamına serilir.
+         2) AYDINLIK YARIM + OYUK (altta) — yalnız aydınlık YARIYA serilir (`background-size`
+            50%, `background-position` `--moon-side`), ve o yarıda terminatör elipsinin İÇİ
+            saydam, dışı `--moon-lit`tir. Elipsin merkezi diskin merkezine denk gelsin diye
+            gradyan yarım kutunun iç kenarına (`--moon-hinge`) çakılır; yatay yarıçap yarım
+            kutuya göre ölçüldüğü için `--moon-term`in İKİ KATIDIR (yarım kutu diskin yarısı).
+       Kesişim (hilal) 2. katmanın kendi oyuğundan, birleşim (şişkin) 1. katmanın üste
+       binmesinden doğar — `mask-composite` gerekmez, eski Android WebView'da da çalışır.
+       DÖRT KRİTİK AN:
+         · yeni ay (`--moon-term:50%`, mid saydam) → oyuk elipsi tam diske eşit, aydınlık yarım
+           tamamen oyulur, `--moon-glow` de 0 → ay görünmez. Eski sürümdeki ince parlak yay da
+           yok: oyuk elipsin İÇİNDE %100'e kadar tam saydamdır, aydınlık ancak %100–102 arasında
+           açılır — yeni ayda o bant zaten diskin DIŞINDA kalır ve `border-radius` onu keser.
+         · hilal → oyuk elipsi aydınlık yarımın içini yer, geriye ince yay kalır.
+         · dördün (`--moon-term` ≈ 0) → elips yok olur, aydınlık yarım DÜZ kenarla durur.
+         · dolunay (`--moon-term:50%`, mid aydınlık) → 1. katman tüm diski kaplar (rampası
+           102%'e taşar, limb yine `border-radius`tan gelir) → tam disk. Şişkin evrede de
+           1. katman 2. katmanın rampasının tamamını (%102) örter, dikişe yer kalmaz.
+       Dünya ışığı (earthshine) BİLEREK ÇİZİLMİYOR: gökyüzünden koyu olmayan bir iz ancak
+       toplamalı katışımla olurdu, o da bizi yeniden aynı hataya götürürdü. Siyah leke riski sıfır
+       kalsın diye karanlık limb tamamen boş.
+
+       Hale `box-shadow`, yani YEREL: gökyüzünün genel parlaklık bandına, `--sky-lum`'a ve durum
+       döşemelerinin merdivenine dokunmaz. Güneşle AYNI DİLİ konuşur — nabız değil 16 sn'lik
+       soluk, alfa sabit (.5), değişen yalnız yayılım. Kural yalnız `data-sky="live"` içindir;
+       sabit kip ayı hiç çizmez. */
+    :root[data-sky="live"] body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background-color:transparent;background-image:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 102%,transparent 103%),radial-gradient(ellipse calc(var(--moon-term) * 2) 50% at var(--moon-hinge) 50%,transparent 0 100%,var(--moon-lit) 102%);background-size:100% 100%,50% 100%;background-position:0 0,var(--moon-side) 0;background-repeat:no-repeat;box-shadow:0 0 calc(var(--moon-size) * 1.5) calc(var(--moon-size) * .42) rgba(232,240,255,calc(var(--moon-glow) * .5));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-breath 16s ease-in-out alternate infinite}
+    @keyframes panel-moon-breath{from{box-shadow:0 0 calc(var(--moon-size) * 1.2) calc(var(--moon-size) * .32) rgba(232,240,255,calc(var(--moon-glow) * .5))}to{box-shadow:0 0 calc(var(--moon-size) * 1.8) calc(var(--moon-size) * .52) rgba(232,240,255,calc(var(--moon-glow) * .5))}}
     :root[data-sky="live"] body:not([data-active-view="home"])::after{opacity:calc(var(--moon-disc) * .5)}
     :root[data-sky="live"]:not([data-active-view="home"])::before{opacity:calc(var(--sun-disc) * .5)}
     /* Hareket azaltma: nabız ve kayma durur, DİSK durur — gök cismi silinmez, yalnız kıpırdamaz. */

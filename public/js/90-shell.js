@@ -414,8 +414,9 @@
      gece ortasında tepeye çıkar, gün doğumunda öbür kenardan batar). Doğruluk iddiası yoktur.
      EVRE ise gerçek veriye dayanır ve takvimle uyumludur: bilinen bir yeni ay anından sinodik
      ay boyunca (29,53 gün) sayılır. Terminatör (aydınlık/karanlık sınırı) yarım ELİPSTİR — bu
-     yüzden CSS'te iki katman var: yarım-yarım aydınlık/karanlık taban + genişliği evreyle
-     daralan elips. Ayın kendi ışığı yalnız YEREL bir hale (`--moon-glow`, CSS'te `box-shadow`);
+     yüzden CSS'te iki katman var: yalnız AYDINLIK yarıya serilen ve terminatör elipsini OYAN
+     taban + şişkin evrede o oyuğu kapatan elips. Karanlık yarım hiç boyanmaz (ne katışım ne
+     maske; ayrıntısı panel.css'te). Ayın kendi ışığı yalnız YEREL bir hale (`--moon-glow`, CSS'te `box-shadow`);
      zeminin genel parlaklık bandına dokunmaz, yani durum döşemelerinin merdiveni bozulmaz. */
   const synodicMonth=29.530588853*86400000;
   const knownNewMoon=Date.UTC(2000,0,6,18,14);
@@ -442,13 +443,19 @@
     const illumination=(1-Math.cos(2*Math.PI*phase))/2;
     root.style.setProperty("--moon-glow",illumination.toFixed(3));
     // Elipsin yarıçapı dördünlerde sıfıra iner (düz kenar), yeni ay/dolunayda diske eşitlenir.
-    root.style.setProperty("--moon-term",`${(Math.abs(Math.cos(2*Math.PI*phase))*50).toFixed(2)}%`);
-    // Büyürken (yeni ay → dolunay) aydınlık taraf sağdadır, küçülürken solda.
+    // Taban sıfır DEĞİL: sıfır yarıçaplı radyal gradyan tarayıcıya göre belirsiz çiziliyor,
+    // %0,01 hem düz kenarı verir hem de o belirsizliğe hiç girmez.
+    root.style.setProperty("--moon-term",`${Math.max(.01,Math.abs(Math.cos(2*Math.PI*phase))*50).toFixed(2)}%`);
+    // Büyürken (yeni ay → dolunay) aydınlık taraf sağdadır, küçülürken solda. KARANLIK YARIM
+    // BOYANMAZ (CSS'te uzun not): yalnız aydınlık yarım serilir, bu iki değişken onun HANGİ yarı
+    // olduğunu söyler — `--moon-side` katmanın yeri, `--moon-hinge` terminatör elipsinin o
+    // yarıdaki menteşesi, yani diskin merkezine denk gelen kenar.
     const waxing=phase<.5;
-    root.style.setProperty("--moon-left",waxing?"var(--moon-dark)":"var(--moon-lit)");
-    root.style.setProperty("--moon-right",waxing?"var(--moon-lit)":"var(--moon-dark)");
-    // Şişkin evrede (dördünler arası) elips aydınlığı taşır, hilalde karanlığı.
-    root.style.setProperty("--moon-mid",phase>.25&&phase<.75?"var(--moon-lit)":"var(--moon-dark)");
+    root.style.setProperty("--moon-side",waxing?"100%":"0%");
+    root.style.setProperty("--moon-hinge",waxing?"0%":"100%");
+    // Şişkin evrede (dördünler arası) elips aydınlığı taşır ve oyuğun üstünü kapatır; hilalde
+    // saydam kalır, yani elips aydınlık yarımdan hilali oyar.
+    root.style.setProperty("--moon-mid",phase>.25&&phase<.75?"var(--moon-lit)":"transparent");
   }
   /* GÖKYÜZÜNÜN AŞAMA AĞIRLIKLARI — şafak · gündüz · batım (gece = kalan pay).
      KIZILLIK İKİ SAAT SÜRER VE DORUĞU TAM GÜN DOĞUMUDUR: şafak doğuştan `skyRedSpan` dakika
