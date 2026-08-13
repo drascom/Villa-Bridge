@@ -67,6 +67,12 @@
       --sky-day:linear-gradient(168deg,rgba(207,231,247,var(--sky-a-day)) 0%,rgba(172,209,238,var(--sky-a-day)) 52%,rgba(206,226,232,var(--sky-a-day)) 100%);
       --sky-dusk:linear-gradient(180deg,rgba(255,214,172,var(--sky-a-dusk)) 0%,rgba(246,176,146,var(--sky-a-dusk)) 46%,rgba(212,174,198,var(--sky-a-dusk)) 100%);
       --sky-night:linear-gradient(180deg,#b7c4dc 0%,#a2b0cb 55%,#909eb6 100%);
+      /* DAĞ SİLÜETİNİN RENKLERİ — ikisi de OPAK. Gece tonu tabanda durur, gündüz tonu onun
+         üstüne `--sky-lum` alfasıyla biner; ikisi arası geçiş böylece gün ışığı ekseniyle
+         sürekli olur ve silüet HİÇBİR SAATTE saydamlaşmaz (arkasındaki güneş/ay sızmaz).
+         Gündüz tonları rgb üçlüsüdür, çünkü alfası değişkenden geliyor (`color-mix` yok). */
+      --mountain-night:#4a5a72;--mountain-night-top:#5f7189;
+      --mountain-day:110,131,153;--mountain-day-top:142,164,184;
       --star-color:255,255,255;--star-warm:255,247,232;--star-cool:222,236,255;
       /* YILDIZ ALANI BEŞ KATMAN — üçü ince nokta (eskiler), ikisi YENİ ve daha İRİ. Kullanıcının
          isteği "aralarda büyük yıldızlar da olsun": gerçek gökyüzünde de birkaç parlak yıldız
@@ -129,8 +135,8 @@
          GÖRÜNMEZDİR, yani karanlık yarım gökyüzünün kendisi olarak kalır ve yalnız ihmal
          edilebilir bir "dünya ışığı" izi bırakır. Karışım desteklenmiyorsa saydam kalır;
          eski gri levha hiçbir durumda geri gelmez. */
-      --moon-angle:0deg;--moon-disc:0;--moon-glow:0;--moon-size:9vmin;--moon-term:50%;
-      --moon-lit:#fffdf1;--moon-dark:transparent;
+      --moon-angle:0deg;--moon-disc:0;--moon-glow:0;--moon-size:15.5vmin;--moon-term:50%;
+      --moon-lit:#fff;--moon-dark:transparent;
       --moon-left:var(--moon-dark);--moon-right:var(--moon-lit);--moon-mid:var(--moon-dark);
       /* TABAN AİLE KOYU ÇİPTİR — ilk kare için. Kart da döşeme de koyu yarı saydam, üstündeki
          yazı açık; hızlı kumanda penceresi (`.quick-modal`) zaten bu dilde, o yüzden `data-sky`
@@ -196,8 +202,9 @@
       --paper:#101514;--surface:#1b2320;--surface-soft:#232d29;--ink:#edf5f0;--ink-soft:#c6d4cd;--muted:#a6b6ad;--line:#33433b;
       --forest:#71c6a2;--forest-soft:#203d32;--on-forest:#0b1c15;--sun:#f0b65c;--danger:#f07a72;--danger-soft:#40211f;--shadow:0 18px 54px rgba(0,0,0,.28);--card-shadow:0 2px 10px rgba(0,0,0,.18);
       --home-glass:rgba(226,239,232,.09);--home-control:#1b2320;--home-border:#33433b;--home-float-shadow:0 2px 10px rgba(0,0,0,.18);
-      /* Koyu gökyüzünde ay biraz daha sıcak-beyaz. Karanlık limb burada da boyanmaz. */
-      --moon-lit:#f7f1de;--moon-dark:transparent;
+      /* Koyu gökyüzünde de aydınlık yüz TAM BEYAZ: `screen` katışımı altında beyaz tavandır,
+         daha parlak bir ay ancak buradan çıkar. Karanlık limb burada da boyanmaz. */
+      --moon-lit:#fff;--moon-dark:transparent;
       /* Karanlık temada kenar açık renge döner. */
       --home-action-line:rgba(237,245,240,.42);--home-action-halo:none;--home-action-glyph-shadow:none;
       /* Koyu temada hale koyu olur: açık yazı, zeminin turuncu/açık lekelerinin üstünde de ayrışır. */
@@ -214,6 +221,10 @@
       --sky-day:linear-gradient(168deg,rgba(46,94,142,var(--sky-a-day)) 0%,rgba(31,68,110,var(--sky-a-day)) 46%,rgba(20,42,72,var(--sky-a-day)) 100%);
       --sky-dusk:linear-gradient(180deg,rgba(48,46,92,var(--sky-a-dusk)) 0%,rgba(168,80,52,var(--sky-a-dusk)) 46%,rgba(86,36,24,var(--sky-a-dusk)) 100%);
       --sky-night:linear-gradient(180deg,#0b1330 0%,#070c1e 55%,#05080f 100%);
+      /* Koyu temada gece göğü neredeyse siyah: silüet burada gökten bir tık AÇIK olur, yoksa
+         karanlıkta kaybolur. Gündüz tonu yine gökten koyudur. */
+      --mountain-night:#131c30;--mountain-night-top:#1c2740;
+      --mountain-day:12,24,40;--mountain-day-top:24,44,68;
       --glass-bright:.78;--glass-card-bright:.92;
       --glass-card:rgba(8,12,20,.24);
       --glass-shadow:0 20px 46px rgba(0,0,0,.46);
@@ -603,7 +614,8 @@
        yalnız nabız ve geçiş durur, konum ve tonlama saate göre doğru sürer. */
     :root[data-sky="live"]::before{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(255,247,102,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-pulse 5.5s ease-in-out alternate infinite}
     @keyframes panel-sun-pulse{from{box-shadow:0 0 calc(var(--sun-size) * 2.6) calc(var(--sun-size) * .9) rgba(var(--sun-halo),calc(var(--sun-glow) * .3))}to{box-shadow:0 0 calc(var(--sun-size) * 1.5) calc(var(--sun-size) * .45) rgba(var(--sun-halo),calc(var(--sun-glow) * .16))}}
-    /* AY — güneşle aynı kol tekniği, ters yön. Tek farkı: disk radyal simetrik DEĞİL (evre
+    /* AY — güneşle aynı kol tekniği, AYNI YÖN (soldan doğar, sağdan batar; açıyı JS yazar).
+       Tek farkı: disk radyal simetrik DEĞİL (evre
        çizgisi var), o yüzden kolun dönüşü diskin üstünde geri alınır — `rotate(-açı)` olmasa
        terminatör yayla birlikte yatardı. Evre iki katmanla çizilir:
          1) taban — disk yarı aydınlık yarı karanlık (hangi yarı, `--moon-left/right`),
@@ -627,15 +639,34 @@
        `--moon-dark` sıfır değil, çok koyu bir tondur: screen'in ekleyeceği ~%3 ışık gerçek
        "dünya ışığı"nın (earthshine) ihmal edilebilir izidir. Karışım desteklenmezse değişken
        `transparent` kalır (kökteki varsayılan) — o zaman hilal oyulmaz ama gri levha da geri
-       gelmez. Kural yalnız `data-sky="live"` içindir; sabit kip ayı hiç çizmez. */
-    :root[data-sky="live"] body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 99%,transparent 100%),linear-gradient(90deg,var(--moon-left) 0 50%,var(--moon-right) 50% 100%);box-shadow:0 0 calc(var(--moon-size) * 1.7) calc(var(--moon-size) * .5) rgba(226,236,255,calc(var(--moon-glow) * .2));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-pulse 5s ease-in-out alternate infinite}
-    @keyframes panel-moon-pulse{from{box-shadow:0 0 calc(var(--moon-size) * 1.9) calc(var(--moon-size) * .6) rgba(226,236,255,calc(var(--moon-glow) * .26))}to{box-shadow:0 0 calc(var(--moon-size) * 1.1) calc(var(--moon-size) * .3) rgba(226,236,255,calc(var(--moon-glow) * .13))}}
+       gelmez. Kural yalnız `data-sky="live"` içindir; sabit kip ayı hiç çizmez.
+
+       AY NEDEN BÜYÜDÜ VE PARLADI (kullanıcı: "çok soluk ve silik, güneş gibi parlasın, daha
+       büyük olsun"): TEKNİK DEĞİŞMEDİ, screen katışımı korundu — çünkü karanlık yarımın
+       görünmezliği tam olarak ondan geliyor ve maskeye geçmek iki katmanı çıkarma (`crescent`)
+       ile toplama (`gibbous`) arasında evreye göre çevirmeyi, yani `mask-composite`i gerektirirdi;
+       o özellik tabletin eski WebView'ında güvenilir değil. Bunun yerine screen'in TAVANINA
+       çıkıldı ve varlık ölçüden geldi:
+         · `--moon-lit` her iki temada da TAM BEYAZ (#fff). Screen altında beyaz en yüksek
+           çıktıdır (1-(1-1)(1-b)=1), yani disk artık gökyüzü ne olursa olsun tam parlak.
+         · `--moon-size` 9vmin → 15.5vmin: ay artık güneşten (12.5vmin) BÜYÜK.
+         · Hale alfası .2 → .5 (nabız .26/.13 → .58/.32), yarıçapı ise diske oranla bir tık
+           daraltıldı (1.7/.5 → 1.5/.42) — büyüyen diskle birlikte hale de büyüdüğü için mutlak
+           yayılım zaten arttı. Hale hâlâ `box-shadow`, yani YEREL: gökyüzünün genel parlaklık
+           bandına, `--sky-lum`'a ve durum döşemelerinin merdivenine dokunmaz.
+         · `--moon-dark` bir tık daha koyuldu: disk büyüdüğü için screen'in eklediği earthshine
+           izi de büyüyecekti, karanlık yarım görünmez kalsın diye kısıldı.
+       Evre geometrisi AYNEN duruyor: terminatör elipsi yatay yarıçapını `--moon-term` YÜZDESİ
+       ile alır (diskin genişliğinin oranı), bu yüzden disk büyüdükçe elips de orantılı büyür —
+       yarım ayda hâlâ tam yarım disk, hilalde hilal, yeni ayda kayıp. */
+    :root[data-sky="live"] body::after{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);border-radius:50%;opacity:var(--moon-disc);background:radial-gradient(ellipse var(--moon-term) 50% at 50% 50%,var(--moon-mid) 0 99%,transparent 100%),linear-gradient(90deg,var(--moon-left) 0 50%,var(--moon-right) 50% 100%);box-shadow:0 0 calc(var(--moon-size) * 1.5) calc(var(--moon-size) * .42) rgba(232,240,255,calc(var(--moon-glow) * .5));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-pulse 5s ease-in-out alternate infinite}
+    @keyframes panel-moon-pulse{from{box-shadow:0 0 calc(var(--moon-size) * 1.7) calc(var(--moon-size) * .5) rgba(232,240,255,calc(var(--moon-glow) * .58))}to{box-shadow:0 0 calc(var(--moon-size) * 1) calc(var(--moon-size) * .26) rgba(232,240,255,calc(var(--moon-glow) * .32))}}
     /* Katışım desteği varsa: disk toplamalı çizilir ve karanlık taraf ölçülebilir biçimde
        görünmez olur. Değişkenler aynı özgüllükte yeniden yazılır (bu blok sonra geldiği için
        kazanır), böylece açık ve koyu temanın kendi satırlarına dokunmaya gerek kalmaz. */
     @supports (mix-blend-mode:screen){
-      :root{--moon-dark:#070a11}
-      :root[data-theme="dark"]{--moon-dark:#05070d}
+      :root{--moon-dark:#04060b}
+      :root[data-theme="dark"]{--moon-dark:#030509}
       :root[data-sky="live"] body::after{mix-blend-mode:screen}
     }
     :root[data-sky="live"] body:not([data-active-view="home"])::after{opacity:calc(var(--moon-disc) * .5)}
@@ -664,16 +695,25 @@
        perspektifiyle verildi: dikey gradyan eteği koyu, zirveleri yarı yarıya siliktir — ayrı
        bir sıra çizmek ikinci bir sözde öğe/boyama isterdi, bu bedava. Köşeler 0,7px blur ile
        yumuşar; öğe durağan olduğu için filtre bir kez birleştirilir.
-       RENK GÖKYÜZÜNE BAĞLI: tek koyu ton, alfası gün ışığı ekseninden (`--sky-lum`, 0 derin
-       gece · 1 öğle) türer. Parlak gökte silüet netleşir (etek .23), gökyüzü karardıkça geri
-       çekilir (.10) — böylece HER SAATTE gökyüzünden bir tık koyu kalır, hiçbir saatte siyah
-       bir bant olmaz. Alfa bir tık düşürüldü: amaç "uzaktaki tepe", "gri levha" değil. Eksen
-       zaten kökte yazılı, yeni JS/ölçüm yok; `--sky-lum` henüz yazılmadıysa yedek 1 (panelin
-       genel varsayılanı gündüz).
+       RENK GÖKYÜZÜNE BAĞLI AMA SİLÜET OPAKTIR. Eskiden tek koyu ton yarı saydam sürülüyordu
+       (etek alfası .10→.23, zirve .05→.115) ve batan güneş silüetin İÇİNDEN okunuyordu —
+       kullanıcının şikâyeti buydu: "güneş dağın önünden batıyor". Artık iki katman var:
+         · TABAN — gece tonu, alfa YOK, tam opak (`--mountain-night/-top`),
+         · ÜST — gündüz tonu, alfası doğrudan `--sky-lum` (0 derin gece · 1 öğle).
+       Toplam alfa her saatte 1'dir, yani arkadaki disk hiçbir saatte sızmaz; değişen yalnız
+       RENKtir — öğlen açık gri-mavi, gece koyu. Renkler temaya göre ayrı (açık temada gece
+       göğü aydınlık olduğu için silüet ondan koyu, koyu temada gökten bir tık açık).
+       HAVA PERSPEKTİFİ KORUNDU: her iki katman da etekten zirveye açılır (dikey gradyan), yani
+       zirveler hâlâ daha silik okunur — ama SAYDAM değil, sadece daha açık renkli; disk orada
+       da geçmez. Eksen zaten kökte yazılı, yeni JS/ölçüm yok; `--sky-lum` yedeği 1 (gündüz).
+       SOL UÇTAKİ maskeli sönüm bilerek duruyor (sert dikey kesim olmasın diye). Disk oradan
+       sızmaz: kol yarıçapı ekranın yarısından uzun, bu yüzden gök cismi ancak ±80°'yi geçince
+       silüet bandının yüksekliğine iner ve o anda yatayda ekranın en solunda (dağ kutusunun
+       tamamen dışında) ya da en sağında (maskenin tam opak olduğu yerde) olur.
        HAREKET YOK: dağ sabit, animasyonu ve geçişi yok — `prefers-reduced-motion` bu öğeyi
        hiç ilgilendirmiyor. Sabit sistemde (`data-sky="fixed"`) kural HİÇ eşleşmez: dağ çizilmez,
        yani orada ne boyama ne maskeleme maliyeti doğar. */
-    :root[data-sky="live"]::after{content:"";position:fixed;z-index:-1;right:0;bottom:-6px;display:block;width:min(78vw,1500px);height:calc(var(--mountain-h,94px) + env(safe-area-inset-bottom) + 6px);pointer-events:none;background:linear-gradient(to top,rgba(12,19,29,calc(.1 + var(--sky-lum,1) * .13)) 0 34%,rgba(12,19,29,calc(.05 + var(--sky-lum,1) * .065)) 100%);clip-path:polygon(0 100%,5% 95%,12% 76%,17% 86%,25% 60%,30% 72%,38% 46%,44% 63%,50% 33%,55% 54%,62% 19%,67% 49%,73% 33%,78% 44%,85% 15%,90% 38%,96% 25%,100% 42%,100% 100%);filter:blur(.7px);-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%);mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%)}
+    :root[data-sky="live"]::after{content:"";position:fixed;z-index:-1;right:0;bottom:-6px;display:block;width:min(78vw,1500px);height:calc(var(--mountain-h,94px) + env(safe-area-inset-bottom) + 6px);pointer-events:none;background:linear-gradient(to top,rgba(var(--mountain-day),var(--sky-lum,1)) 0 34%,rgba(var(--mountain-day-top),var(--sky-lum,1)) 100%),linear-gradient(to top,var(--mountain-night) 0 34%,var(--mountain-night-top) 100%);clip-path:polygon(0 100%,5% 95%,12% 76%,17% 86%,25% 60%,30% 72%,38% 46%,44% 63%,50% 33%,55% 54%,62% 19%,67% 49%,73% 33%,78% 44%,85% 15%,90% 38%,96% 25%,100% 42%,100% 100%);filter:blur(.7px);-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%);mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%)}
     /* Ana ekran dışında gökyüzü yarıya söner; dağ da onunla birlikte geri çekilir. */
     :root[data-sky="live"]:not([data-active-view="home"])::after{opacity:.5}
     /* Dağ silüeti kapatılabilir (arka plan ayarları). Kural `content`i silmez, öğeyi HİÇ

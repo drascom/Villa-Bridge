@@ -433,8 +433,11 @@
       return;
     }
     const altitude=Math.sin(Math.PI*track);
-    // Güneş soldan doğup sağdan batıyor; ay bilerek TERS yönde ilerler — kol açısı da ters.
-    root.style.setProperty("--moon-angle",`${((.5-track)*180).toFixed(2)}deg`);
+    // YÖN GÜNEŞLE AYNI: ay da güneşin doğduğu kenardan (sol) doğar, battığı kenardan (sağ)
+    // batar. Açı bu yüzden güneşinkiyle bire bir aynı formülden gelir — güneşte ilerleme
+    // doğuş→batış, ayda batış→doğuş; ikisi de -90° (sol ufuk) → 0° (tepe) → +90° (sağ ufuk).
+    // ESKİDEN TERSTİ ((.5-track)); kullanıcı ayın ters yönde süzülmesini istemedi.
+    root.style.setProperty("--moon-angle",`${((track-.5)*180).toFixed(2)}deg`);
     root.style.setProperty("--moon-disc",Math.min(1,altitude*4).toFixed(3));
     const illumination=(1-Math.cos(2*Math.PI*phase))/2;
     root.style.setProperty("--moon-glow",illumination.toFixed(3));
