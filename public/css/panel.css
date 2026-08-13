@@ -84,7 +84,22 @@
         radial-gradient(circle 1.1px at 22% 31%,rgba(var(--star-color),calc(var(--star-a) * .9)) 0 40%,rgba(var(--star-color),0) 100%),
         radial-gradient(circle .9px at 68% 12%,rgba(var(--star-cool),calc(var(--star-a) * .68)) 0 40%,rgba(var(--star-cool),0) 100%),
         radial-gradient(circle 1.5px at 47% 74%,rgba(var(--star-warm),calc(var(--star-a) * .8)) 0 40%,rgba(var(--star-warm),0) 100%);
-      --sky:var(--star-field),var(--sky-dawn),var(--sky-day),var(--sky-dusk),var(--sky-night);
+      /* SAMANYOLU KUŞAĞI — yıldız döşemeleriyle aşama gradyanlarının ARASINA giren, sayısı
+         varyanta göre değişen bir katman öbeği. Yeni DOM düğümü, yeni JS ekseni ve yeni
+         zamanlayıcı YOK: alfaların hepsi `--star-a` ile çarpılı olduğu için gündüz kendiliğinden
+         söner, tıpkı yıldızlar gibi.
+         KATMAN SAYISI DEĞİŞKEN olduğu için `background-image`, `-size`, `-repeat` ve `-blend-mode`
+         listelerinin dördü de tek bir yerden büyür: her varyant `--mw-layers` içine katmanlarını
+         SONDA VİRGÜLLE bırakır, `--mw-size`/`--mw-repeat`/`--mw-blend` de aynı sayıda değeri aynı
+         sırada yazar. Boş değer ( `: ;` ) hiçbir şeye açılır, yani "kapalı" hâlde dört liste de
+         eski dokuz katmanına döner. Hizayı `panel.css` okuyan gözden çok bu kural korur: dört
+         listenin de ortasında AYNI değişken durur. */
+      --mw-a:.65;
+      --mw-layers: ;
+      --mw-size: ;
+      --mw-repeat: ;
+      --mw-blend: ;
+      --sky:var(--star-field),var(--mw-layers) var(--sky-dawn),var(--sky-day),var(--sky-dusk),var(--sky-night);
       /* GÜNEŞ VE AY DÖNEN BİR KOL ÜZERİNDE — referansın tekniği, tek öğeyle. Disk ufkun
          ortasına çakılıdır; `rotate(açı) translateY(calc(-1 * kol))` onu gerçek bir YAY
          üzerinde taşır (eski x/y çifti aynı yayı iki ayrı doğrusal aralıkla taklit ediyordu,
@@ -498,8 +513,11 @@
        197×163 · 269×211 · 149×131; birbirini tutmayan kenarlar seçildi ki desen ızgara gibi
        okunmasın), kalan dört katman aşama gradyanları — hepsi ekranı kaplar. Tema değişince
        katman SAYISI değişmez, o yüzden liste tek yerde durabiliyor.
-       MALİYET: beş tekrarlı gradyan + dört doğrusal gradyan = dokuz arka plan katmanı, TEK öğe,
-       sıfır DOM düğümü ve sıfır JS döngüsü. (Referanstaki 300 `div` yerine bu seçildi.)
+       Aradaki tek DEĞİŞKEN öbek Samanyolu kuşağıdır (`--mw-*`, aşağıdaki varyant blokları): dört
+       listenin de altıncı sırasında aynı değişken durur, o yüzden katman eklense de hiza bozulmaz.
+       MALİYET: beş tekrarlı gradyan + dört doğrusal gradyan = dokuz arka plan katmanı (Samanyolu
+       açıkken varyantına göre 11 · 12 · 14), TEK öğe, sıfır DOM düğümü ve sıfır JS döngüsü.
+       (Referanstaki 300 `div` yerine bu seçildi.)
        Ana ekran dışındaki ekranlar opak kart dilini sürdürdüğü için gökyüzü orada sakinleşir. */
     body{background-color:var(--paper);background-image:none}
     /* İKİ GÖRÜNÜM SİSTEMİ — kökteki `data-sky` işareti hangisinin geçerli olduğunu söyler:
@@ -510,8 +528,62 @@
        yani ne boyama ne animasyon ne de `transform` maliyeti doğar. Tema (`data-theme`) ayrı
        eksende kalır — sabit sistemde de light ve dark ikisi de vardır. */
     :root[data-sky="fixed"] body{background-image:var(--ground-wash,none)}
-    :root[data-sky="live"] body::before{content:"";position:fixed;z-index:-3;inset:-6%;display:block;background-color:transparent;background-image:var(--sky);background-size:613px 521px,331px 277px,197px 163px,269px 211px,149px 131px,cover,cover,cover,cover;background-repeat:repeat,repeat,repeat,repeat,repeat,no-repeat,no-repeat,no-repeat,no-repeat;pointer-events:none;will-change:transform;animation:panel-ground-drift 90s ease-in-out infinite}
+    :root[data-sky="live"] body::before{content:"";position:fixed;z-index:-3;inset:-6%;display:block;background-color:transparent;background-image:var(--sky);background-size:613px 521px,331px 277px,197px 163px,269px 211px,149px 131px,var(--mw-size) cover,cover,cover,cover;background-repeat:repeat,repeat,repeat,repeat,repeat,var(--mw-repeat) no-repeat,no-repeat,no-repeat,no-repeat;background-blend-mode:normal,normal,normal,normal,normal,var(--mw-blend) normal,normal,normal,normal;pointer-events:none;will-change:transform;animation:panel-ground-drift 90s ease-in-out infinite}
     :root[data-sky="live"] body:not([data-active-view="home"])::before{opacity:.5}
+    /* SAMANYOLU VARYANTLARI — yalnız hareketli sistemde. İşareti kökteki `data-milkyway` taşır;
+       yokken VARSAYILAN B'dir, böylece ilk kare ayar okunmadan da doğru çizilir.
+       Açı her varyantta sabit: kuşak ekranı bir köşeden öbürüne çapraz keser. Renkler doğrudan
+       yazılır, `color-mix()` yok (eski Android WebView desteklemiyor). */
+    :root[data-sky="live"]{
+      /* B · dengeli · 124° · 3 katman — VARSAYILAN */
+      --mw-layers:
+        linear-gradient(124deg,rgba(6,10,26,0) 46%,rgba(6,10,26,calc(var(--star-a) * var(--mw-a) * .40)) 50.5%,rgba(6,10,26,0) 55%),
+        linear-gradient(124deg,rgba(216,228,255,0) 35%,rgba(216,228,255,calc(var(--star-a) * var(--mw-a) * .16)) 45%,rgba(242,246,255,calc(var(--star-a) * var(--mw-a) * .22)) 51%,rgba(216,228,255,calc(var(--star-a) * var(--mw-a) * .16)) 57%,rgba(216,228,255,0) 67%),
+        linear-gradient(124deg,rgba(138,170,232,0) 17%,rgba(138,170,232,calc(var(--star-a) * var(--mw-a) * .09)) 50%,rgba(138,170,232,0) 83%),;
+      --mw-size:cover,cover,cover,;
+      --mw-repeat:no-repeat,no-repeat,no-repeat,;
+      --mw-blend:normal,normal,normal,;
+    }
+    /* Kapalı: dört liste de dokuz katmanlık eski hâline döner. */
+    :root[data-sky="live"][data-milkyway="off"]{
+      --mw-layers: ;
+      --mw-size: ;
+      --mw-repeat: ;
+      --mw-blend: ;
+    }
+    /* A · ince ip · 108° · 2 katman — dar çekirdek + çok silik geniş hale, karanlık yarık yok. */
+    :root[data-sky="live"][data-milkyway="a"]{
+      --mw-layers:
+        linear-gradient(108deg,rgba(214,228,255,0) 41%,rgba(214,228,255,calc(var(--star-a) * var(--mw-a) * .11)) 47.5%,rgba(236,242,255,calc(var(--star-a) * var(--mw-a) * .15)) 50%,rgba(214,228,255,calc(var(--star-a) * var(--mw-a) * .11)) 52.5%,rgba(214,228,255,0) 59%),
+        linear-gradient(108deg,rgba(146,176,236,0) 27%,rgba(146,176,236,calc(var(--star-a) * var(--mw-a) * .06)) 50%,rgba(146,176,236,0) 73%),;
+      --mw-size:cover,cover,;
+      --mw-repeat:no-repeat,no-repeat,;
+      --mw-blend:normal,normal,;
+    }
+    /* B · dengeli — varsayılanla aynı; işaret açıkça yazıldığında da eşleşsin diye tekrarlanır. */
+    :root[data-sky="live"][data-milkyway="b"]{
+      --mw-layers:
+        linear-gradient(124deg,rgba(6,10,26,0) 46%,rgba(6,10,26,calc(var(--star-a) * var(--mw-a) * .40)) 50.5%,rgba(6,10,26,0) 55%),
+        linear-gradient(124deg,rgba(216,228,255,0) 35%,rgba(216,228,255,calc(var(--star-a) * var(--mw-a) * .16)) 45%,rgba(242,246,255,calc(var(--star-a) * var(--mw-a) * .22)) 51%,rgba(216,228,255,calc(var(--star-a) * var(--mw-a) * .16)) 57%,rgba(216,228,255,0) 67%),
+        linear-gradient(124deg,rgba(138,170,232,0) 17%,rgba(138,170,232,calc(var(--star-a) * var(--mw-a) * .09)) 50%,rgba(138,170,232,0) 83%),;
+      --mw-size:cover,cover,cover,;
+      --mw-repeat:no-repeat,no-repeat,no-repeat,;
+      --mw-blend:normal,normal,normal,;
+    }
+    /* C · geniş toz · 148° · 5 katman — kuşağın üstüne `overlay` ile iki ince toz DÖŞEMESİ biner,
+       yıldızlar bandın içinde yoğunlaşır dışında sönük kalır. Döşeme boyutları birbirinin katı
+       DEĞİL, yoksa ızgara okunur. En pahalı varyant. */
+    :root[data-sky="live"][data-milkyway="c"]{
+      --mw-layers:
+        radial-gradient(circle .8px at 27% 63%,rgba(238,244,255,calc(var(--star-a) * var(--mw-a) * .95)) 0 42%,rgba(238,244,255,0) 100%),
+        radial-gradient(circle .7px at 71% 24%,rgba(226,236,255,calc(var(--star-a) * var(--mw-a) * .85)) 0 42%,rgba(226,236,255,0) 100%),
+        linear-gradient(148deg,rgba(5,9,24,0) 44%,rgba(5,9,24,calc(var(--star-a) * var(--mw-a) * .46)) 51%,rgba(5,9,24,0) 58%),
+        linear-gradient(148deg,rgba(212,226,255,0) 28%,rgba(212,226,255,calc(var(--star-a) * var(--mw-a) * .17)) 41%,rgba(246,248,255,calc(var(--star-a) * var(--mw-a) * .26)) 51%,rgba(226,222,246,calc(var(--star-a) * var(--mw-a) * .17)) 61%,rgba(212,226,255,0) 74%),
+        linear-gradient(148deg,rgba(132,164,230,0) 8%,rgba(132,164,230,calc(var(--star-a) * var(--mw-a) * .11)) 50%,rgba(132,164,230,0) 92%),;
+      --mw-size:83px 71px,107px 89px,cover,cover,cover,;
+      --mw-repeat:repeat,repeat,no-repeat,no-repeat,no-repeat,;
+      --mw-blend:overlay,overlay,normal,normal,normal,;
+    }
     @keyframes panel-ground-drift{0%{transform:scale(1) translate3d(0,0,0)}50%{transform:scale(1.05) translate3d(-1.2%,.9%,0)}100%{transform:scale(1) translate3d(0,0,0)}}
     @media(prefers-reduced-motion:reduce){:root[data-sky="live"] body::before{animation:none}}
     /* GÜNEŞ — DÖNEN KOLUN UCUNDA. Öğe ufkun ortasına (`left:50%`, `top:88%`) çakılıdır;
@@ -572,9 +644,12 @@
        HAREKET YOK: dağ sabit, animasyonu ve geçişi yok — `prefers-reduced-motion` bu öğeyi
        hiç ilgilendirmiyor. Sabit sistemde (`data-sky="fixed"`) kural HİÇ eşleşmez: dağ çizilmez,
        yani orada ne boyama ne maskeleme maliyeti doğar. */
-    :root[data-sky="live"]::after{content:"";position:fixed;z-index:-1;right:0;bottom:-6px;display:block;width:min(78vw,1500px);height:calc(94px + env(safe-area-inset-bottom) + 6px);pointer-events:none;background:linear-gradient(to top,rgba(12,19,29,calc(.1 + var(--sky-lum,1) * .13)) 0 34%,rgba(12,19,29,calc(.05 + var(--sky-lum,1) * .065)) 100%);clip-path:polygon(0 100%,5% 95%,12% 76%,17% 86%,25% 60%,30% 72%,38% 46%,44% 63%,50% 33%,55% 54%,62% 19%,67% 49%,73% 33%,78% 44%,85% 15%,90% 38%,96% 25%,100% 42%,100% 100%);filter:blur(.7px);-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%);mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%)}
+    :root[data-sky="live"]::after{content:"";position:fixed;z-index:-1;right:0;bottom:-6px;display:block;width:min(78vw,1500px);height:calc(var(--mountain-h,94px) + env(safe-area-inset-bottom) + 6px);pointer-events:none;background:linear-gradient(to top,rgba(12,19,29,calc(.1 + var(--sky-lum,1) * .13)) 0 34%,rgba(12,19,29,calc(.05 + var(--sky-lum,1) * .065)) 100%);clip-path:polygon(0 100%,5% 95%,12% 76%,17% 86%,25% 60%,30% 72%,38% 46%,44% 63%,50% 33%,55% 54%,62% 19%,67% 49%,73% 33%,78% 44%,85% 15%,90% 38%,96% 25%,100% 42%,100% 100%);filter:blur(.7px);-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%);mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,rgba(0,0,0,.55) 22%,#000 46%)}
     /* Ana ekran dışında gökyüzü yarıya söner; dağ da onunla birlikte geri çekilir. */
     :root[data-sky="live"]:not([data-active-view="home"])::after{opacity:.5}
+    /* Dağ silüeti kapatılabilir (arka plan ayarları). Kural `content`i silmez, öğeyi HİÇ
+       kurmaz: boyama da maskeleme de kalkar. */
+    :root[data-sky="live"][data-mountain="off"]::after{display:none}
     /* OTOMATİK TEMA GEÇİŞİ — "Güneşe göre" kipinde eşik geçilirken kök kısa süre bu işareti
        taşır ve renkler sert değil yumuşak döner. Evrensel seçici bilerek DAR bir pencerede
        açık: günde en çok iki kez, ~1 sn; sonra JS işareti kaldırır. Elle tema seçiminde ve
