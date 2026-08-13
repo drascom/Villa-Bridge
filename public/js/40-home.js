@@ -695,48 +695,53 @@
     if(offlineCount)rows.push({tone:"alert",text:t("groupSummaryOffline",{count:offlineCount})});
     return`<span class="group-summary">${rows.map(row=>`<span class="${row.tone}">${esc(row.text)}</span>`).join("")}</span>`;
   }
-  const tileWidthGlyphs={
-    expand:'<svg class="tile-width-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg>',
-    collapse:'<svg class="tile-width-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="m5 8 4 4-4 4"/><path d="m19 8-4 4 4 4"/></svg>'
-  };
-  const tileWidthPreference=key=>state.tileWidths[key]||"auto";
+  /* Kademe göstergesi tek bir dil konuşur: aynı çerçeve, içinde dolan bir çubuk. Ok çiftleri
+     (genişlet/daralt) kalktı — iki hâlde işe yarıyordu, üç kademede "hangisindeyim" sorusunu
+     cevaplamıyordu. */
+  const tileWidthGlyph=fill=>`<svg class="tile-width-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="3"/><rect x="5.5" y="9.5" width="${fill}" height="5" rx="2" fill="currentColor" stroke="none"/></svg>`;
+  const tileWidthGlyphs={small:tileWidthGlyph(4),medium:tileWidthGlyph(8.5),full:tileWidthGlyph(13)};
+  const tileWidthActionLabels={small:"tileWidthToSmall",medium:"tileWidthToMedium",full:"tileWidthToFull"};
+  /* Önce kartın kendi anahtarı, sonra eski (kartsız) kayıt: göç yedeği. Hiçbiri yoksa varsayılan. */
+  const tileWidthPreference=(key,legacyKey)=>normalizeTileWidthMode(state.tileWidths[key]||(legacyKey?state.tileWidths[legacyKey]:null)||defaultTileWidthMode);
   function saveTileWidths(){
     try{localStorage.setItem(tileWidthStorageKey,JSON.stringify(state.tileWidths))}catch{}
   }
-  function tileWidthToggleHtml(key,wide){
-    const label=t(wide?"collapseTile":"expandTile");
-    return`<button class="tile-width-toggle" type="button" data-tile-width-toggle="${esc(key)}" aria-pressed="${wide?"true":"false"}" aria-label="${esc(label)}" title="${esc(label)}">${wide?tileWidthGlyphs.collapse:tileWidthGlyphs.expand}</button>`;
+  /* Düğme kademeler arasında döner; etiketi HER ZAMAN bir sonraki kademeyi söyler ("küçült",
+     "orta yap", "tam genişlik yap") — basmadan ne olacağı okunur. */
+  function tileWidthToggleHtml(key,mode){
+    const label=t(tileWidthActionLabels[nextTileWidthMode(mode)]);
+    return`<button class="tile-width-toggle" type="button" data-tile-width-toggle="${esc(key)}" data-tile-width-mode="${esc(mode)}" aria-label="${esc(label)}" title="${esc(label)}">${tileWidthGlyphs[mode]}</button>`;
   }
-  function refreshTileWidthToggle(slot){
+  function refreshTileWidthToggle(slot,mode){
     const button=slot.querySelector("[data-tile-width-toggle]");
     if(!button)return;
-    const wide=slot.classList.contains("is-wide");
-    const label=t(wide?"collapseTile":"expandTile");
-    button.setAttribute("aria-pressed",wide?"true":"false");
+    const label=t(tileWidthActionLabels[nextTileWidthMode(mode)]);
+    button.dataset.tileWidthMode=mode;
     button.setAttribute("aria-label",label);
     button.title=label;
-    button.innerHTML=wide?tileWidthGlyphs.collapse:tileWidthGlyphs.expand;
+    button.innerHTML=tileWidthGlyphs[mode];
   }
-  /* Önce her butonu kendi tercihine kur (yazma turu), sonra yalnız "auto" olanları ölç (okuma turu)
-     ve sığmayanları genişlet. Ölçüm hep dar hâlde yapıldığı için geniş→ölç→dar döngüsü oluşmaz. */
+  /* Izgaranın GERÇEK sütun sayısı, hesaplanmış `grid-template-columns` üzerinden. "orta" kademe
+     iki sütun kaplar; kap tek sütunluksa (ana ekranda oda kartları öyle) span 2 örtük bir sütun
+     yaratır, o sütun içerikle boyutlanır ve YAN DÖŞEMELER de oraya akar — bir döşemeyi
+     genişletince başkalarının daralmasının sebebi buydu. Span burada gerçek sütun sayısına
+     kırpılır, örtük sütun hiç doğmaz. "tam" kademesi `1/-1` olduğu için zaten güvenli. */
+  const tileGridColumnCount=grid=>{
+    const parts=(getComputedStyle(grid).gridTemplateColumns||"").split(" ").filter(part=>part.endsWith("px"));
+    return parts.length||1;
+  };
   function applyTileWidths(grid){
     if(!grid)return;
     const slots=[...grid.querySelectorAll(".group-control-slot")];
     if(!slots.length)return;
+    grid.style.setProperty("--group-tile-span",String(Math.min(2,tileGridColumnCount(grid))));
     for(const slot of slots){
-      const preference=tileWidthPreference(slot.dataset.tileKey);
-      slot.dataset.tileWidth=preference;
-      slot.classList.toggle("is-wide",preference==="wide");
+      const mode=tileWidthPreference(slot.dataset.tileKey,slot.dataset.tileLegacyKey);
+      slot.dataset.tileWidth=mode;
+      slot.classList.toggle("is-medium",mode==="medium");
+      slot.classList.toggle("is-full",mode==="full");
+      refreshTileWidthToggle(slot,mode);
     }
-    const auto=slots.filter(slot=>slot.dataset.tileWidth==="auto");
-    if(auto.length&&grid.clientWidth>0){
-      const clipped=auto.filter(slot=>{
-        const label=slot.querySelector(".group-control-copy strong");
-        return Boolean(label)&&label.scrollWidth>label.clientWidth+1;
-      });
-      for(const slot of clipped)slot.classList.add("is-wide");
-    }
-    for(const slot of slots)refreshTileWidthToggle(slot);
   }
   function applyAllTileWidths(){$$(".group-control-grid").forEach(applyTileWidths)}
   let tileWidthObserver=null;
@@ -761,7 +766,7 @@
     if(!slot)return;
     const key=button.dataset.tileWidthToggle;
     if(!key)return;
-    state.tileWidths[key]=slot.classList.contains("is-wide")?"narrow":"wide";
+    state.tileWidths[key]=nextTileWidthMode(slot.dataset.tileWidth);
     saveTileWidths();
     applyTileWidths(slot.closest(".group-control-grid"));
   }
@@ -791,8 +796,10 @@
     return`<span class="ov-switch-wrap"><button class="ov-switch" type="button" role="switch" aria-checked="${active?"true":"false"}"${empty?" disabled aria-disabled=\"true\"":""} data-overview-toggle="${esc(group.id)}" aria-label="${esc(empty?`${label} — ${t("showInOverviewEmpty")}`:label)}"><span class="ov-switch-track" aria-hidden="true"><span class="ov-switch-knob"></span></span><span class="ov-switch-text">${esc(t("showInOverview"))}</span></button>${empty?`<small class="ov-switch-note">${esc(t("showInOverviewEmpty"))}</small>`:""}</span>`;
   }
   /* Tek döşemenin HTML'i. Oda kartı, grup sekmesi ve Favoriler kartı aynı çağrıyı kullanır:
-     ikinci bir döşeme dili açılmasın, hızlı kumanda/genişlik/göz/yıldız her yerde aynı davransın. */
-  function groupTileSlotHtml(device,control){
+     ikinci bir döşeme dili açılmasın, hızlı kumanda/genişlik/göz/yıldız her yerde aynı davransın.
+     `scope` = döşemeyi basan KARTIN kimliği; yalnız genişlik tercihini kapsar (bkz. `tileWidthKey`).
+     Oda kartı ile o odanın sekmesi bilerek aynı kapsamı paylaşır: ikisi aynı kartın iki boyu. */
+  function groupTileSlotHtml(device,control,scope){
       const name=control?channelDisplayName(device,control):device.name;
       const controlAction=dashboardControlAction(control);
       const preparing=device.preparing===true;
@@ -805,9 +812,10 @@
       const statusLabel=preparing?t("preparing"):device.availability==="offline"?primaryStatus.label:pending?t("sendingCommand"):controlAction?(shown?t("on"):t("off")):primaryStatus.label;
       const statusTone=preparing?"muted":device.availability==="offline"?"danger":controlAction?(shown?"active":"muted"):primaryStatus.tone;
       const controlId=control?control.id:groupDeviceControlId;
-      const widthKey=tileWidthKey(device.id,controlId);
-      const widthMode=tileWidthPreference(widthKey);
-      const wide=widthMode==="wide";
+      const widthKey=tileWidthKey(scope,device.id,controlId);
+      const widthLegacyKey=legacyTileWidthKey(device.id,controlId);
+      const widthMode=tileWidthPreference(widthKey,widthLegacyKey);
+      const widthClass=widthMode==="full"?" is-full":widthMode==="medium"?" is-medium":"";
       /* Döşemede İKİ dokunma hedefi var: yuvarlak ikon cihazı açıp kapar, gövde (isim + durum)
          hızlı kumanda penceresini açar. Kap bu yüzden <button> değil <div>: iç içe <button>
          geçersizdir (aynı gerekçe gözde de yazılı). Görsel sınıflar kapta kaldığı için düzenleme
@@ -824,14 +832,18 @@
       const bodyHtml=`<button class="tile-body" type="button" data-tile-open="${esc(device.id)}" data-tile-control="${esc(controlId)}" aria-label="${esc(preparing?`${name} · ${t("preparing")}`:openLabel)}"${preparing?" disabled":""}><span class="group-control-copy"><strong>${esc(name)}</strong><small>${esc(statusLabel)}</small></span></button>`;
       const tile=`<div class="group-control-tile ${visualState}${pending?" pending":""}${failed?" command-failed":""}">${knobHtml}${bodyHtml}${preparing||pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</div>`;
       const hiddenTile=isTileHidden(device.id,control?control.id:null);
-      return`<div class="group-control-slot has-eye${wide?" is-wide":""}${hiddenTile?" is-hidden-tile":""}" data-tile-key="${esc(widthKey)}" data-tile-width="${esc(widthMode)}">${tile}${tileWidthToggleHtml(widthKey,wide)}${tileVisibilityHtml(device,control,name)}${tileFavoriteHtml(device,control,name)}</div>`;
+      return`<div class="group-control-slot has-eye${widthClass}${hiddenTile?" is-hidden-tile":""}" data-tile-key="${esc(widthKey)}" data-tile-legacy-key="${esc(widthLegacyKey)}" data-tile-width="${esc(widthMode)}">${tile}${tileWidthToggleHtml(widthKey,widthMode)}${tileVisibilityHtml(device,control,name)}${tileFavoriteHtml(device,control,name)}</div>`;
   }
   function groupWidgetHtml(group,options={}){
     const overview=options.variant!=="panel";
     const entries=groupControlEntries(group);
     const picked=overview?overviewGroupEntries(entries):{entries,hidden:0};
     const shown=state.dashboardEditing?entries:picked.entries;
-    const controls=shown.map(({device,control})=>groupTileSlotHtml(device,control)).join("");
+    /* Genişlik kapsamı KART kimliğidir ve o da grubun kalıcı kimliğinden gelir (`group:<id>`) —
+       sıra/indeks değil: kart taşınsa, silinip geri eklense de tercih yerinde kalır. Oda kartı ile
+       o odanın sekmesi bilerek aynı kapsamı paylaşır (aynı kartın iki boyu). */
+    const scope=groupWidgetId(group.id);
+    const controls=shown.map(({device,control})=>groupTileSlotHtml(device,control,scope)).join("");
     /* Gizlenen cihaz sessizce kaybolmaz: kartın altında sayısıyla duyurulur ve satır Cihazlar
        görünümüne (mümkünse o odayı süzerek) götürür. Gizli yoksa satır hiç basılmaz. */
     const hiddenNote=overview&&!state.dashboardEditing&&picked.hidden

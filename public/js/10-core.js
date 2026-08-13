@@ -44,12 +44,33 @@
   /* Sekme seçimi widget düzeninden ayrı bir kayıt: `villa-dashboard-widgets` ile karışmaz. */
   const homeTabStorageKey="villa-home-tab";
   const savedHomeTab=(()=>{try{const value=localStorage.getItem(homeTabStorageKey);return typeof value==="string"&&value?value:overviewTabId}catch{return overviewTabId}})();
-  /* Kart içi cihaz butonunun genişlik kademesi. Kanonik anahtar: cihaz kimliği (IEEE) + kontrol
-     kimliği — dostane ad değişse de tercih kaybolmaz. "auto" = ölçüme bırakılmış, elle seçim yok. */
+  /* Kart içi cihaz butonunun genişlik kademesi. Anahtar ÜÇ parçalı: KART kimliği + cihaz kimliği
+     (IEEE) + kontrol kimliği — dostane ad değişse de tercih kaybolmaz. Kart parçası şart: aynı
+     kanal birden çok kartta görünür (Favoriler + odası + "Işıklar"), kart parçası olmadan
+     bir döşemeyi genişletmek diğer karttaki kardeşini de genişletiyordu. Genişlik bir YERLEŞİM
+     tercihidir, cihazın özelliği değil: her kart kendi düzenini tutar. Görünürlük (göz) ve favori
+     bilerek ev genelinde tektir, onlar kart başına bölünmez.
+
+     Kademe ÜÇ: küçük (bir ızgara birimi) · orta (iki birim = varsayılan döşeme boyu) · tam (satırın
+     tamamı). Kayıtsız döşeme ortadadır — böylece hiçbir şey seçilmemiş kart bugünkü görünümünde
+     kalır.
+
+     Göç iki eksende birden: DEĞER ekseninde eski iki hâl yeni kademelere düşer (`wide`→`full`,
+     `narrow`/`auto`→`medium`, yani varsayılan) ve bu okurken bir kez uygulanır — kullanıcının elle
+     bir şey yapması gerekmez. ANAHTAR ekseninde eski iki parçalı kayıtlar (`cihaz::kontrol`)
+     silinmez, YEDEK okuma olarak durur: kart anahtarı yoksa eski değer uygulanır, kullanıcı o
+     kartta ilk dokunuşta kart anahtarını yazar ve kartlar birbirinden ayrılır. */
   const tileWidthStorageKey="villa-tile-widths";
-  const tileWidthModes=new Set(["auto","narrow","wide"]);
-  const normalizeTileWidthMode=value=>tileWidthModes.has(value)?value:"narrow";
-  const tileWidthKey=(deviceId,controlId)=>`${deviceId}::${controlId||groupDeviceControlId}`;
+  const tileWidthModes=["small","medium","full"];
+  const defaultTileWidthMode="medium";
+  const legacyTileWidthModes={narrow:"medium",auto:"medium",wide:"full"};
+  const normalizeTileWidthMode=value=>tileWidthModes.includes(value)
+    ?value
+    :legacyTileWidthModes[value]||defaultTileWidthMode;
+  const nextTileWidthMode=mode=>tileWidthModes[(tileWidthModes.indexOf(normalizeTileWidthMode(mode))+1)%tileWidthModes.length];
+  const favoritesWidgetId="favorites";
+  const tileWidthKey=(scope,deviceId,controlId)=>`${scope||"tile"}::${deviceId}::${controlId||groupDeviceControlId}`;
+  const legacyTileWidthKey=(deviceId,controlId)=>`${deviceId}::${controlId||groupDeviceControlId}`;
   const savedTileWidths=(()=>{try{
     const value=JSON.parse(localStorage.getItem(tileWidthStorageKey)||"{}");
     if(!value||typeof value!=="object"||Array.isArray(value))return{};

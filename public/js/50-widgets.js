@@ -9,7 +9,7 @@
     if(!grid)return;
     const entries=favoriteEntries();
     grid.innerHTML=entries.length
-      ?entries.map(({device,control})=>groupTileSlotHtml(device,control)).join("")
+      ?entries.map(({device,control})=>groupTileSlotHtml(device,control,favoritesWidgetId)).join("")
       :`<div class="group-empty">${esc(t("favoritesEmpty"))}</div>`;
   }
   function widgetCatalogItemHtml(entry){
