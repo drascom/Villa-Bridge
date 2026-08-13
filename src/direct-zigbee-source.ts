@@ -107,6 +107,33 @@ export function applyEndpointSuffix(
       : [`${key}${suffix}`, value]));
 }
 
+/**
+ * Zigbee2MQTT sözleşmesinde ON/OFF kullanan yazılabilir bir durum TOGGLE komutunu da kabul eder;
+ * cihaz tanımları bunu `e.switch()` üzerinden **istisnasız** ilan eder (`value_toggle: "TOGGLE"`)
+ * ve panel ile otomasyon "değiştir" seçeneğini buna dayanarak sunar. Ama her dönüştürücü bunu
+ * gerçekten uygulamıyor: veri noktası (DP) tabanlı anahtarlarda değer bir ON/OFF sözlüğünde
+ * aranır ve TOGGLE **gönderim öncesi** reddedilir ("Key 'TOGGLE' not found in: [ON, OFF]").
+ * Böyle bir durumda komutu düşürmek yerine köprü TOGGLE'ı kendisi uygular: bilinen son durumun
+ * tersini yazar. Cihaza özel kural yok — ölçüt yalnız "değer reddedildi + son durum biliniyor".
+ *
+ * Hata metni denenen değeri anmıyorsa (ulaşılamayan cihaz, zaman aşımı) `null` döner; o hatalar
+ * yeniden denenmez.
+ */
+export function toggleFallbackValue(
+  requestedValue: unknown,
+  currentValue: unknown,
+  error: unknown
+): "ON" | "OFF" | null {
+  if (typeof requestedValue !== "string") return null;
+  const requested = requestedValue.toUpperCase();
+  if (requested !== "TOGGLE") return null;
+  if (!String(error).toUpperCase().includes(requested)) return null;
+  const current = typeof currentValue === "string" ? currentValue.toUpperCase() : null;
+  if (current === "ON") return "OFF";
+  if (current === "OFF") return "ON";
+  return null;
+}
+
 export function isUnresolvedActionMessage(
   message: Pick<Events.MessagePayload, "cluster" | "type">,
   matchingConverterCount: number,
@@ -1416,7 +1443,8 @@ export class DirectZigbeeSource implements ZigbeeSource {
       const converter = definition.toZigbee.find((item) =>
         !item.key || item.key.includes(requestedKey) || item.key.includes(baseKey)
       );
-      if (!converter?.convertSet) throw new Error(`'${requestedKey}' komutu desteklenmiyor.`);
+      const convertSet = converter?.convertSet;
+      if (!convertSet) throw new Error(`'${requestedKey}' komutu desteklenmiyor.`);
       const endpointId = endpointName ? endpointMap[endpointName] : undefined;
       const endpoint = (endpointId ? device.getEndpoint(endpointId) : device.getEndpoint(1)) ?? device.endpoints[0];
       if (!endpoint) throw new Error("Cihaz uç noktası bulunamadı.");
@@ -1424,21 +1452,40 @@ export class DirectZigbeeSource implements ZigbeeSource {
         state = { ...state, ...applyEndpointSuffix(update, endpointName, definition) };
         this.states.set(ieeeAddress, state);
       };
-      const converterMessage = endpointName
-        ? Object.fromEntries(Object.entries(command).map(([key, item]) => [
-            key.endsWith(`_${endpointName}`) ? key.slice(0, -(endpointName.length + 1)) : key,
-            item
-          ]))
-        : command;
-      const result = await converter.convertSet(endpoint, baseKey, value, {
-        message: converterMessage,
-        device,
-        mapped: definition,
-        options,
-        state,
-        endpoint_name: endpointName,
-        publish
-      });
+      const send = async (attemptValue: unknown): Promise<Awaited<ReturnType<typeof convertSet>>> => {
+        const attemptCommand = attemptValue === value
+          ? command
+          : { ...command, [requestedKey]: attemptValue as JsonObject[string] };
+        const converterMessage = endpointName
+          ? Object.fromEntries(Object.entries(attemptCommand).map(([key, item]) => [
+              key.endsWith(`_${endpointName}`) ? key.slice(0, -(endpointName.length + 1)) : key,
+              item
+            ]))
+          : attemptCommand;
+        return convertSet.call(converter, endpoint, baseKey, attemptValue, {
+          message: converterMessage,
+          device,
+          mapped: definition,
+          options,
+          state,
+          endpoint_name: endpointName,
+          publish
+        });
+      };
+      let result: Awaited<ReturnType<typeof convertSet>>;
+      try {
+        result = await send(value);
+      } catch (error) {
+        // Dönüştürücü TOGGLE'ı tanımıyorsa köprü onu bilinen durumdan uygular (bkz.
+        // `toggleFallbackValue`). Uyarı günlüğe düşer ki sessiz bir davranış farkı olmasın.
+        const fallback = toggleFallbackValue(value, state[requestedKey], error);
+        if (fallback === null) throw error;
+        console.warn(
+          `'${requestedKey}' kanalı TOGGLE komutunu kabul etmedi (${ieeeAddress}); `
+          + `bilinen son durumun tersi '${fallback}' olarak yazılıyor.`
+        );
+        result = await send(fallback);
+      }
       if (result?.state) {
         state = {
           ...state,
