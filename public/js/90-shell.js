@@ -31,6 +31,8 @@
     // Saat önizlemesi yalnız arka plan sayfasında yaşar: sayfadan çıkan kullanıcı paneli donmuş
     // bir gökyüzüyle bırakmasın diye çıkışta kendiliğinden kapanır.
     if(viewName!=="skySettings")setSkyScrub(null);
+    // Önizleme sahnesi gizliyken ölçülemez (genişliği sıfırdır); sayfa görünür olur olmaz ölçülür.
+    if(viewName==="skySettings")requestAnimationFrame(measureSkyStage);
     if(viewName!=="connections")stopMatterWatch();
     if(viewName==="connections")loadMatter();
     if(viewName==="connections")loadSettings();
@@ -369,6 +371,39 @@
     // tek dokunuşluk çıkışı ver.
     $("#skyModeNotice").hidden=state.themeMode==="sun";
     renderSkyScrub();
+  }
+  /* ÖNİZLEME SAHNESİNİN ÖLÇÜSÜ — panelin gökyüzüne dair yaptığı TEK ölçüm; iki sayı yazar.
+     1) YÜKSEKLİK. Kart sayfanın EN ALTINDAKİ öğedir, yani ona düşen pay "kartın üst kenarından
+        ekranın altına kadar kalan yer"dir. Bu pay CSS'te kestirilemez: üstteki modül sırasının
+        boyu çiplerin kaç satıra sardığına, o da dile ve ekran genişliğine bağlıdır. Sayıyı
+        tahmin etmek yerine ölçüyoruz — böylece 1024×640'ta da, Türkçede de, dar ekranda da
+        taşma imkânsız. CSS'teki `clamp` yalnız JS'ten önceki ilk kare için duruyor.
+     2) ÖLÇEK. Sahnenin iç kutusu sabit 1024×640 px'tir (tabletin gerçek CSS viewport'u): gökyüzü
+        katmanları orada ekrandaki ölçüleriyle çizilir, hiçbir kural viewport birimini yeniden
+        yorumlamak zorunda kalmaz. Karta sığdırma tek bir `transform:scale()` işidir.
+     Ölçüm kart GÖRÜNÜRKEN anlamlıdır; gizliyken genişlik sıfırdır ve sessizce çıkılır.
+     `ResizeObserver` varsa dönme/yeniden boyutlanma kendiliğinden yakalanır, yoksa `resize`
+     olayı aynı işi görür (99-bind.js). Yüksekliği yazmak kartın kutusunu değiştirdiği için
+     gözlemci bir kez daha tetiklenir; ikinci turda sayı aynı çıkar (kartın ÜST kenarı sahnenin
+     boyundan etkilenmez) ve 1px'lik ölü bant yazımı durdurur — döngü kapanır. */
+  const skyStageLimits={min:132,max:380};
+  function measureSkyStage(){
+    const card=$("#skyPreviewCard");
+    const frame=$(".sky-stage-frame");
+    const stage=$("#skyStage");
+    if(!card||!frame||!stage)return;
+    const box=card.getBoundingClientRect();
+    if(box.width<=0)return;
+    // Kartın kendi dolgusu + kenarı: kutunun sahneye ayrılmayan payı.
+    const chrome=Math.max(0,box.height-frame.getBoundingClientRect().height);
+    const main=card.closest("main");
+    const gutter=main?parseFloat(getComputedStyle(main).paddingBottom)||0:0;
+    const room=window.innerHeight-box.top-gutter-chrome;
+    const height=Math.max(skyStageLimits.min,Math.min(skyStageLimits.max,room));
+    if(Math.abs(frame.getBoundingClientRect().height-height)>1)frame.style.height=`${Math.round(height)}px`;
+    const width=frame.clientWidth;
+    if(width<=0)return;
+    stage.style.setProperty("--sky-stage-scale",Math.min(width/1024,height/640).toFixed(4));
   }
   /* Kaydırıcı, okunur saat, rozet ve "şimdiye dön"ün durumu. Önizleme kapalıyken kaydırıcı
      GERÇEK saati gösterir, yani kullanıcı nereden başladığını görür. Sabit görünümde bütün

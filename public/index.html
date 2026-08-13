@@ -204,58 +204,51 @@
 
     <!-- ARKA PLAN — yönetici sayfası DEĞİL: herkes açabilir, hiçbir şey sunucuya yazılmaz.
          Yukarıdaki `#settings` ile karıştırılmasın; burada yalnız "Güneşe göre" görünümünün
-         gökyüzü ayarları var ve hepsi bu cihazda kalır (`localStorage`). -->
+         gökyüzü ayarları var ve hepsi bu cihazda kalır (`localStorage`).
+         DÜZEN: üstte modül sırası, altında ÖNİZLEME KARTI. Gökyüzü artık sayfanın zemininde
+         değil o kartın içinde canlanıyor; kartın içi tabletin gerçek ekranının (1024×640)
+         ölçekli bir kopyasıdır, yani kullanıcı ne görüyorsa ekranda da o olacak. -->
     <section id="skySettings" class="view">
-      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navBackground">Background</h1></div></header>
-      <p class="sky-settings-lead" data-i18n="skySettingsLead">These settings change the “By the sun” view only — Light, Dark and System stay plain.</p>
-      <div id="skyModeNotice" class="sky-mode-notice" role="note" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><p data-i18n="skyModeNoticeLead">The moving sky is off right now, so nothing here is visible. Switch the appearance to “By the sun” to see it.</p><button id="skyModeSwitch" class="secondary" type="button" data-i18n="skyModeNoticeAction">Switch to “By the sun”</button></div>
-      <!-- SAAT ÖNİZLEMESİ. Yalnız gökyüzünün okuduğu "şimdi"yi dondurur; saat/hava bloğu, alarm,
-           otomasyon ve cihazlar gerçek saatlerini okumayı sürdürür. Kalıcı değil: sayfadan
-           çıkınca, "şimdiye dön" ile ve sayfa yenilenince kapanır. -->
-      <article class="setting-card sky-preview-card" id="skyPreviewCard">
-        <h2 data-i18n="skyPreview">See another hour</h2>
-        <p data-i18n="skyPreviewLead">Drag the hour to watch the sky, the sun and moon arc and the stars at that moment. Only the background moves — the clock, alarms and devices keep the real time.</p>
-        <div class="sky-slider-row">
-          <label for="skyPreviewHour" data-i18n="skyPreviewHour">Hour</label>
-          <input id="skyPreviewHour" type="range" min="0" max="1439" step="5" value="720">
-          <output id="skyPreviewValue" class="sky-readout" for="skyPreviewHour">12:00</output>
-        </div>
-        <div class="sky-preview-jumps" role="group" data-i18n-aria="skyPreview" aria-label="See another hour">
-          <button type="button" data-sky-jump="dawn" data-i18n="skyPreviewDawn">Sunrise</button>
-          <button type="button" data-sky-jump="noon" data-i18n="skyPreviewNoon">Midday</button>
-          <button type="button" data-sky-jump="dusk" data-i18n="skyPreviewDusk">Sunset</button>
-          <button type="button" data-sky-jump="midnight" data-i18n="skyPreviewMidnight">Middle of the night</button>
-          <button id="skyPreviewNow" type="button" data-i18n="skyPreviewNow">Back to now</button>
-        </div>
-        <!-- AY EVRESİ. Aynı önizleme durumunun ikinci ekseni: saat "ne zaman"ı, bu "ayın hangi
-             evresi"ni dondurur. Ay yalnız gece çizildiği için gündüzde evre seçmek saati
-             kendiliğinden gecenin ortasına alır — açıklama satırı bunu söylüyor. -->
-        <div class="sky-preview-moon">
-          <h3 data-i18n="skyPreviewMoon">Moon phase</h3>
-          <p data-i18n="skyPreviewMoonLead">Slide through a whole month of moons instead of waiting for one. The moon only shows at night, so picking a phase during the day moves the hour to the middle of the night for you.</p>
-          <div class="sky-slider-row">
-            <label for="skyPreviewPhase" data-i18n="skyPreviewPhaseLabel">Phase</label>
-            <input id="skyPreviewPhase" type="range" min="0" max="100" step="1" value="0">
-            <output id="skyPreviewPhaseValue" class="sky-readout" for="skyPreviewPhase">Full moon · 100% lit</output>
+      <header class="page-head">
+        <button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="page-head-title"><h1 data-i18n="navBackground">Background</h1><p class="sky-settings-lead" data-i18n="skySettingsLead">Only the “By the sun” view uses these, and they stay on this tablet.</p></div>
+        <button id="skyResetButton" class="secondary" type="button" data-i18n="skyResetDefaults">Reset to defaults</button>
+      </header>
+      <div id="skyModeNotice" class="sky-mode-notice" role="note" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><p data-i18n="skyModeNoticeLead">The moving sky is off right now, so none of this shows on screen.</p><button id="skyModeSwitch" class="secondary" type="button" data-i18n="skyModeNoticeAction">Switch to “By the sun”</button></div>
+      <!-- KONTROLLER — her ayar kendi bloğunda, hepsi kartın üstünde tek sırada. Saat ve ay
+           evresi yalnız ÖNİZLEMEdir: kaydedilmez, sayfadan çıkınca kendiliğinden kapanır. -->
+      <div class="sky-controls">
+        <article class="sky-block">
+          <div class="sky-block-head"><h2 data-i18n="skyPreviewHour">Hour</h2><output id="skyPreviewValue" class="sky-readout" for="skyPreviewHour">12:00</output></div>
+          <input id="skyPreviewHour" type="range" min="0" max="1439" step="5" value="720" data-i18n-aria="skyPreviewHour" aria-label="Hour">
+          <div class="sky-chips" role="group" data-i18n-aria="skyPreviewHour" aria-label="Hour">
+            <button type="button" data-sky-jump="dawn" data-i18n="skyPreviewDawn">Sunrise</button>
+            <button type="button" data-sky-jump="noon" data-i18n="skyPreviewNoon">Midday</button>
+            <button type="button" data-sky-jump="dusk" data-i18n="skyPreviewDusk">Sunset</button>
+            <button type="button" data-sky-jump="midnight" data-i18n="skyPreviewMidnight">Night</button>
+            <button id="skyPreviewNow" type="button" data-i18n="skyPreviewNow">Now</button>
           </div>
-          <div class="sky-preview-jumps" role="group" data-i18n-aria="skyPreviewMoon" aria-label="Moon phase">
+        </article>
+        <article class="sky-block">
+          <div class="sky-block-head"><h2 data-i18n="skyPreviewMoon">Moon phase</h2></div>
+          <output id="skyPreviewPhaseValue" class="sky-block-value" for="skyPreviewPhase">Full moon · 100% lit</output>
+          <p class="sky-block-note" data-i18n="skyPreviewMoonLead">Picking a phase in daylight moves the hour to the middle of the night.</p>
+          <input id="skyPreviewPhase" type="range" min="0" max="100" step="1" value="0" data-i18n-aria="skyPreviewMoon" aria-label="Moon phase">
+          <div class="sky-chips" role="group" data-i18n-aria="skyPreviewMoon" aria-label="Moon phase">
             <button type="button" data-sky-moon="new" data-i18n="skyMoonNew">New moon</button>
             <button type="button" data-sky-moon="first" data-i18n="skyMoonFirstQuarter">First quarter</button>
             <button type="button" data-sky-moon="full" data-i18n="skyMoonFull">Full moon</button>
             <button type="button" data-sky-moon="last" data-i18n="skyMoonLastQuarter">Last quarter</button>
             <button id="skyPreviewMoonNow" type="button" data-i18n="skyPreviewMoonNow">Real phase</button>
           </div>
-        </div>
-      </article>
-      <div class="sky-settings-grid">
-        <article class="setting-card sky-settings-card">
-          <h2 data-i18n="skyMilkyWay">Milky Way</h2>
-          <p data-i18n="skyMilkyWayLead">A faint band across the night sky. It fades away by itself as the sun comes up.</p>
+        </article>
+        <article class="sky-block">
+          <div class="sky-block-head"><h2 data-i18n="skyMilkyWay">Milky Way</h2></div>
           <div class="sky-choice-row" role="group" data-i18n-aria="skyMilkyWay" aria-label="Milky Way">
-            <button type="button" data-sky-milkyway="off" aria-pressed="false"><b data-i18n="skyMilkyWayOff">Off</b><span data-i18n="skyMilkyWayOffLead">Plain star field</span></button>
-            <button type="button" data-sky-milkyway="a" aria-pressed="false"><b data-i18n="skyMilkyWayA">Thin thread</b><span data-i18n="skyMilkyWayALead">Barely there</span></button>
-            <button type="button" data-sky-milkyway="b" aria-pressed="false"><b data-i18n="skyMilkyWayB">Balanced</b><span data-i18n="skyMilkyWayBLead">Split by a dark rift</span></button>
-            <button type="button" data-sky-milkyway="c" aria-pressed="false"><b data-i18n="skyMilkyWayC">Wide dust</b><span data-i18n="skyMilkyWayCLead">Broad, stars gather inside</span></button>
+            <button type="button" data-sky-milkyway="off" aria-pressed="false" data-i18n="skyMilkyWayOff">Off</button>
+            <button type="button" data-sky-milkyway="a" aria-pressed="false" data-i18n="skyMilkyWayA">Thin thread</button>
+            <button type="button" data-sky-milkyway="b" aria-pressed="false" data-i18n="skyMilkyWayB">Balanced</button>
+            <button type="button" data-sky-milkyway="c" aria-pressed="false" data-i18n="skyMilkyWayC">Wide dust</button>
           </div>
           <div class="sky-slider-row">
             <label for="skyDensity" data-i18n="skyDensity">Brightness</label>
@@ -263,18 +256,13 @@
             <output id="skyDensityValue" class="sky-readout" for="skyDensity">65%</output>
           </div>
         </article>
-        <article class="setting-card sky-settings-card">
-          <h2 data-i18n="skyStars">Stars</h2>
-          <p data-i18n="skyStarsLead">How bright the stars burn at night. They still follow the hour, so daylight always clears them.</p>
-          <div class="sky-slider-row">
-            <label for="skyStarGain" data-i18n="skyStarBrightness">Star brightness</label>
-            <input id="skyStarGain" type="range" min="0" max="150" step="5" value="100">
-            <output id="skyStarGainValue" class="sky-readout" for="skyStarGain">100%</output>
-          </div>
+        <article class="sky-block">
+          <div class="sky-block-head"><h2 data-i18n="skyStars">Stars</h2><output id="skyStarGainValue" class="sky-readout" for="skyStarGain">100%</output></div>
+          <p class="sky-block-note" data-i18n="skyStarsLead">Daylight always clears them.</p>
+          <input id="skyStarGain" type="range" min="0" max="150" step="5" value="100" data-i18n-aria="skyStars" aria-label="Stars">
         </article>
-        <article class="setting-card sky-settings-card">
-          <h2 data-i18n="skyMountain">Mountains</h2>
-          <p data-i18n="skyMountainLead">The dark ridge along the bottom edge of the screen.</p>
+        <article class="sky-block">
+          <div class="sky-block-head"><h2 data-i18n="skyMountain">Mountains</h2></div>
           <label class="sky-toggle"><input id="skyMountainOn" type="checkbox" checked><span data-i18n="skyMountainShow">Show the ridge</span></label>
           <div class="sky-slider-row">
             <label for="skyMountainHeight" data-i18n="skyMountainHeight">Height</label>
@@ -283,10 +271,22 @@
           </div>
         </article>
       </div>
-      <div class="settings-actions sky-settings-actions">
-        <p class="settings-note" data-i18n="skySettingsNote">Saved on this tablet only. Nothing is sent to the server, and other devices keep their own background.</p>
-        <button id="skyResetButton" class="secondary" type="button" data-i18n="skyResetDefaults">Reset to defaults</button>
-      </div>
+      <!-- ÖNİZLEME KARTI. İç kutu (`.sky-stage-screen`) tam 1024×640 px'tir — tabletin gerçek CSS
+           viewport'u — ve tek bir `transform:scale()` ile karta sığar; ölçeği panel ölçüp yazar
+           (`--sky-stage-scale`). Katmanlar ana ekranın gökyüzüyle AYNI kuralları paylaşır, yalnız
+           `fixed` yerine `absolute` konumlanır; ana ekranın gökyüzü bundan hiç etkilenmez. -->
+      <article class="setting-card sky-preview-card" id="skyPreviewCard">
+        <div class="sky-stage-frame">
+          <div class="sky-stage" id="skyStage" aria-hidden="true">
+            <div class="sky-stage-screen">
+              <div class="sky-stage-sky"></div>
+              <div class="sky-stage-sun"></div>
+              <div class="sky-moon sky-moon-stage"><div class="sky-moon-face"><div class="sky-moon-half"><i></i></div><div class="sky-moon-bulge"></div></div></div>
+              <div class="sky-stage-mountain"></div>
+            </div>
+          </div>
+        </div>
+      </article>
       <!-- Önizleme açıkken ekranda duran rozet: gökyüzünün gerçek saat sanılmaması için. Dokunmak
            önizlemeyi kapatır. -->
       <button id="skyPreviewBadge" class="sky-preview-badge" type="button" hidden><b id="skyPreviewBadgeTime">12:00</b><span data-i18n="skyPreviewBadge">preview · tap for now</span></button>

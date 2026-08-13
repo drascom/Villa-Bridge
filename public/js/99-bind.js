@@ -57,6 +57,12 @@
   const skyMoonMarks={new:0,first:.25,full:.5,last:.75};
   $$("[data-sky-moon]").forEach(button=>button.onclick=()=>setSkyPhase(skyMoonMarks[button.dataset.skyMoon]));
   $("#skyPreviewMoonNow").onclick=()=>setSkyPhase(null);
+  /* Önizleme sahnesinin ölçeği kartın genişliğinden çıkar; kart yeniden boyutlanınca (tablet
+     dönünce, pencere değişince) yeniden ölçülmeli. `ResizeObserver` varsa kartı doğrudan
+     izler — düzenin oturduğu anı yakalayan tek yol o; yoksa `resize` olayına düşülür. */
+  const skyStageFrame=$(".sky-stage-frame");
+  if(skyStageFrame&&typeof ResizeObserver==="function")new ResizeObserver(measureSkyStage).observe(skyStageFrame);
+  else window.addEventListener("resize",measureSkyStage);
   /* "Güneşe göre" kipi de dinler: gün doğumu/batımı hiç bilinmiyorsa o kip sistem tercihine
      düşüyor, o hâlde sistem değişince yeniden boyanmalı. */
   const handleSystemThemeChange=()=>{if(state.themeMode==="system"||state.themeMode==="sun")applyTheme()};
