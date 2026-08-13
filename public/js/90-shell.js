@@ -28,6 +28,9 @@
     // ekran dışında güneşin de sönmesi ancak kökteki bu ikizle mümkün.
     document.documentElement.dataset.activeView=viewName;
     if(viewName==="automations"){renderAutomations();loadAutomations().then(renderAutomations).catch(error=>showToast(error.message,true))}
+    // Saat önizlemesi yalnız arka plan sayfasında yaşar: sayfadan çıkan kullanıcı paneli donmuş
+    // bir gökyüzüyle bırakmasın diye çıkışta kendiliğinden kapanır.
+    if(viewName!=="skySettings")setSkyScrub(null);
     if(viewName!=="connections")stopMatterWatch();
     if(viewName==="connections")loadMatter();
     if(viewName==="connections")loadSettings();
@@ -135,12 +138,55 @@
   })();
   const skyPreviewCycle=40000;
   const skyPreviewStart=Date.now();
+  /* AYNI KAPSAMIN ELLE SÜRÜLENİ — arka plan sayfasındaki saat kaydırıcısı. `?sky=preview` bir
+     günü 40 sn'ye sıkıştırır ama istenen anda DURMAZ; bu kaydırıcı gökyüzünün "şimdi"sini tek
+     bir dakikaya DONDURUR, böylece gündüz vakti gece manzarasına bakılabilir. Kapsam yine dar:
+     yalnız `skyMinutes()` değişir. Elle saat seçilir seçilmez 40 sn'lik döngü de durur (donmuş
+     saat kazanır); önizleme kapanınca döngü kaldığı yerden akmaya devam eder.
+     KALICI HİÇBİR ŞEY YAZMAZ ve üç yolla kapanır: "şimdiye dön", arka plan sayfasından çıkış
+     (`activateView`), sayfanın yenilenmesi. `settle` yalnız kapanış karesi içindir — dönüş
+     hareketi 60 sn sürmesin diye adım süresini bir kereliğine kısaltır. */
+  const skyScrub={active:false,minutes:720,settle:false};
   function skyMinutes(){
+    if(skyScrub.active)return skyScrub.minutes;
     if(!skyPreview){
       const now=new Date();
       return now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
     }
     return ((Date.now()-skyPreviewStart)%skyPreviewCycle)/skyPreviewCycle*1440;
+  }
+  const skyClock=minutes=>{
+    const total=((Math.round(minutes)%1440)+1440)%1440;
+    return dateTimeFormatter({hour:"2-digit",minute:"2-digit",hour12:false})
+      .format(new Date(2000,0,1,Math.floor(total/60),total%60));
+  };
+  /* Hızlı sıçramaların dakikaları GERÇEK gün doğumu/batımından türer (canlı hava verisi → son
+     bilinen → yaklaşık yedek), sabit saatlerden değil. "Gece ortası" takvim gece yarısı değil
+     batış–doğuş aralığının ortasıdır: ay tam o anda yayın tepesindedir. */
+  function skyScrubMarks(){
+    const times=sunGroundTimes()||cachedSunTimes()||fallbackSunTimes();
+    return{
+      dawn:times.rise,
+      noon:(times.rise+times.set)/2,
+      dusk:times.set,
+      midnight:((times.set+times.rise+1440)/2)%1440,
+    };
+  }
+  /* Tek giriş: dakika ver → dondur, `null` ver → gerçek saate dön. Gökyüzü ve (kip "güneşe
+     göre" ise) tema aynı karede yeniden yazılır; başka hiçbir sistem haberdar edilmez. */
+  function setSkyScrub(minutes){
+    if(minutes===null){
+      if(!skyScrub.active)return;
+      skyScrub.active=false;
+      skyScrub.settle=true;
+    }else{
+      const value=Number(minutes);
+      if(!Number.isFinite(value))return;
+      skyScrub.active=true;
+      skyScrub.minutes=Math.max(0,Math.min(1439,Math.round(value)));
+    }
+    if(sunGroundState.started){syncSunTheme();applySunGround()}
+    renderSkySettings();
   }
   /* Gündüz mü? Canlı veri varsa o, yoksa önbellek, ikisi de yoksa `null` (bilinmiyor). */
   function sunIsUp(){
@@ -170,6 +216,10 @@
     },1100);
   }
   function applyTheme(options={}){
+    // Sabit görünümde (Light · Dark · System) gökyüzü hiç çizilmiyor; saat önizlemesinin
+    // gösterecek bir şeyi kalmadığı için sessizce kapanır. Yalnız bayrak düşürülür — gökyüzünü
+    // aşağıdaki `syncSunGround` zaten durduruyor.
+    if(skyScrub.active&&state.themeMode!=="sun"){skyScrub.active=false;skyScrub.settle=false}
     const resolved=resolveThemeMode();
     const previous=document.documentElement.dataset.theme;
     if(options.fade===true&&previous&&previous!==resolved&&!reducedMotion())startThemeFade();
@@ -276,6 +326,25 @@
     // Sabit görünümdeyken bu sayfanın hiçbir ayarı ekranda görünmez; kullanıcıya söyle ve
     // tek dokunuşluk çıkışı ver.
     $("#skyModeNotice").hidden=state.themeMode==="sun";
+    renderSkyScrub();
+  }
+  /* Kaydırıcı, okunur saat, rozet ve "şimdiye dön"ün durumu. Önizleme kapalıyken kaydırıcı
+     GERÇEK saati gösterir, yani kullanıcı nereden başladığını görür. Sabit görünümde bütün
+     denetimler kapatılır. */
+  function renderSkyScrub(){
+    const slider=$("#skyPreviewHour");
+    if(!slider)return;
+    const minutes=skyMinutes();
+    if(document.activeElement!==slider)slider.value=String(Math.round(minutes));
+    $("#skyPreviewValue").textContent=skyClock(minutes);
+    const off=state.themeMode!=="sun";
+    slider.disabled=off;
+    $$("[data-sky-jump]").forEach(button=>{button.disabled=off});
+    $("#skyPreviewNow").disabled=off||!skyScrub.active;
+    $("#skyPreviewCard").classList.toggle("is-off",off);
+    const badge=$("#skyPreviewBadge");
+    badge.hidden=!skyScrub.active;
+    $("#skyPreviewBadgeTime").textContent=skyClock(minutes);
   }
   /* Tek giriş: değeri yaz → hemen boya → gecikmeli kaydet → arayüzü tazele. */
   function updateSkySettings(patch){
@@ -503,8 +572,12 @@
     root.style.setProperty("--sun-disc",Math.min(1,altitude*4).toFixed(3));
     root.style.setProperty("--sun-glow",(twilight*(0.35+0.65*altitude)).toFixed(3));
     // Konum değişimlerinin geçiş süresi = yazma aralığı: açı dakikada bir yazılır ama gözle
-    // sürekli kayar. Önizlemede aralık da süre de kısalır.
-    root.style.setProperty("--sky-step",skyPreview?".14s":"60s");
+    // sürekli kayar. Önizlemede aralık da süre de kısalır; saat kaydırıcısı sürüklenirken
+    // gökyüzü parmağı takip etmeli, önizleme kapanırken de gerçek saate 60 sn'de değil hızla
+    // dönmeli (`settle`, yalnız o tek kare için).
+    const step=skyPreview||skyScrub.active?".14s":skyScrub.settle?".6s":"60s";
+    skyScrub.settle=false;
+    root.style.setProperty("--sky-step",step);
     // Gece: batıştan doğuşa uzanan aralık. Gece yarısı bu aralığın ORTASI sayılır (takvim
     // gece yarısı değil), böylece ay yayın tepesine gecenin ortasında çıkar.
     const night=minutes>=times.set||minutes<times.rise;
@@ -532,12 +605,16 @@
     // Sıra korunsun ki o kare içinde tema ile gökyüzü aynı dakikayı anlatsın.
     syncSunTheme();
     applySunGround();
+    // Arka plan sayfasındaki saat okunuru gerçek zamanla akmayı sürdürsün (önizleme kapalıyken).
+    renderSkyScrub();
     // "Hazır" artık işarete değil CANLI veriye bakar: işaret yedekle de konuyor, ama hava
     // servisi henüz cevap vermediyse yine sık yoklanmalı.
     const ready=sunGroundState.live===true;
     // Önizlemede sanal gün 40 sn'de dönüyor: 140 ms'lik adım yaklaşık 5 sanal dakika, yani
     // gökyüzü basamaklanmadan akar. Normalde dakikada bir yeter.
-    sunGroundState.timer=setTimeout(scheduleSunGround,ready?(skyPreview?140:60000):15000);
+    // Saat elle dondurulmuşsa 40 sn'lik döngünün hızlı adımına gerek yok: gökyüzü zaten sabit.
+    const fast=skyPreview&&!skyScrub.active;
+    sunGroundState.timer=setTimeout(scheduleSunGround,ready?(fast?140:60000):15000);
   }
   function startSunGround(){
     if(sunGroundState.started)return;

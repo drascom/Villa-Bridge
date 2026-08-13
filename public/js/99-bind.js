@@ -43,6 +43,13 @@
   $("#skyMountainHeight").oninput=()=>updateSkySettings({mountainHeight:Number($("#skyMountainHeight").value)});
   $("#skyResetButton").onclick=resetSkySettings;
   $("#skyModeSwitch").onclick=()=>setThemeMode("sun");
+  /* SAAT ÖNİZLEMESİ. Kaydırıcı gökyüzünü sürüklendiği dakikada dondurur, hızlı sıçramalar gerçek
+     gün doğumu/batımından hesaplanır, "şimdiye dön" ve rozet önizlemeyi kapatır. Hiçbir yere
+     kaydedilmez; arka plan sayfasından çıkınca `activateView` zaten kapatıyor. */
+  $("#skyPreviewHour").oninput=()=>setSkyScrub(Number($("#skyPreviewHour").value));
+  $$("[data-sky-jump]").forEach(button=>button.onclick=()=>setSkyScrub(skyScrubMarks()[button.dataset.skyJump]));
+  $("#skyPreviewNow").onclick=()=>setSkyScrub(null);
+  $("#skyPreviewBadge").onclick=()=>setSkyScrub(null);
   /* "Güneşe göre" kipi de dinler: gün doğumu/batımı hiç bilinmiyorsa o kip sistem tercihine
      düşüyor, o hâlde sistem değişince yeniden boyanmalı. */
   const handleSystemThemeChange=()=>{if(state.themeMode==="system"||state.themeMode==="sun")applyTheme()};
