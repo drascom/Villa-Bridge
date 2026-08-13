@@ -416,8 +416,14 @@
      ay boyunca (29,53 gün) sayılır. Terminatör (aydınlık/karanlık sınırı) yarım ELİPSTİR — bu
      yüzden CSS'te iki katman var: yalnız AYDINLIK yarıya serilen ve terminatör elipsini OYAN
      taban + şişkin evrede o oyuğu kapatan elips. Karanlık yarım hiç boyanmaz (ne katışım ne
-     maske; ayrıntısı panel.css'te). Ayın kendi ışığı yalnız YEREL bir hale (`--moon-glow`, CSS'te `box-shadow`);
-     zeminin genel parlaklık bandına dokunmaz, yani durum döşemelerinin merdiveni bozulmaz. */
+     maske; ayrıntısı panel.css'te). Ayın kendi ışığı yalnız YEREL bir hale (`--moon-glow`, CSS'te
+     `filter: drop-shadow`, yani hale de evrenin biçimini alır); zeminin genel parlaklık bandına
+     dokunmaz, yani durum döşemelerinin merdiveni bozulmaz.
+     "AY GÖRÜNMÜYOR" HER ZAMAN HATA DEĞİL — önce EVREYE bak. Evre gerçek: yeni aya yakın günlerde
+     aydınlık yay bir pikselin altına iner ve hale de sıfıra gider, yani ay BİLEREK yok olur.
+     Ölçülü örnek: 2026-08-13'te `phase` .020, aydınlanma %0,40; 1024×640'ta (r=49,6px) aydınlık
+     yayın genişliği 0,39px, hale alfası .002 — ekranda hiçbir şey görünmez ve bu DOĞRU sonuçtur.
+     Aynı takvimde 3 gün sonra (faz .12, %13,9) yay 13,8px olur ve ay net okunur. */
   const synodicMonth=29.530588853*86400000;
   const knownNewMoon=Date.UTC(2000,0,6,18,14);
   const moonPhase=at=>{
