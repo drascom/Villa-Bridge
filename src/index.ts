@@ -407,6 +407,17 @@ const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "ut
 const dashboardETag = assetETag(dashboard);
 const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
 const dashboardBackgroundETag = assetETag(dashboardBackground);
+/**
+ * Gece gökyüzündeki ayın YÜZÜ. Kaynak: NASA Scientific Visualization Studio, "Moon Phase and
+ * Libration 2019" (SVS 4442) tek karesi; veri LRO LOLA + WAC. NASA görselleri KAMU MALIDIR
+ * (telif korumasız), atıf istenir — bu yorum o atıftır. 512×512 JPEG, ~49 KB.
+ * Neden `panelAssetRoutes` DEĞİL: o tablo dosyaları `utf8` metin olarak okuyup metin
+ * `Content-Type`'ıyla yolluyor; ikili dosya oradan geçemez. Panelde ikili varlığın kurulu
+ * kalıbı zaten bu satırın hemen üstünde (`dashboard-landscape.jpg`): `Buffer` olarak oku,
+ * ETag'ini çıkar, kendi rotasını yaz. Aynı kalıp tekrarlandı, yeni mekanizma icat edilmedi.
+ */
+const moonTexture = await readFile(resolve(moduleDir, "../public/assets/moon-texture.jpg"));
+const moonTextureETag = assetETag(moonTexture);
 const localesDirectory = resolve(moduleDir, "../public/locales");
 
 // Panel parçaları da açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
@@ -438,6 +449,9 @@ for (const route of panelAssetRoutes) {
 
 app.get("/assets/dashboard-landscape.jpg", async (request, reply) =>
   sendAsset(request, reply, "image/jpeg", dashboardBackground, dashboardBackgroundETag));
+
+app.get("/assets/moon-texture.jpg", async (request, reply) =>
+  sendAsset(request, reply, "image/jpeg", moonTexture, moonTextureETag));
 
 /**
  * Hava sahnesi görselleri (Meteocons, MIT — `public/assets/weather/README.md`). Onlarca dosya

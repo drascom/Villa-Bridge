@@ -469,17 +469,18 @@
      ayın KONUMU kurgudur: güneşin yayının gece yarısını taklit eder (batışta bir kenardan doğar,
      gece ortasında tepeye çıkar, gün doğumunda öbür kenardan batar). Doğruluk iddiası yoktur.
      EVRE ise gerçek veriye dayanır ve takvimle uyumludur: bilinen bir yeni ay anından sinodik
-     ay boyunca (29,53 gün) sayılır. Terminatör (aydınlık/karanlık sınırı) yarım ELİPSTİR — bu
-     yüzden CSS'te iki katman var: yalnız AYDINLIK yarıya serilen ve terminatör elipsini OYAN
-     taban + şişkin evrede o oyuğu kapatan elips. Karanlık yarım hiç boyanmaz (ne katışım ne
-     maske; ayrıntısı panel.css'te). Ayın kendi ışığı yalnız YEREL bir hale (`--moon-glow`, CSS'te
-     `filter: drop-shadow`, yani hale de evrenin biçimini alır); zeminin genel parlaklık bandına
-     dokunmaz, yani durum döşemelerinin merdiveni bozulmaz.
+     ay boyunca (29,53 gün) sayılır. Ayın YÜZÜ gerçek bir dokudur (NASA/SVS dolunay karesi),
+     evre o dokuyu KESEN bir maskedir: terminatör (aydınlık/karanlık sınırı) yarım ELİPS olduğu
+     için hilalde aydınlık yarımdan elips oyulur, şişkin evrede aynı elips yarımın üstüne biner.
+     Karanlık yarım hiç boyanmaz — boyanmıyor değil, kesiliyor (ayrıntısı panel.css'te).
+     Ayın kendi ışığı yalnız YEREL bir hale (`--moon-glow`, CSS'te `filter: drop-shadow`, ve hale
+     maskeli şeklin ALFASINDAN üretildiği için evrenin biçimini alır); zeminin genel parlaklık
+     bandına dokunmaz, yani durum döşemelerinin merdiveni bozulmaz.
      "AY GÖRÜNMÜYOR" HER ZAMAN HATA DEĞİL — önce EVREYE bak. Evre gerçek: yeni aya yakın günlerde
      aydınlık yay bir pikselin altına iner ve hale de sıfıra gider, yani ay BİLEREK yok olur.
      Ölçülü örnek: 2026-08-13'te `phase` .020, aydınlanma %0,40; 1024×640'ta (r=49,6px) aydınlık
      yayın genişliği 0,39px, hale alfası .002 — ekranda hiçbir şey görünmez ve bu DOĞRU sonuçtur.
-     Aynı takvimde 3 gün sonra (faz .12, %13,9) yay 13,8px olur ve ay net okunur. */
+     Aynı takvimde 3 gün sonra (faz .12, %13,6) yay 13,4px olur ve ay net okunur. */
   const synodicMonth=29.530588853*86400000;
   const knownNewMoon=Date.UTC(2000,0,6,18,14);
   const moonPhase=at=>{
@@ -507,17 +508,23 @@
     // Elipsin yarıçapı dördünlerde sıfıra iner (düz kenar), yeni ay/dolunayda diske eşitlenir.
     // Taban sıfır DEĞİL: sıfır yarıçaplı radyal gradyan tarayıcıya göre belirsiz çiziliyor,
     // %0,01 hem düz kenarı verir hem de o belirsizliğe hiç girmez.
-    root.style.setProperty("--moon-term",`${Math.max(.01,Math.abs(Math.cos(2*Math.PI*phase))*50).toFixed(2)}%`);
-    // Büyürken (yeni ay → dolunay) aydınlık taraf sağdadır, küçülürken solda. KARANLIK YARIM
-    // BOYANMAZ (CSS'te uzun not): yalnız aydınlık yarım serilir, bu iki değişken onun HANGİ yarı
-    // olduğunu söyler — `--moon-side` katmanın yeri, `--moon-hinge` terminatör elipsinin o
-    // yarıdaki menteşesi, yani diskin merkezine denk gelen kenar.
+    const term=`${Math.max(.01,Math.abs(Math.cos(2*Math.PI*phase))*50).toFixed(2)}%`;
+    root.style.setProperty("--moon-term",term);
+    // Büyürken (yeni ay → dolunay) aydınlık taraf sağdadır, küçülürken solda. `--moon-side`
+    // aydınlık YARIM maskesinin yeridir; karanlık yarıma hiçbir katman değmez.
     const waxing=phase<.5;
     root.style.setProperty("--moon-side",waxing?"100%":"0%");
-    root.style.setProperty("--moon-hinge",waxing?"0%":"100%");
-    // Şişkin evrede (dördünler arası) elips aydınlığı taşır ve oyuğun üstünü kapatır; hilalde
-    // saydam kalır, yani elips aydınlık yarımdan hilali oyar.
-    root.style.setProperty("--moon-mid",phase>.25&&phase<.75?"var(--moon-lit)":"transparent");
+    // ŞİŞKİN Mİ HİLAL Mİ — evre maskesinin iki ayrı kurulumu (ayrıntısı `panel.css`):
+    //   · HİLAL: aydınlık yarımdan terminatör elipsi OYULUR (`--moon-carve`), şişkinlik kapalı.
+    //   · ŞİŞKİN: oyuk kapanır (`none`) ve aynı elips ayrı bir katman olarak yarımın üstüne
+    //     biner (`--moon-bulge:1`). Oyuk şişkin evrede de açık kalsaydı elipsin kenarı iki kez
+    //     yumuşar ve terminatörde yarım piksellik koyu bir dikiş kalırdı.
+    // Rampa elipsin DIŞINDA (%100 → %101): yeni ayda tamamı diskin dışına düşer ve
+    // `border-radius` onu keser, yani parlak hayalet yay çıkmaz.
+    const gibbous=phase>.25&&phase<.75;
+    root.style.setProperty("--moon-carve",gibbous?"none"
+      :`radial-gradient(ellipse ${term} 50% at 50% 50%,transparent 0 100%,#000 101%)`);
+    root.style.setProperty("--moon-bulge",gibbous?"1":"0");
   }
   /* GÖKYÜZÜNÜN AŞAMA AĞIRLIKLARI — şafak · gündüz · batım (gece = kalan pay).
      KIZILLIK İKİ SAAT SÜRER VE DORUĞU TAM GÜN DOĞUMUDUR: şafak doğuştan `skyRedSpan` dakika

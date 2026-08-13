@@ -52,6 +52,14 @@
   <link rel="stylesheet" href="/css/panel.css">
 </head>
 <body>
+<!-- AY — gökyüzünün TEK gerçek DOM düğümü. Öbür üç katman hâlâ sözde öğe (gökyüzü `body::before`,
+     güneş `html::before`, dağ `html::after`); ay düğüme çıktı çünkü HALE ile ŞEKİL ayrı öğelerde
+     olmak zorunda: maske öğenin `filter` çıktısını da kırpar, tek öğede hale kaybolurdu. Dış kutu
+     haleyi ve kolun dönüşünü taşır, iç kutu dokulu yüzü evre maskesiyle keser. Ayrıntı ve dört
+     evrenin ölçümü `panel.css` içinde. Sabit görünümde düğüm `display:none`, hiç kurulmaz. -->
+<div class="sky-moon sky-moon-screen" aria-hidden="true">
+  <div class="sky-moon-face"><div class="sky-moon-half"><i></i></div><div class="sky-moon-bulge"></div></div>
+</div>
 <div class="shell">
   <main>
     <div id="systemAlertBar" class="system-alert-bar" role="alert" hidden><span class="system-alert-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3v.1"/></svg></span><span id="systemAlertText"></span><span id="systemAlertCount" class="system-alert-count" hidden></span></div>
