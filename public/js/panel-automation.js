@@ -769,6 +769,39 @@
     try{await persistAutomations(state.automations.filter(item=>item.id!==automation.id),"automationDeleted")}
     catch(error){showToast(error.message,true)}
   }
+  /* ————— çoğaltma. Kopya sunucuya HEMEN yazılmaz: paneldeki "yeni otomasyon" da yalnız Kaydet'e
+     basılınca kalıcı olur, çoğaltma da aynı akışa girer. Kullanıcı adı ve cihazları değiştirip
+     kaydeder; vazgeçerse ortada yarım bir kural kalmaz. Açık taslak kopyaya dönüşür, özgün kayıt
+     olduğu gibi durur. */
+  function automationDraftToCopy(){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    const base=automationWizardName(wizard);
+    // Yeni kayıt yeni kimlik alır: kimlik kaydederken üretilir, eskisi taşınmaz.
+    wizard.id=null;
+    wizard.name=automationCopyName(base);
+    // Aynı kural evde iki kez çalışmasın: kopya kapalı doğar, kullanıcı hazır olunca açar.
+    wizard.enabled=false;
+    wizard.touched=true;
+    // Düzenleme kipi: kopya ad adımında açılır, oradan cihazlara da dokunulabilir.
+    wizard.stage="name";
+    renderAutomationWizard();
+    showToast(t("automationDuplicateReady"));
+  }
+  // Listedeki "⋯" penceresinden: kimlik pencere kapanmadan okunur, kapanışta bağlam silinir.
+  function duplicateAutomation(){
+    const id=state.automationContext;
+    $("#automationActionDialog").close();
+    if(!id||!state.automations.some(item=>item.id===id))return;
+    openAutomationWizard(id);
+    automationDraftToCopy();
+  }
+  // Düzenleme ekranının kendi içinden aynı iş; yalnız kayıtlı bir kuralda anlamlıdır.
+  function duplicateAutomationDraft(){
+    const wizard=state.automationWizard;
+    if(!wizard||!wizard.id)return;
+    automationDraftToCopy();
+  }
   const automationTriggerChoices=[
     {kind:"time",glyph:"🕐",label:"automationTriggerTime",ready:true},
     {kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:true},
@@ -778,6 +811,21 @@
   ];
   const automationDeviceKinds=["button","sensor","deviceState"];
   const automationNewId=()=>`${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`.toLowerCase();
+  const automationMaxNameLength=64;
+  // Kopyanın adı i18n'den gelir. Sunucu yalnız **kimliği** tekil tutar, adı değil — aynı ad iki kez
+  // oluşabilirdi. Ad zaten kullanılıyorsa sıra sayısı eklenir; iki kayıt listede ayırt edilir.
+  const automationCopyName=name=>{
+    const base=String(name||"").trim();
+    const taken=new Set(state.automations.map(item=>String(item.name||"").trim()));
+    const fit=text=>String(text).slice(0,automationMaxNameLength).trim();
+    let candidate=fit(t("automationCopyName",{name:base}));
+    for(let index=2;taken.has(candidate)&&index<100;index+=1){
+      candidate=fit(t("automationCopyNameNumbered",{name:base,count:index}));
+    }
+    return candidate;
+  };
+  // Kural saf JSON'dur; kopya hiçbir alanı özgün kayıtla paylaşmasın diye tam kopya alınır.
+  const automationDeepCopy=value=>JSON.parse(JSON.stringify(value));
   const automationTimeText=wizard=>`${String(wizard.hour).padStart(2,"0")}:${String(wizard.minute).padStart(2,"0")}`;
   const maxAutomationSunOffset=240;
   // §9.1 — güneş yolu her zaman iki olayı taşır: kullanıcıya "batış mı doğuş mu" diye sorulmaz,
@@ -1030,7 +1078,9 @@
       // süre zaten varsa açık gelir (türetilir), bu alan yalnız elle açmayı taşır.
       waitOpen:false,
       // Koşullar (§5.3): boş liste "her zaman çalışsın" demektir.
-      conditions:(existing?.conditions||[]).map(condition=>({...condition})),
+      // Tam kopya: iç içe alanlar (saat aralığının uçları gibi) kayıtla paylaşılmaz, düzenleme
+      // taslağı listedeki kuralı sessizce değiştirmez. Çoğaltmada da kopya kendi verisiyle açılır.
+      conditions:(existing?.conditions||[]).map(condition=>automationDeepCopy(condition)),
       // §2.4 — kural başına tek anahtar: hepsi mi, herhangi biri mi. Alan yoksa "hepsi".
       conditionMode:existing?.conditionMode==="any"?"any":"all",
       draftCondition:null,
@@ -1923,7 +1973,12 @@
     const hint=mode==="none"?"":`<p class="automation-hint">${t(mode==="idle"?"automationAutoOffIdleHint":"automationAutoOffAfterHint")}</p>`;
     return`${automationOptionsHtml(options)}${timer}${hint}`;
   }
-  const automationNameHtml=wizard=>`<div class="automation-name-field"><input id="automationName" type="text" maxlength="64" value="${esc(automationWizardName(wizard))}" placeholder="${esc(t("automationNamePlaceholder"))}" data-i18n-placeholder="automationNamePlaceholder" aria-label="${esc(t("automationNameLabel"))}"></div><p class="automation-hint">${esc(t("automationNameHint"))}</p>`;
+  // Çoğaltma satırı yalnız kayıtlı bir kuralı düzenlerken görünür: yeni kuralda kopyalanacak bir şey
+  // yok, kopyanın kendisinde (kimlik boş) ikinci kez basmak kafa karıştırırdı.
+  const automationDuplicateHtml=wizard=>wizard.id
+    ?`<button class="automation-add" type="button" data-automation-duplicate="1"><span class="automation-plus" aria-hidden="true">⧉</span><span>${esc(t("automationDuplicate"))}</span></button>`
+    :"";
+  const automationNameHtml=wizard=>`<div class="automation-name-field"><input id="automationName" type="text" maxlength="64" value="${esc(automationWizardName(wizard))}" placeholder="${esc(t("automationNamePlaceholder"))}" data-i18n-placeholder="automationNamePlaceholder" aria-label="${esc(t("automationNameLabel"))}"></div><p class="automation-hint">${esc(t("automationNameHint"))}</p>${automationDuplicateHtml(wizard)}`;
   // Yol seçimi sihirbazın ilk adımı: liste ile "yeni ekleme" ayrı yerler olduğu böyle anlaşılır.
   function automationPathHtml(){
     return automationOptionsHtml([
@@ -2388,6 +2443,7 @@
     $$("[data-automation-group-value]").forEach(button=>button.onclick=()=>chooseAutomationGroupValue(button.dataset.automationGroupValue));
     $$("[data-automation-scene-group]").forEach(button=>button.onclick=()=>chooseAutomationSceneGroup(button.dataset.automationSceneGroup));
     $$("[data-automation-scene]").forEach(button=>button.onclick=()=>chooseAutomationScene(Number(button.dataset.automationScene)));
+    $$("[data-automation-duplicate]").forEach(button=>button.onclick=()=>duplicateAutomationDraft());
     const nameInput=$("#automationName");
     if(nameInput)nameInput.oninput=()=>{wizard.name=nameInput.value.slice(0,64);automationSyncFoot()};
   }

@@ -126,6 +126,7 @@
   $("#closeAutomationActions").onclick=()=>$("#automationActionDialog").close();
   $("#runAutomationNow").onclick=runAutomationNow;
   $("#editAutomation").onclick=()=>{const id=state.automationContext;$("#automationActionDialog").close();if(id)openAutomationWizard(id)};
+  $("#duplicateAutomation").onclick=duplicateAutomation;
   $("#deleteAutomation").onclick=deleteAutomation;
   $("#revertAgentAutomations").onclick=revertAgentAutomations;
   $("#automationActionDialog").onclose=()=>{state.automationContext=null};
