@@ -205,9 +205,10 @@
     <!-- ARKA PLAN — yönetici sayfası DEĞİL: herkes açabilir, hiçbir şey sunucuya yazılmaz.
          Yukarıdaki `#settings` ile karıştırılmasın; burada yalnız "Güneşe göre" görünümünün
          gökyüzü ayarları var ve hepsi bu cihazda kalır (`localStorage`).
-         DÜZEN: üstte modül sırası, altında ÖNİZLEME KARTI. Gökyüzü artık sayfanın zemininde
-         değil o kartın içinde canlanıyor; kartın içi tabletin gerçek ekranının (1024×640)
-         ölçekli bir kopyasıdır, yani kullanıcı ne görüyorsa ekranda da o olacak. -->
+         DÜZEN: iki sütun — SOLDA kontrol kenar sütunu (kendi içinde kayar), SAĞDA ÖNİZLEME
+         KARTI (sabit durur, kaymaz). Gökyüzü artık sayfanın zemininde değil o kartın içinde
+         canlanıyor; kartın içi tabletin gerçek ekranının (1024×640) ölçekli bir kopyasıdır,
+         yani kullanıcı ne görüyorsa ekranda da o olacak. -->
     <section id="skySettings" class="view">
       <header class="page-head">
         <button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
@@ -215,9 +216,12 @@
         <button id="skyResetButton" class="secondary" type="button" data-i18n="skyResetDefaults">Reset to defaults</button>
       </header>
       <div id="skyModeNotice" class="sky-mode-notice" role="note" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><p data-i18n="skyModeNoticeLead">The moving sky is off right now, so none of this shows on screen.</p><button id="skyModeSwitch" class="secondary" type="button" data-i18n="skyModeNoticeAction">Switch to “By the sun”</button></div>
-      <!-- KONTROLLER — her ayar kendi bloğunda, hepsi kartın üstünde tek sırada. Saat ve ay
-           evresi yalnız ÖNİZLEMEdir: kaydedilmez, sayfadan çıkınca kendiliğinden kapanır. -->
-      <div class="sky-controls">
+      <!-- İKİ SÜTUN: solda kontrol kenar sütunu, sağda önizleme. Yükseklik `measureSkyStage`
+           tarafından ölçülüp yazılır; sayfa kaymaz, taşan kontroller kendi sütununda kayar. -->
+      <div class="sky-layout">
+      <!-- KONTROLLER — her ayar kendi bloğunda, hepsi solda alt alta. Saat ve ay evresi yalnız
+           ÖNİZLEMEdir: kaydedilmez, sayfadan çıkınca kendiliğinden kapanır. -->
+      <aside class="sky-controls" data-i18n-aria="navBackground" aria-label="Background">
         <article class="sky-block">
           <!-- Saat satırı bir taşıma denetimi gibi: oynat/duraklat + okunur saat. Tek düğme iki
                durum taşır (`aria-pressed`), ikon CSS'te ona göre değişir. -->
@@ -272,7 +276,7 @@
             <output id="skyMountainHeightValue" class="sky-readout" for="skyMountainHeight">94 px</output>
           </div>
         </article>
-      </div>
+      </aside>
       <!-- ÖNİZLEME KARTI. İç kutu (`.sky-stage-screen`) tam 1024×640 px'tir — tabletin gerçek CSS
            viewport'u — ve tek bir `transform:scale()` ile karta sığar; ölçeği panel ölçüp yazar
            (`--sky-stage-scale`). Katmanlar ana ekranın gökyüzüyle AYNI kuralları paylaşır, yalnız
@@ -289,6 +293,7 @@
           </div>
         </div>
       </article>
+      </div>
       <!-- Önizleme açıkken ekranda duran rozet: gökyüzünün gerçek saat sanılmaması için. Dokunmak
            önizlemeyi kapatır. -->
       <button id="skyPreviewBadge" class="sky-preview-badge" type="button" hidden><b id="skyPreviewBadgeTime">12:00</b><span data-i18n="skyPreviewBadge">preview · tap for now</span></button>
