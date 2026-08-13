@@ -450,32 +450,40 @@
     // Şişkin evrede (dördünler arası) elips aydınlığı taşır, hilalde karanlığı.
     root.style.setProperty("--moon-mid",phase>.25&&phase<.75?"var(--moon-lit)":"var(--moon-dark)");
   }
-  /* GÖKYÜZÜNÜN AŞAMA AĞIRLIKLARI — şafak · gündüz · batım (gece = kalan pay). Kırılma noktaları
-     gün doğumu/batımına GÖRE tanımlıdır: şafak doğuştan 72 dk önce açılır, 12 dk önce doruğa
-     çıkar, 66 dk sonra tam gündüze döner; batımda aynı şey simetrik olarak tersine işler.
-     Aradaki her an İKİ komşu aşamanın doğrusal karışımıdır — üç aşama aynı anda hiç açık olmaz,
-     bu yüzden geçiş çamurlaşmadan yumuşak kalır. */
+  /* GÖKYÜZÜNÜN AŞAMA AĞIRLIKLARI — şafak · gündüz · batım (gece = kalan pay).
+     KIZILLIK İKİ SAAT SÜRER VE DORUĞU TAM GÜN DOĞUMUDUR: şafak doğuştan `skyRedSpan` dakika
+     önce açılır, doğuş anında 1'e çıkar, aynı süre sonra tam gündüze döner. Batımda simetrik.
+     (Eskiden pencere 72 dk önce / 66 dk sonraydı ve doruk doğuştan 12 dk ÖNCEYE düşüyordu;
+     kullanıcı kızıllığın hem daha uzun sürmesini hem de gerçekten doğuş anına oturmasını
+     istedi.) Aradaki her an İKİ komşu aşamanın karışımıdır — üç aşama aynı anda hiç açık olmaz.
+     GEÇİŞ DOĞRUSAL DEĞİL YUMUŞATILMIŞ: ham oran smoothstep'ten geçer, yani pencerenin iki
+     ucunda türev sıfırdır. Basamak hissi asıl buradan gider; renkler zaten temadan koptu. */
+  const skyRedSpan=60;
   function skyPhases(minutes,rise,set){
     const w={dawn:0,day:0,dusk:0};
+    const ease=t=>t*t*(3-2*t);
     const blend=(from,to,low,high)=>{
-      const t=Math.max(0,Math.min(1,(minutes-from)/(to-from)));
+      const t=ease(Math.max(0,Math.min(1,(minutes-from)/(to-from))));
       if(low)w[low]+=1-t;
       if(high)w[high]+=t;
     };
-    if(minutes<=rise-72||minutes>=set+72){/* tam gece: üç ağırlık da sıfır kalır */}
-    else if(minutes<rise-12)blend(rise-72,rise-12,null,"dawn");
-    else if(minutes<rise+66)blend(rise-12,rise+66,"dawn","day");
-    else if(minutes<set-66)w.day=1;
-    else if(minutes<set+12)blend(set-66,set+12,"day","dusk");
-    else blend(set+12,set+72,"dusk",null);
+    const span=skyRedSpan;
+    if(minutes<=rise-span||minutes>=set+span){/* tam gece: üç ağırlık da sıfır kalır */}
+    else if(minutes<rise)blend(rise-span,rise,null,"dawn");
+    else if(minutes<rise+span)blend(rise,rise+span,"dawn","day");
+    else if(minutes<set-span)w.day=1;
+    else if(minutes<set)blend(set-span,set,"day","dusk");
+    else blend(set,set+span,"dusk",null);
     return w;
   }
   /* GÜN IŞIĞI EKSENİ — TEK VE SÜREKLİ, tema başına tablo YOK. Aşama ağırlıkları bu tabloyla
      çarpılır, 0..1 arası tek sayı çıkar: 0 = derin gece, 1 = öğle. Sayı YALNIZ zamana bağlıdır,
      `data-theme`e değil; yani gün doğumu/batımı eşiğinde tema dönerken bile akış kesilmez.
-     .409 rastgele değil: eşik anında ağırlıklar dawn .846 / day .154 olduğu için
-     .846 × .409 + .154 = .500 eder — eksen tam gün doğumunda (ve simetriğiyle batımında)
-     ORTASINDAN geçer. Mürekkebin en kritik anı böylece eşiğe oturur, eşiğin bir yanına değil.
+     .409 rastgele değil: kızıl gökyüzünün gerçek parlaklığına yakın ölçülmüş bir paydır, yani
+     şafak/batım bandında eksen ne gündüzün ne gecenin ucuna yapışır. Kızıllık penceresi iki
+     saate çıkınca (doruk = gün doğumu) eksen o anda .409'dan geçer ve oradan gündüze .409→1,
+     geceye .409→0 olarak YUMUŞATILMIŞ (smoothstep) biçimde iner: eşikte basamak yoktur, tek
+     fark en kritik anın artık tam doğuş anına oturmasıdır.
      TARİHÇE: burada eskiden gradyanlardan ölçülmüş tema başına parlaklık tablosu vardı
      (light .653/.703/.578/.438 · dark .141/.061/.070/.005). Gökyüzü eşikte GERÇEKTEN basamak
      yapıyor (tema gradyanları değişiyor); mürekkebi o ölçüme bağlamak basamağı mürekkebe de
@@ -554,6 +562,11 @@
     root.style.setProperty("--sky-a-dawn",phases.dawn.toFixed(3));
     root.style.setProperty("--sky-a-day",dayAlpha.toFixed(3));
     root.style.setProperty("--sky-a-dusk",duskAlpha.toFixed(3));
+    // ÖĞLE ALTINI — aşama DEĞİL, gündüzün üstüne binen ince sıcak yıkama (yığında gündüzün
+    // hemen üstünde, şafak/batımın altında). Ağırlık gündüz payı × yüksekliğin KARESİ: kare
+    // olduğu için ton yayın tepesinde toplanır, sabah/akşam kenarlarına sürünmez. Tavan .28,
+    // "hafif sarı" istendi. Zincire girmez, `--sky-lum`'a dokunmaz — mürekkep etkilenmez.
+    root.style.setProperty("--sky-a-noon",(phases.day*altitude*altitude*.28).toFixed(3));
     // Yıldızlar gecenin payıyla belirir, şafak/batım açılırken söner. Tek bir opaklık; desen
     // CSS'te tekrarlı gradyan katmanları, DOM düğümü yok. Kullanıcının parlaklık çarpanı
     // (arka plan ayarları) bunun ÜSTÜNE binsin diye gece payı ayrıca saklanır.

@@ -45,34 +45,50 @@
            1-3) yıldız döşemeleri — tek tek DOM düğümü DEĞİL, üç tekrarlı `radial-gradient`
                 deseni (referanstaki 300 div tablette kaydırmayı yorardı; buradaki maliyet
                 üç arka plan katmanı ve sıfır düğüm),
-           4) şafak · 5) gündüz · 6) batım — alfalarını panel yazar (`--sky-a-*`),
-           7) GECE — taban, opak; üstündekiler sıfırlanınca geriye o kalır.
+           4) şafak · 5) öğle altını · 6) gündüz · 7) batım — alfalarını panel yazar (`--sky-a-*`),
+           8) GECE — taban, opak; üstündekiler sıfırlanınca geriye o kalır.
          Alfa gradyanın KENDİ renk duraklarında durur: bir arka plan KATMANINA ayrıca opaklık
          verilemez, o yüzden her durak `rgba(..., var(--sky-a-*))` biçiminde yazılır.
          Ağırlıklar zincirleme birleşir (üstteki katman altındakinin payını yer), JS bunu
          hesaba katarak yazar — böylece iki aşama arasındaki geçiş gerçek bir çapraz geçiş olur.
          VARSAYILAN "gündüz" (`--sky-a-day:1`): hava verisi gelmeden de panel doğru boyanır;
          güneş, ay ve yıldızlar görünmez (`--sun-disc`/`--moon-disc`/`--star-a` sıfır). */
-      --sky-a-dawn:0;--sky-a-day:1;--sky-a-dusk:0;--star-a:0;
-      /* AÇIK TEMANIN AŞAMALARI PASTELDİR, DRAMATİK DEĞİL — bilerek. Saat/hava bloğunun kartı
-         yok, doğrudan gökyüzünün üstünde duruyor ve açık temada mürekkebi KOYU; gökyüzü
-         doygun bir batım kırmızısına ya da gece lacivertine inseydi o blok okunmaz olurdu
-         (kartsız hub yazısının kontrast ölçümü). Aşamalar bu yüzden burada tonla
-         anlatılır, parlaklıkla değil: bant hep aydınlık kalır, değişen sıcaklık ve renk.
-         Dramatik gökyüzü koyu temanın işi — "güneşe göre" kipinde batımda zaten oraya geçilir.
-         GÜNDÜZ ARTIK MAVİ (eski bej taban gitti): referans pen'in renk yolculuğu mavi gündüz →
-         turuncu-pembe şafak/batım → lacivert gece. Açık temada gece bandı yine AYDINLIK kalır
-         (lacivert olsaydı kartsız hub yazısı okunmazdı); koyulaşma koyu temanın işi. */
-      --sky-dawn:linear-gradient(180deg,rgba(255,222,190,var(--sky-a-dawn)) 0%,rgba(250,194,176,var(--sky-a-dawn)) 46%,rgba(226,188,206,var(--sky-a-dawn)) 100%);
-      --sky-day:linear-gradient(168deg,rgba(207,231,247,var(--sky-a-day)) 0%,rgba(172,209,238,var(--sky-a-day)) 52%,rgba(206,226,232,var(--sky-a-day)) 100%);
-      --sky-dusk:linear-gradient(180deg,rgba(255,214,172,var(--sky-a-dusk)) 0%,rgba(246,176,146,var(--sky-a-dusk)) 46%,rgba(212,174,198,var(--sky-a-dusk)) 100%);
-      --sky-night:linear-gradient(180deg,#b7c4dc 0%,#a2b0cb 55%,#909eb6 100%);
+      --sky-a-dawn:0;--sky-a-day:1;--sky-a-dusk:0;--sky-a-noon:0;--star-a:0;
+      /* GÖKYÜZÜ PALETİ TEMADAN BAĞIMSIZDIR — TEK KÜME, İKİNCİ BİR TAKIM YOK.
+         TARİHÇE VE KÖK SEBEP: bu dört gradyan eskiden hem `:root` (pastel) hem
+         `:root[data-theme="dark"]` (dramatik) içinde AYRI renklerle tanımlıydı. "Güneşe göre"
+         kipinde tema tam gün doğumu/batımı eşiğinde dönüyor, yani gökyüzünün BÜTÜN paleti tek
+         karede takas oluyordu: kullanıcının "renk değişimi birdenbire oluyor" dediği sıçrama
+         buydu — aşama ağırlıkları yumuşak akarken altlarındaki renkler zıplıyordu.
+         Çözüm mürekkepteki desenin aynısı (`--sky-lum`): gökyüzü artık YALNIZ ZAMANIN sürekli
+         fonksiyonu. `data-theme` live kipte gökyüzüne hiç dokunmaz — kart, çip ve döşeme
+         dilini sürmeye devam eder. Bu değişkenler zaten yalnız `data-sky="live"` içinde
+         kullanılıyor (`--sky` → `body::before`), sabit kip gökyüzü çizmiyor: dolayısıyla tek
+         küme sabit kipte hiçbir şeyi değiştirmez.
+         OKUNURLUK: eskiden açık temanın gece bandı "kartsız hub yazısı okunsun" diye AYDINLIK
+         tutuluyordu. O gerekçe düştü — hub mürekkebi artık temadan değil `--sky-lum`'dan
+         türüyor (gece açık mürekkep, gündüz koyu), yani gece gerçekten lacivert olabilir.
+         RENK YOLCULUĞU (kullanıcının tarifi): iki saatlik kızıllık (doğuştan 60 dk önce başlar,
+         doğuş anında doruk, 60 dk sonra biter — pencereler `skyPhases`'te) → berrak mavi gündüz
+         → yayın tepesinde HAFİF altın → yine kızıllık → lacivert gece. */
+      --sky-dawn:linear-gradient(180deg,rgba(54,56,106,var(--sky-a-dawn)) 0%,rgba(146,84,84,var(--sky-a-dawn)) 48%,rgba(222,124,64,var(--sky-a-dawn)) 100%);
+      --sky-day:linear-gradient(168deg,rgba(126,186,236,var(--sky-a-day)) 0%,rgba(92,160,222,var(--sky-a-day)) 52%,rgba(158,203,232,var(--sky-a-day)) 100%);
+      --sky-dusk:linear-gradient(180deg,rgba(48,46,92,var(--sky-a-dusk)) 0%,rgba(176,84,54,var(--sky-a-dusk)) 46%,rgba(150,58,34,var(--sky-a-dusk)) 100%);
+      --sky-night:linear-gradient(180deg,#0b1330 0%,#070c1e 55%,#05080f 100%);
+      /* ÖĞLE ALTINI — mavinin ÜSTÜNE binen ince sıcak yıkama, ayrı bir aşama değil bir TON.
+         Alfası güneşin yüksekliğinden gelir (`--sky-a-noon`, JS yazar: gündüz ağırlığı ×
+         yükseklik², tavan .28), yani yayın tepesinde doruğa çıkar ve sabah/akşam kenarlarına
+         yayılmaz. Yukarıdan aşağı söner: ışık tepeden geliyor. "Hafif" istendi, doygun değil. */
+      --sky-noon:linear-gradient(180deg,rgba(255,226,150,var(--sky-a-noon)) 0%,rgba(255,236,190,calc(var(--sky-a-noon) * .5)) 52%,rgba(255,246,220,0) 100%);
       /* DAĞ SİLÜETİNİN RENKLERİ — ikisi de OPAK. Gece tonu tabanda durur, gündüz tonu onun
          üstüne `--sky-lum` alfasıyla biner; ikisi arası geçiş böylece gün ışığı ekseniyle
          sürekli olur ve silüet HİÇBİR SAATTE saydamlaşmaz (arkasındaki güneş/ay sızmaz).
-         Gündüz tonları rgb üçlüsüdür, çünkü alfası değişkenden geliyor (`color-mix` yok). */
-      --mountain-night:#4a5a72;--mountain-night-top:#5f7189;
-      --mountain-day:110,131,153;--mountain-day-top:142,164,184;
+         Gündüz tonları rgb üçlüsüdür, çünkü alfası değişkenden geliyor (`color-mix` yok).
+         Gökyüzü paleti gibi bu dörtlü de TEMADAN BAĞIMSIZDIR: gece tonu lacivert gökten bir tık
+         açıktır (yoksa karanlıkta kaybolur), gündüz tonu berrak maviden belirgin koyudur ama
+         siyah değil — uzaktaki tepe, gri levha değil. */
+      --mountain-night:#131c30;--mountain-night-top:#1c2740;
+      --mountain-day:86,112,140;--mountain-day-top:120,146,172;
       --star-color:255,255,255;--star-warm:255,247,232;--star-cool:222,236,255;
       /* YILDIZ ALANI BEŞ KATMAN — üçü ince nokta (eskiler), ikisi YENİ ve daha İRİ. Kullanıcının
          isteği "aralarda büyük yıldızlar da olsun": gerçek gökyüzünde de birkaç parlak yıldız
@@ -105,7 +121,13 @@
       --mw-size: ;
       --mw-repeat: ;
       --mw-blend: ;
-      --sky:var(--star-field),var(--mw-layers) var(--sky-dawn),var(--sky-day),var(--sky-dusk),var(--sky-night);
+      /* YIĞIN (üstten alta): 5 yıldız · Samanyolu · ŞAFAK · ÖĞLE ALTINI · GÜNDÜZ · BATIM · GECE.
+         Öğle katmanı gündüzün ÜSTÜNDE durmalı (altında kalsaydı gündüz alfası 1'ken tamamen
+         örtülürdü); şafak/batım ise onun da üstünde, çünkü kızıllık altını yutmalı.
+         Katman sayısı 9'dan 10'a çıktı: `body::before` kuralındaki `background-size`,
+         `-repeat` ve `-blend-mode` listelerine de birer değer eklendi — dört listenin hizası
+         orada tek tek sayılıdır. */
+      --sky:var(--star-field),var(--mw-layers) var(--sky-dawn),var(--sky-noon),var(--sky-day),var(--sky-dusk),var(--sky-night);
       /* GÜNEŞ VE AY DÖNEN BİR KOL ÜZERİNDE — referansın tekniği, tek öğeyle. Disk ufkun
          ortasına çakılıdır; `rotate(açı) translateY(calc(-1 * kol))` onu gerçek bir YAY
          üzerinde taşır (eski x/y çifti aynı yayı iki ayrı doğrusal aralıkla taklit ediyordu,
@@ -211,20 +233,9 @@
       --hub-muted:#cddcd4;
       --hub-text-shadow:0 1px 3px rgba(0,0,0,.82),0 0 12px rgba(0,0,0,.7);
       --hub-divider-line:rgba(255,255,255,.17);
-      /* KOYU TEMANIN GÖKYÜZÜ — aynı dört aşama, DRAMATİK palet: gündüz derin mavi, şafak mor →
-         kızıl → turuncu, batım turuncu → koyu kızıl, gece lacivert-siyah. Referans pen'in renk
-         yolculuğu asıl burada karşılığını bulur; açık tema okunurluk yüzünden pastel kalır.
-         Yıldızlar da asıl burada okunur. Cam kümesi ARTIK TEMAYA GÖRE DÖNMEZ (kökte tek küme);
-         koyu temada değişen yalnız iki parlaklık kelepçesi ve kartın dolgu alfası: zemin zaten
-         karanlık olduğu için kart burada .24'e kadar açılabilir, gökyüzü içinden geçer. */
-      --sky-dawn:linear-gradient(180deg,rgba(60,58,104,var(--sky-a-dawn)) 0%,rgba(140,86,86,var(--sky-a-dawn)) 48%,rgba(196,116,58,var(--sky-a-dawn)) 100%);
-      --sky-day:linear-gradient(168deg,rgba(46,94,142,var(--sky-a-day)) 0%,rgba(31,68,110,var(--sky-a-day)) 46%,rgba(20,42,72,var(--sky-a-day)) 100%);
-      --sky-dusk:linear-gradient(180deg,rgba(48,46,92,var(--sky-a-dusk)) 0%,rgba(168,80,52,var(--sky-a-dusk)) 46%,rgba(86,36,24,var(--sky-a-dusk)) 100%);
-      --sky-night:linear-gradient(180deg,#0b1330 0%,#070c1e 55%,#05080f 100%);
-      /* Koyu temada gece göğü neredeyse siyah: silüet burada gökten bir tık AÇIK olur, yoksa
-         karanlıkta kaybolur. Gündüz tonu yine gökten koyudur. */
-      --mountain-night:#131c30;--mountain-night-top:#1c2740;
-      --mountain-day:12,24,40;--mountain-day-top:24,44,68;
+      /* GÖKYÜZÜ VE DAĞ ARTIK BURADA TANIMLI DEĞİL: live kipin paleti temadan bağımsız tek küme
+         (kökte). Koyu temada değişen yalnız iki parlaklık kelepçesi ve kartın dolgu alfası:
+         zemin zaten karanlık olduğu için kart burada .24'e kadar açılabilir. */
       --glass-bright:.78;--glass-card-bright:.92;
       --glass-card:rgba(8,12,20,.24);
       --glass-shadow:0 20px 46px rgba(0,0,0,.46);
@@ -543,7 +554,7 @@
        yani ne boyama ne animasyon ne de `transform` maliyeti doğar. Tema (`data-theme`) ayrı
        eksende kalır — sabit sistemde de light ve dark ikisi de vardır. */
     :root[data-sky="fixed"] body{background-image:var(--ground-wash,none)}
-    :root[data-sky="live"] body::before{content:"";position:fixed;z-index:-3;inset:-6%;display:block;background-color:transparent;background-image:var(--sky);background-size:613px 521px,331px 277px,197px 163px,269px 211px,149px 131px,var(--mw-size) cover,cover,cover,cover;background-repeat:repeat,repeat,repeat,repeat,repeat,var(--mw-repeat) no-repeat,no-repeat,no-repeat,no-repeat;background-blend-mode:normal,normal,normal,normal,normal,var(--mw-blend) normal,normal,normal,normal;pointer-events:none;will-change:transform;animation:panel-ground-drift 90s ease-in-out infinite}
+    :root[data-sky="live"] body::before{content:"";position:fixed;z-index:-3;inset:-6%;display:block;background-color:transparent;background-image:var(--sky);background-size:613px 521px,331px 277px,197px 163px,269px 211px,149px 131px,var(--mw-size) cover,cover,cover,cover,cover;background-repeat:repeat,repeat,repeat,repeat,repeat,var(--mw-repeat) no-repeat,no-repeat,no-repeat,no-repeat,no-repeat;background-blend-mode:normal,normal,normal,normal,normal,var(--mw-blend) normal,normal,normal,normal,normal;pointer-events:none;will-change:transform;animation:panel-ground-drift 90s ease-in-out infinite}
     :root[data-sky="live"] body:not([data-active-view="home"])::before{opacity:.5}
     /* SAMANYOLU VARYANTLARI — yalnız hareketli sistemde. İşareti kökteki `data-milkyway` taşır;
        yokken VARSAYILAN B'dir, böylece ilk kare ayar okunmadan da doğru çizilir.
