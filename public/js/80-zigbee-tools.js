@@ -550,7 +550,7 @@
       pendingHomeBackup=null;
       $("#homeBackupDialog").close();
       showToast(t("homeBackupRestored"));
-      await Promise.allSettled([refresh(),loadHomeGroups(),loadHomeVisibility(),loadAutomations()]);
+      await Promise.allSettled([refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations()]);
       render();
     }catch(error){
       button.disabled=false;

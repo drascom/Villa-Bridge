@@ -375,6 +375,7 @@
     $$("[data-color]").forEach(input=>input.onchange=()=>command(input.dataset.color,input.dataset.property,input.value));
     bindLightPanel();
     $$("[data-visibility-device]:not(.tile-eye)").forEach(button=>button.onclick=()=>toggleTileVisibility(button.dataset.visibilityDevice,button.dataset.visibilityControl));
+    $$("[data-favorite-device]:not(.tile-star)").forEach(button=>button.onclick=()=>toggleFavorite(button.dataset.favoriteDevice,button.dataset.favoriteControl));
     $$("[data-change-image]").forEach(button=>button.onclick=()=>openImageChooser(button.dataset.changeImage));
     $$("[data-rename]").forEach(button=>button.onclick=event=>{event.preventDefault();event.stopPropagation();openRename(button.dataset.rename)});
     $$("[data-rename-channel]").forEach(button=>button.onclick=()=>openRename(button.dataset.renameChannel,button.dataset.channel));
@@ -772,6 +773,15 @@
     const label=`${visibilityLabel(hidden)}: ${name}`;
     return`<button class="tile-eye" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(control?control.id:groupDeviceControlId)}" aria-label="${esc(label)}" title="${esc(label)}">${visibilityIcon(hidden)}</button>`;
   }
+  /* Yıldız gözün kardeşi ve aynı kipte (düzenleme) görünür: ikisi de "bu döşemeyi nereye
+     koyayım" sorusunun cevabı, günlük kumanda değil. Kumandası olmayan cihazda (sensör) yıldız
+     HİÇ basılmaz — favori bir eylem öğesidir, sunucu da `@device` kaydını kabul etmez. */
+  function tileFavoriteHtml(device,control,name){
+    if(!control)return"";
+    const on=isFavorite(device.id,control.id);
+    const label=`${favoriteLabel(on)}: ${name}`;
+    return`<button class="tile-star" type="button" aria-pressed="${on?"true":"false"}" data-favorite-device="${esc(device.id)}" data-favorite-control="${esc(control.id)}" aria-label="${esc(label)}" title="${esc(label)}">${favoriteIcon()}</button>`;
+  }
   /* Grup seviyesi filtre: kart Genel görünümde çıksın mı? Kayıt sunucuda `hiddenGroups` içinde
      grup kimliğiyle durur, dostane ad değil. Cihazsız grupta anahtar pasif ve sebebi yazılı. */
   function overviewSwitchHtml(group,entries){
@@ -780,12 +790,9 @@
     const label=`${group.name} · ${t("showInOverview")}`;
     return`<span class="ov-switch-wrap"><button class="ov-switch" type="button" role="switch" aria-checked="${active?"true":"false"}"${empty?" disabled aria-disabled=\"true\"":""} data-overview-toggle="${esc(group.id)}" aria-label="${esc(empty?`${label} — ${t("showInOverviewEmpty")}`:label)}"><span class="ov-switch-track" aria-hidden="true"><span class="ov-switch-knob"></span></span><span class="ov-switch-text">${esc(t("showInOverview"))}</span></button>${empty?`<small class="ov-switch-note">${esc(t("showInOverviewEmpty"))}</small>`:""}</span>`;
   }
-  function groupWidgetHtml(group,options={}){
-    const overview=options.variant!=="panel";
-    const entries=groupControlEntries(group);
-    const picked=overview?overviewGroupEntries(entries):{entries,hidden:0};
-    const shown=state.dashboardEditing?entries:picked.entries;
-    const controls=shown.map(({device,control})=>{
+  /* Tek döşemenin HTML'i. Oda kartı, grup sekmesi ve Favoriler kartı aynı çağrıyı kullanır:
+     ikinci bir döşeme dili açılmasın, hızlı kumanda/genişlik/göz/yıldız her yerde aynı davransın. */
+  function groupTileSlotHtml(device,control){
       const name=control?channelDisplayName(device,control):device.name;
       const controlAction=dashboardControlAction(control);
       const preparing=device.preparing===true;
@@ -817,8 +824,14 @@
       const bodyHtml=`<button class="tile-body" type="button" data-tile-open="${esc(device.id)}" data-tile-control="${esc(controlId)}" aria-label="${esc(preparing?`${name} · ${t("preparing")}`:openLabel)}"${preparing?" disabled":""}><span class="group-control-copy"><strong>${esc(name)}</strong><small>${esc(statusLabel)}</small></span></button>`;
       const tile=`<div class="group-control-tile ${visualState}${pending?" pending":""}${failed?" command-failed":""}">${knobHtml}${bodyHtml}${preparing||pending?'<span class="command-spinner" aria-hidden="true"></span>':""}</div>`;
       const hiddenTile=isTileHidden(device.id,control?control.id:null);
-      return`<div class="group-control-slot has-eye${wide?" is-wide":""}${hiddenTile?" is-hidden-tile":""}" data-tile-key="${esc(widthKey)}" data-tile-width="${esc(widthMode)}">${tile}${tileWidthToggleHtml(widthKey,wide)}${tileVisibilityHtml(device,control,name)}</div>`;
-    }).join("");
+      return`<div class="group-control-slot has-eye${wide?" is-wide":""}${hiddenTile?" is-hidden-tile":""}" data-tile-key="${esc(widthKey)}" data-tile-width="${esc(widthMode)}">${tile}${tileWidthToggleHtml(widthKey,wide)}${tileVisibilityHtml(device,control,name)}${tileFavoriteHtml(device,control,name)}</div>`;
+  }
+  function groupWidgetHtml(group,options={}){
+    const overview=options.variant!=="panel";
+    const entries=groupControlEntries(group);
+    const picked=overview?overviewGroupEntries(entries):{entries,hidden:0};
+    const shown=state.dashboardEditing?entries:picked.entries;
+    const controls=shown.map(({device,control})=>groupTileSlotHtml(device,control)).join("");
     /* Gizlenen cihaz sessizce kaybolmaz: kartın altında sayısıyla duyurulur ve satır Cihazlar
        görünümüne (mümkünse o odayı süzerek) götürür. Gizli yoksa satır hiç basılmaz. */
     const hiddenNote=overview&&!state.dashboardEditing&&picked.hidden

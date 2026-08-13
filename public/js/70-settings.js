@@ -583,6 +583,21 @@
     applyWidgetLayout();
     render();
   }
+  /* Favoriler görünürlükle aynı yolu izler: karar sunucuda, panel yalnız okur ve yazar. Göç yok —
+     depo (`home-favorites.json`) baştan sunucudaydı, cihazda hiç yerel bir favori kaydı olmadı.
+     Çevrimdışıysa panel son bilinen kayıtla çalışmaya devam eder, liste sıfırlanmaz. */
+  async function loadHomeFavorites(){
+    let favorites;
+    try{
+      favorites=(await api("/api/favorites")).favorites;
+    }catch(error){
+      showToast(t("favoritesLoadFailed",{error:error.message}),true);
+      return;
+    }
+    applyFavorites(favorites);
+    applyWidgetLayout();
+    render();
+  }
   function migratableLocalGroups(){
     if(!state.devices.length)return savedGroups;
     return savedGroups.map(group=>({id:group.id,name:group.name,items:group.items.filter(item=>{

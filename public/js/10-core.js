@@ -80,6 +80,24 @@
   }catch{return null}})();
   const savedHiddenTiles=new Set(savedVisibilityCache?savedVisibilityCache.hiddenDevices:[]);
   const savedHiddenGroups=new Set(savedVisibilityCache?savedVisibilityCache.hiddenGroups:[]);
+  /* Favoriler: görünürlüğün AYNASI ama tersi işaretli — kayıt yalnız YILDIZLANANLARI tutar ve boş
+     başlar. Depo sunucuda zaten vardı (`home-favorites.json`, `/api/favorites`); panel bugüne
+     kadar hiç kullanmıyordu, yıldız düğmesi onu kullanan ilk yüzey. Anahtar yine cihaz kimliği
+     (IEEE) + kontrol kimliği; dostane ad kullanılmaz.
+
+     `@device` (kumandası olmayan cihaz) favori OLAMAZ: sunucunun doğrulaması kontrolün gerçekten
+     var olmasını ve `isHomeFavoriteControlKind` olmasını şart koşuyor. Favori zaten "eylem
+     öğesi" demek — sensörün yıldızlanacak bir eylemi yok, gizlenmesi (göz) anlamlıdır.
+
+     Sıra kullanıcınındır: yıldızlama sırası korunur (Set ekleme sırasını tutar), cihaz listesinin
+     sırası değil. Yerel kayıt yalnız çevrimdışı açılışta son bilinen değeri gösterir. */
+  const favoritesCacheKey="villa-home-favorites-cache";
+  const maxHomeFavorites=64;
+  const favoriteKey=(deviceId,controlId)=>`${deviceId}::${controlId}`;
+  const savedFavorites=new Set((()=>{try{
+    const value=JSON.parse(localStorage.getItem(favoritesCacheKey)||"[]");
+    return Array.isArray(value)?value.filter(item=>typeof item==="string"&&item):[];
+  }catch{return[]}})());
   const dashboardWidgetTypes={
     quick:{title:"homeTabsWidget",lead:"homeTabsWidgetLead"},
     summary:{title:"summaryWidget",lead:"summaryWidgetLead"}
@@ -132,7 +150,7 @@
     }
   }catch{}
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],debugNetworkEvents:[],agentTokens:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,deviceReturnWait:null,lightDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,automationAgentBackups:0,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,quickControl:null,quickPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,deviceSort:savedDeviceSort??{key:"name",direction:"asc"},attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,mqttPasswordVisible:false,debugErrors:[],debugNetworkEvents:[],agentTokens:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,favorites:savedFavorites,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,deviceReturnWait:null,lightDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,automationAgentBackups:0,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,quickControl:null,quickPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,deviceSort:savedDeviceSort??{key:"name",direction:"asc"},attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
   let applicationStarted=false;
   /* `updatedAt` sunucunun veriyi çektiği an, `checkedAt` bu cihazın sunucuya en son sorduğu an.
      İkisi ayrıdır: veri on dakika önce çekilmiş olabilir ama biz onu saniyeler önce okumuş

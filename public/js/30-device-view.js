@@ -203,6 +203,66 @@
     const label=`${visibilityLabel(hidden)}: ${control.name||device.name}`;
     return`<button class="visibility-toggle${hidden?" is-hidden":""}" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(control.id)}" aria-label="${esc(label)}" title="${esc(visibilityLabel(hidden))}">${visibilityIcon(hidden)}</button>`;
   };
+  /* FAVORİLER — göz ikonunun kardeşi. Aynı iskelet: karar SUNUCUDA (`/api/favorites`, ev genelinde
+     tek doğru), yerel kayıt yalnız çevrimdışı açılışın yansısı, anahtar cihaz kimliği + kontrol
+     kimliği. Fark tek: göz "gizlenenleri", yıldız "seçilenleri" tutar. */
+  const isFavorite=(deviceId,controlId)=>state.favorites.has(favoriteKey(deviceId,controlId));
+  /* Sunucudaki şekil: `[{deviceId,controlId}]`. Panelde tek dizeli anahtar taşınır; çeviri burada. */
+  function favoritesPayload(){
+    return[...state.favorites].map(key=>{
+      const index=key.lastIndexOf("::");
+      return index<0?null:{deviceId:key.slice(0,index),controlId:key.slice(index+2)};
+    }).filter(entry=>entry&&entry.deviceId&&entry.controlId);
+  }
+  function cacheFavorites(){
+    try{localStorage.setItem(favoritesCacheKey,JSON.stringify([...state.favorites]))}catch{}
+  }
+  function applyFavorites(favorites){
+    const list=Array.isArray(favorites)?favorites:[];
+    state.favorites=new Set(list
+      .filter(entry=>entry&&typeof entry.deviceId==="string"&&typeof entry.controlId==="string")
+      .map(entry=>favoriteKey(entry.deviceId,entry.controlId)));
+    cacheFavorites();
+  }
+  async function saveHomeFavorites(){
+    cacheFavorites();
+    try{
+      await api("/api/favorites",{method:"PUT",body:JSON.stringify({favorites:favoritesPayload()})});
+      return true;
+    }catch(error){showToast(t("favoritesSaveFailed",{error:error.message}),true);return false}
+  }
+  /* Sunucu 64 kaydı aşan listeyi reddediyor: kullanıcı sessiz bir hatayla değil, açık bir uyarıyla
+     karşılaşsın ve yıldız işaretlenmemiş kalsın. */
+  function toggleFavorite(deviceId,controlId){
+    if(!deviceId||!controlId||controlId===groupDeviceControlId)return;
+    const key=favoriteKey(deviceId,controlId);
+    if(state.favorites.has(key))state.favorites.delete(key);
+    else{
+      if(state.favorites.size>=maxHomeFavorites){showToast(t("favoritesFull",{count:maxHomeFavorites}),true);return}
+      state.favorites.add(key);
+    }
+    void saveHomeFavorites();
+    render();
+  }
+  /* Favori kartının içeriği: kayıttaki SIRAYLA çözülür. Silinen cihaz ya da kalkmış kanal kaydı
+     burada sessizce düşer (sunucu da cihaz silinince kendi kaydını temizliyor); çevrimdışı cihaz
+     düşmez — döşemesi normal "offline" hâliyle durur, çünkü kullanıcı onu bilerek seçti. */
+  function favoriteEntries(){
+    return[...state.favorites].map(key=>{
+      const index=key.lastIndexOf("::");
+      if(index<0)return null;
+      const device=state.devices.find(candidate=>candidate.id===key.slice(0,index));
+      const control=device?.controls.find(candidate=>candidate.id===key.slice(index+2)&&isDashboardControl(candidate));
+      return device&&control?{device,control}:null;
+    }).filter(Boolean);
+  }
+  const favoriteIcon=()=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.85 6.8 19.6l1-5.75-4.2-4.1 5.8-.85z"/></svg>';
+  const favoriteLabel=on=>t(on?"removeFromFavorites":"addToFavorites");
+  const favoriteButton=(device,control)=>{
+    const on=isFavorite(device.id,control.id);
+    const label=`${favoriteLabel(on)}: ${control.name||device.name}`;
+    return`<button class="favorite-toggle" type="button" aria-pressed="${on?"true":"false"}" data-favorite-device="${esc(device.id)}" data-favorite-control="${esc(control.id)}" aria-label="${esc(label)}" title="${esc(favoriteLabel(on))}">${favoriteIcon()}</button>`;
+  };
   const commandValue=value=>esc(JSON.stringify(value));
   const optionValue=(values,pattern,fallback)=>values?.find(value=>pattern.test(String(value).toUpperCase()))??fallback;
   const dashboardControlKinds=new Set(["switch","fan","siren","cover","position","lock","climate"]);
@@ -278,7 +338,7 @@
       const valueLabel=control.value===null?t("unknownState"):active?t("on"):t("off");
       const pending=commandPending(device.id,control.property);
       const name=channelDisplayName(device,control);
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(name)}${renameControlButton(device,control)}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${isDashboardControl(control)?visibilityButton(device,control):""}<button class="switch ${active?"on":""}${pending?" pending":""}" data-command-value="${commandValue(!active)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(name)}" aria-pressed="${active}"${pending?' aria-busy="true"':""}${pending?" disabled":""}><span></span></button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(name)}${renameControlButton(device,control)}</div><div class="control-value">${pending?t("sendingCommand"):valueLabel}</div></div><div class="control-actions">${isDashboardControl(control)?favoriteButton(device,control)+visibilityButton(device,control):""}<button class="switch ${active?"on":""}${pending?" pending":""}" data-command-value="${commandValue(!active)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(name)}" aria-pressed="${active}"${pending?' aria-busy="true"':""}${pending?" disabled":""}><span></span></button></div></div>`;
     }
     if(control.kind==="cover"){
       const values=control.values||[];
@@ -286,14 +346,14 @@
       const stopValue=optionValue(values,/STOP/,"STOP");
       const closeValue=optionValue(values,/CLOSE|DOWN/,"CLOSE");
       const current=String(control.value??"").toUpperCase();
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("cover"))}</div><div class="control-value">${esc(control.value??t("unknownState"))}</div></div><div class="control-icon-actions">${isDashboardControl(control)?visibilityButton(device,control):""}<button class="control-command ${current===String(openValue).toUpperCase()?"active":""}" data-command-value="${commandValue(openValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("open")}" title="${t("open")}">↑</button><button class="control-command stop" data-command-value="${commandValue(stopValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("stop")}" title="${t("stop")}">■</button><button class="control-command close-action ${current===String(closeValue).toUpperCase()?"active":""}" data-command-value="${commandValue(closeValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("close")}" title="${t("close")}">↓</button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("cover"))}</div><div class="control-value">${esc(control.value??t("unknownState"))}</div></div><div class="control-icon-actions">${isDashboardControl(control)?favoriteButton(device,control)+visibilityButton(device,control):""}<button class="control-command ${current===String(openValue).toUpperCase()?"active":""}" data-command-value="${commandValue(openValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("open")}" title="${t("open")}">↑</button><button class="control-command stop" data-command-value="${commandValue(stopValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("stop")}" title="${t("stop")}">■</button><button class="control-command close-action ${current===String(closeValue).toUpperCase()?"active":""}" data-command-value="${commandValue(closeValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("close")}" title="${t("close")}">↓</button></div></div>`;
     }
     if(control.kind==="lock"){
       const values=control.values||[];
       const lockValue=optionValue(values,/^LOCK(?:ED)?$/,"LOCK");
       const unlockValue=optionValue(values,/UNLOCK/,"UNLOCK");
       const locked=/^LOCK(?:ED)?$/.test(String(control.value??"").toUpperCase());
-      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("lockDevice"))}</div><div class="control-value">${locked?t("lock"):t("unlock")}</div></div><div class="control-icon-actions">${isDashboardControl(control)?visibilityButton(device,control):""}<button class="control-command ${locked?"active":""}" data-command-value="${commandValue(lockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("lock")}" title="${t("lock")}">▣</button><button class="control-command ${!locked?"active":""}" data-command-value="${commandValue(unlockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("unlock")}" title="${t("unlock")}">□</button></div></div>`;
+      return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name||t("lockDevice"))}</div><div class="control-value">${locked?t("lock"):t("unlock")}</div></div><div class="control-icon-actions">${isDashboardControl(control)?favoriteButton(device,control)+visibilityButton(device,control):""}<button class="control-command ${locked?"active":""}" data-command-value="${commandValue(lockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("lock")}" title="${t("lock")}">▣</button><button class="control-command ${!locked?"active":""}" data-command-value="${commandValue(unlockValue)}" data-device="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("unlock")}" title="${t("unlock")}">□</button></div></div>`;
     }
     if(control.kind==="select"){
       return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(control.name)}</div>${control.adminOnly?`<div class="control-value">${t("deviceSetting")}</div>`:""}</div><select class="control-select" data-select="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${esc(control.name)}">${(control.values||[]).map(value=>`<option value="${esc(value)}"${String(value)===String(control.value)?" selected":""}>${esc(String(value).replaceAll("_"," "))}</option>`).join("")}</select></div>`;
@@ -301,7 +361,7 @@
     if(control.kind==="color")return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${t("color")}</div><div class="control-value">${esc(control.value)}</div></div><input type="color" value="${esc(control.value||"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(control.property)}" aria-label="${t("color")}"></div>`;
     const known=typeof control.value==="number";
     const label=control.kind==="position"?t("position"):control.kind==="climate"?t("targetTemperature"):control.name;
-    return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(label)}</div><div class="control-value">${known?levelValueHtml(control.value,control.unit):t("unknownState")}</div></div><div class="control-actions">${isDashboardControl(control)?visibilityButton(device,control):""}<input type="range" min="${control.min??0}" max="${control.max??100}" step="${control.step??1}" value="${known?control.value:control.min??0}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" data-unit="${esc(control.unit||"")}" aria-label="${esc(label)}"></div></div>`;
+    return`<div class="control-row${adminClass}"${adminAttr}><div><div class="control-name">${esc(label)}</div><div class="control-value">${known?levelValueHtml(control.value,control.unit):t("unknownState")}</div></div><div class="control-actions">${isDashboardControl(control)?favoriteButton(device,control)+visibilityButton(device,control):""}<input type="range" min="${control.min??0}" max="${control.max??100}" step="${control.step??1}" value="${known?control.value:control.min??0}" data-level="${esc(device.id)}" data-property="${esc(control.property)}" data-unit="${esc(control.unit||"")}" aria-label="${esc(label)}"></div></div>`;
   };
   // Rol satırı cihazın yayımladığı ayarların en altında, "switch type" gibi görünür. Cihaza yazılmaz,
   // Villa Bridge'in kendi ayarıdır — alt yazısı bunu söyler. Satır her cihazda çıkar; seçim yalnız
@@ -681,10 +741,12 @@
       :"";
     const modeButtons=powerButton+modeButton("level",parts.level,mode==="level")+modeButton("temperature",parts.temperature,mode==="temperature")+modeButton("color",parts.color,mode==="color");
     const modesHtml=modeButtons?`<div class="light-modes" role="group" aria-label="${esc(t("quickControl"))}">${modeButtons}</div>`:"";
-    /* Göz kip düğmelerinin yanında, kumandanın içinde durur. Yeni bileşen yok: satırdakiyle BİREBİR
-       aynı `visibilityButton` çağrısı — aynı sınıf, aynı `role="switch"`/`aria-checked`, aynı
-       `data-visibility-*` bağlaması. Panoya ekleme/çıkarma davranışı değişmedi, yalnız yeri değişti. */
-    const eyeHtml=options.compact!==true&&lightPanelCoversPower(device,parts)?visibilityButton(device,parts.power):"";
+    /* Yıldız ve göz kip düğmelerinin yanında, kumandanın içinde durur. Yeni bileşen yok: satırdakiyle
+       BİREBİR aynı `favoriteButton`/`visibilityButton` çağrıları — aynı sınıf, aynı işaretleme, aynı
+       `data-favorite-*`/`data-visibility-*` bağlaması. Yalnız yerleri değişti. */
+    const eyeHtml=options.compact!==true&&lightPanelCoversPower(device,parts)
+      ?favoriteButton(device,parts.power)+visibilityButton(device,parts.power)
+      :"";
     const actionsHtml=modesHtml||eyeHtml?`<div class="light-actions">${modesHtml}${eyeHtml}</div>`:"";
     /* Hazır renklerin altında panelin KENDİ renk seçicisi durur (`.color-picker` + `data-color`):
        serbest renk için ikinci bir arayüz yazılmadı, mevcut olan yeniden kullanıldı. */

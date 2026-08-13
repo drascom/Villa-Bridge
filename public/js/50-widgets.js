@@ -379,6 +379,12 @@
       event.stopPropagation();
       toggleTileVisibility(button.dataset.visibilityDevice,button.dataset.visibilityControl);
     });
+    /* Yıldız da yalnız favori kaydını değiştirir; gözle aynı gerekçeyle olay burada durdurulur. */
+    $$(".tile-star").forEach(button=>button.onclick=event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      toggleFavorite(button.dataset.favoriteDevice,button.dataset.favoriteControl);
+    });
     /* "n cihaz gizli" satırı Cihazlar görünümüne götürür; oda gerçek bir grupsa oraya süzer. */
     $$("[data-hidden-room]").forEach(button=>button.onclick=event=>{
       event.preventDefault();
