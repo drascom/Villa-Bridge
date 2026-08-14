@@ -12,6 +12,7 @@ import { assertPanelGraph } from "./panel-graph.mjs";
 import { assertHomeLayout } from "./check-home-layout.mjs";
 import { assertRuntimeModuleGraph } from "./runtime-module-graph.mjs";
 import { assertThemePackages } from "./check-theme-packages.mjs";
+import { assertPanelInk } from "./check-panel-ink.mjs";
 import { verifyAstronomy } from "./verify-astronomy.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -25,6 +26,9 @@ async function main() {
 
   const themes = await assertThemePackages(projectRoot);
   console.log(`Tema paketleri tamam: ${themes.length} paket.`);
+
+  const ink = await assertPanelInk(projectRoot);
+  console.log(`Koyu yuzey murekkep denetimi tamam: ${ink.surfaces} yuzey, ${ink.tokens.length} token.`);
 
   await verifyAstronomy(projectRoot);
   console.log("Astronomi dogrulamasi tamam.");

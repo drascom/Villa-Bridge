@@ -2543,6 +2543,75 @@
       --glass-line:var(--theme-ink-line);--glass-inset:var(--theme-ink-inset);
       --glass-tile-text-shadow:var(--sky-plate-shadow,none);
     }
+    /* İLK KARE YEDEĞİ. `<head>` betiği `data-theme-package`ı önbellekten yazıyor ama koyu yüzey
+       kümesini yazamıyor — önbellekte yalnız O ANKİ palet var, koyu palet yok. JS gelene kadar
+       geçerli olan bu yedek panelin KENDİ koyu çip ailesinin ta kendisidir (kökteki `--glass-*`
+       değerleri, 194–227), yani paketsiz davranışla birebir aynı. JS bir kare sonra paketin
+       değerlerini kökün SATIR İÇİ stiline yazar ve bu blok kendiliğinden geri çekilir. */
+    :root[data-theme-package]{
+      --on-dark-ink:#f3f7f5;--on-dark-ink-soft:rgba(226,238,232,.88);
+      --on-dark-line:rgba(255,255,255,.16);--on-dark-inset:rgba(255,255,255,.09);
+      --on-dark-tile:rgba(42,50,61,.6);--on-dark-edge:rgba(255,255,255,.26);
+      --on-dark-accent:#a4e6c9;--on-dark-accent-soft:rgba(122,206,166,.2);--on-dark-accent-ink:#0b1c15;
+      --on-dark-danger:#f5978f;--on-dark-danger-soft:rgba(198,88,78,.26);
+    }
+    /* ————— KOYU KALAN YÜZEYLER — TEK KURAL, TEK LİSTE —————
+       KÖK SEBEP (iki kez aynı yerden çıktı, üçüncüsü olmasın diye tek kurala indirildi):
+       köprü `--ink`/`--muted`/`--glass-ink*` ailesini paketin O ANKİ faz mürekkebine bağlıyor.
+       Bu, yüzeyi de gökyüzüyle birlikte dönen öğeler için DOĞRU. Ama panelde birkaç yüzey
+       bilerek gökyüzüne UYMAZ, gün boyu koyu kalır — menü levhası (canlı kipte), hızlı kumanda
+       penceresi, alarm saati seçicisi. Onların üstüne gündüz çapasının koyu laciverti (`day.ink`
+       #10263a) düşünce yazı yok oluyordu:
+         menü levhası (bileşke üstünde) — şafak 1,17:1 · gündüz 1,41:1
+         menünün seçili tema/dil çipi (dolu aksan) — şafak 2,26:1 · gündüz 2,45:1
+         hızlı kumandanın ikincil satırları (`--muted`) — şafak 1,02:1 · gündüz 1,13:1 ·
+           sabit-açık 1,30:1
+       `1ee9117`'deki kapalı döşeme hatası bunun TERSİYDİ (açık yüzey + panelin beyazımsı
+       mürekkebi); ikisi de "köprü mürekkebi yeniden bağlarken yüzeyin yönünü hesaba katmıyor"
+       demek. Bu yüzden çözüm kural kural değil, İLİŞKİ olarak yazıldı:
+         "yüzey koyu kalıyorsa mürekkep `--on-dark-*` kümesinden gelir."
+       Küme `82-theme-packages.js` içinde TEK YERDE üretiliyor (canlı kipte paketin solar `night`
+       çapası, sabit kiplerde `palettes.dark`) ve aşağıdaki TEK bildirim bloğu onu bağlıyor.
+       Yeni bir koyu yüzey eklemek = bu listeye BİR seçici eklemek; renk kararı tekrarlanmaz.
+       Denetimi `scripts/check-panel-ink.mjs` yapıyor: listedeki her ad `--on-dark-*` okumak
+       zorunda, blok içinde çıplak renk yasak.
+       KAPSAM — yalnız yüzeyi KENDİ KARARIYLA koyu kalanlar:
+       · menü levhası SADECE `data-sky="live"` içinde listede. Sabit kipte levha `--glass-tile`
+         taşıyor, yani Light'ta AÇIK (ölçüm 15,67:1) — orada koyu mürekkep zaten doğrusu;
+         Dark'ta da köprünün kendi mürekkebi doğru (11,69:1). Listeye alsaydık Light'ı kırardık
+         (1,04:1 olurdu) — ölçüldü, o yüzden kip kancası seçicide duruyor.
+       · `.quick-modal` her kipte listede: kendi `--quick-*` ailesi zaten sabit koyu, sızan
+         yalnız panelin genel adlarıydı. Alarm saati seçicisi de aynı sınıfı taşıdığı için
+         (`.modal.quick-modal.time-picker-card`) ayrı seçici gerekmiyor.
+       LİSTEYE ALINMAYANLAR ve gerekçesi (taramada bakıldı, hepsi sağlam):
+       · `.alarm-dialog`, `.screensaver`, `.toast`, `.image-edit-overlay` — mürekkepleri düz
+         `#fff`, köprüden hiçbir mürekkep okumuyorlar. `--danger`/`--forest` okuyan tek iki
+         öğeleri (`.screensaver-alert`, `.alarm-stop`) `data-theme` ile dönüyor, yani yönleri
+         zaten doğru. Bu blok `--danger`ı koyu aileye çevirdiği için onları listeye almak
+         `.screensaver-alert`in beyaz yazısını açık pembe zemine düşürürdü — bilerek dışarıda.
+       · Alt sayfaların kartları, `dialog` tabanı, `.coach-tooltip` — yüzeyleri `--surface`,
+         yani `data-theme` ile dönüyor; köprü `--surface`ı hiç yeniden bağlamıyor. Koyu yüzey
+         + koyu mürekkep durumu oluşmuyor.
+       · Alt şeridin seçili sekmesi ve "+" düğmesi — dolguları paketten DEĞİL panelin kendi
+         `--glass-plate-accent`/`--forest` ailesinden geliyor ve mürekkepleri (`--on-forest`,
+         `--glass-plate-accent-ink`) `data-theme` ile birlikte kutup değiştiriyor: gündüz koyu
+         yeşil + beyaz (10,09:1), gece açık nane + koyu (12,5:1).
+       · Döşeme durum çipleri (yanan/aktif/uyarı) — paket yolunda dolguları `--theme-glass-tile`,
+         yazıları `--theme-ink`, yani ikisi de AYNI fazdan; alt satırları `color:inherit`
+         (`.group-control-copy small`), `--muted`e hiç bakmıyorlar. `1ee9117`'de kapalı döşeme
+         için yapılanın karşılığı burada zaten kuruluydu. */
+    :root[data-theme-package][data-sky="live"] dialog.app-menu-dialog>.app-menu-modal,
+    :root[data-theme-package] .quick-modal{
+      --ink:var(--on-dark-ink);--ink-soft:var(--on-dark-ink-soft);--muted:var(--on-dark-ink-soft);
+      --line:var(--on-dark-line);--surface:var(--on-dark-inset);--surface-soft:var(--on-dark-inset);
+      --forest:var(--on-dark-accent);--forest-soft:var(--on-dark-accent-soft);--on-forest:var(--on-dark-accent-ink);
+      --danger:var(--on-dark-danger);--danger-soft:var(--on-dark-danger-soft);
+      --glass-ink:var(--on-dark-ink);--glass-ink-soft:var(--on-dark-ink-soft);--glass-sub:var(--on-dark-ink-soft);
+      --glass-line:var(--on-dark-line);--glass-inset:var(--on-dark-inset);
+      --glass-tile:var(--on-dark-tile);--glass-tile-brd:var(--on-dark-edge);
+      --glass-accent:var(--on-dark-accent);--glass-accent-soft:var(--on-dark-accent-soft);--glass-accent-ink:var(--on-dark-accent-ink);
+      --glass-danger:var(--on-dark-danger);--glass-danger-soft:var(--on-dark-danger-soft);
+    }
     /* `data-moon-visible` KALKTI: onu yazan tek yer ikinci motordu (astronomi yoklaması) ve o
        motor kaldırıldı. Ayın görünürlüğü zaten tek yerden geliyor — `--moon-disc`, gündüz sıfır. */
 

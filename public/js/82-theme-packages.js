@@ -146,10 +146,49 @@
         [[{colors:{sky:palette.colors.skyTop}},.5],[{colors:{sky:palette.colors.skyBottom}},.5]],"sky")));
     });
   }
+  /* ————— KOYU KALAN YÜZEYİN MÜREKKEBİ — TEK KAYNAK —————
+     Panelde birkaç yüzey gökyüzüne UYMAZ, bilerek koyu kalır: menü levhası (canlı kipte), hızlı
+     kumanda penceresi ve alarm saati seçicisi. Köprü ise `--glass-ink*`/`--ink`/`--muted`
+     ailesini paketin O ANKİ faz mürekkebine bağlıyor — gündüz çapasında bu KOYU lacivert
+     (`day.ink` #10263a). Koyu yüzey + koyu mürekkep = ölçülen 1,17:1 (şafak) ve 1,41:1 (gündüz),
+     yani yazı yok olur. Aynı hata kapalı döşemede (`1ee9117`) TERS yönde çıkmıştı: orada açık
+     yüzeyin üstüne panelin beyazımsı mürekkebi düşüyordu.
+     TEK KURAL, İKİ BASAMAK: (1) burada, koyu yüzeye uygun mürekkep kümesi `--on-dark-*` adıyla
+     BİR KEZ yayımlanır; (2) `panel.css` içinde koyu kalan yüzeyleri sayan TEK kural o kümeye
+     bağlanır. Yeni kural yazmak = o listeye bir seçici eklemek; renk kararı tekrarlanmaz.
+     KAYNAK PALET paketin kendisidir, uydurma renk yok: canlı kipte solar `night` çapası, sabit
+     kiplerde `palettes.dark`. İkisi de "koyu zemin" için tasarlanmış kümeler.
+     `accentInk` paket şemasında YOK; dolu aksan düğmesinin (seçili tema/dil çipi) yazısı o
+     paletin KENDİ zemininden (`page`) türer — koyu zemin, açık nane aksanın üstünde 12,76:1.
+     Şema değişmedi, yeni token paket dosyasına eklenmedi. */
+  const darkSurfaceTokenCss={ink:"--on-dark-ink",inkSoft:"--on-dark-ink-soft",page:"--on-dark-accent-ink",
+    accent:"--on-dark-accent",accentSoft:"--on-dark-accent-soft",glassEdge:"--on-dark-edge",
+    glassTile:"--on-dark-tile",stateAlert:"--on-dark-danger"};
+  function applyDarkSurfaceInk(theme,mode){
+    const night=theme?.palettes?.solar?.anchors?.night;
+    const source=mode==="sun"&&night
+      ?mergeThemePalette(night,themeRuntime.appearance?.overrides?.[theme.id]?.solar?.night||{})
+      :mergeThemePalette(theme.palettes.dark,themeOverride(theme.id,"dark"));
+    if(!source?.colors)return;
+    const root=document.documentElement;
+    Object.entries(darkSurfaceTokenCss).forEach(([token,css])=>{
+      if(typeof source.colors[token]==="string")root.style.setProperty(css,source.colors[token]);
+    });
+    // Ayraç ve iç yüzey mürekkebin seyreltilmişidir — köprünün `--theme-ink-line/-inset`
+    // türetmesinin birebir aynısı, yalnız koyu paletten.
+    const ink=parseThemeColor(source.colors.ink);
+    root.style.setProperty("--on-dark-line",themeRgba(ink,.16));
+    root.style.setProperty("--on-dark-inset",themeRgba(ink,.07));
+    const danger=parseThemeColor(source.colors.stateAlert||source.colors.ink);
+    root.style.setProperty("--on-dark-danger-soft",themeRgba(danger,.26));
+  }
   function applyThemePackage(mode=state.themeMode){
     const theme=activeThemePackage();
     if(!theme)return;
     applyThemeAnchors(theme);
+    /* Çapalar gibi SABİTTİR (pakete ve kipe bağlı, saate değil), o yüzden dakikalık döngüde
+       değil yalnız paket/kip değişiminde yazılır. */
+    applyDarkSurfaceInk(theme,mode);
     if(mode==="sun"){
       if(typeof applySolarThemePaint==="function")applySolarThemePaint();
       return;
