@@ -88,7 +88,27 @@ export interface DeviceView {
   lastAction?: DeviceLastActionView | null;
   alerts: DeviceAlertView[];
   controls: DeviceControlView[];
+  /**
+   * Cihazın yayımladığı ama yazılamayan tüm ölçümler. Kumanda değildir, salt gösterimdir:
+   * rol süzgecine takılmaz. Kural jeneriktir — cihaza/özelliğe özel liste yoktur.
+   */
+  readings: DeviceReadingView[];
   state: JsonObject;
+}
+
+export interface DeviceReadingView {
+  property: string;
+  /** Gösterim etiketi: expose `label` ?? `name`, alt çizgiler boşluğa çevrili. */
+  name: string;
+  /** Z2M expose tipi: `numeric` | `binary` | `enum` | `text` … Tanım yoksa boş dize. */
+  type: string;
+  unit?: string;
+  /** `state`ten okunan son değer; henüz gelmediyse `null`. */
+  value: JsonScalar | null;
+  /** `config` | `diagnostic` — panelde ikinci sınıf gösterim için. */
+  category?: string;
+  /** Üst composite'in adı; çok endpoint'li cihazda aynı adlı ölçümleri ayırır. */
+  parentName?: string;
 }
 
 export interface DeviceAlertView {

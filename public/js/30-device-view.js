@@ -617,6 +617,33 @@
     const rows=buttons.map(button=>`<div class="device-button-row${deviceButtonPressed(device,button)?" pressed":""}" data-device-button="${esc(button.id)}"><div class="device-button-name">${esc(deviceButtonName(button))}${deviceButtonRenameButton(device,button)}</div><div class="device-button-presses">${esc(deviceButtonPressList(button))}</div></div>`).join("");
     return`<div class="device-buttons"><div class="device-buttons-head">${t("deviceButtons")}</div>${deviceButtonLastLine(device)}${rows}</div>`;
   };
+  /* Cihazın yayımladığı ama yazılamayan TÜM ölçümler. Liste sunucudan hazır gelir
+     (`device.readings`, bkz. `src/device-store.ts` → `deviceReadings`); panelde cihaza ya da
+     özellik adına özel hiçbir kural yoktur — biçim yalnız expose tipinden okunur. */
+  const readingValueText=reading=>{
+    const value=reading?.value;
+    if(value===null||value===undefined)return t("unknownState");
+    // İkili ölçüm cihazdan ya boolean ya da kendi `value_on/value_off` dizesiyle gelir:
+    // boolean'a dile çevrilmiş karşılık, dizeye cihazın kendi sözcüğü yazılır.
+    if(typeof value==="boolean")return t(value?"readingYes":"readingNo");
+    if(typeof value==="number"){
+      // Ondalık gürültüsü kırpılır (21.599999998 → 21.6); tam sayı olduğu gibi kalır.
+      const rounded=Number.isInteger(value)?value:Math.round(value*100)/100;
+      return reading.unit?`${rounded} ${reading.unit}`:String(rounded);
+    }
+    return String(value).replaceAll("_"," ");
+  };
+  const deviceReadingsHtml=device=>{
+    const list=Array.isArray(device?.readings)?device.readings:[];
+    if(!list.length)return"";
+    const rows=list.map(reading=>{
+      const label=reading.parentName?`${reading.parentName} · ${reading.name}`:reading.name;
+      // Tanı amaçlı alanlar (pil voltajı, sayaçlar…) ev sakinine kalabalık yapmasın.
+      const admin=reading.category==="diagnostic"?" data-admin-only":"";
+      return`<div class="control-row"${admin}><span class="control-name">${esc(label)}</span><span class="control-value">${esc(readingValueText(reading))}</span></div>`;
+    }).join("");
+    return`<div class="device-buttons device-readings"><div class="device-buttons-head">${esc(t("readings"))}</div><div class="controls">${rows}</div></div>`;
+  };
   // Otomatik onarım sessiz kalmasın: cihazın kendi kartında son denemenin izi görünür.
   const deviceSelfHealHtml=device=>{
     const event=(state.events||[]).find(item=>item.sourceName===device.sourceName&&item.property==="self_heal");
@@ -826,7 +853,12 @@
        birinci gözde durur — resim kartı onunla hizalanır — kalanı ikinci göze iner. */
     const controlsListHtml=`<div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div>`;
     const controlsLeadHtml=panelHtml||controlsListHtml;
-    const controlsRestHtml=panelHtml?`<div class="device-detail-controls-rest">${controlsListHtml}</div>`:"";
+    /* Ölçümler kumanda sütununun altına iner: aynı sütunda, kontrollerin/düğmelerin hemen
+       ardında. `.device-detail-controls` `display:contents` olduğu için doğrudan çocuk
+       eklenmez — ızgara gözü tanımlı olan "rest" sarmalayıcının içine girer. */
+    const readingsHtml=deviceReadingsHtml(device);
+    const controlsRestBody=`${panelHtml?controlsListHtml:""}${readingsHtml}`;
+    const controlsRestHtml=controlsRestBody?`<div class="device-detail-controls-rest">${controlsRestBody}</div>`:"";
     return`${setupHtml}<div class="device-detail-layout">
         <div class="device-detail-controls"><div class="device-detail-controls-lead">${controlsLeadHtml}</div>${controlsRestHtml}</div>
         ${mediaHtml}

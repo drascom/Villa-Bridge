@@ -3,6 +3,7 @@ import type {
   BridgeGroup,
   DeviceControlView,
   DeviceEventView,
+  DeviceReadingView,
   DeviceView,
   GroupView,
   JsonObject,
@@ -223,6 +224,92 @@ function writableFeatures(exposes: unknown): WritableFeature[] {
   };
   visit(exposes);
   return [...features.values()].sort((left, right) => left.property.localeCompare(right.property, "en"));
+}
+
+/**
+ * Gösterimde asla ölçüm sayılmayan jenerik altyapı anahtarları. Cihaza özel değildir:
+ * hepsi Zigbee2MQTT'nin her cihaza eklediği köprü/taşıma alanlarıdır.
+ */
+const nonReadingProperties: ReadonlySet<string> = new Set([
+  "linkquality", "last_seen", "update", "update_available", "elapsed"
+]);
+
+/** Ölçüm etiketi: `label` varsa o, yoksa `name`; alt çizgiler boşluğa çevrilir. */
+function readingLabel(label: unknown, name: string): string {
+  const text = typeof label === "string" && label.trim().length > 0 ? label : name;
+  return text.replaceAll("_", " ").trim();
+}
+
+/**
+ * `writableFeatures()`in kardeşi: yayımlanan ama YAZILAMAYAN (`access & 1` var, `access & 2` yok)
+ * her expose'u toplar. Yazılabilirler zaten `deviceControls()` ile kumanda satırına dönüyor,
+ * burada tekrar edilmez. Kural tamamen Z2M expose sözleşmesinden türer; model listesi yoktur.
+ */
+function readableFeatures(exposes: unknown): Omit<DeviceReadingView, "value">[] {
+  const features = new Map<string, Omit<DeviceReadingView, "value">>();
+  const visit = (
+    value: unknown,
+    parent: { name?: string; category?: string } = {}
+  ): void => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, parent));
+      return;
+    }
+    if (!isObject(value)) return;
+    const access = typeof value.access === "number" ? value.access : 0;
+    const property = typeof value.property === "string" ? value.property : undefined;
+    if ((access & 1) !== 0 && (access & 2) === 0 && property && !nonReadingProperties.has(property)) {
+      const name = typeof value.name === "string" ? value.name : property;
+      const category = typeof value.category === "string" ? value.category : parent.category;
+      features.set(property, {
+        property,
+        name: readingLabel(value.label, name),
+        type: typeof value.type === "string" ? value.type : "",
+        ...(typeof value.unit === "string" && value.unit.length > 0 ? { unit: value.unit } : {}),
+        ...(category ? { category } : {}),
+        ...(parent.name ? { parentName: parent.name } : {})
+      });
+    }
+    if ("features" in value) {
+      visit(value.features, {
+        name: typeof value.name === "string" ? value.name : parent.name,
+        category: typeof value.category === "string" ? value.category : parent.category
+      });
+    }
+  };
+  visit(exposes);
+  return [...features.values()];
+}
+
+/**
+ * Ölçüm listesi: tanımdan gelenler + tanımda olmayıp durumda görünen skaler anahtarlar.
+ * İkinci kaynak doğrudan kip / eksik tanım / `inferred-exposes` durumunda değerin yine
+ * görünmesini sağlar. Kumanda olan özellikler dışarıda kalır — onların kendi satırı var.
+ */
+function deviceReadings(
+  exposes: unknown,
+  state: JsonObject,
+  controls: DeviceControlView[]
+): DeviceReadingView[] {
+  const controlled = new Set(controls.map((control) => control.property));
+  const readings: DeviceReadingView[] = [];
+  const seen = new Set<string>();
+  for (const feature of readableFeatures(exposes)) {
+    if (controlled.has(feature.property)) continue;
+    seen.add(feature.property);
+    readings.push({ ...feature, value: scalar(state[feature.property]) ?? null });
+  }
+  for (const [property, raw] of Object.entries(state)) {
+    if (seen.has(property) || controlled.has(property) || nonReadingProperties.has(property)) continue;
+    const value = scalar(raw);
+    if (value === undefined) continue;
+    seen.add(property);
+    readings.push({ property, name: readingLabel(undefined, property), type: "", value });
+  }
+  // Asıl ölçümler önce, `config`/`diagnostic` sonra; her küme kendi içinde alfabetik.
+  const rank = (reading: DeviceReadingView): number => (reading.category ? 1 : 0);
+  return readings.sort((left, right) =>
+    rank(left) - rank(right) || left.property.localeCompare(right.property, "en"));
 }
 
 /**
@@ -898,6 +985,7 @@ export class DeviceStore {
           lastAction,
           alerts,
           controls,
+          readings: deviceReadings(exposes, stateValue, controls),
           state: stateValue
         };
       })
