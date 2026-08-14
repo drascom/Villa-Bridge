@@ -28,7 +28,10 @@ async function main() {
   console.log(`Tema paketleri tamam: ${themes.length} paket.`);
 
   const ink = await assertPanelInk(projectRoot);
-  console.log(`Koyu yuzey murekkep denetimi tamam: ${ink.surfaces} yuzey, ${ink.tokens.length} token.`);
+  console.log(
+    `Yuzey murekkep denetimi tamam: koyu ${ink.surfaces} yuzey / ${ink.tokens.length} token, ` +
+      `dolu aksan ${ink.accentSurfaces} yuzey.`
+  );
 
   await verifyAstronomy(projectRoot);
   console.log("Astronomi dogrulamasi tamam.");

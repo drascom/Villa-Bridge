@@ -1,24 +1,33 @@
 /*
- * KOYU KALAN YUZEYLERIN MUREKKEBI — STATIK DENETIM.
+ * YUZEY YONU VE MUREKKEP — STATIK DENETIM (IKI SIMETRIK KURAL).
  *
- * Panelde ayni hata iki kez cikti: kopru (`:root[data-theme-package]`) `--ink`/`--muted`/
- * `--glass-ink*` ailesini paketin O ANKI faz murekkebine bagliyor, ama yuzeyi gokyuzuyle
- * DONMEYEN oglelerde (menu levhasi, hizli kumanda penceresi) bu koyu ustune koyu demek.
- * Cozum tek iliskiye indirildi: "yuzey koyu kaliyorsa murekkep `--on-dark-*` kumesinden gelir."
+ * Panelde ayni hata uc kez cikti ve her seferinde ayni cumleydi: bir kural murekkebi yeniden
+ * baglarken YUZEYIN YONUNU hesaba katmiyordu. Iki yonu var, ikisi de tek bir kurala indirildi:
  *
- * Bu denetim o iliskiyi ayakta tutar:
+ *   1) "yuzey KOYU kaliyorsa murekkep `--on-dark-*` kumesinden gelir" (menu levhasi canli
+ *      kipte, hizli kumanda penceresi). Kopru (`:root[data-theme-package]`) `--ink`/`--muted`/
+ *      `--glass-ink*` ailesini paketin O ANKI faz murekkebine bagliyor; yuzeyi gokyuzuyle
+ *      DONMEYEN oglelerde bu koyu ustune koyu demek.
+ *   2) "yuzey DOLU AKSAN ise murekkep yuzeyin KENDI murekkebidir" (`currentColor`) — secili
+ *      menu satiri, secili tema/dil cipi. Simetrigi: acik zeminin ustune levhanin acik
+ *      murekkebi dusuyordu; baslik zeminle birebir ayni renkti (1,00:1).
+ *
+ * Bu denetim iki iliskiyi de ayakta tutar:
  *   1) panel.css icindeki KOYU YUZEY blogundaki her bildirim `var(--on-dark-*)` okumali —
  *      bloga ciplak renk (hex/rgb) ya da baska bir token sizarsa hata,
- *   2) kural koke degil YUZEY listesine uygulanmali (koke uygulanirsa tum panel koyu murekkebe
- *      doner),
- *   3) blogun okudugu her `--on-dark-*` adi gercekten uretilmeli ve iki kaynak (panel.css'teki
- *      ilk kare yedegi ile `public/js/82-theme-packages.js`) ayni kumeyi tanimlamali.
+ *   2) DOLU AKSAN blogundaki her bildirim `currentColor` olmali — o bloga bir RENK (kume adi
+ *      dahil) girerse kural "yuzeyin kendi murekkebi" olmaktan cikar,
+ *   3) iki kural da koke degil YUZEY listesine uygulanmali (koke uygulanirsa tum panel doner),
+ *   4) koyu blogun okudugu her `--on-dark-*` adi gercekten uretilmeli ve iki kaynak
+ *      (panel.css'teki ilk kare yedegi ile `public/js/82-theme-packages.js`) ayni kumeyi
+ *      tanimlamali.
  */
 import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DARK_RULE_MARKER = "KOYU KALAN YÜZEYLER — TEK KURAL, TEK LİSTE";
+const ACCENT_RULE_MARKER = "DOLU AKSAN ZEMİNLİ YÜZEYLER — TEK KURAL, TEK LİSTE";
 const FALLBACK_MARKER = "İLK KARE YEDEĞİ.";
 
 function blockAfter(css, marker, label) {
@@ -49,6 +58,17 @@ const declarations = (body) =>
     })
     .filter((entry) => entry.name.startsWith("--"));
 
+// Isaret bir yorumun ICINDE duruyor; secici listesi yorum kapandiktan sonra basliyor.
+function surfaceSelectors(rule, label) {
+  const text = rule.selector.slice(rule.selector.indexOf("*/") + 2);
+  const selectors = text.split(",").map((item) => item.trim()).filter(Boolean);
+  const rootOnly = selectors.filter((item) => /^:root(\[[^\]]+\])*$/.test(item));
+  if (rootOnly.length > 0) {
+    throw new Error(`${label} koke uygulanamaz (yuzey listesi olmali): ${rootOnly.join(" | ")}`);
+  }
+  return selectors;
+}
+
 export async function assertPanelInk(projectRoot) {
   const css = await fs.readFile(path.join(projectRoot, "public", "css", "panel.css"), "utf8");
   const js = await fs.readFile(path.join(projectRoot, "public", "js", "82-theme-packages.js"), "utf8");
@@ -70,13 +90,23 @@ export async function assertPanelInk(projectRoot) {
   }
   if (used.size === 0) throw new Error("Koyu yuzey kurali bos: hicbir --on-dark-* okunmuyor.");
 
-  // Isaret bir yorumun ICINDE duruyor; secici listesi yorum kapandiktan sonra basliyor.
-  const selectorText = rule.selector.slice(rule.selector.indexOf("*/") + 2);
-  const selectors = selectorText.split(",").map((item) => item.trim()).filter(Boolean);
-  const rootOnly = selectors.filter((item) => /^:root(\[[^\]]+\])*$/.test(item));
-  if (rootOnly.length > 0) {
-    throw new Error(`Koyu yuzey kurali koke uygulanamaz (yuzey listesi olmali): ${rootOnly.join(" | ")}`);
+  const selectors = surfaceSelectors(rule, "Koyu yuzey kurali");
+
+  // SIMETRIK KURAL: dolu aksan zeminli yuzeyler. Burada renk YOK — her deger `currentColor`,
+  // yani "yuzeyin kendi murekkebi". Bir kume adi ya da hex sizarsa iliski bozulmus demektir.
+  const accentRule = blockAfter(css, ACCENT_RULE_MARKER, "dolu aksan kurali");
+  const accentBad = declarations(accentRule.body).filter((entry) => entry.value !== "currentColor");
+  if (accentBad.length > 0) {
+    throw new Error(
+      "Dolu aksan kuralindaki her deger currentColor olmali (yuzeyin kendi murekkebi); su bildirimler degil -> " +
+        accentBad.map((entry) => `${entry.name}: ${entry.value}`).join(" | ")
+    );
   }
+  if (declarations(accentRule.body).length === 0) {
+    throw new Error("Dolu aksan kurali bos: hicbir murekkep adi yeniden baglanmiyor.");
+  }
+  const accentSelectors = surfaceSelectors(accentRule, "Dolu aksan kurali");
+  if (accentSelectors.length === 0) throw new Error("Dolu aksan kurali bos: hicbir yuzey listelenmemis.");
 
   const declared = new Set(declarations(fallback.body).map((entry) => entry.name));
   const written = new Set();
@@ -94,17 +124,20 @@ export async function assertPanelInk(projectRoot) {
         `yalniz CSS yedeginde: ${missingInJs.join(", ") || "-"} | yalniz JS'te: ${missingInCss.join(", ") || "-"}`
     );
   }
-  return { tokens: [...declared].sort(), surfaces: selectors.length };
+  return { tokens: [...declared].sort(), surfaces: selectors.length, accentSurfaces: accentSelectors.length };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const projectRoot = path.resolve(path.dirname(process.argv[1]), "..");
   assertPanelInk(projectRoot)
     .then((result) =>
-      console.log(`Koyu yuzey murekkep denetimi tamam: ${result.surfaces} yuzey, ${result.tokens.length} token.`)
+      console.log(
+        `Yuzey murekkep denetimi tamam: koyu ${result.surfaces} yuzey / ${result.tokens.length} token, ` +
+          `dolu aksan ${result.accentSurfaces} yuzey.`
+      )
     )
     .catch((error) => {
-      console.error("Koyu yuzey murekkep denetimi basarisiz:", error.message ?? error);
+      console.error("Yuzey murekkep denetimi basarisiz:", error.message ?? error);
       process.exitCode = 1;
     });
 }
