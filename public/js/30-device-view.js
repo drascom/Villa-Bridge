@@ -620,9 +620,19 @@
   /* Cihazın yayımladığı ama yazılamayan TÜM ölçümler. Liste sunucudan hazır gelir
      (`device.readings`, bkz. `src/device-store.ts` → `deviceReadings`); panelde cihaza ya da
      özellik adına özel hiçbir kural yoktur — biçim yalnız expose tipinden okunur. */
+  /* Zigbee2MQTT'nin STANDART algılama sözlüğü — her üreticide aynı property adları. Liste cihaz
+     modeline/markasına değil, protokolün ortak sözcüklerine dayanır: bu yüzden yeni bir sensör
+     eklendiğinde tek satır bile değişmez. Bu ölçümlerde "Açık/Kapalı" bir güç dilidir ve yanlış
+     okunur; doğru dil "Var/Yok"tur. */
+  const readingDetectionProperties=new Set(["occupancy","presence","vibration","smoke","water_leak","gas","carbon_monoxide","tamper","moving"]);
+  const readingBinaryLabels=property=>readingDetectionProperties.has(property)
+    ?{on:"readingPresent",off:"readingAbsent"}
+    :{on:"readingOn",off:"readingOff"};
   const readingValueText=reading=>{
     const value=reading?.value;
     if(value===null||value===undefined)return t("unknownState");
+    const property=String(reading?.property||"");
+    const labels=readingBinaryLabels(property);
     /* İkili ölçüm cihazdan ya boolean ya da kendi sözcüğüyle gelir (`ON`, `open`, `alarm`…).
        Eşleme cihazın kendi bildirdiği uçlarla yapılır (`value_on`/`value_off`); tanım yoksa
        boolean da aynı iki etikete düşer. Karşılaştırma tip-gevşek: Z2M uçları sayı da olabilir. */
@@ -630,10 +640,14 @@
       const same=other=>other!==undefined&&other!==null&&String(value)===String(other);
       // Cihazın kendi bildirdiği uçlar önce gelir: ters kutuplu ikili ölçümde (`value_on:false`)
       // ham boolean'a bakmak yanlış etiketi verirdi.
-      if(same(reading.valueOn))return t("readingOn");
-      if(same(reading.valueOff))return t("readingOff");
+      if(same(reading.valueOn))return t(labels.on);
+      if(same(reading.valueOff))return t(labels.off);
     }
-    if(typeof value==="boolean")return t(value?"readingOn":"readingOff");
+    /* Uçlar bildirilmemişse ham boolean çevrilir. Tek istisna `contact`: Z2M sözleşmesinde
+       `contact:true` = kapı KAPALI (uç tanımı da `value_on:false` ile bunu söyler). Düz eşleme
+       "Açık" yazıp aktif olarak yanıltıyordu, bu yüzden yalnız bu özellikte kutup ters çevrilir —
+       yeni etiket gerekmez, mevcut Açık/Kapalı çifti ters eşlenir. */
+    if(typeof value==="boolean")return t((property==="contact"?!value:value)?labels.on:labels.off);
     if(typeof value==="number"){
       // Ondalık gürültüsü kırpılır (21.599999998 → 21.6); tam sayı olduğu gibi kalır.
       const rounded=Number.isInteger(value)?value:Math.round(value*100)/100;
@@ -821,20 +835,24 @@
     return name===device.id||/^0x[0-9a-f]+$/i.test(name);
   }
   const deviceDetailBodyHtml=device=>{
-    const deviceFacts=facts(device);
     const updateState=device.state.update&&typeof device.state.update==="object"?device.state.update:{};
     const updateRunning=updateState.state==="updating";
     const updateScheduled=updateState.state==="scheduled";
     const updateLabel=updateRunning?t("updatingFirmware",{progress:Math.round(Number(updateState.progress)||0)}):t(updateScheduled?"cancelScheduledUpdate":"scheduleUpdate");
     const otaButton=device.otaSupported?`<button class="secondary" data-admin-only data-ota-check="${esc(device.id)}"${updateRunning?" disabled":""}>↻ ${t("checkForUpdate")}</button><button class="secondary" data-admin-only data-ota="${esc(device.id)}" data-ota-enabled="${updateScheduled?"false":"true"}"${updateRunning?" disabled":""}>⇧ ${esc(updateLabel)}</button>`:"";
     const photoHtml=`${deviceDetailPhoto(device)}`;
-    const factsHtml=deviceFacts.length?`<div class="facts">${deviceFacts.map(fact=>`<span class="fact">${esc(fact)}</span>`).join("")}</div>`:"";
-    // Rol satırları resmin altındaki boşluğa oturur; sol sütun resimsiz cihazda da bu blokla dolar.
-    const rolesHtml=`<div class="controls device-detail-roles">${deviceRoleRowsHtml(device)}</div>`;
-    /* Resim kartı sol sütunun İLK gözü, kalan bloklar (rozetler + roller) ikinci gözü: geniş
-       ekranda ikisi ayrı ızgara satırına düşer ve resim kartı sağdaki ilk kartla hizalanır
-       (bkz. `.device-detail-layout` yatay bloğu). */
-    const mediaHtml=`<div class="device-detail-media">${photoHtml}<div class="device-detail-media-rest">${factsHtml}${rolesHtml}</div></div>`;
+    /* Rozet şeridi (`facts()`) detaydan kaldırıldı: "Değerler" kartı aynı bilgiyi satır satır ve
+       birimiyle veriyordu, şerit tek başına duran bir tekrar oluyordu. `facts()` işlevi durur —
+       başka bir yüzey ona geri dönebilir; detay gövdesi artık çağırmıyor.
+       Roller kendi kartında ve SAĞ kolonun en üstünde: "bu cihaz ne?" sorusu kumandadan önce gelir.
+       Kart kabuğu ve başlık dili ölçüm kartıyla aynı (`.device-buttons` + `-head`), yeni görsel
+       dil icat edilmedi. Başlık mevcut `deviceRoleTitle` anahtarından gelir. */
+    /* Kartın kendisi `data-admin-only`: içindeki satırların HEPSİ zaten yöneticiye özel
+       (`body.resident-session [data-admin-only]{display:none}`), sarmalayıcı işaretlenmezse ev
+       sakinine başlığı olan boş bir kart kalırdı. */
+    const rolesHtml=`<div class="device-buttons device-detail-roles-card" data-admin-only><div class="device-buttons-head">${esc(t("deviceRoleTitle"))}</div><div class="controls device-detail-roles">${deviceRoleRowsHtml(device)}</div></div>`;
+    // Sol kolonda artık YALNIZ resim kartı var; yüksekliği sağ kolondan gelir (bkz. panel.css).
+    const mediaHtml=`<div class="device-detail-media">${photoHtml}</div>`;
     // Düğme de bir kontroldür: kumandayı zaten onunla kullanıyoruz. Bu yüzden düğmeler kontrol
     // sütununda, kontrollerin altında durur; aşağıda ikinci bir kopya gösterilmez.
     const covered=lightPanelCoveredControls(device);
@@ -857,8 +875,8 @@
        aynı akışın içinde, satırların hemen üstünde okunuyor ve toplam yükseklik artmıyor
        (öncesi: panel + max(medya,satırlar); sonrası: max(medya, panel+satırlar) — asla daha büyük değil).
        Kurulum kurtarma şeridi taşınmadı, pencerenin en üstünde kalır. */
-    /* Sağ sütun da ikiye ayrılır: ilk kart (kumanda paneli yoksa kontrol/düğme kartları) tek başına
-       birinci gözde durur — resim kartı onunla hizalanır — kalanı ikinci göze iner. */
+    /* Sağ sütun bir yığın: rol kartı → `-lead` (kumanda paneli ya da kontrol listesi) → `-rest`
+       (paneli olan cihazda kontrol listesi + ölçümler). Satırın boyunu bu yığın belirler. */
     const controlsListHtml=`<div class="controls">${controlsBodyHtml||(panelHtml?"":`<div class="device-exposed-empty">${t("noExposedControls")}</div>`)}</div>`;
     const controlsLeadHtml=panelHtml||controlsListHtml;
     /* Ölçümler kumanda sütununun altına iner: aynı sütunda, kontrollerin/düğmelerin hemen
@@ -868,7 +886,7 @@
     const controlsRestBody=`${panelHtml?controlsListHtml:""}${readingsHtml}`;
     const controlsRestHtml=controlsRestBody?`<div class="device-detail-controls-rest">${controlsRestBody}</div>`:"";
     return`${setupHtml}<div class="device-detail-layout">
-        <div class="device-detail-controls"><div class="device-detail-controls-lead">${controlsLeadHtml}</div>${controlsRestHtml}</div>
+        <div class="device-detail-controls">${rolesHtml}<div class="device-detail-controls-lead">${controlsLeadHtml}</div>${controlsRestHtml}</div>
         ${mediaHtml}
       </div>
       ${deviceRoomsHtml(device)}

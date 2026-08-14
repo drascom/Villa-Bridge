@@ -1884,8 +1884,12 @@
        (`.control-row`) olduğu gibi kullanır; burada yalnız satır yoğunluğu ayarlanır.
        Renk tanımı YOK — kart ve satır renkleri mevcut token ailesinden miras kalır. */
     .device-readings .controls{gap:clamp(5px,.8vh,9px);margin-top:clamp(6px,1vh,10px)}
-    .device-readings .control-row{padding-top:clamp(7px,1.1vh,12px)}
-    .device-readings .control-value{font-size:clamp(11px,1.5vh,13px);font-weight:700;text-align:right;overflow-wrap:anywhere}
+    .device-readings .control-row{padding-top:clamp(8px,1.3vh,13px)}
+    /* Değer okunaklılığı: tablette 13px fazla küçüktü. Etiket (`.control-name`) olduğu gibi kalır,
+       yalnız değer büyür — hiyerarşi hâlâ ayakta (değer kalın + `--muted`, etiket 650 ağırlıkta).
+       1024×640'ta 2.1vh=13.4px olduğu için taban 14px devreye girer; satır payı bir tık artırıldı ki
+       büyüyen yazı sıkışmasın, kart yine de gereksiz uzamasın. */
+    .device-readings .control-value{font-size:clamp(14px,2.1vh,17px);line-height:1.25;font-weight:700;text-align:right;overflow-wrap:anywhere}
     :root[data-theme="dark"] .device-status-icon.danger{background:#432622;box-shadow:inset 0 0 0 1px #6f3732}:root[data-theme="dark"] .toggle-knob{background:#dfe9e4;box-shadow:0 1px 4px rgba(0,0,0,.4)}:root[data-theme="dark"] .device-detail-close{background:#26322c}
     :root[data-theme="dark"] .device-attention{border-color:#6f3732;background:#3d2422}:root[data-theme="dark"] .device-attention-head{color:#ffc0ba}:root[data-theme="dark"] .image-edit-overlay{border-color:rgba(255,255,255,.2);background:rgba(36,94,72,.92)}
     @media(max-width:680px){.device-header-status{gap:7px}.device-name-edit{width:44px;height:44px}.device-attention{padding:13px}.device-attention-head{align-items:flex-start}}
@@ -1903,43 +1907,42 @@
        çarpıyla zaten yapılıyor. Şerit gidince gövde onun yerini kullanır. */
     /* Onar düğmesiyle yan yana duruyor: tehlike dili bakışta ayrışsın diye kırmızı çerçeve. */
     .card-actions .remove{border:1px solid var(--danger)}
-    .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-controls,.device-detail-media{min-width:0}.device-detail-media,.device-detail-media-rest{display:grid;align-content:start;gap:14px;min-width:0}.device-detail-media .facts{margin-top:0}.device-detail-media .device-detail-photo{margin:0}.device-detail-media .device-detail-roles{margin-top:0}.device-detail-roles .control-select{min-width:0;max-width:100%}.device-setup-recovery{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.75em;margin:0 0 1.1em;padding:0.85em 1em;border-left:0.25em solid var(--sun);background:var(--surface-soft);text-align:left}.device-setup-recovery p{margin:0;flex:1 1 12em;min-width:0;color:var(--muted);font-size:0.85rem}.device-setup-recovery button{flex:0 0 auto}
-    /* CİHAZ DETAYI — RESİM KARTININ HİZASI.
-       İstenen: resim kartının ALT kenarı sağdaki İLK kartın alt kenarıyla aynı hizada dursun.
-       Sütunları ayrı ayrı esnetmek bunu veremez (sol sütun bir yığın: resim + rozetler + roller),
-       bu yüzden iki sütun sarmalayıcısı da `display:contents` olur ve dört blok TEK ızgaranın
-       gözlerine düşer: 1. satır = resim | sağdaki ilk kart, 2. satır = kalan bloklar. Aynı satırın
-       iki gözü `align-items:stretch` ile eşit boya gelir, yani alt kenarlar hizalanır.
-       Satırın boyunu SAĞDAKİ kart belirler: resim mutlak konumlanır (`position:absolute`), yani
-       gözün yüksekliğine hiç katkı vermez ve büyük bir dosya pencereyi taşıramaz. Kutuyu doldurur
-       ama `object-fit:contain` ile oranı korunur, kırpma yok; genişlik zaten tavanı çizer.
-       Sağdaki kart `-lead` gözünün içinde durduğu için gözün esnemesi tek başına yetmiyordu:
-       göz ızgara olur (`display:grid`) ve tek satırı `align-content:stretch` ile dolar, kartın
-       kendi alt boşluğu da sıfırlanır — iki kartın alt kenarı böylece aynı hizada biter.
-       Daraltma `:has(>.light-panel)` ile: ışık paneli olmayan cihazda kontrol listesi gereksiz
-       yere gerilmesin. */
+    .device-detail-layout{display:grid;gap:18px;margin-bottom:18px}.device-detail-media{display:grid;align-content:start;gap:14px;min-width:0}.device-detail-media .device-detail-photo{margin:0}/* Sağ kolon her kırılımda bir yığın: kartlar arası pay tek yerden (`gap`) gelir, kartların kendi dış boşluğu sıfırlanır. */.device-detail-controls{display:grid;align-content:start;gap:18px;min-width:0}.device-detail-roles-card{margin:0}.device-detail-roles{margin-top:clamp(6px,1vh,10px)}.device-detail-roles .control-select{min-width:0;max-width:100%}.device-setup-recovery{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.75em;margin:0 0 1.1em;padding:0.85em 1em;border-left:0.25em solid var(--sun);background:var(--surface-soft);text-align:left}.device-setup-recovery p{margin:0;flex:1 1 12em;min-width:0;color:var(--muted);font-size:0.85rem}.device-setup-recovery button{flex:0 0 auto}
+    /* CİHAZ DETAYI — İKİ KOLON VE RESİM KARTININ HİZASI.
+       Sol kolonda YALNIZ resim kartı var (rozet şeridi kaldırıldı, roller sağ kolonun tepesindeki
+       kendi kartına taşındı). Bu yüzden `display:contents` + elle göz yerleşimi gerekmiyor: iki
+       sarmalayıcı tek satırın iki gözüdür, sağdaki bir yığın (rol kartı → kumanda → ölçümler),
+       soldaki tek kart. `align-items:stretch` gözleri eşitler, resim kartı da kolonu doldurur —
+       yani boyu SAĞ kolondan gelir ve iki kolon alt kenarda birlikte biter.
+       Resim satırı sürüklemez: mutlak konumlanır (`position:absolute`), gözün yüksekliğine katkı
+       vermez, büyük bir dosya pencereyi taşıramaz. Kutuyu doldurur ama `object-fit:contain` ile
+       oranı korunur, kırpma yok; tavanı zaten kolon genişliği çizer.
+       DİKKAT: mutlak konumlu `<img>` (replaced öğe) `width/height:auto` iken `inset` ile GERİLMEZ —
+       doğal boyutunda kalıp sol üste oturur. Bu yüzden ölçü `inset:0` + `width/height:100%` ile
+       verilir, kenar boşluğu da img'in KENDİ `padding`inden gelir (kartın padding'i 0'a çekilir,
+       yoksa boşluk iki kez uygulanır). "Resmi değiştir" bindirmesi kartın padding kutusuna göre
+       konumlandığı için sağ altta 12px içeride kalır.
+       Beyaz zemin bu kırılımda kaldırılır: kutu artık tüm kartı kapladığından `#fff` koyu temada
+       kocaman bir levhaya dönerdi; saydam olunca letterbox payı kart yüzeyine oturur.
+       Görünür resim yoksa (kaynak yok ya da yüklenemedi → `[hidden]`) sol kolon hiç açılmaz:
+       `:not(:has(...))` ile ızgara tek kolona iner, yarım pencere boş kalmaz. */
     @media(min-width:900px) and (orientation:landscape){
-      .device-detail-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto;align-items:stretch}
-      .device-detail-media,.device-detail-controls{display:contents}
-      .device-detail-media>.device-detail-photo{grid-column:1;grid-row:1;place-content:center}
-      .device-detail-media>.device-detail-media-rest{grid-column:1;grid-row:2}
-      .device-detail-controls>.device-detail-controls-lead{grid-column:2;grid-row:1;min-width:0}
-      .device-detail-controls>.device-detail-controls-rest{grid-column:2;grid-row:2;min-width:0}
-      /* Resmi olmayan cihazda birinci satırın sol gözü boş kalmasın: kalan blok iki satırı da alır. */
-      .device-detail-layout:has(.device-detail-photo[hidden])>.device-detail-media>.device-detail-media-rest{grid-row:1/span 2}
-      .device-detail-media>.device-detail-photo{min-height:clamp(130px,22vh,190px);padding:clamp(10px,1.6vh,14px)}
-      .device-detail-photo .device-photo{position:absolute;grid-area:auto;inset:clamp(10px,1.6vh,14px);width:auto;height:auto;max-width:none;max-height:none}
-      .device-detail-controls>.device-detail-controls-lead:has(>.light-panel){display:grid;min-height:0}
-      .device-detail-controls>.device-detail-controls-lead>.light-panel{height:100%;margin:0;align-content:center}
+      .device-detail-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch}
+      .device-detail-media{grid-column:1;grid-row:1;align-content:stretch}
+      .device-detail-controls{grid-column:2;grid-row:1;display:grid;align-content:start;gap:18px}
+      .device-detail-layout:not(:has(.device-detail-photo:not([hidden]))){grid-template-columns:minmax(0,1fr)}
+      .device-detail-layout:not(:has(.device-detail-photo:not([hidden])))>.device-detail-media{display:none}
+      .device-detail-media>.device-detail-photo{min-height:clamp(130px,22vh,190px);padding:0}
+      .device-detail-photo .device-photo{position:absolute;grid-area:auto;inset:0;width:100%;height:100%;max-width:none;max-height:none;padding:clamp(10px,1.6vh,14px);box-sizing:border-box;object-fit:contain;background:transparent}
     }
     /* Işık kartındaki büyük dikey kumanda. Yükseklik viewport'a bağlı (clamp + vh), sabit px yok:
        1024×640 tablette pencere kaydırılmadan sığar. Renk karıştıran CSS işlevi YOK — Android
        WebView desteklemiyor; dolgunun rengi satır içi `--light-tint` ile gelir, yoksa sıcak sarı. */
     .light-panel{display:grid;justify-items:center;gap:clamp(8px,1.5vh,15px);margin:0 0 clamp(14px,2.2vh,20px);padding:clamp(12px,2vh,20px);border:1px solid var(--line);border-radius:20px;background:var(--surface-soft)}
-    /* Kumanda ayar satırlarının sütununda: üstünde boşluk yok (sütunun ilk öğesi), altında satırlara
-       geçiş payı var. Sütun daraldığı için kolonun ölçüsü burada ayrıca tabanlanır — sürükleme hedefi
-       44px'in çok üstünde kalsın diye genişlik tabanı 88px, yükseklik tabanı 132px. */
-    .device-detail-controls-lead>.light-panel{margin:0 0 clamp(12px,2vh,18px)}
+    /* Kumanda ayar satırlarının sütununda: kartlar arası pay sütunun kendi `gap`inden geldiği için
+       panelin dış boşluğu sıfırlanır. Sütun daraldığı için kolonun ölçüsü burada ayrıca tabanlanır —
+       sürükleme hedefi 44px'in çok üstünde kalsın diye genişlik tabanı 88px, yükseklik tabanı 132px. */
+    .device-detail-controls-lead>.light-panel{margin:0}
     .device-detail-controls .light-column{width:clamp(88px,12vw,120px);height:clamp(132px,26vh,200px)}
     .light-readout{text-align:center}.light-readout-value{font:800 clamp(24px,4.4vh,36px)/1.05 system-ui,sans-serif}.light-readout-since{margin-top:3px;color:var(--muted);font-size:clamp(11px,1.6vh,13px)}
     .light-column{position:relative;width:clamp(88px,15vw,124px);height:clamp(120px,28vh,220px);display:block;padding:0;border:1px solid var(--line);border-radius:clamp(16px,2.6vh,26px);background:var(--surface);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}

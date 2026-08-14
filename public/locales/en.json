@@ -864,6 +864,8 @@
     "readings": "Readings",
     "readingOn": "On",
     "readingOff": "Off",
+    "readingPresent": "Yes",
+    "readingAbsent": "No",
     "deviceButtons": "Buttons",
     "nameButton": "Name button",
     "deviceButtonLastPress": "Last pressed: {button} · {press} · {time}",
