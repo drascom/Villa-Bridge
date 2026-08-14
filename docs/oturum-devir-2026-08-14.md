@@ -69,21 +69,31 @@ Sunucu `192.168.0.91` (`/opt/villa-bridge`), dal `platform/linux`.
    kaplıyor, sayfa aşağı kayıyor; "bekleme süresi için üç satır gerekmemeli, tek satırda
    halledilmeli", "tıklayınca kendi içinde değer girilebilmeli". Mockup hazırlanıyordu
    (bkz. §3). Karar verilmedi.
-2. **`public/js/panel-automation.js` bölme (~3600 satır).** Kullanıcı modüllere ayrılmasını
-   istiyor: "genel iş akışı" ile "cihaza özel motor" ayrı dosyalarda. Plan çıkarılıyordu (§3).
-   Kural: **davranış değişmeyecek**; panel dosyası eklemek `index.html` script sırası +
-   `src/index.ts` `panelAssetRoutes` ikisini birden gerektirir, `npm run check` denetler.
-   Önerilen sıra: önce mekanik bölme, sonra sihirbaz yenilemesi (yeniden yazım küçük dosyalarda
-   daha güvenli).
-3. **Jeneriklik kuralı** (kullanıcı açıkça istedi): cihaza özel motor **model/üretici adına ya da
-   sabit alan listesine bakmayacak**; yetenek cihazın kendi bildirdiği modelden okunacak.
-   Alan bazlı tablolar yalnız kozmetik (etiket/çeviri) olabilir ve jenerik yedeği olmalı.
-   Bugünkü sayısal keşif zaten jenerik (`device.state` içindeki sayı olan alanlar).
-4. **Tablet kurulumu.** Bugünün hiçbir sürümü tablete kurulamadı (cihaz USB'de görünmedi).
+2. **`public/js/panel-automation.js` bölme (3706 satır).** Plan hazır ve onaya bekliyor:
+   **`docs/otomasyon-bolme-plani.md`**. Özet: 6 dosya — `91-automation-devices.js` (cihaza özel
+   motor, **yalnız bu dosya** `device.features/state/controls/buttons` okur), `92-automation-text.js`
+   (kural → cümle), `93-automation-list.js` (liste + sunucu IO), `94-automation-wizard-model.js`
+   (taslak + aşama makinesi), `95-automation-wizard-view.js` (HTML), `96-automation-wizard-actions.js`
+   (bind + kaydet). `index.html:384` ve `src/index.ts:441` birlikte güncellenir.
+   **Önerilen sıra: önce bölme, en son sihirbaz yenilemesi** — yenileme bölünmüş hâlde yalnız
+   `95`'i yeniden yazar. 3 commit; taşımanın saf kes-yapıştır olduğu `sort | diff` ile kanıtlanmalı.
+   **Uyarı:** `npm run check` ad çakışmasını ve tablo ayrışmasını yakalar, ama düşen bir
+   `data-automation-*` kancasını YAKALAMAZ.
+3. **Jeneriklik** (kullanıcı açıkça istedi): motor model/üretici adına ya da sabit alan listesine
+   bakmamalı. Tarama sonucu: model/üretici adına bakan yer **yok**, ama **bir işlevsel ihlal var** —
+   `automationSensorEvents` (panel-automation.js:196–206) 9 alanlık **sabit izin listesi** ve kapı
+   görevi görüyor: `vibration`, `tamper`, `gas`, `door_state` gibi alanları bildiren cihazlar
+   sunucu motoru o olayları görüyor olmasına rağmen **sihirbazda hiç görünmüyor**. Tablo etiket
+   tablosuna indirgenmeli, türetme sunucudaki yasak-listesi diliyle jenerikleştirilmeli
+   (sayısal keşif ve değer eylemleri zaten jenerik). Ayrı commit olarak planlandı.
+4. **Sunucu tarafı**: `src/automations.ts` bölünmesin (tip + doğrulama tek konu).
+   `src/automation-engine.ts` saf fonksiyonlar (35–615) ile durumlu sınıf (616–1698) arasından
+   bölünebilir ama acil değil.
+5. **Tablet kurulumu.** Bugünün hiçbir sürümü tablete kurulamadı (cihaz USB'de görünmedi).
    Bağlanınca `npm run android:install`.
-5. **Android yön kilidi** (`dc5a64b`) depoda duruyor ama tablete kurulmadı: telefon dikeye
+6. **Android yön kilidi** (`dc5a64b`) depoda duruyor ama tablete kurulmadı: telefon dikeye
    kilitlenir, tablet serbest kalır (`sw600dp`; Nokia T10 = 640dp).
-6. Gündüz–gece geçişinde yanan döşemenin parlaklık farkı büyüdü (.82 → .13). Rahatsız ederse
+7. Gündüz–gece geçişinde yanan döşemenin parlaklık farkı büyüdü (.82 → .13). Rahatsız ederse
    gece bandı bir tık yukarı çekilebilir.
 
 ## 3. Bu oturumun kalıcılaştırılan çalışma dosyaları
