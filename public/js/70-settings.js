@@ -1,11 +1,73 @@
+  /* KOORDİNATÖR ADRESİ TESTİ
+     Sunucu koordinatöre tek bayt yazmaz: TCP'de bağlan-kapat, seri yolda yalnız dosya bakışı.
+     Bu yüzden başarı metni "doğrulandı" DEMEZ, "adrese ulaşıldı" der — SLZB gibi köprüler
+     birden çok istemcinin bağlantısını kabul ettiği için ulaşmak ne doğru koordinatör olduğunu
+     ne de sahiplenilebileceğini kanıtlar. Caveat metni (`adapterTestNotVerified`) ayrı durur. */
+  const coordinatorProbeText=status=>({
+    "active":{key:"adapterTestActive",tone:"ok"},
+    "active-degraded":{key:"adapterTestActiveDegraded",tone:"bad"},
+    "reachable":{key:"adapterTestReached",tone:"ok",caveat:true},
+    "refused":{key:"adapterTestRefused",tone:"bad"},
+    "timeout":{key:"adapterTestTimeout",tone:"bad"},
+    "dns-failed":{key:"adapterTestDnsFailed",tone:"bad"},
+    "serial-present":{key:"adapterTestSerialFound",tone:"ok",caveat:true},
+    "serial-missing":{key:"adapterTestSerialMissing",tone:"bad"},
+    "serial-not-a-device":{key:"adapterTestSerialNotDevice",tone:"bad"},
+    "serial-no-access":{key:"adapterTestSerialNoAccess",tone:"bad"}
+  }[status]||{key:"adapterTestUnreachable",tone:"bad"});
+  function setAdapterTestResult(node,message,tone,caveat){
+    if(!node)return;
+    node.dataset.tone=tone;
+    node.innerHTML=`<span>${esc(message)}</span>${caveat?`<span class="adapter-test-caveat">${esc(t("adapterTestNotVerified"))}</span>`:""}`;
+  }
+  function clearAdapterTestResult(node){
+    if(!node)return;
+    node.dataset.tone="";
+    node.textContent="";
+  }
+  /* Tek yoklama noktası: ayarlar sayfası da kurulum sihirbazı da buradan geçer. Dönen değer
+     "adrese ulaşıldı mı" — kurulum kapısı bu değere bakar. */
+  async function probeZigbeeAdapter(input,output,button){
+    const address=(input?.value||"").trim();
+    if(!address){setAdapterTestResult(output,t("adapterTestEmpty"),"bad",false);return false}
+    setAdapterTestResult(output,t("adapterTesting"),"busy",false);
+    if(button)button.disabled=true;
+    try{
+      const data=await api("/api/settings/zigbee-adapter/test",{method:"POST",body:JSON.stringify({address})});
+      /* Sunucunun kanonik biçimi alana geri yazılır (çıplak sunucu adı → `tcp://sunucu:6638`),
+         böylece kaydedilen değer test edilen değerin aynısı olur. */
+      if(data.result?.address)input.value=data.result.address;
+      const info=coordinatorProbeText(data.result?.status);
+      setAdapterTestResult(output,t(info.key,{address:data.result?.address||address}),info.tone,info.caveat===true);
+      return info.tone==="ok";
+    }catch(error){
+      setAdapterTestResult(output,error.message,"bad",false);
+      return false;
+    }finally{
+      if(button)button.disabled=false;
+    }
+  }
+  /* Shadow kipinde koordinatörün sahibi Zigbee2MQTT'dir: adres burada yalnız okunur. */
+  function applyZigbeeAdapterOwnership(){
+    const input=$("#zigbeeAdapterUrl");
+    if(!input)return;
+    const managed=state.health?.mode==="shadow";
+    input.readOnly=managed;
+    $("#testZigbeeAdapter").hidden=managed;
+    $("#zigbeeAdapterManaged").hidden=!managed;
+    $("#zigbeeAdapterHelp").textContent=t(state.zigbeeCapabilities?.serialSupported?"adapterUrlHelp":"adapterUrlHelpTcpOnly");
+  }
   async function loadSettings(){
     try{
       const data=await api("/api/settings");
       state.settings=data.settings;
       state.network=data.network||null;
       state.mqttAccess=data.mqttAccess||null;
+      state.zigbeeCapabilities=data.zigbee||null;
       renderConnectedServerAddress();
       $("#zigbeeAdapterUrl").value=state.settings.zigbee.adapterUrl;
+      clearAdapterTestResult($("#zigbeeAdapterTestResult"));
+      applyZigbeeAdapterOwnership();
       $("#zigbeeChannel").value=String(state.settings.zigbee.channel);
       $("#lowBatteryThreshold").value=String(state.settings.alerts?.lowBatteryThreshold??15);
       $("#selfHealingEnabled").value=state.settings.selfHealing?.enabled===false?"false":"true";
@@ -157,6 +219,15 @@
     }
     return settings;
   }
+  /* Kanal onayının kardeşi: adres değiştiyse sunucu açık onay ister. Kurulum sihirbazında
+     kullanıcı adresi zaten yazıp test etmiştir (`silent`), ikinci bir soru sorulmaz. */
+  function settingsWithAdapterConfirmation(settings,silent=false){
+    const previous=String(state.settings?.zigbee?.adapterUrl||"");
+    const next=String(settings?.zigbee?.adapterUrl||"");
+    if(!previous||previous===next)return settings;
+    if(!silent&&!confirm(t("zigbeeAdapterConfirm",{from:previous,to:next})))return null;
+    return{...settings,zigbeeAdapterConfirmation:"CHANGE"};
+  }
   function renderOnboarding(){
     const draft=state.onboardingDraft;
     if(!draft)return;
@@ -182,7 +253,7 @@
     let body="";
     if(step===0)body=onboardingHero("welcome","setupWelcomeTitle","setupWelcomeLead",`<div class="onboarding-choices"><button class="onboarding-choice ${state.language==="en"?"selected":""}" type="button" data-onboarding-language="en">English<small>Continue in English</small></button><button class="onboarding-choice ${state.language==="tr"?"selected":""}" type="button" data-onboarding-language="tr">Türkçe<small>Türkçe devam et</small></button></div>`);
     if(step===1)body=onboardingHero("hub","setupHubTitle","setupHubLead",`<div class="onboarding-features"><div class="onboarding-feature"><strong>Zigbee</strong><span>${t("setupHubZigbee")}</span></div><div class="onboarding-feature"><strong>MQTT</strong><span>${t("setupHubMqtt")}</span></div><div class="onboarding-feature"><strong>Matter</strong><span>${t("setupHubMatter")}</span></div></div>`);
-    if(step===2)body=onboardingHero("zigbee","setupZigbeeTitle","setupZigbeeLead",`<div class="onboarding-fields"><div class="onboarding-field"><label for="onboardingZigbeeUrl">${t("adapterUrl")}</label><input id="onboardingZigbeeUrl" type="url" value="${esc(draft.zigbeeAdapterUrl)}" placeholder="tcp://192.168.0.248:6638" required></div></div><p class="onboarding-help">${t("setupRecommendedValues")}</p>`);
+    if(step===2)body=onboardingHero("zigbee","setupZigbeeTitle","setupZigbeeLead",`<div class="onboarding-fields"><div class="onboarding-field"><label for="onboardingZigbeeUrl">${t("adapterUrl")}</label><input id="onboardingZigbeeUrl" type="text" inputmode="url" autocomplete="off" spellcheck="false" value="${esc(draft.zigbeeAdapterUrl)}" placeholder="tcp://192.0.2.10:6638" required><div class="adapter-test-row"><button id="onboardingZigbeeTest" class="secondary" type="button">${t("adapterTest")}</button><span id="onboardingZigbeeTestResult" class="adapter-test-result" role="status"></span></div></div></div><p class="onboarding-help">${t(state.zigbeeCapabilities?.serialSupported?"adapterUrlHelp":"adapterUrlHelpTcpOnly")}</p><p class="onboarding-help">${t("adapterTestRequiredHelp")}</p>`);
     if(step===3)body=onboardingHero("services","setupServicesTitle","setupServicesLead",`<div class="onboarding-fields"><div class="onboarding-field"><label for="onboardingMqttUrl">${t("mqttUrl")}</label><input id="onboardingMqttUrl" type="url" value="${esc(draft.mqttUrl)}" required></div><div class="onboarding-field"><label for="onboardingMqttTopic">${t("baseTopic")}</label><input id="onboardingMqttTopic" value="${esc(draft.mqttBaseTopic)}" required></div><div class="onboarding-field"><label for="onboardingMatterUrl">${t("matterUrl")}</label><input id="onboardingMatterUrl" type="url" value="${esc(draft.matterWsUrl)}" required></div></div><p class="onboarding-help">${t("setupRecommendedValues")}</p>`);
     if(step===4){
       const ip=state.network?.preferredAddress||state.network?.addresses?.[0]||t("ipUnavailable");
@@ -199,18 +270,39 @@
       setLanguage(button.dataset.onboardingLanguage);
       renderOnboarding();
     });
+    /* Adres alanı her değiştiğinde test bayrağı düşer: yazılan yeni adres denenmemiştir. */
+    const zigbeeInput=$("#onboardingZigbeeUrl");
+    if(zigbeeInput){
+      const output=$("#onboardingZigbeeTestResult");
+      zigbeeInput.oninput=()=>{
+        draft.zigbeeAdapterUrl=zigbeeInput.value.trim();
+        draft.zigbeeAdapterVerified=false;
+        clearAdapterTestResult(output);
+      };
+      $("#onboardingZigbeeTest").onclick=async()=>{
+        draft.zigbeeAdapterVerified=await probeZigbeeAdapter(zigbeeInput,output,$("#onboardingZigbeeTest"));
+        draft.zigbeeAdapterUrl=zigbeeInput.value.trim();
+      };
+    }
     const wifi=$("#onboardingWifiSettings");
     if(wifi){
       wifi.hidden=typeof window.VillaAndroid?.openWifiSettings!=="function";
       wifi.onclick=openWifiSettings;
     }
   }
-  function captureOnboardingStep(){
+  function captureOnboardingStep(forward=true){
     const draft=state.onboardingDraft;
     if(state.onboardingStep===2){
       const input=$("#onboardingZigbeeUrl");
       if(!input.reportValidity())return false;
       draft.zigbeeAdapterUrl=input.value.trim();
+      /* KAPI: test edilmemiş adresle ilerlenmez. Yanlış adres kaydedilirse servis bir daha
+         açılmaz, onu düzeltecek panel de gelmez; kurtarma bant dışıdır (SSH + `.settings-backup`).
+         Testi zorunlu kılmanın tek sebebi budur. */
+      if(forward&&draft.zigbeeAdapterVerified!==true){
+        showToast(t("adapterTestRequired"),true);
+        return false;
+      }
     }
     if(state.onboardingStep===3){
       const inputs=[$("#onboardingMqttUrl"),$("#onboardingMqttTopic"),$("#onboardingMatterUrl")];
@@ -228,6 +320,9 @@
     state.onboardingDraft=state.remoteOnboarding?{}:{
       language:state.language,
       zigbeeAdapterUrl:state.settings.zigbee.adapterUrl,
+      /* Kayıtlı adres bile olsa sihirbaz test görmeden ilerlemez: kurulumu bitiren kişi
+         adresin ŞU AN yanıt verdiğini görmüş olmalı. */
+      zigbeeAdapterVerified:false,
       zigbeeChannel:state.settings.zigbee.channel,
       mqttUrl:state.settings.mqtt.url,
       mqttBaseTopic:state.settings.mqtt.baseTopic,
@@ -257,7 +352,10 @@
         debug:state.settings.debug
       };
       if(JSON.stringify(settings)!==JSON.stringify(current)){
-        const payload=settingsWithChannelConfirmation(settings);
+        const withChannel=settingsWithChannelConfirmation(settings);
+        if(!withChannel)return;
+        // Adres onayı sihirbazda sessizdir: kullanıcı adresi bu adımda yazıp test etti.
+        const payload=settingsWithAdapterConfirmation(withChannel,true);
         if(!payload)return;
         const data=await api("/api/settings",{method:"PUT",body:JSON.stringify(payload)});
         state.settings=data.settings;
@@ -287,7 +385,7 @@
   }
   function previousOnboardingStep(){
     if(state.onboardingStep===0)return;
-    captureOnboardingStep();
+    captureOnboardingStep(false);
     state.onboardingStep-=1;
     renderOnboarding();
   }

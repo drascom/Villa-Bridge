@@ -582,7 +582,9 @@
         selfHealing:{enabled:$("#selfHealingEnabled").value!=="false",probeOffline:state.settings?.selfHealing?.probeOffline===true},
         debug:{enabled:state.settings?.debug?.enabled!==false}
       };
-    const payload=settingsWithChannelConfirmation(settings);
+    const withChannel=settingsWithChannelConfirmation(settings);
+    if(!withChannel)return;
+    const payload=settingsWithAdapterConfirmation(withChannel);
     if(!payload||!confirm(t("restartConfirm")))return;
     const button=$("#saveSettings");
     button.disabled=true;

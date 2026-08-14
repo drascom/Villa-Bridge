@@ -467,6 +467,7 @@
     lowBatteryFact.textContent=t("lowBatteryDevices",{count:lowBatteryDevices});
     lowBatteryFact.hidden=lowBatteryDevices===0;
     $("#chooseZigbeeRestore").hidden=state.health?.mode!=="direct";
+    applyZigbeeAdapterOwnership();
     renderPairingRouters();
     renderZigbeeGroups();
     renderHomeSummary();

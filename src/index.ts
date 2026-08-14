@@ -15,6 +15,11 @@ import { CelestialService } from "./celestial-service.js";
 import { AgentTokenStore } from "./agent-tokens.js";
 import { AuthStore, type AuthRole } from "./auth-store.js";
 import { loadConfig } from "./config.js";
+import {
+  defaultCoordinatorPort,
+  parseCoordinatorAddress,
+  probeCoordinator
+} from "./coordinator-probe.js";
 import { normalizeControlValue, soleSwitchChannelId } from "./device-controls.js";
 import { deviceMissingResponse } from "./device-departures.js";
 import { DeviceNetworkEventLog } from "./device-network-events.js";
@@ -182,6 +187,13 @@ const homeBackupService = new HomeBackupService({
   automationLookup: (deviceId) => store.getDevice(deviceId),
   automationGroupLookup: (groupId) => automationGroupLookup(groupId)
 });
+/**
+ * Konak rolü zaten var (LAN keşfi ve devir mantığı bunu kullanır); koordinatör adresi de aynı
+ * ayrımı miras alır: seri yol (USB çubuk) yalnız sunucu/Pi konağında anlamlıdır, Android
+ * tablette hiç açılamaz. Panel bu kararı istemcide tahmin ETMEZ, sunucudan gelen bayrağa bakar.
+ */
+const nodeRole = resolveVillaBridgeNodeRole();
+const zigbeeSerialSupported = nodeRole !== "android";
 const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
   configPath,
   config.zigbee.configurationFile,
@@ -196,7 +208,8 @@ const settingsStore = config.zigbee?.configurationFile ? new SettingsStore(
       probeOffline: config.selfHealing.probeOffline
     },
     debug: { enabled: config.debug.enabled }
-  }
+  },
+  { allowSerialAdapter: zigbeeSerialSupported }
 ) : null;
 const recentErrors = new RecentErrorLog(50, config.debug.enabled);
 /**
@@ -216,7 +229,6 @@ const weatherService = new WeatherService({
  * "saat panelinde hangi şehirler"; ayrı yazılır, ayrı yetkilenir.
  */
 const worldClockStore = new WorldClockStore(resolve(dirname(configPath), "world-clock.json"));
-const nodeRole = resolveVillaBridgeNodeRole();
 const nodeId = resolveVillaBridgeNodeId(nodeRole);
 const discoveryRecord = createVillaBridgeDiscoveryRecord(
   nodeRole,
@@ -1628,6 +1640,8 @@ app.get("/api/settings", async (_request, reply) => {
     return {
       ok: true,
       settings: await settingsStore.get(),
+      // Konak yeteneği: seri koordinatör yolu yalnız sunucu/Pi kurulumunda girilebilir.
+      zigbee: { serialSupported: settingsStore.serialSupported, defaultPort: defaultCoordinatorPort },
       network: getNetworkInfo(),
       // Doğrudan modda kütüphaneye eklenen harici cihaz tanımları; hangi dosyanın yüklendiği
       // (ve hangisinin patladığı) tek bakışta görülsün diye ayarlarla birlikte dönülür.
@@ -1654,8 +1668,16 @@ app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
       && "zigbeeChannelConfirmation" in request.body
         ? (request.body as { zigbeeChannelConfirmation?: unknown }).zigbeeChannelConfirmation
         : undefined;
+    const adapterConfirmation =
+      typeof request.body === "object"
+      && request.body !== null
+      && !Array.isArray(request.body)
+      && "zigbeeAdapterConfirmation" in request.body
+        ? (request.body as { zigbeeAdapterConfirmation?: unknown }).zigbeeAdapterConfirmation
+        : undefined;
     const settings = await settingsStore.save(request.body, {
-      confirmZigbeeChannelChange: confirmation === "CHANGE"
+      confirmZigbeeChannelChange: confirmation === "CHANGE",
+      confirmZigbeeAdapterChange: adapterConfirmation === "CHANGE"
     });
     store.setLowBatteryThreshold(settings.alerts.lowBatteryThreshold);
     recentErrors.setEnabled(settings.debug.enabled);
@@ -1667,6 +1689,75 @@ app.put<{ Body?: unknown }>("/api/settings", async (request, reply) => {
     return { ok: true, settings, restartRequired: true };
   } catch (error) {
     return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/**
+ * Koordinatör adresi yoklaması — "adrese ulaşılıyor mu?" sorusunun tek yanıtı.
+ *
+ * Koordinatöre **bayt yazılmaz**: TCP'de bağlan-kapat, seri yolda yalnız dosya sistemi bakışı
+ * (gerekçeler `coordinator-probe.ts` başında). Şu an bağlı olduğumuz adres sorulursa hiç soket
+ * açılmaz, çalışan oturumun durumu dönülür — ikinci bir bağlantı açmanın anlamı yok.
+ *
+ * GET değil POST: adres sorgu dizesine, erişim günlüklerine ve tarayıcı geçmişine düşmesin.
+ * Yetki: `access-control.ts` tablolarının hiçbirinde yok → yönetici gerekir. Hız sınırı da
+ * oradaki gerekçenin devamı: aksi hâlde bu uç, yönetici oturumu üzerinden bir port tarayıcısına
+ * dönerdi.
+ */
+let adapterProbeBusy = false;
+let adapterProbeAt = 0;
+const adapterProbeIntervalMs = 3000;
+app.post<{ Body?: { address?: unknown } }>("/api/settings/zigbee-adapter/test", async (request, reply) => {
+  if (!settingsStore) {
+    return reply.code(503).send({ ok: false, error: "Bağlantı ayarları bu çalışma modunda kullanılamıyor." });
+  }
+  let address;
+  try {
+    address = parseCoordinatorAddress(request.body?.address);
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+  if (address.kind === "serial" && !zigbeeSerialSupported) {
+    return reply.code(400).send({
+      ok: false,
+      error: "Bu cihazda seri koordinatör yolu kullanılamaz; `tcp://sunucu:port` girin."
+    });
+  }
+  // Durum A: sorulan adres şu an sahip olduğumuz adres. Hiç soket açılmaz, hız sınırına da
+  // takılmaz — dışarıya tek paket çıkmıyor, yalnız çalışan oturumun durumu okunuyor.
+  let activeAddress: string | null = null;
+  try {
+    activeAddress = parseCoordinatorAddress(config.zigbee?.serial.path).value;
+  } catch {
+    activeAddress = null;
+  }
+  if (config.mode === "direct" && activeAddress === address.value) {
+    return {
+      ok: true,
+      result: {
+        address: address.value,
+        kind: address.kind,
+        status: coordinatorStatus === "ready" ? "active" : "active-degraded",
+        code: coordinatorError,
+        live: true
+      }
+    };
+  }
+  const now = Date.now();
+  if (adapterProbeBusy || now - adapterProbeAt < adapterProbeIntervalMs) {
+    return reply.code(429).header("Retry-After", "3").send({
+      ok: false,
+      error: "Bağlantı testi çok sık istendi; birkaç saniye sonra yeniden deneyin."
+    });
+  }
+  adapterProbeBusy = true;
+  adapterProbeAt = now;
+  try {
+    const result = await probeCoordinator(address);
+    return { ok: true, result: { ...result, live: false } };
+  } finally {
+    adapterProbeBusy = false;
+    adapterProbeAt = Date.now();
   }
 });
 

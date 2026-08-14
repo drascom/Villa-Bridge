@@ -1,6 +1,7 @@
 import { copyFile, readFile, rename, stat, writeFile } from "node:fs/promises";
 import YAML from "yaml";
 import { atomicTemporaryPath } from "./atomic-file.js";
+import { parseCoordinatorAddress } from "./coordinator-probe.js";
 
 type YamlObject = Record<string, unknown>;
 
@@ -51,7 +52,27 @@ const endpoint = (value: unknown, protocols: string[], label: string): string =>
   return parsed.toString().replace(/\/$/, "");
 };
 
-export const validateConnectionSettings = (value: unknown): ConnectionSettings => {
+export interface ConnectionSettingsOptions {
+  /**
+   * Seri yol (`/dev/ttyUSB0`) yalnız USB koordinatör takılabilen konaklarda geçerlidir.
+   * Android tablette böyle bir yol hiç açılamaz; orada doğrulama eskisi gibi `tcp://` ister.
+   */
+  allowSerialAdapter?: boolean;
+}
+
+/** Koordinatör adresi: MQTT/Matter uçlarından ayrı kural — seri yol da geçerli bir değerdir. */
+const coordinatorEndpoint = (value: unknown, allowSerial: boolean): string => {
+  const address = parseCoordinatorAddress(value);
+  if (address.kind === "serial" && !allowSerial) {
+    throw new Error("Bu cihazda seri koordinatör yolu kullanılamaz; `tcp://sunucu:port` girin.");
+  }
+  return address.value;
+};
+
+export const validateConnectionSettings = (
+  value: unknown,
+  options: ConnectionSettingsOptions = {}
+): ConnectionSettings => {
   const input = objectValue(value);
   const zigbee = objectValue(input.zigbee);
   const mqtt = objectValue(input.mqtt);
@@ -78,7 +99,7 @@ export const validateConnectionSettings = (value: unknown): ConnectionSettings =
   }
   return {
     zigbee: {
-      adapterUrl: endpoint(zigbee.adapterUrl, ["tcp:"], "Zigbee adaptörü"),
+      adapterUrl: coordinatorEndpoint(zigbee.adapterUrl, options.allowSerialAdapter === true),
       channel
     },
     mqtt: {
@@ -118,8 +139,14 @@ export class SettingsStore {
   constructor(
     private readonly configPath: string,
     private readonly z2mPath: string,
-    private readonly fallback: ConnectionSettings
+    private readonly fallback: ConnectionSettings,
+    private readonly options: ConnectionSettingsOptions = {}
   ) {}
+
+  /** Konak yeteneği: panel seri yol alanını yalnız bu doğruyken gösterir. */
+  get serialSupported(): boolean {
+    return this.options.allowSerialAdapter === true;
+  }
 
   async get(): Promise<ConnectionSettings> {
     const [file, z2m] = await Promise.all([readYaml(this.configPath), readYaml(this.z2mPath)]);
@@ -159,14 +186,14 @@ export class SettingsStore {
       debug: {
         enabled: fileDebug.enabled ?? this.fallback.debug.enabled
       }
-    });
+    }, this.options);
   }
 
   async save(
     value: unknown,
-    options: { confirmZigbeeChannelChange?: boolean } = {}
+    options: { confirmZigbeeChannelChange?: boolean; confirmZigbeeAdapterChange?: boolean } = {}
   ): Promise<ConnectionSettings> {
-    const settings = validateConnectionSettings(value);
+    const settings = validateConnectionSettings(value, this.options);
     const [file, z2m] = await Promise.all([readYaml(this.configPath), readYaml(this.z2mPath)]);
     const fileMqtt = objectValue(file.mqtt);
     const fileMatter = objectValue(file.matterbridge);
@@ -188,6 +215,30 @@ export class SettingsStore {
     ) {
       throw new Error(
         "Zigbee kanal değişikliği açık onay gerektirir; cihazlar bağlantısını kaybedebilir."
+      );
+    }
+    /**
+     * Koordinatör adresi kanaldan da tehlikelidir: yanlış adres kaydedilirse servis bir daha
+     * açılmaz ve onu düzeltecek panel de gelmez — kurtarma bant dışıdır (SSH + `.settings-backup`).
+     * Bu yüzden değişiklik açık onay ister. Adres okunamıyorsa (bozuk yapılandırma) onarım
+     * yolunu kapatmamak için onay aranmaz.
+     */
+    let currentAdapter: string | null = null;
+    try {
+      currentAdapter = coordinatorEndpoint(
+        z2mSerial.port ?? this.fallback.zigbee.adapterUrl,
+        true
+      );
+    } catch {
+      currentAdapter = null;
+    }
+    if (
+      currentAdapter !== null
+      && currentAdapter !== settings.zigbee.adapterUrl
+      && options.confirmZigbeeAdapterChange !== true
+    ) {
+      throw new Error(
+        "Koordinatör adresi değişikliği açık onay gerektirir; yanlış adres servisi açılamaz hâle getirir."
       );
     }
 

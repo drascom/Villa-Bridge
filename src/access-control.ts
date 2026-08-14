@@ -72,6 +72,13 @@ const residentRoutes = new Set([
   "POST /api/auth/logout"
 ]);
 
+// `POST /api/settings/zigbee-adapter/test` bilerek YUKARIDAKİ TABLOLARIN HİÇBİRİNDE yok:
+// listelenmeyen her yol yönetici ister ve bu uç tam olarak onu istiyor. Ev sakinine açılsaydı,
+// evin panelinde oturan herkes sunucudan istediği adrese TCP bağlantısı denettirebilirdi —
+// yani uç, ağdaki servisleri tarayan bir araca dönerdi. Ucun kendi içinde bir de hız sınırı var
+// (tek eşzamanlı yoklama, çağrılar arası ≥3 sn); yetki tablosu ile o sınır aynı gerekçenin iki
+// yarısıdır. Yol koordinatöre tek bayt yazmaz, yalnız "adres yanıt veriyor mu" der.
+
 const parseCookie = (header: string | undefined, name: string): string | undefined => {
   if (!header) return undefined;
   for (const part of header.split(";")) {
