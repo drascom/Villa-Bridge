@@ -2145,6 +2145,7 @@
        aynı 44px hattında hizalı. Kural cümlesi bu satırın ALTINDA, adın hizasından sağ kenara
        kadar tam genişlikte akan bir ALT BAŞLIK — düğmelerle yan yana durmaz. Kartın boyunu yine
        metin değil dokunma hedefleri belirler: cümle iki satırda kırpılır, kartı uzatmaz. */
+    .automation-card{--automation-indent:56px}
     .automation-card-head{display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;column-gap:12px;padding:6px 0 0}
     .automation-card-head>.automation-card-menu{grid-column:1;grid-row:1;width:44px;height:44px;justify-self:start;border-radius:12px}
     .automation-card .automation-card-name{grid-column:2;grid-row:1;min-width:0;display:flex;align-items:center;gap:6px;overflow:hidden}
@@ -2152,15 +2153,18 @@
     .automation-card-head>.automation-card-note{grid-column:2/-1;grid-row:2;margin-top:2px;padding-bottom:6px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
     .automation-card-head>.device-card-toggle{grid-column:3;grid-row:1;width:56px;min-height:44px;height:44px;align-self:center;padding:0}
     .automation-card-name .automation-card-chip{flex:none;margin-top:0;margin-left:0}
-    /* İNCE AYRAÇ ve ALT SATIR — son çalışma saati solda, geçmiş bağlantısı sağda. */
-    .automation-card-foot{display:flex;align-items:center;gap:10px;min-height:36px;border-top:1px solid var(--line)}
+    /* İNCE AYRAÇ ve ALT SATIR — son çalışma saati solda, geçmiş bağlantısı sağda.
+       Alt satır dişlinin genişliği + sütun boşluğu kadar içeriden başlar, yani başlık ve alt
+       başlıkla aynı hizada. Girinti padding ile verilir: border-top kutunun kenarında kaldığı
+       için ayraç tam genişlikte kalır — kart bölgelerini uçtan uca ayıran çizgi olarak okunur. */
+    .automation-card-foot{display:flex;align-items:center;gap:10px;min-height:36px;padding-left:var(--automation-indent);border-top:1px solid var(--line)}
     .automation-card-when{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px;font-weight:700}
     .automation-card-when.warn{color:var(--danger)}
     .automation-card-foot .automation-card-chip{flex:none;margin-top:0}
     .automation-runs-toggle{flex:none;min-height:36px;display:inline-flex;align-items:center;gap:6px;margin:0;padding:0 2px;border:0;background:none;color:var(--forest);font-size:12.5px;font-weight:800;text-align:left;touch-action:manipulation}
     .automation-runs-caret{font-size:11px;line-height:1}
     .automation-runs-toggle:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px;border-radius:6px}
-    .automation-runs{margin-top:0;padding:6px 0 2px;border-top:1px solid var(--line)}
+    .automation-runs{margin-top:0;padding:6px 0 2px var(--automation-indent);border-top:1px solid var(--line)}
     .automation-runs-empty{margin:0;color:var(--muted);font-size:12.5px}
     .automation-run-list{display:grid;gap:0;margin:0;padding:0;list-style:none}
     .automation-run-row{color:var(--muted);font-size:12.5px;line-height:1.35}
@@ -2198,7 +2202,7 @@
     .location-manual{margin-top:clamp(12px,2vh,20px)}
     .location-manual summary{padding:clamp(6px,1vh,10px) 0;color:var(--muted);font-size:clamp(12px,1.6vh,13.5px);cursor:pointer}
     .location-manual .location-fields{margin-top:clamp(8px,1.2vh,14px)}
-    @media(max-width:560px){.simple-link-choices{grid-template-columns:1fr}.automation-card.link-card{grid-template-columns:46px minmax(0,1fr);row-gap:12px}.automation-card .danger-button{grid-column:1/-1}.automation-card-head{column-gap:9px}}
+    @media(max-width:560px){.simple-link-choices{grid-template-columns:1fr}.automation-card.link-card{grid-template-columns:46px minmax(0,1fr);row-gap:12px}.automation-card .danger-button{grid-column:1/-1}.automation-card-head{column-gap:9px}.automation-card{--automation-indent:53px}}
     @media(max-width:900px){.toast{bottom:calc(24px + env(safe-area-inset-bottom))}}@media(orientation:landscape) and (max-width:900px) and (max-height:700px){.toast{bottom:24px}}
     /* Tablet yatay duruyor: dokunmatik ekranda her diyalog ekranı doldurur. Tek tek diyaloğa kural
        yazılmaz — ortak `dialog`/`.modal` kuralı genişletildiği için yeni diyaloglar da uyar.
