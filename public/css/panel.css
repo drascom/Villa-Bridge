@@ -428,25 +428,48 @@
          değil, eksik bant. Artık gündüzün de kendi cam değerleri var.
          GÜNDÜZ YÖNÜ TERSTİR, bilerek: gece gökyüzü karanlık olduğu için orada dolgu KOYU +
          mürekkep açık kehribar; gündüz gökyüzü parlak olduğu için burada dolgu AÇIK kehribar +
-         mürekkep koyu kehribar. Ortak olan şey teknik: dolgu artık cam (alfa .96 → .55, yani
-         gökyüzü payı %4 → %45; gradyan, güneş ve bulut deseni yanan döşemenin de içinden
-         okunuyor) ve "yanıyor" bilgisini beş işaret taşıyor — kehribar KENAR, ince dış HALKA,
-         dar HALE, kehribar İKON çipi ve sıcak MÜREKKEP.
-         AYIRT EDİLEBİLİRLİK (öğle gökyüzü rgb(92,160,222) üstünde bileşke bağıl parlaklık):
-           kapalı .135 < uyarı .161 < aktif .175 < taban .195 < YANAN .447
-         — merdivenin SIRASI gece bandıyla birebir aynı ve yanan döşeme yine ekranın en parlak
-         öğesi; ama artık tabanın 130 katı değil 2,3 katı, yani ekranı ezmiyor. Asıl ayrım gene
-         RENKTEN: bütün öbür döşemeler mavi-gri tarafta (bileşkede mavi−kırmızı ≈ +103), yanan
-         döşeme sıcak kum tarafında (−31). Tek doymuş sıcak öğe odur.
-         OKUNURLUK (aynı gökyüzü): koyu kehribar mürekkep 5,73:1, ikinci satır 4,77:1, ikon
-         glifi 6,12:1 — üçü de AA üstü. Kızıl gökyüzünde (şafak/batım, rgb(176,84,54)) mürekkep
-         4,74:1, ikinci satır 4,02:1 (gece bandının alacakaranlık ölçümüyle aynı mertebe).
+         mürekkep koyu kehribar. "Yanıyor" bilgisini beş işaret taşır — kehribar KENAR, ince dış
+         HALKA, dar HALE, kehribar İKON çipi ve sıcak MÜREKKEP.
+         GEÇMİŞ ARA DURUM (artık geçerli değil): dolgu bir tur cama indirilmişti (alfa .96 → .55,
+         gökyüzü payı %45) ve bileşke parlaklık .447'de kalıyordu; aşağıdaki tur onu geri aldı.
+         Ayrımı taşıyan asıl eksen değişmedi: bütün öbür döşemeler mavi-gri tarafta (bileşkede
+         mavi−kırmızı ≈ +103), yanan döşeme sıcak/beyaz tarafta. Tek doymuş sıcak öğe odur.
          Beyaz yazı taşıyan öbür döşemelerin konturu (`--glass-tile-text-shadow`) yanan döşemeye
-         uygulanmaz — mürekkebi koyu, ihtiyacı yok. */
-      --glass-on:rgba(255,196,92,.55);--glass-on-brd:rgba(214,138,26,.95);
+         uygulanmaz — mürekkebi koyu, ihtiyacı yok.
+         DOLGU BEYAZA ÇEKİLDİ (kullanıcı, gündüz açık mavi gök: "açık olan butonun rengi çok
+         uygun değil, arkadaki mavinin içinde krem gibi kayboluyor. Beyaza doğru yaklaştırsak
+         mı?"). Sorun doğru teşhis: eski dolgu rgba(255,196,92,.55) öğle göğünün üstünde
+         bileşkede rgb(182,180,151) veriyordu — mavinin içinde soluk bir kum lekesi, "ekranın en
+         parlak öğesi" iddiasını taşımıyordu. Yeni dolgu rgba(255,247,232,.9): pigment kremden
+         SICAK BEYAZ'a çıktı, alfa .55 → .9 (gökyüzü payı %45 → %10). Bileşke rgb(239,238,231),
+         bağıl parlaklık .447 → .854 — döşeme artık gerçekten beyaz bir ışık lekesi.
+         SICAKLIĞI ARTIK DOLGU DEĞİL, KENAR + İKON ÇİPİ + HALE + MÜREKKEP TAŞIYOR — dördü de
+         yerinde ve dördü de beyaz zeminde eskisinden DAHA görünür: kehribar kenar (.95) artık
+         krem değil beyaz bir yüzeyi çevreliyor, çip .72 → .82 doyurulup bileşkede rgb(227,166,66)
+         oluyor, dış halka .45 → .6 ve dış hale .28 → .42 ile kehribar ışıma güçlendi. Hale
+         yarıçapı 7px → 8px: yanlara 4px taşar, en dar komşu boşluğu 6px — hâlâ altında.
+         Cam payı düştü (gökyüzü artık yanan döşemenin içinden okunmuyor); bilinçli bedel, çünkü
+         "yanıyor" bilgisi bu bantta okunurluktan önce gelir ve gece bandı cam kalmayı sürdürüyor.
+         YENİ ÖLÇÜM (öğle gökyüzü rgb(92,160,222), bileşke bağıl parlaklık):
+           kapalı .135 < uyarı .161 < aktif .175 < taban .195 < YANAN .854
+         — merdivenin sırası korundu; yanan artık tabanın 2,3 katı değil 4,4 katı ve ekranın tek
+         beyaz öğesi. Pastel gökte (rgb(172,209,238)) sıra aynı: .242 < .275 < .291 < .353 < .898.
+         Mürekkep beyazlaşan dolguda daha da açıldı: koyu kehribar 5,73:1 → 10,43:1, ikinci satır
+         4,77:1 → 7,93:1, ikon glifi 6,12:1 → 6,81:1 (öğle göğü). Kızıl gökte (şafak/batım)
+         10,00:1 / 7,63:1 / 6,77:1.
+         DÖŞEMENİN GÖKYÜZÜNDEN AYRIŞMASI (bileşke ↔ gök): öğle mavisinde 1,32:1 → 2,40:1, kızıl
+         gökte 1,97:1 → 4,16:1. Gökyüzü gradyanının EN AÇIK ucunda (pastel rgb(172,209,238), yani
+         ekranın üst şeridi) beyaz döşeme ile gök 1,45:1'de kalıyor — eski krem dolgunun orada
+         1,02:1 olduğu, yani tamamen kaybolduğu düşünülürse ilerleme; ayrımı orada kehribar KENAR
+         taşıyor, döşemeler de zaten ekranın alt/orta bandında, doymuş mavinin üstünde duruyor.
+         BANT SIÇRAMASI, dürüstçe: gece bandındaki yanan döşeme (istendiği gibi) dokunulmadan
+         kaldı; eşikte gündüz .816 → gece .125 arası fark eskisinden (.361 → .125) belirgin daha
+         büyük. Eşik geçişini kökteki `data-theme-fade` .9s çapraz geçişi taşıyor, basamak
+         görünmüyor ama fark artık daha uzun bir yol gidiyor. */
+      --glass-on:rgba(255,247,232,.9);--glass-on-brd:rgba(214,138,26,.95);
       --glass-on-ink:#4a3105;--glass-on-sub:rgba(74,49,5,.9);
-      --glass-on-chip:rgba(224,150,30,.72);--glass-on-chip-ink:#3a2408;
-      --glass-on-glow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(120,72,10,.25),0 0 0 1px rgba(214,138,26,.45),0 1px 2px rgba(16,24,34,.28),0 2px 7px rgba(205,135,25,.28);
+      --glass-on-chip:rgba(224,150,30,.82);--glass-on-chip-ink:#3a2408;
+      --glass-on-glow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(120,72,10,.32),0 0 0 1px rgba(214,138,26,.6),0 1px 2px rgba(16,24,34,.28),0 2px 8px rgba(205,135,25,.42);
       /* Aktif ve uyarı da aynı dile döner: dolguları zaten ince, kenarları da gece bandındaki
          gibi kendi tonlarının doymuş ucuna çekildi — yüzeyi dolgu değil KENAR tanımlıyor.
          Beyaz yazı taşıdıkları için mürekkepleri değişmedi, kontrastları da (aktif 4,67:1,
