@@ -600,6 +600,10 @@
       :"";
     return`<div class="automation-card-foot"><span class="automation-card-when${failed?" warn":""}">${esc(when)}</span>${automationInactiveHtml(automation)}${link}</div>`;
   };
+  /* AYARLAR DİŞLİSİ — emoji glifi değil çizim. "⚙" karakteri yazı boyunda kalıyor, yazı tipine göre
+     inceliyor ve dokunmatikte kayboluyordu; çizilen dişli kutunun tamamını doldurur, kalınlığı ve
+     boyu buradan bellidir. */
+  const AUTOMATION_GEAR_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>';
   const automationCardHtml=automation=>{
     const trigger=automation.triggers?.[0];
     const actions=(automation.actions||[]).filter(Boolean);
@@ -620,7 +624,9 @@
     const autoOff=map?"":automationAutoOffLine(actions.find(item=>item.autoOff)||action);
     // Kapanış sözü ayrı bir SATIR değil, aynı cümlenin devamı: iki satırlık kutuya sığar, kartı uzatmaz.
     const note=[line+more,autoOff].filter(Boolean).join(" · ");
-    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><div class="automation-card-head"><span class="automation-card-glyph" aria-hidden="true">🧩</span><strong class="automation-card-name"><span class="automation-card-title">${esc(automation.name)}</span>${automationAgentChip(automation)}</strong><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button><span class="automation-card-note" title="${esc(note)}">${esc(note)}</span><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}"><span aria-hidden="true">⚙</span></button></div>${automationCardFootHtml(automation)}${automationRunsHtml(automation)}</article>`;
+    // BAŞLIK SATIRI: solda ayarlar dişlisi, ortada ad, sağda aç/kapa. Kural cümlesi kendi satırında,
+    // adın altında alt başlık olarak akar — düğmelerle yan yana durmaz.
+    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><div class="automation-card-head"><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}">${AUTOMATION_GEAR_SVG}</button><strong class="automation-card-name"><span class="automation-card-title">${esc(automation.name)}</span>${automationAgentChip(automation)}</strong><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button><span class="automation-card-note" title="${esc(note)}">${esc(note)}</span></div>${automationCardFootHtml(automation)}${automationRunsHtml(automation)}</article>`;
   };
   /* Geri alma modelin değil kullanıcının işidir: bu yüzden bir MCP aracı değil, panelde bir düğme.
      Sunucu ajan yazmasından **önce** aldığı yedekleri sayar; sayı sıfırsa geri alınacak bir şey de
