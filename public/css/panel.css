@@ -1683,6 +1683,56 @@
     body[data-active-view="home"] #home .quick-card.selected .quick-device-icon{color:var(--glass-active-ink);background:var(--glass-active-chip);box-shadow:inset 0 0 0 1px var(--glass-active-brd)}
     :root[data-theme="dark"] .quick-card.selected{border-color:#3d8966;color:#a8e3c6;background:#26493a}
     :root[data-theme="dark"] .quick-card.selected .quick-device-icon{color:#a8e3c6;background:#26493a;box-shadow:inset 0 0 0 1px #3d8966}
+    /* SEÇİLİ SEKME — YALNIZ CANLI KİPTE (`data-sky="live"`); Light/Dark sabit sistemi yukarıdaki
+       kurallarda kalır, hiç etkilenmez.
+       SORUN (kullanıcı sordu, ölçüldü): seçili sekme durum ailesinin AKTİF yeşilini alıyordu ve o
+       aile CAM — gündüz `rgba(28,60,46,.38)`. Parlak gök üstünde bileşke rgb(68,122,155) çıkıyor,
+       üstündeki açık nane mürekkep (`--glass-active-ink`, #b4ecd0) ile arası öğle göğünde 3,52:1,
+       gökyüzünün pastel ucunda 2,32:1 — yani AA'nın altı ve ekrandaki EN DÜŞÜK kontrastlı yazı.
+       Seçili öğe, tam da vurgulanması gereken öğe, en soluk öğe oluyordu; üstelik açık+saydam
+       görünüm arayüz dilinde "devre dışı" okunuyor. Sekmenin kendisi de gökten ayrışmıyordu
+       (1,67:1 / 1,92:1).
+       KARAR: DOLU AKSAN — "net aksan çerçevesi + parlak yazı" değil. Gerekçe üç maddede:
+       1) Panelin dili bunu zaten söylüyor: cam/saydamlık burada "ortam, arka plan" demek; bir
+          şeyin ÖZNE olduğu SAYDAMLIKTAN ÇIKARAK anlatılıyor (yanan döşeme gündüz artık neredeyse
+          opak, "yeni grup" düğmesi tek dolu aksan blok). Saydam kalıp yalnız kenarı güçlendirmek,
+          seçili sekmeyi cam ailesinin içinde tutmak demekti — yani sorunun kaynağını korumak.
+       2) Dolu dolgu kontrastı GÖKYÜZÜNDEN BAĞIMSIZ kılıyor: yazı/zemin oranı gün boyu sabit
+          kalıyor, gökyüzü altındaki tek kontrol noktası olmaktan çıkıyor. Saydam bir çözümde bu
+          oran gün içinde 2,3:1 ile 3,5:1 arasında geziniyordu.
+       3) Hue çakışmıyor: kehribar YANAN'ın, yeşil SEÇİLİ'nin; ikisi de artık dolu ama biri sıcak
+          beyaz biri doymuş yeşil, üstelik farklı bölgelerde (döşeme ızgarası / alt şerit).
+       AKSAN GÖKYÜZÜNÜN TERSİNİ TUTAR — kartın tersine, bilerek: kart göğün tarafını tutup
+       ortamla kaynaşır, seçili sekme AYRIŞMAK için var. Gündüz koyu orman yeşili + beyaz yazı
+       (parlak göğün üstünde koyu blok), gece doymuş yeşil + koyu yazı (karanlık göğün üstünde
+       parlak blok). İkisi de mevcut tokenlardan: `--glass-plate-accent(-ink)` ve
+       `--glass-active-brd` / `--glass-accent-ink`. Yeni renk ailesi yok, `color-mix` yok.
+       ÖLÇÜM — yazı/zemin: gündüz 2,32–3,52:1 → 10,09:1 (sabit, dolgu opak), alt satır 1,97–2,78:1
+       → 6,83:1. Gece 5,15–13,29:1 → 6,68:1 (derin gece) / 7,20:1 (alacakaranlık), alt satır
+       4,56:1 / 4,81:1 — hepsi AA üstü, en dar hâli 4,56:1.
+       ÖLÇÜM — sekmenin gökten ayrışması: gündüz 1,67:1 → 3,62:1 (doymuş mavi) ve 1,92:1 → 6,30:1
+       (pastel uç). Gece 1,10:1 → 7,36:1 (derin gece); alacakaranlıkta 1,35:1 → 2,06:1, orada
+       ayrımı parlaklık değil doymuş yeşil ile kızıl gök arasındaki HUE farkı taşıyor.
+       ÖLÇÜM — komşusuyla farkı: seçilmeyen sekmeye karşı gündüz 3,62:1 (bileşke L .195 → .054),
+       gece 6,99:1 (L .007 → .348). Fark gri tonlamada da duruyor, yani bilgi yalnız RENKTE değil.
+       ERİŞİLEBİLİRLİK: `aria-selected` + roving `tabindex` zaten 40-home.js'te üretiliyor, aynen
+       korundu. Odak halkası (`.quick-card:focus-visible`, 3px, offset 2px) ve dokunma hedefleri
+       (min-height 44px, `#home` şeridinde 88px) değişmedi — burada yalnız renk ve dolgu yazıldı.
+       İkon çipi kendi kabuğunu bırakıp mürekkebin rengine düşüyor: dolu aksanın üstünde ikinci
+       bir dolgu katmanı gürültü olurdu, glif tek başına yeterli. Canlı nokta (`--sun`) ve
+       "genel bakışta" noktası da mürekkebe döner, yoksa gece nane zeminde kayboluyorlardı. */
+    :root[data-sky="live"] body[data-active-view="home"] #home .quick-card.selected .quick-device-icon{color:inherit;background:transparent;box-shadow:none}
+    :root[data-sky="live"] body[data-active-view="home"] #home .quick-card.selected .home-tab-live{color:inherit}
+    :root[data-sky="live"] body[data-active-view="home"] #home .quick-card.selected .home-tab-dot{background:currentColor;opacity:.6}
+    :root[data-sky="live"] body[data-active-view="home"] #home .quick-card.selected{text-shadow:none}
+    :root[data-sky="live"]:not([data-theme="dark"]) body[data-active-view="home"] #home .quick-card.selected{
+      --ink:var(--glass-plate-accent-ink);--muted:var(--glass-plate-accent-ink);
+      border-color:var(--glass-active-brd);color:var(--glass-plate-accent-ink);background:var(--glass-plate-accent)
+    }
+    :root[data-sky="live"][data-theme="dark"] body[data-active-view="home"] #home .quick-card.selected{
+      --ink:var(--glass-accent-ink);--muted:var(--glass-accent-ink);
+      border-color:var(--glass-active-brd);color:var(--glass-accent-ink);background:var(--glass-active-brd)
+    }
     .quick-card-add{flex:0 0 auto;width:clamp(58px,6.2vw,70px);min-width:58px;justify-content:center;padding:5px clamp(8px,1vw,12px);border:1px solid var(--forest);color:var(--on-forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}
     body[data-active-view="home"] #home .quick-card-add{border-color:var(--forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}
     /* "Yeni grup" düğmesinin gölgesi tokendan değil, kuralın içinden geliyor (yeşil tonlu) —
