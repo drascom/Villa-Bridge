@@ -1014,7 +1014,7 @@
     .device-name-row{min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.device-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:16px}.device-link-level{display:inline-flex;align-items:center;gap:4px;flex:none;padding:3px 6px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:10px;font-weight:800;line-height:1}.device-link-level svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}.device-link-level.strong{color:#24805a;background:#e2f3ea}.device-link-level.good{color:#927035;background:#fff1ca}.device-link-level.weak{color:var(--danger);background:#f9e6e3}.device-meta{color:var(--muted);font-size:12px;margin-top:3px}.online-text{color:#24805a}.offline-text{color:var(--danger)}.unknown-text{color:#927035}
     .controls{display:grid;gap:9px;margin-top:16px}.control-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding-top:12px;border-top:1px solid #edf0ed}.control-name{font-weight:650}.control-value{color:var(--muted);font-size:12px}.device-role-fixed{text-align:right;font-weight:750}.control-actions{display:flex;align-items:center;gap:8px}.visibility-toggle{width:44px;height:44px;display:grid;place-items:center;flex:none;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--forest);background:var(--forest-soft);line-height:1;touch-action:manipulation}.visibility-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.visibility-toggle.is-hidden{color:var(--muted);background:var(--surface-soft)}.visibility-toggle:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}/* Yıldız gözün kardeşi: aynı 44px yuvarlak hedef, aynı yerleşim. Dolu/boş ayrımı `aria-pressed`ten okunur. */.favorite-toggle{width:44px;height:44px;display:grid;place-items:center;flex:none;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--muted);background:var(--surface-soft);line-height:1;touch-action:manipulation}.favorite-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.favorite-toggle[aria-pressed="true"]{color:var(--sun);border-color:var(--sun)}.favorite-toggle[aria-pressed="true"] svg{fill:currentColor}.favorite-toggle:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     .switch{width:50px;height:29px;border:0;border-radius:99px;padding:3px;background:#cfd6d1;transition:.2s}.switch span{display:block;width:23px;height:23px;border-radius:50%;background:white;box-shadow:0 2px 5px #0002;transition:.2s}.switch.on{background:var(--forest)}.switch.on span{transform:translateX(21px)}
-    input[type=range]{width:150px;accent-color:var(--forest)}.facts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.fact{padding:6px 9px;background:#f2f3f0;font-size:12px;color:#4e5b55}
+    input[type=range]{width:150px;accent-color:var(--forest)}/* `.fact` çipi ana sayfadaki `.widget-facts` şeridinde yaşar (bkz. index.html); eski cihaz detayı `.facts` sarmalayıcısı üretilmediği için kuralı kaldırıldı. */.fact{padding:6px 9px;background:#f2f3f0;font-size:12px;color:#4e5b55}
     details{margin-top:14px;color:var(--muted)}summary{cursor:pointer;font-size:12px}.technical-details{margin-top:12px}.technical{padding:12px 0 0;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
     .card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.card-actions button{min-height:44px;padding:11px 14px;border:0;border-radius:10px;font-size:13px;font-weight:700}.rename,.change-image{background:var(--forest-soft);color:var(--forest)}.remove{background:#f8e9e7;color:var(--danger)}
     .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:18px}#devices .toolbar{position:sticky;z-index:6;top:0;margin-inline:calc(var(--page-gutter) * -1);margin-bottom:10px;padding-block:clamp(10px,1.6vh,16px) clamp(14px,2.4vh,22px);padding-inline:var(--page-gutter);background:var(--paper)}.search-field{position:relative;display:flex;min-width:0}.search-field .search{width:100%;padding-right:clamp(56px,6vw,66px)}.search-clear{position:absolute;right:clamp(6px,1vw,12px);top:50%;width:44px;height:44px;display:grid;place-items:center;padding:0;border:0;border-radius:10px;color:var(--muted);background:transparent;transform:translateY(-50%);touch-action:manipulation}.search-clear[hidden]{display:none}.search-clear svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}.search-clear:hover,.search-clear:focus-visible{color:var(--forest)}.toolbar-actions{display:flex;align-items:center;gap:8px}
@@ -1924,6 +1924,9 @@
        konumlandığı için sağ altta 12px içeride kalır.
        Beyaz zemin bu kırılımda kaldırılır: kutu artık tüm kartı kapladığından `#fff` koyu temada
        kocaman bir levhaya dönerdi; saydam olunca letterbox payı kart yüzeyine oturur.
+       Kart sağ kolon boyunca uzadığı için `object-position` ÜST kenara çekilir (`50% 0`): resim
+       uzun kartın dikey ortasında asılı kalmaz, üstten başlar; yatayda ortalı kalır. Üst boşluğu
+       yine img'in kendi `padding`i verir, resim kart kenarına yapışmaz.
        Görünür resim yoksa (kaynak yok ya da yüklenemedi → `[hidden]`) sol kolon hiç açılmaz:
        `:not(:has(...))` ile ızgara tek kolona iner, yarım pencere boş kalmaz. */
     @media(min-width:900px) and (orientation:landscape){
@@ -1933,7 +1936,7 @@
       .device-detail-layout:not(:has(.device-detail-photo:not([hidden]))){grid-template-columns:minmax(0,1fr)}
       .device-detail-layout:not(:has(.device-detail-photo:not([hidden])))>.device-detail-media{display:none}
       .device-detail-media>.device-detail-photo{min-height:clamp(130px,22vh,190px);padding:0}
-      .device-detail-photo .device-photo{position:absolute;grid-area:auto;inset:0;width:100%;height:100%;max-width:none;max-height:none;padding:clamp(10px,1.6vh,14px);box-sizing:border-box;object-fit:contain;background:transparent}
+      .device-detail-photo .device-photo{position:absolute;grid-area:auto;inset:0;width:100%;height:100%;max-width:none;max-height:none;padding:clamp(10px,1.6vh,14px);box-sizing:border-box;object-fit:contain;object-position:50% 0;background:transparent}
     }
     /* Işık kartındaki büyük dikey kumanda. Yükseklik viewport'a bağlı (clamp + vh), sabit px yok:
        1024×640 tablette pencere kaydırılmadan sığar. Renk karıştıran CSS işlevi YOK — Android
@@ -1960,8 +1963,25 @@
     .light-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(44px,1fr));gap:clamp(6px,1vw,10px)}
     .light-color .color-picker{height:clamp(44px,7vh,52px)}
     .light-preset{min-width:44px;min-height:44px;padding:0;border:1px solid var(--line);border-radius:12px;touch-action:manipulation}
-    .light-effect{width:100%;max-width:clamp(216px,52vw,360px);display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:750}.light-effect .control-select{width:100%;min-width:0}
-    @media(prefers-reduced-motion:reduce){.light-column-fill{transition:none}}
+    /* HIZLI SIRANIN İPUCU BALONU (`data-tip`). Yalnız FARE + KLAVYE için: tablette tek girdi yolu
+       dokunmatik ve orada `:hover` tıklamadan sonra düğmeye YAPIŞIR — balon açık kalır, altındaki
+       düğmeyi gölgeler. Bu yüzden kural bütünüyle `(hover:hover) and (pointer:fine)` içindedir;
+       Nokia T10'da hiç derlenmez. Klavye kullanıcısı `:focus-visible` ile aynı balonu görür.
+       Balon düğmenin ÜSTÜNDE durur: `.device-detail-body` dikeyde kaydırır, yatayda kırpar
+       (`overflow-x:hidden`) — bu yüzden yatay taşma riski konumlandırmayla kapatılır: balon
+       düğmeye göre ortalıdır, ama sıranın İLK düğmesinde sola, SON düğmesinde sağa yaslanır,
+       böylece dar pencerede kenarın dışına çıkıp kesilmez. `width:max-content` + `max-width`
+       kısa metni tek satırda tutar, uzun çeviriyi sarar. Tıklamayı engellemez (`pointer-events:none`).
+       Renk yok: kart yüzeyi (`--surface`), çizgi (`--line`), mürekkep (`--ink`) ve mevcut
+       `--card-shadow` kullanılır — sabit renk ve `color-mix()` yok. */
+    @media(hover:hover) and (pointer:fine){
+      .light-actions [data-tip]{position:relative}
+      .light-actions [data-tip]::after{content:attr(data-tip);position:absolute;z-index:6;left:50%;bottom:calc(100% + clamp(6px,.9vh,9px));transform:translateX(-50%);width:max-content;max-width:clamp(112px,16vw,200px);padding:clamp(5px,.8vh,8px) clamp(8px,1vw,12px);border:1px solid var(--line);border-radius:11px;color:var(--ink);background:var(--surface);box-shadow:var(--card-shadow);font-size:clamp(11px,1.5vh,13px);font-weight:750;line-height:1.3;text-align:center;white-space:normal;opacity:0;visibility:hidden;transition:opacity .12s ease;pointer-events:none}
+      .light-modes>[data-tip]:first-child::after{left:0;transform:none}
+      .light-actions>[data-tip]:last-child::after{left:auto;right:0;transform:none}
+      .light-actions [data-tip]:hover::after,.light-actions [data-tip]:focus-visible::after{opacity:1;visibility:visible}
+    }
+    @media(prefers-reduced-motion:reduce){.light-column-fill{transition:none}.light-actions [data-tip]::after{transition:none}}
     .device-card.device-card-offline{filter:saturate(.7);opacity:.72}.device-attention .device-card.device-card-offline{filter:saturate(.85);opacity:.92}:root[data-theme="dark"] .device-card.device-card-offline{opacity:.8}:root[data-theme="dark"] .device-attention .device-card.device-card-offline{opacity:.95}
     .device-grid.devices-list-view{justify-items:center}.device-grid.devices-list-view>.device-card{width:min(100%,760px)}.device-grid.devices-list-view>.empty{width:100%}
     .device-card-hint{flex:none;display:flex;align-items:center;color:var(--muted);font-size:19px;font-weight:700;line-height:1;opacity:.6}.device-card-hint.divided{margin-right:2px;padding-right:10px;border-right:1px solid var(--line)}

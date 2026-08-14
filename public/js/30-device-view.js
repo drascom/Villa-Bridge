@@ -133,20 +133,6 @@
     const label=`${t("signal")} ${percent===null?"—":`${percent}%`}`;
     return`<span class="device-link-level${tone?` ${tone}`:""}" title="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16a10 10 0 0 1 14 0M8 19a6 6 0 0 1 8 0M11 22a2 2 0 0 1 2 0"/></svg><span>${percent===null?"—":`${percent}%`}</span></span>`;
   };
-  const facts=device=>{
-    const list=[];
-    if(typeof device.state.battery==="number")list.push(`${t("battery")} ${device.state.battery}%`);
-    if(device.state.contact!==undefined)list.push(device.state.contact?t("doorClosed"):t("doorOpen"));
-    if(device.state.presence!==undefined)list.push(device.state.presence?t("motionDetected"):t("motionClear"));
-    else if(device.state.occupancy!==undefined)list.push(device.state.occupancy?t("motionDetected"):t("motionClear"));
-    if(device.state.smoke!==undefined)list.push(device.state.smoke?t("smokeDetected"):t("noSmoke"));
-    if(device.state.carbon_monoxide!==undefined)list.push(device.state.carbon_monoxide?t("coDetected"):t("coClear"));
-    if(typeof device.state.illuminance==="number")list.push(`${device.state.illuminance} lux`);
-    if(typeof device.state.power==="number")list.push(`${device.state.power} W`);
-    if(typeof device.state.action==="string")list.push(`◉ ${String(device.state.action).replaceAll("_"," ")}`);
-    const primaryLabel=primaryStatusForDevice(device).label;
-    return list.filter(fact=>fact!==primaryLabel).slice(0,5);
-  };
   /* Gizlenenler listesi: kayıtta olmayan her şey görünür. Yıldız/favori değil — "oda kartında
      göster/gizle". Anahtar cihaz kimliği + kontrol kimliği; kontrolü olmayan cihaz `@device`. */
   const isTileHidden=(deviceId,controlId)=>state.hiddenTiles.has(tileVisibilityKey(deviceId,controlId));
@@ -198,10 +184,15 @@
     ?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 5.2A9.3 9.3 0 0 1 12 5.1c5 0 9 4.4 9 6.9 0 1-.7 2.3-1.9 3.5"/><path d="M6.4 6.8C4.3 8.2 3 10.1 3 12c0 2.5 4 6.9 9 6.9 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>'
     :'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c0-2.5 4-6.9 9-6.9s9 4.4 9 6.9-4 6.9-9 6.9-9-4.4-9-6.9Z"/><circle cx="12" cy="12" r="3"/></svg>';
   const visibilityLabel=hidden=>t(hidden?"showOnRoomCard":"hideFromRoomCard");
-  const visibilityButton=(device,control)=>{
+  /* `options.tip`: düğme ışık kumandasının hızlı sırasında çizildiğinde tarayıcının `title`
+     balonu yerine panelin kendi `data-tip` balonu kullanılır (ikisi birden = çift balon).
+     Öteki yüzeylerde (kontrol satırları, oda kartları) `title` bugünkü gibi kalır. Metin iki
+     durumda da AYNI kaynaktan, `visibilityLabel(hidden)`dan gelir; `aria-label` hiç değişmez. */
+  const tipOrTitle=(text,options)=>`${options?.tip===true?"data-tip":"title"}="${esc(text)}"`;
+  const visibilityButton=(device,control,options)=>{
     const hidden=isTileHidden(device.id,control.id);
     const label=`${visibilityLabel(hidden)}: ${control.name||device.name}`;
-    return`<button class="visibility-toggle${hidden?" is-hidden":""}" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(control.id)}" aria-label="${esc(label)}" title="${esc(visibilityLabel(hidden))}">${visibilityIcon(hidden)}</button>`;
+    return`<button class="visibility-toggle${hidden?" is-hidden":""}" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(control.id)}" aria-label="${esc(label)}" ${tipOrTitle(visibilityLabel(hidden),options)}>${visibilityIcon(hidden)}</button>`;
   };
   /* FAVORİLER — göz ikonunun kardeşi. Aynı iskelet: karar SUNUCUDA (`/api/favorites`, ev genelinde
      tek doğru), yerel kayıt yalnız çevrimdışı açılışın yansısı, anahtar cihaz kimliği + kontrol
@@ -258,10 +249,10 @@
   }
   const favoriteIcon=()=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.85 6.8 19.6l1-5.75-4.2-4.1 5.8-.85z"/></svg>';
   const favoriteLabel=on=>t(on?"removeFromFavorites":"addToFavorites");
-  const favoriteButton=(device,control)=>{
+  const favoriteButton=(device,control,options)=>{
     const on=isFavorite(device.id,control.id);
     const label=`${favoriteLabel(on)}: ${control.name||device.name}`;
-    return`<button class="favorite-toggle" type="button" aria-pressed="${on?"true":"false"}" data-favorite-device="${esc(device.id)}" data-favorite-control="${esc(control.id)}" aria-label="${esc(label)}" title="${esc(favoriteLabel(on))}">${favoriteIcon()}</button>`;
+    return`<button class="favorite-toggle" type="button" aria-pressed="${on?"true":"false"}" data-favorite-device="${esc(device.id)}" data-favorite-control="${esc(control.id)}" aria-label="${esc(label)}" ${tipOrTitle(favoriteLabel(on),options)}>${favoriteIcon()}</button>`;
   };
   const commandValue=value=>esc(JSON.stringify(value));
   const optionValue=(values,pattern,fallback)=>values?.find(value=>pattern.test(String(value).toUpperCase()))??fallback;
@@ -674,8 +665,10 @@
   };
   /* Büyük dikey ışık kumandası — yetenek bazlı çizilir. Hangi parçanın görüneceğini cihazın
      SUNDUĞU kumandalar belirler; model ya da ad listesi yoktur. Parçalar `DeviceControlView`
-     kimliğinden okunur: `main` aç/kapa kanalı, `main:brightness`, `main:temperature`,
-     `main:color` ve efekt `select`i. Yoksa o parça hiç çizilmez. */
+     kimliğinden okunur: `main` aç/kapa kanalı, `main:brightness`, `main:temperature` ve
+     `main:color`. Yoksa o parça hiç çizilmez. Efekt burada YOK: ileri bir cihaz ayarı olduğu
+     için yeri ayar satırları listesi (bkz. `lightPanelCoveredControls` — efekt covered değildir,
+     satırı listede durur). */
   const lightPanelParts=device=>{
     const controls=device?.controls||[];
     const byId=(id,kind)=>controls.find(control=>control.id===id&&control.kind===kind)||null;
@@ -683,8 +676,7 @@
       power:controls.find(control=>control.kind==="switch"&&control.id==="main")||controls.find(isNamedChannel)||null,
       level:byId("main:brightness","level"),
       temperature:byId("main:temperature","temperature"),
-      color:byId("main:color","color"),
-      effect:controls.find(control=>control.kind==="select"&&/(^|_)effect$/.test(String(control.property||"")))||null
+      color:byId("main:color","color")
     };
   };
   /* Kumanda ışık profiline aittir: sınıf tanım verisinden (`light` expose tipi) çıkar, kullanıcının
@@ -764,9 +756,11 @@
   };
   /* `options.compact`: aynı kumanda hızlı kumanda penceresinde de çizilir. Orada göz (oda kartında
      göster/gizle) yeri değil — pencereyi açan döşemeyi pencerenin içinden kaldırmak anlamsız;
-     göz cihaz sayfasındaki yerinde durmaya devam eder. Aynı gerekçeyle "Efekt" açılır listesi de
-     düşer: hızlı kumanda parlaklık, renk sıcaklığı/renk ve aç/kapa demektir; efekt gibi ileri ayar
-     "Ayrıntılar"daki cihaz sayfasında tam sürümde durmaya devam eder. Başka hiçbir parça değişmez. */
+     göz cihaz sayfasındaki yerinde durmaya devam eder. Başka hiçbir parça değişmez.
+     "Efekt" açılır listesi kumandanın HİÇBİR sürümünde çizilmez: hızlı kumanda parlaklık, renk
+     sıcaklığı/renk ve aç/kapa demektir. Efekt ileri bir cihaz ayarıdır ve zaten ayar satırları
+     listesinde ("effect · cihaz ayarı") duruyordu — panelde ikinci kez çizmek aynı ayarı iki
+     arayüzle sunmaktı. Satır listede kalır; efekt covered kümesine EKLENMEZ. */
   const lightPanelHtml=(device,options={})=>{
     const parts=lightPanelParts(device);
     if(!lightPanelSupported(device,parts))return"";
@@ -781,12 +775,16 @@
     const tint=lightColumnTint(parts);
     const offline=device.availability==="offline";
     const modeLabels={level:t("brightness"),temperature:t("colorTemperature"),color:t("color")};
+    /* İpucu balonu `title` DEĞİL `data-tip`: tarayıcının yavaş, biçimsiz balonu yerine panelin
+       kendi dili (bkz. panel.css `.light-actions [data-tip]`). İkisi aynı düğmede DURMAZ, yoksa
+       üst üste iki balon çıkar. `aria-label` aynen kalır — ekran okuyucu ondan okur, balon yalnız
+       fare/klavye için görsel bir ek. Metinler mevcut anahtarlardan, yeni anahtar açılmadı. */
     const modeButton=(key,control,active)=>control
-      ?`<button class="light-mode${active?" active":""}" type="button" data-light-mode-button="${key}" aria-pressed="${active}" aria-label="${esc(modeLabels[key])}" title="${esc(modeLabels[key])}">${lightGlyphs[key]}</button>`
+      ?`<button class="light-mode${active?" active":""}" type="button" data-light-mode-button="${key}" aria-pressed="${active}" aria-label="${esc(modeLabels[key])}" data-tip="${esc(modeLabels[key])}">${lightGlyphs[key]}</button>`
       :"";
     // Güç düğmesi genel komut yolunu kullanır (`data-command-value`), ayrı bir bağlama gerekmez.
     const powerButton=parts.power
-      ?`<button class="light-mode${lit?" on":""}" type="button" data-device="${esc(device.id)}" data-property="${esc(parts.power.property)}" data-command-value="${commandValue(!lit)}" aria-pressed="${lit}" aria-label="${esc(`${device.name} · ${lit?t("off"):t("on")}`)}" title="${esc(t("lightPower"))}">${lightGlyphs.power}</button>`
+      ?`<button class="light-mode${lit?" on":""}" type="button" data-device="${esc(device.id)}" data-property="${esc(parts.power.property)}" data-command-value="${commandValue(!lit)}" aria-pressed="${lit}" aria-label="${esc(`${device.name} · ${lit?t("off"):t("on")}`)}" data-tip="${esc(t("lightPower"))}">${lightGlyphs.power}</button>`
       :"";
     const modeButtons=powerButton+modeButton("level",parts.level,mode==="level")+modeButton("temperature",parts.temperature,mode==="temperature")+modeButton("color",parts.color,mode==="color");
     const modesHtml=modeButtons?`<div class="light-modes" role="group" aria-label="${esc(t("quickControl"))}">${modeButtons}</div>`:"";
@@ -794,7 +792,7 @@
        BİREBİR aynı `favoriteButton`/`visibilityButton` çağrıları — aynı sınıf, aynı işaretleme, aynı
        `data-favorite-*`/`data-visibility-*` bağlaması. Yalnız yerleri değişti. */
     const eyeHtml=options.compact!==true&&lightPanelCoversPower(device,parts)
-      ?favoriteButton(device,parts.power)+visibilityButton(device,parts.power)
+      ?favoriteButton(device,parts.power,{tip:true})+visibilityButton(device,parts.power,{tip:true})
       :"";
     const actionsHtml=modesHtml||eyeHtml?`<div class="light-actions">${modesHtml}${eyeHtml}</div>`:"";
     /* Hazır renklerin altında panelin KENDİ renk seçicisi durur (`.color-picker` + `data-color`):
@@ -802,13 +800,10 @@
     const presetsHtml=parts.color
       ?`<div class="light-color"${mode==="color"?"":" hidden"}><div class="light-presets" role="group" aria-label="${esc(t("lightPresetColors"))}">${lightColorPresets.map(hex=>`<button class="light-preset" type="button" data-light-preset="${hex}" data-device="${esc(device.id)}" data-property="${esc(parts.color.property)}" aria-label="${esc(`${t("color")} ${hex}`)}" title="${hex}" style="background:${hex}"></button>`).join("")}</div><input class="color-picker" type="color" value="${esc(typeof parts.color.value==="string"?parts.color.value:"#ffffff")}" data-color="${esc(device.id)}" data-property="${esc(parts.color.property)}" aria-label="${esc(t("color"))}"></div>`
       :"";
-    const effectHtml=options.compact!==true&&parts.effect
-      ?`<label class="light-effect"><span>${esc(t("lightEffect"))}</span><select class="control-select" data-select="${esc(device.id)}" data-property="${esc(parts.effect.property)}" aria-label="${esc(t("lightEffect"))}">${(parts.effect.values||[]).map(value=>`<option value="${esc(value)}"${String(value)===String(parts.effect.value)?" selected":""}>${esc(String(value).replaceAll("_"," "))}</option>`).join("")}</select></label>`
-      :"";
     return`<div class="light-panel" data-light-panel="${esc(device.id)}">
         <div class="light-readout"><div class="light-readout-value" data-light-readout>${esc(readout)}</div><div class="light-readout-since">${esc(ago(device.stateUpdatedAt))}</div></div>
         <div class="light-column${lit?"":" off"}" data-light-column="${esc(device.id)}" data-light-kind="${spec.kind}" tabindex="0" role="${slider?"slider":"switch"}" ${slider?`aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" aria-valuetext="${esc(readout)}"`:`aria-checked="${lit}"`} aria-label="${esc(label)}"${offline?' aria-disabled="true"':""}${tint?` style="--light-tint:${esc(tint)}"`:""}><div class="light-column-fill" style="height:${percent}%"></div>${lightGlyphs.column}</div>
-        ${actionsHtml}${presetsHtml}${effectHtml}
+        ${actionsHtml}${presetsHtml}
       </div>`;
   };
   /* Büyük kumanda parlaklığı, renk sıcaklığını, rengi ve gücü zaten sürüyor; aynı kanalın satır
@@ -841,9 +836,10 @@
     const updateLabel=updateRunning?t("updatingFirmware",{progress:Math.round(Number(updateState.progress)||0)}):t(updateScheduled?"cancelScheduledUpdate":"scheduleUpdate");
     const otaButton=device.otaSupported?`<button class="secondary" data-admin-only data-ota-check="${esc(device.id)}"${updateRunning?" disabled":""}>↻ ${t("checkForUpdate")}</button><button class="secondary" data-admin-only data-ota="${esc(device.id)}" data-ota-enabled="${updateScheduled?"false":"true"}"${updateRunning?" disabled":""}>⇧ ${esc(updateLabel)}</button>`:"";
     const photoHtml=`${deviceDetailPhoto(device)}`;
-    /* Rozet şeridi (`facts()`) detaydan kaldırıldı: "Değerler" kartı aynı bilgiyi satır satır ve
-       birimiyle veriyordu, şerit tek başına duran bir tekrar oluyordu. `facts()` işlevi durur —
-       başka bir yüzey ona geri dönebilir; detay gövdesi artık çağırmıyor.
+    /* Rozet şeridi detaydan kaldırıldı: "Değerler" kartı aynı bilgiyi satır satır ve birimiyle
+       veriyordu, şerit tek başına duran bir tekrar oluyordu. Üreteci (`facts()`) tek çağıranı
+       burasıydı; çağrı kalkınca işlev de silindi. Rozetlerin kullandığı çeviri anahtarları
+       DURUYOR — hepsi olay akışında ve `primaryStatusForDevice`ta ayrıca kullanılıyor.
        Roller kendi kartında ve SAĞ kolonun en üstünde: "bu cihaz ne?" sorusu kumandadan önce gelir.
        Kart kabuğu ve başlık dili ölçüm kartıyla aynı (`.device-buttons` + `-head`), yeni görsel
        dil icat edilmedi. Başlık mevcut `deviceRoleTitle` anahtarından gelir. */
