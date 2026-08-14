@@ -1449,14 +1449,18 @@
     ...automationConditionRows(device),
     ...automationConditionNumericRows(device)
   ];
-  const automationConditionDevices=()=>state.devices
-    .filter(device=>automationConditionAllRows(device).length>0)
+  /* Ölçüm yolu (`numericOnly`) listeyi sayısal okuması OLAN cihazlara daraltır: "ışık düzeyi
+     30'un altında" kurmak isteyen kişiye açma/kapama anahtarlarını göstermenin anlamı yok. */
+  const automationConditionDevices=(numericOnly=false)=>state.devices
+    .filter(device=>(numericOnly?automationNumericProperties(device).length:automationConditionAllRows(device).length)>0)
     .sort(automationByName);
+  // Evde ölçüm bildiren tek bir cihaz bile yoksa ölçüm seçeneği kapalı çizilir; sebebi rozette yazar.
+  const automationHasNumericDevices=()=>automationConditionDevices(true).length>0;
   // §9.3 — cihaz satırının altında hangi okumaların koşula girebileceği önden görünsün.
   // Aynı özelliğin "açık/kapalı" gibi iki satırı tek okuma adına iner; üçten fazlası kısalır.
-  const automationCondPropertyPreview=device=>{
+  const automationCondPropertyPreview=(device,numericOnly=false)=>{
     const names=[];
-    for(const row of automationConditionAllRows(device)){
+    for(const row of(numericOnly?automationConditionNumericRows(device):automationConditionAllRows(device))){
       const label=automationPropertyLabel(device,row.property);
       if(label&&!names.includes(label))names.push(label);
     }
@@ -1654,11 +1658,24 @@
   // Süre ölçütü (`forSeconds`) durum koşulunun içinde sessiz bir satırdı: kullanıcı orada olduğunu
   // bilmiyordu. Üçüncü satır aynı koşulu kurar, tek farkı süre satırının açık gelmesidir —
   // veri modeli aynı: `deviceState` + `forSeconds`.
-  const automationConditionChoicesHtml=()=>automationOptionsHtml([
-    {glyph:"🕐",title:t("automationCondTime"),sub:t("automationCondTimeSub"),hook:'data-automation-cond-kind="timeRange"'},
-    {glyph:"💡",title:t("automationCondState"),sub:t("automationCondStateSub"),hook:'data-automation-cond-kind="deviceState"'},
-    {glyph:"⏱",title:t("automationCondStateFor"),sub:t("automationCondStateForSub"),hook:'data-automation-cond-kind="deviceStateFor"'}
-  ]);
+  /* §9.4 — ölçüm koşulu KENDİ satırı. Aynı koşul "cihaz bir durumdaysa" yolundan da kurulabiliyor
+     ama ancak cihaz seçildikten SONRA görünüyordu: "ışık düzeyi 30'un altındaysa" arayan kişi
+     listede üç satır görüp yolu bulamıyordu. Bu satır veri modelini değiştirmez — aynı
+     `deviceState` + `above`/`below` koşulunu kurar, yalnız akışı sayısal okumalara daraltır.
+     Ölçüm bildiren cihaz yoksa satır gizlenmez, KAPALI çizilir: yokluğun sebebi görünsün. */
+  const automationConditionChoicesHtml=()=>{
+    const measures=automationHasNumericDevices();
+    return automationOptionsHtml([
+      {glyph:"🕐",title:t("automationCondTime"),sub:t("automationCondTimeSub"),hook:'data-automation-cond-kind="timeRange"'},
+      {glyph:"💡",title:t("automationCondState"),sub:t("automationCondStateSub"),hook:'data-automation-cond-kind="deviceState"'},
+      {glyph:"⏱",title:t("automationCondStateFor"),sub:t("automationCondStateForSub"),hook:'data-automation-cond-kind="deviceStateFor"'},
+      {
+        glyph:"📊",title:t("automationCondMeasure"),sub:t("automationCondMeasureSub"),
+        disabled:!measures,badge:measures?null:t("automationCondMeasureNone"),
+        hook:'data-automation-cond-kind="deviceMeasurement"'
+      }
+    ]);
+  };
   // §2.4 — kural başına tek anahtar. Tek koşulda anlamsız olduğu için hiç çizilmez.
   function automationCondModeHtml(wizard){
     const active=wizard.conditionMode==="any"?"any":"all";
@@ -1773,8 +1790,9 @@
   function automationConditionStateHtml(wizard){
     const draft=wizard.draftCondition;
     const device=state.devices.find(item=>item.id===draft.deviceId)||null;
-    const rows=automationConditionAllRows(device);
-    if(!rows.length)return`<p class="automation-empty-line">${esc(t("automationCondNoState"))}</p>`;
+    // Ölçüm yolunda liste yalnız sayısal okumalardır; boşsa sebebi yazılır, boş kutu bırakılmaz.
+    const rows=draft.numericOnly?automationConditionNumericRows(device):automationConditionAllRows(device);
+    if(!rows.length)return`<p class="automation-empty-line">${esc(t(draft.numericOnly?"automationCondNoMeasure":"automationCondNoState"))}</p>`;
     if(draft.numeric)return`${automationCondThresholdHtml(draft,device)}${automationCondForHtml(draft)}`;
     const negate=(value,key)=>automationChoiceHtml(value?"off":"on",key,Boolean(draft.negate)===value,`data-automation-cond-negate="${value?1:0}"`);
     const picked=rows.find(row=>!row.numeric&&draft.property===row.property&&draft.value===row.equals)||null;
@@ -1856,7 +1874,7 @@
   const automationPickScopeDevices=(wizard,scope)=>scope==="trigger"
     ?automationTriggerDevices(wizard)
     :scope==="cond"
-    ?automationConditionDevices()
+    ?automationConditionDevices(Boolean(wizard?.draftCondition?.numericOnly))
     :automationTargetScope(wizard).devices;
   const automationPickQuery=(wizard,scope)=>scope==="trigger"?wizard.triggerQuery:scope==="cond"?wizard.condQuery:wizard.targetQuery;
   const automationPickTab=(wizard,scope)=>scope==="trigger"?wizard.triggerTab:scope==="cond"?wizard.condTab:wizard.targetTab;
@@ -1900,7 +1918,7 @@
         // §9.3 — koşul listesinde satırın altında hangi özelliğin koşula gireceği önden yazar;
         // kullanıcı bugüne dek bunu ancak cihaza girerek görebiliyordu.
         sub:scope==="cond"
-          ?automationCondPropertyPreview(device)
+          ?automationCondPropertyPreview(device,Boolean(wizard.draftCondition?.numericOnly))
           :automationJoin(deviceKind(device),group.proven?"":t("automationButtonUnproven")),
         on:selected===device.id,
         hook:scope==="trigger"
@@ -1917,7 +1935,11 @@
   // Ortak cihaz seçici: alt çizgili arama alanı + düz metin sekmeler + satır listesi.
   function automationPickerHtml(wizard,scope){
     const devices=automationPickScopeDevices(wizard,scope);
-    const emptyKey=scope==="target"?"automationNoTargets":scope==="cond"?"automationCondNoDevices":wizard.triggerKind==="button"?"automationNoButtons":"automationNoSensors";
+    const emptyKey=scope==="target"
+      ?"automationNoTargets"
+      :scope==="cond"
+      ?(wizard.draftCondition?.numericOnly?"automationCondNoMeasureDevices":"automationCondNoDevices")
+      :wizard.triggerKind==="button"?"automationNoButtons":"automationNoSensors";
     if(!devices.length)return`<p class="automation-empty-line">${t(emptyKey)}</p>`;
     const query=automationPickQuery(wizard,scope)||"";
     const search=`<div class="automation-search"><span class="automation-search-glyph" aria-hidden="true">⌕</span><input type="search" data-automation-search="${scope}" value="${esc(query)}" placeholder="${esc(t("automationSearchPlaceholder"))}" aria-label="${esc(t("automationSearchPlaceholder"))}" autocomplete="off" autocapitalize="none"></div>`;
@@ -3309,22 +3331,47 @@
         wizard.stage="condTime";
         return;
       }
-      if(kind!=="deviceState"&&kind!=="deviceStateFor")return;
+      if(kind!=="deviceState"&&kind!=="deviceStateFor"&&kind!=="deviceMeasurement")return;
+      // Ölçüm yolunda ölçüm bildiren cihaz yoksa adım hiç açılmaz: boş liste göstermek yerine
+      // seçenek zaten kapalı çizilir, buradaki kontrol o kapının ikinci kanadıdır.
+      if(kind==="deviceMeasurement"&&!automationHasNumericDevices())return;
       // Süreli yol aynı taslağı kurar; yalnız süre satırı bir dakikayla açık başlar.
-      wizard.draftCondition={type:"deviceState",deviceId:null,property:null,value:null,negate:false,numeric:false,thresholdDir:"above",above:0,below:0,forSeconds:kind==="deviceStateFor"?60:null,freshWithinSeconds:null,index:wizard.draftConditionIndex};
+      // Ölçüm yolu da aynı taslak: `numericOnly` yalnız cihaz ve okuma listesini daraltır.
+      wizard.draftCondition={type:"deviceState",deviceId:null,property:null,value:null,negate:false,numeric:false,numericOnly:kind==="deviceMeasurement",thresholdDir:"above",above:0,below:0,forSeconds:kind==="deviceStateFor"?60:null,freshWithinSeconds:null,index:wizard.draftConditionIndex};
       wizard.condQuery="";
       wizard.condTab="all";
       wizard.stage="condDevice";
     });
   }
+  // Sayısal özellikte hazır değer yoktur: karşılaştırma satırı bugünkü okumanın yakınından başlar.
+  function automationSeedCondNumeric(draft,device,property){
+    const current=Number(device?.state?.[property]);
+    const seed=Number.isFinite(current)?Math.round(current):0;
+    draft.numeric=true;
+    draft.property=property;
+    draft.value=null;
+    draft.negate=false;
+    draft.thresholdDir="above";
+    draft.above=seed;
+    draft.below=seed;
+  }
   function chooseAutomationCondDevice(deviceId){
     const wizard=state.automationWizard;
     if(!wizard||!wizard.draftCondition)return;
     automationChooseDevice("cond",deviceId,()=>{
-      wizard.draftCondition.deviceId=deviceId;
-      wizard.draftCondition.property=null;
-      wizard.draftCondition.value=null;
-      wizard.draftCondition.numeric=false;
+      const draft=wizard.draftCondition;
+      draft.deviceId=deviceId;
+      draft.property=null;
+      draft.value=null;
+      draft.numeric=false;
+      /* Ölçüm yolunda tek okuması olan cihaz seçilince ara adım sormaz: kullanıcı zaten
+         "bir ölçüm" dedi, cihazın tek ölçümü var — doğrudan karşılaştırma ekranı açılır.
+         Birden çok okuması varsa liste gelir, çünkü orada gerçek bir seçim vardır. */
+      if(draft.numericOnly){
+        const device=state.devices.find(item=>item.id===deviceId)||null;
+        const numeric=automationNumericProperties(device);
+        if(numeric.length===1)automationSeedCondNumeric(draft,device,numeric[0]);
+      }
       wizard.condQuery="";
       wizard.stage="condState";
     });
@@ -3357,16 +3404,7 @@
     const row=automationConditionAllRows(device).find(item=>item.token===token);
     if(!row)return;
     if(row.numeric){
-      // Sayısal özellikte hazır değer yoktur: karşılaştırma satırı bugünkü okumanın yakınından başlar.
-      const current=Number(device?.state?.[row.property]);
-      const seed=Number.isFinite(current)?Math.round(current):0;
-      draft.numeric=true;
-      draft.property=row.property;
-      draft.value=null;
-      draft.negate=false;
-      draft.thresholdDir="above";
-      draft.above=seed;
-      draft.below=seed;
+      automationSeedCondNumeric(draft,device,row.property);
       automationRedraw();
       return;
     }
