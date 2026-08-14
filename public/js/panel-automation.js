@@ -471,11 +471,6 @@
       ?t("automationAutoOffIdleWaitLine",{duration:automationDurationText(auto.seconds),device})
       :t("automationAutoOffIdleLine",{device});
   };
-  const automationRunChip=automation=>{
-    if(!automation.lastRunAt)return`<span class="automation-card-chip">${t("automationNeverRan")}</span>`;
-    const failed=automation.lastRunOk===false;
-    return`<span class="automation-card-chip${failed?" warn":""}">${t(failed?"automationLastRunFailed":"automationLastRun",{time:ago(automation.lastRunAt)})}</span>`;
-  };
   /* Geçmiş SON 5 çalışmayla sınırlı. Sınır ISTEKTE uygulanır, panelde kırpılarak değil: sunucunun
      okuyucusu günlüğü sondan tarar ve sayı dolunca durur (`automation-runs.ts`), yani `limit=5`
      dosyadan okunan satırı da yanıtı da küçültür. Panelde kırpmak aynı işi yaptırıp fazlasını
@@ -591,6 +586,20 @@
     const text=automationReasonText(inactive.code);
     return`<span class="automation-card-chip warn">${esc(text)}</span>`;
   };
+  /* ALT SATIR — ince ayracın altında: son çalışma saati solda, geçmiş bağlantısı sağda.
+     Hiç çalışmamış kuralda açılacak bir geçmiş yoktur: bağlantı hiç basılmaz, satır tek cümlede
+     biter ve kart bir tık daha kısalır. */
+  const automationCardFootHtml=automation=>{
+    const failed=automation.lastRunOk===false;
+    const when=automation.lastRunAt
+      ?t(failed?"automationLastRunFailed":"automationLastRun",{time:automationRunClock(automation.lastRunAt)})
+      :t("automationNeverRan");
+    const open=state.automationRunsOpen===automation.id;
+    const link=automation.lastRunAt
+      ?`<button class="automation-runs-toggle" type="button" data-automation-runs="${esc(automation.id)}" aria-expanded="${open}"><span>${esc(t("automationRunsTitle"))}</span><span class="automation-runs-caret" aria-hidden="true">${open?"⌃":"⌄"}</span></button>`
+      :"";
+    return`<div class="automation-card-foot"><span class="automation-card-when${failed?" warn":""}">${esc(when)}</span>${automationInactiveHtml(automation)}${link}</div>`;
+  };
   const automationCardHtml=automation=>{
     const trigger=automation.triggers?.[0];
     const actions=(automation.actions||[]).filter(Boolean);
@@ -609,7 +618,9 @@
     const more=rest>0?` ${t("automationCardMore",{count:rest})}`:"";
     // Kapanış sözü ayrı bir cümle olarak görünür; kart özeti sihirbazdaki cümleyle tutarlı kalır.
     const autoOff=map?"":automationAutoOffLine(actions.find(item=>item.autoOff)||action);
-    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><span class="automation-card-glyph" aria-hidden="true">🧩</span><div class="automation-card-copy"><strong>${esc(automation.name)}</strong><span class="automation-card-note">${esc(line+more)}</span>${autoOff?`<span class="automation-card-note">${esc(autoOff)}</span>`:""}${automationRunChip(automation)}${automationAgentChip(automation)}${automationInactiveHtml(automation)}<button class="automation-runs-toggle" type="button" data-automation-runs="${esc(automation.id)}" aria-expanded="${state.automationRunsOpen===automation.id}">${esc(t("automationRunsTitle"))}</button>${automationRunsHtml(automation)}</div><div class="automation-card-actions"><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}"><span aria-hidden="true">⋯</span></button><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button></div></article>`;
+    // Kapanış sözü ayrı bir SATIR değil, aynı cümlenin devamı: iki satırlık kutuya sığar, kartı uzatmaz.
+    const note=[line+more,autoOff].filter(Boolean).join(" · ");
+    return`<article class="automation-card${automation.enabled?"":" off"}" tabindex="0" data-automation-card="${esc(automation.id)}" aria-label="${esc(automation.name)}"><div class="automation-card-head"><span class="automation-card-glyph" aria-hidden="true">🧩</span><strong class="automation-card-name"><span class="automation-card-title">${esc(automation.name)}</span>${automationAgentChip(automation)}</strong><button class="device-card-toggle${automation.enabled?" on":""}" type="button" data-automation-toggle="${esc(automation.id)}" aria-pressed="${automation.enabled}" aria-label="${esc(automation.name)}"><span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span></button><span class="automation-card-note" title="${esc(note)}">${esc(note)}</span><button class="automation-card-menu" type="button" data-automation-menu="${esc(automation.id)}" aria-label="${esc(t("automationCardMenu"))}" title="${esc(t("automationCardMenu"))}"><span aria-hidden="true">⚙</span></button></div>${automationCardFootHtml(automation)}${automationRunsHtml(automation)}</article>`;
   };
   /* Geri alma modelin değil kullanıcının işidir: bu yüzden bir MCP aracı değil, panelde bir düğme.
      Sunucu ajan yazmasından **önce** aldığı yedekleri sayar; sayı sıfırsa geri alınacak bir şey de
@@ -642,7 +653,7 @@
     const links=simpleLinks();
     const cards=[
       ...state.automations.map(automationCardHtml),
-      ...links.map(link=>`<article class="automation-card"><span class="automation-card-glyph" aria-hidden="true">⚡</span><div class="automation-card-copy"><strong>${t("simpleLinkSummary",{source:esc(link.sourceName),target:esc(link.targetName)})}</strong><span class="automation-card-note">${t("simpleLinkDirectNote")}</span></div><button class="danger-button" type="button" data-remove-link="${esc(link.key)}">${t("simpleLinkRemove")}</button></article>`)
+      ...links.map(link=>`<article class="automation-card link-card"><span class="automation-card-glyph" aria-hidden="true">⚡</span><div class="automation-card-copy"><strong>${t("simpleLinkSummary",{source:esc(link.sourceName),target:esc(link.targetName)})}</strong><span class="automation-card-note">${t("simpleLinkDirectNote")}</span></div><button class="danger-button" type="button" data-remove-link="${esc(link.key)}">${t("simpleLinkRemove")}</button></article>`)
     ].filter(Boolean);
     container.innerHTML=cards.length
       ?cards.join("")
@@ -653,10 +664,10 @@
     $$("[data-automation-menu]").forEach(button=>button.onclick=event=>{event.stopPropagation();openAutomationActions(button.dataset.automationMenu)});
     $$("[data-automation-runs]").forEach(button=>button.onclick=event=>{event.stopPropagation();toggleAutomationRuns(button.dataset.automationRuns)});
     $$("[data-automation-run-detail]").forEach(button=>button.onclick=event=>{event.stopPropagation();toggleAutomationRunDetail(button.dataset.automationRunDetail)});
-    // Kart gövdesine tek dokunuş doğrudan düzenlemeyi açar; seçenekler görünür "⋯" düğmesinde.
+    // Kart gövdesine tek dokunuş doğrudan düzenlemeyi açar; seçenekler görünür "⚙" düğmesinde.
     $$("[data-automation-card]").forEach(card=>{
       card.onclick=event=>{
-        if(event.target.closest?.("[data-automation-toggle],[data-automation-menu],[data-automation-runs],.automation-runs"))return;
+        if(event.target.closest?.("[data-automation-toggle],[data-automation-menu],[data-automation-runs],.automation-card-foot,.automation-runs"))return;
         openAutomationWizard(card.dataset.automationCard);
       };
     });
