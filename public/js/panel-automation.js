@@ -1417,6 +1417,12 @@
     const held=Number.isFinite(condition.forSeconds)&&condition.forSeconds>0;
     const duration=held?automationStrong(automationDurationText(condition.forSeconds)):"";
     const key=base=>held?`${base}ForLine`:`${base}Line`;
+    /* §2.6 — tazelik penceresi cümleye şablon olarak girmez: girse her biçimin (üstünde/altında/
+       arasında × süreli/süresiz) iki katı şablon gerekirdi. Gece yarısını aşan aralıkta olduğu
+       gibi, cümlenin arkasına sönük bir not olarak eklenir. */
+    const fresh=Number.isFinite(condition.freshWithinSeconds)&&condition.freshWithinSeconds>0
+      ?` <span class="automation-line-meta">${esc(t("automationCondFreshMeta",{window:automationDurationTextShort(condition.freshWithinSeconds)}))}</span>`
+      :"";
     // Sayısal eşik: i18n kuralı gereği parça birleştirilmez, her biçimin tam şablonu vardır.
     if(condition.above!==undefined||condition.below!==undefined){
       const sensor=state.devices.find(item=>item.id===condition.deviceId)||null;
@@ -1424,14 +1430,14 @@
       const reading=esc(automationPropertyLabel(sensor,condition.property));
       const amount=value=>automationStrong(`${value}${unit}`);
       if(condition.above!==undefined&&condition.below!==undefined)
-        return t(key("automationCondBetween"),{device,reading,from:amount(condition.above),to:amount(condition.below),duration});
+        return t(key("automationCondBetween"),{device,reading,from:amount(condition.above),to:amount(condition.below),duration})+fresh;
       const above=condition.above!==undefined;
       return t(key(above?"automationCondAbove":"automationCondBelow"),{
         device,reading,value:amount(above?condition.above:condition.below),duration
-      });
+      })+fresh;
     }
     const event=esc(automationConditionEventLabel(condition));
-    return t(key(condition.not!==undefined?"automationCondStateNot":"automationCondState"),{device,event,duration});
+    return t(key(condition.not!==undefined?"automationCondStateNot":"automationCondState"),{device,event,duration})+fresh;
   };
   // Taslak ucu her iki biçimi de taşır: kullanıcı saatten güneşe geçip dönünce girdiği saat durur.
   const automationCondEdgeDraft=(value,fallbackEvent)=>{
@@ -1461,18 +1467,21 @@
       const below=condition.below!==undefined&&condition.below!==null;
       // §2.1 süre ölçütü değer ölçütünün üstüne biner: sayısal da olsa boolean da olsa taşınır.
       const forSeconds=Number.isFinite(condition.forSeconds)&&condition.forSeconds>0?condition.forSeconds:null;
+      // §2.6 — pencere yoksa taslakta da yoktur: düzenlenip kaydedilen eski kural aynen geri yazılır.
+      const freshWithinSeconds=Number.isFinite(condition.freshWithinSeconds)&&condition.freshWithinSeconds>0
+        ?condition.freshWithinSeconds:null;
       if(above||below)return{
         type:"deviceState",deviceId:condition.deviceId,property:condition.property,numeric:true,
         thresholdDir:above&&below?"between":below?"below":"above",
         above:Number(above?condition.above:condition.below),
         below:Number(below?condition.below:condition.above),
-        value:null,negate:false,forSeconds,index:index??null
+        value:null,negate:false,forSeconds,freshWithinSeconds,index:index??null
       };
       return{
         type:"deviceState",deviceId:condition.deviceId,property:condition.property,numeric:false,
         thresholdDir:"above",above:0,below:0,
         value:condition.equals!==undefined?condition.equals:condition.not,
-        negate:condition.not!==undefined,forSeconds,index:index??null
+        negate:condition.not!==undefined,forSeconds,freshWithinSeconds,index:index??null
       };
     }
     return null;
@@ -1493,6 +1502,9 @@
     const applyFor=condition=>{
       const seconds=Math.round(Number(draft.forSeconds));
       if(Number.isFinite(seconds)&&seconds>0)condition.forSeconds=Math.min(seconds,maxAutomationCondForSeconds);
+      // §2.6 — tazelik penceresi de aynı kuralda: kapalıyken alan hiç yazılmaz.
+      const fresh=Math.round(Number(draft.freshWithinSeconds));
+      if(Number.isFinite(fresh)&&fresh>0)condition.freshWithinSeconds=Math.min(fresh,maxAutomationCondFreshSeconds);
       return condition;
     };
     if(draft.numeric){
@@ -1575,7 +1587,23 @@
     const dials=draft.thresholdDir==="between"
       ?`${dial("above",t("automationCondThresholdFrom"))}${dial("below",t("automationCondThresholdTo"))}`
       :dial(draft.thresholdDir==="below"?"below":"above",reading);
-    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(reading)}</p><div class="automation-choices">${choice("above","automationCondAbove")}${choice("below","automationCondBelow")}${choice("between","automationCondBetween")}</div></div></div>${dials}<p class="automation-hint">${esc(t("automationCondThresholdHint"))}</p>`;
+    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(reading)}</p><div class="automation-choices">${choice("above","automationCondAbove")}${choice("below","automationCondBelow")}${choice("between","automationCondBetween")}</div></div></div>${dials}<p class="automation-hint">${esc(t("automationCondThresholdHint"))}</p>${automationCondFreshHtml(draft)}`;
+  }
+  /* §2.6 — tazelik penceresi. "Değer şu an eşiğin altında" demek, o değerin **taze** olduğu
+     anlamına gelmiyor: sabit lüks yayan bir sensörde okuma aylık olabilir. Pencere kapalıyken
+     (varsayılan) alan hiç yazılmaz ve mevcut kurallar aynen çalışır. Seçenekler sabit ve azdır —
+     otomasyon anlıktır, "son 10 sn / 30 sn / 1 dk / 5 dk" bu işi görür. */
+  const maxAutomationCondFreshSeconds=3600;
+  const automationCondFreshChoices=[0,10,30,60,300];
+  const automationCondFreshText=seconds=>seconds<=0
+    ?t("automationCondFreshAny")
+    :seconds<60
+    ?t("automationCondFreshSeconds",{count:seconds})
+    :t("automationCondFreshMinutes",{count:Math.round(seconds/60)});
+  function automationCondFreshHtml(draft){
+    const active=Number(draft?.freshWithinSeconds)>0?Number(draft.freshWithinSeconds):0;
+    const chip=seconds=>`<button class="automation-day${active===seconds?" active":""}" type="button" data-automation-cond-fresh="${seconds}" aria-pressed="${active===seconds}">${esc(automationCondFreshText(seconds))}</button>`;
+    return`<p class="automation-part-name">${esc(t("automationCondFreshTitle"))}</p><div class="automation-days">${automationCondFreshChoices.map(chip).join("")}</div><p class="automation-hint">${esc(t("automationCondFreshHint"))}</p>`;
   }
   // §9.2 — "şu kadar süredir böyleyse" satırı. Eylem adımındaki "sonra kapat"la aynı kelimeleri
   // kullandığı için karışıyordu: bu satır varsayılan olarak kapalı durur, kendi görsel dilini
@@ -2458,6 +2486,7 @@
     $$("[data-automation-cond-threshold-dir]").forEach(button=>button.onclick=()=>chooseAutomationCondThresholdDir(button.dataset.automationCondThresholdDir));
     $$("[data-automation-cond-threshold-step]").forEach(button=>button.onclick=()=>stepAutomationCondThreshold(button.dataset.automationCondThresholdStep));
     $$("[data-automation-cond-threshold-value]").forEach(input=>{input.onchange=()=>setAutomationCondThreshold(input.dataset.automationCondThresholdValue,input.value)});
+    $$("[data-automation-cond-fresh]").forEach(button=>button.onclick=()=>chooseAutomationCondFresh(button.dataset.automationCondFresh));
     $$("[data-automation-cond-for]").forEach(button=>button.onclick=()=>toggleAutomationCondFor(button.dataset.automationCondFor));
     // Sayaç dakika gösterir: değer dakikaya yuvarlanır, 0:01 altına inmez, 24:00 üstüne çıkmaz.
     const condForMinutes=()=>automationForMinutes(state.automationWizard?.draftCondition?.forSeconds);
@@ -2911,6 +2940,16 @@
     if(next!==null)draft[edge]=next;
     automationRedraw();
   }
+  // §2.6 — pencere seçimi. 0 = sınırsız, yani alan hiç yazılmaz ve eski davranış geri gelir.
+  function chooseAutomationCondFresh(value){
+    const draft=state.automationWizard?.draftCondition;
+    if(!draft)return;
+    const seconds=Number(value);
+    draft.freshWithinSeconds=Number.isFinite(seconds)&&seconds>0
+      ?Math.min(seconds,maxAutomationCondFreshSeconds)
+      :null;
+    automationRedraw();
+  }
   // Hangi anın ayarlandığını değiştirir; seçim silinmez, ayarlar ana özeldir.
   function chooseAutomationSunEdit(event){
     const wizard=state.automationWizard;
@@ -3141,7 +3180,7 @@
       }
       if(kind!=="deviceState"&&kind!=="deviceStateFor")return;
       // Süreli yol aynı taslağı kurar; yalnız süre satırı bir dakikayla açık başlar.
-      wizard.draftCondition={type:"deviceState",deviceId:null,property:null,value:null,negate:false,numeric:false,thresholdDir:"above",above:0,below:0,forSeconds:kind==="deviceStateFor"?60:null,index:wizard.draftConditionIndex};
+      wizard.draftCondition={type:"deviceState",deviceId:null,property:null,value:null,negate:false,numeric:false,thresholdDir:"above",above:0,below:0,forSeconds:kind==="deviceStateFor"?60:null,freshWithinSeconds:null,index:wizard.draftConditionIndex};
       wizard.condQuery="";
       wizard.condTab="all";
       wizard.stage="condDevice";

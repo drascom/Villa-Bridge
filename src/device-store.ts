@@ -29,6 +29,12 @@ interface StateEntry {
 interface ChannelSinceEntry {
   value: JsonScalar;
   since: Date;
+  /**
+   * §4.2 — kanalın **en son ne zaman rapor edildiği**. `since` ile aynı şey değildir: sabit lüks
+   * yayan bir sensörde değer aylarca değişmez ama her dakika rapor gelir. Tazelik ölçütü
+   * (`freshWithinSeconds`) yalnız bunu okur; süre ölçütü (`forSeconds`) yalnız `since`'i.
+   */
+  reportedAt: Date;
 }
 
 /** Defterin üst sınırı — durum haritasıyla aynı büyüklük sınıfı; taşarsa en eski düşer. */
@@ -613,6 +619,11 @@ export class DeviceStore {
   /**
    * §4.1 — defteri günceller. **Yalnızca değer gerçekten değiştiyse** `since` tazelenir: aynı
    * değerin yeniden bildirilmesi süreyi sıfırlamaz, "1 dakikadır hareket var" ancak böyle çalışır.
+   *
+   * §4.2 — `reportedAt` ise **her raporda** tazelenir, değer değişmese bile: tazelik ölçütünün
+   * sorduğu soru "ne zaman değişti" değil, "cihaz en son ne zaman konuştu". Aynı değer gelince
+   * kayıt yerinde güncellenir, silinip yeniden eklenmez — böylece Map'in ekleme sırası
+   * değişim sırası olmayı sürdürür ve tavan taşınca en eski **değişim** düşer.
    */
   private trackChannelSince(sourceName: string, payload: JsonObject, at: Date): void {
     for (const [property, raw] of Object.entries(payload)) {
@@ -620,10 +631,13 @@ export class DeviceStore {
       if (value === undefined) continue;
       const key = `${sourceName}|${property}`;
       const previous = this.channelSince.get(key);
-      if (previous && previous.value === value) continue;
+      if (previous && previous.value === value) {
+        previous.reportedAt = at;
+        continue;
+      }
       // Yeniden ekleme sırayı da tazeler: Map'in ekleme sırası = değişim sırası, en eski baştadır.
       this.channelSince.delete(key);
-      this.channelSince.set(key, { value, since: at });
+      this.channelSince.set(key, { value, since: at, reportedAt: at });
     }
     while (this.channelSince.size > maxChannelSinceEntries) {
       const oldest = this.channelSince.keys().next();
@@ -646,6 +660,15 @@ export class DeviceStore {
   stateSince(deviceId: string, property: string): Date | null {
     const sourceName = this.getDevice(deviceId)?.sourceName ?? deviceId;
     return this.channelSince.get(`${sourceName}|${property}`)?.since ?? null;
+  }
+
+  /**
+   * §4.2 — kanal en son ne zaman rapor edildi. Aynı defterin ikinci damgası: bellektedir,
+   * yeniden başlatmada boşalır ve `null` döner; tazelik ölçütü bunu kapalı tarafa yorumlar.
+   */
+  stateReportedAt(deviceId: string, property: string): Date | null {
+    const sourceName = this.getDevice(deviceId)?.sourceName ?? deviceId;
+    return this.channelSince.get(`${sourceName}|${property}`)?.reportedAt ?? null;
   }
 
   getEvents(limit = 20): DeviceEventView[] {

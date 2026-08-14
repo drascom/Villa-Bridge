@@ -302,6 +302,8 @@ const automationEngine = new AutomationEngine({
   },
   // §4.1 — "şu kadar süredir böyleyse" koşulunun okuduğu değişim defteri.
   stateSince: (deviceId, property) => store.stateSince(deviceId, property),
+  // §4.2 — tazelik penceresinin (`freshWithinSeconds`) okuduğu rapor zamanı defteri.
+  stateReportedAt: (deviceId, property) => store.stateReportedAt(deviceId, property),
   // Eylem değeri panelin geçtiği normalizasyondan geçsin diye aynı kumanda arayıcısı.
   controls: (deviceId) => store.getDevice(deviceId),
   runLog: automationRunLog

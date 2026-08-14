@@ -336,7 +336,7 @@ const automationConditionSchema = {
   description:
     "`timeRange` (from/to, each `{kind:\"clock\",at}` or `{kind:\"sun\",event,offsetMinutes}`, may "
     + "cross midnight) or `deviceState` (deviceId+property plus exactly one of `equals`, `not` or "
-    + "`above`/`below`, optionally `forSeconds`).",
+    + "`above`/`below`, optionally `forSeconds` and `freshWithinSeconds`).",
   properties: {
     type: { type: "string", enum: ["timeRange", "deviceState"] },
     from: { type: "object" },
@@ -348,7 +348,14 @@ const automationConditionSchema = {
     not: scalarSchema,
     above: { type: "number" },
     below: { type: "number" },
-    forSeconds: { type: "integer" }
+    forSeconds: { type: "integer" },
+    freshWithinSeconds: {
+      type: "integer",
+      description:
+        "`deviceState` only: the value must have been reported within this many seconds (1..3600). "
+        + "Not the same as `forSeconds`: this asks when the device last spoke, not how long the "
+        + "value has held. Omit for no limit. Unknown after a restart, which fails the condition."
+    }
   },
   required: ["type"]
 };

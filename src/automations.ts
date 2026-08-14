@@ -166,6 +166,19 @@ export interface AutomationDeviceStateCondition {
    * `equals: true` + `forSeconds: 60`. Alan yoksa davranış eskisiyle birebir aynıdır.
    */
   forSeconds?: number;
+  /**
+   * §2.6 — **tazelik penceresi** (saniye, 1..`maxAutomationConditionFreshSeconds`). Değer yalnız
+   * son bu kadar saniye içinde **rapor edilmişse** koşul sağlanabilir; daha eski okuma bayat
+   * sayılır ve koşul değerine hiç bakılmadan `false` olur.
+   *
+   * `forSeconds` ile karıştırılmamalı: o "değer ne zamandır aynı", bu "cihaz en son ne zaman
+   * konuştu" sorusudur. Sabit lüks yayan bir sensörde ikisi aylarca farklıdır.
+   *
+   * Alan yoksa pencere **sınırsızdır** ve davranış eskisiyle birebir aynıdır; varsayılan diske
+   * yazılmaz. Rapor damgası bellektedir: yeniden başlatmadan sonra bilinmez ve koşul
+   * **sağlanmamış** sayılır (güvenli taraf, §2.5 ile aynı yorum).
+   */
+  freshWithinSeconds?: number;
 }
 
 export type AutomationCondition =
@@ -337,6 +350,12 @@ export const maxAutomationAutoOffEntries = 128;
  * ayrı sabittir: o farklı bir kavramdır (koşul ölçütü değil, eylem sonucu).
  */
 export const maxAutomationConditionForSeconds = 86_400;
+/**
+ * §2.6 — tazelik penceresinin tavanı. Bilerek `forSeconds`'tan çok daha dar: "son bir saatte
+ * rapor edilmiş" zaten pencere olmaktan çıkar, panel de en fazla beş dakika sunar. Pencere bir
+ * ölçüt değil, **bayat veriye karşı koruma**dır; günlerce genişleyen bir koruma koruma değildir.
+ */
+export const maxAutomationConditionFreshSeconds = 3_600;
 
 /** §8.1 — otomasyonu onaylayacak insan yok; bu kontroller eylem olamaz. */
 export const forbiddenAutomationControlKinds: ReadonlySet<string> = new Set(["lock", "siren"]);
@@ -388,13 +407,17 @@ const thresholdNumber = (value: unknown, message: string): number | undefined =>
  * reddedilir: yarım saniyelik bir ölçüt cihaz raporlama aralığının altında kalır. Koşul ve
  * tetikleyici aynı kuralı paylaşır, yalnızca hata metni farklıdır.
  */
-const forSecondsValue = (value: unknown, message: string): number | undefined => {
+const forSecondsValue = (
+  value: unknown,
+  message: string,
+  max: number = maxAutomationConditionForSeconds
+): number | undefined => {
   if (value === undefined || value === null) return undefined;
   if (
     typeof value !== "number"
     || !Number.isInteger(value)
     || value < 1
-    || value > maxAutomationConditionForSeconds
+    || value > max
   ) {
     throw new Error(message);
   }
@@ -616,6 +639,13 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
     }
     // §2.1 — süre ölçütü üç değer ölçütünün de üstüne binebilir, o yüzden dallardan önce okunur.
     const forSeconds = forSecondsValue(candidate.forSeconds, "Otomasyon koşulu süresi geçersiz.");
+    // §2.6 — tazelik penceresi de değer ölçütünden bağımsızdır; sayısal eşikte de eşitlikte de
+    // aynı soruyu sorar ("cihaz en son ne zaman konuştu"), o yüzden burada bir kez okunur.
+    const freshWithinSeconds = forSecondsValue(
+      candidate.freshWithinSeconds,
+      "Otomasyon koşulu tazelik penceresi geçersiz.",
+      maxAutomationConditionFreshSeconds
+    );
     if (hasThreshold) {
       // İkisi birden verilmişse ölçüt "aralıkta"dır; ters aralık hiçbir zaman sağlanmaz.
       if (above !== undefined && below !== undefined && above >= below) {
@@ -625,6 +655,7 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
       if (above !== undefined) condition.above = above;
       if (below !== undefined) condition.below = below;
       if (forSeconds !== undefined) condition.forSeconds = forSeconds;
+      if (freshWithinSeconds !== undefined) condition.freshWithinSeconds = freshWithinSeconds;
       return condition;
     }
     const raw = hasEquals ? candidate.equals : candidate.not;
@@ -633,6 +664,7 @@ const validateConditions = (value: unknown): AutomationCondition[] => {
       ? { type: "deviceState", deviceId, property, equals: raw }
       : { type: "deviceState", deviceId, property, not: raw };
     if (forSeconds !== undefined) condition.forSeconds = forSeconds;
+    if (freshWithinSeconds !== undefined) condition.freshWithinSeconds = freshWithinSeconds;
     return condition;
   });
 };

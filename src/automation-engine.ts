@@ -114,6 +114,11 @@ export interface AutomationEngineOptions {
    * `forSeconds` taşıyan koşullar hep `false` olur; süresiz koşullar etkilenmez.
    */
   stateSince?: (deviceId: string, property: string) => Date | null;
+  /**
+   * §4.2 — kanal en son ne zaman **rapor edildi** (`DeviceStore.stateReportedAt`). Verilmezse
+   * `freshWithinSeconds` taşıyan koşullar hep `false` olur; penceresiz koşullar etkilenmez.
+   */
+  stateReportedAt?: (deviceId: string, property: string) => Date | null;
   /** Çalışma günlüğü — "neden çalıştı / neden çalışmadı". */
   runLog?: Pick<AutomationRunLog, "append">;
   /**
@@ -231,6 +236,11 @@ export interface AutomationConditionOptions {
    * `null` "bilinmiyor" demektir; süre koşulu bunu kapalı tarafa yorumlar (§2.5).
    */
   stateSince?: (deviceId: string, property: string) => Date | null;
+  /**
+   * §4.2 — kanal en son ne zaman rapor edildi. `null` "bilinmiyor" demektir; tazelik penceresi
+   * bunu kapalı tarafa yorumlar (yeniden başlatmadan sonra kayıt yoktur).
+   */
+  stateReportedAt?: (deviceId: string, property: string) => Date | null;
 }
 
 /**
@@ -294,6 +304,32 @@ export const evaluateAutomationConditions = (
         reason: `${condition.deviceId} cihazının "${condition.property}" durumu bilinmiyor.`
       });
       continue;
+    }
+    // §2.6 — tazelik penceresi değer ölçütünden **önce** gelir: bayat bir okuma hiç yorumlanmaz.
+    // Sıra bilinçli; sonradan bakılsaydı günlükte "değer 8, 30 altında değil" gibi, aslında aylık
+    // bayat bir sayıya dayanan bir gerekçe kalırdı.
+    if (condition.freshWithinSeconds !== undefined) {
+      const reportedAt = options.stateReportedAt?.(condition.deviceId, condition.property) ?? null;
+      if (reportedAt === null) {
+        results.push({
+          type: "deviceState",
+          ok: false,
+          reason: `${condition.deviceId} "${condition.property}" en son ne zaman rapor edildi`
+            + ` bilinmiyor (yeniden başlatmadan beri kayıt yok);`
+            + ` son ${condition.freshWithinSeconds} saniye içinde rapor edilmiş olmalı.`
+        });
+        continue;
+      }
+      const age = Math.floor((date.getTime() - reportedAt.getTime()) / 1_000);
+      if (age > condition.freshWithinSeconds) {
+        results.push({
+          type: "deviceState",
+          ok: false,
+          reason: `${condition.deviceId} "${condition.property}" ${age} saniye önce rapor edildi;`
+            + ` son ${condition.freshWithinSeconds} saniye içinde olmalıydı (veri bayat).`
+        });
+        continue;
+      }
     }
     // Önce değer ölçütü. Süre ölçütü (§2.1) bunun **üstüne** biner, yerine geçmez: değer
     // tutmuyorsa süreye hiç bakılmaz — "1 dakikadır hareket var" önce "hareket var" demektir.
@@ -1243,7 +1279,9 @@ export class AutomationEngine {
           mode: automation.conditionMode,
           times: this.resolveSun(now).times,
           stateSince: (deviceId, property) =>
-            this.options.stateSince?.(deviceId, property) ?? null
+            this.options.stateSince?.(deviceId, property) ?? null,
+          stateReportedAt: (deviceId, property) =>
+            this.options.stateReportedAt?.(deviceId, property) ?? null
         }
       );
       if (!evaluation.ok) {
