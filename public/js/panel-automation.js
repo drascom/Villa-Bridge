@@ -1391,7 +1391,7 @@
     if(from.event==="sunrise"&&to.event==="sunset")return"daylight";
     return"custom";
   };
-  const automationConditionLine=condition=>{
+  const automationConditionLine=(condition,wizard)=>{
     if(condition.type==="timeRange"){
       const from=automationCondPointOf(condition.from),to=automationCondPointOf(condition.to);
       const everyDay=automationEveryDay(condition.days||automationWeekDays);
@@ -1411,7 +1411,16 @@
         ?`${base} <span class="automation-line-meta">${esc(t("automationCondOvernight"))}</span>`
         :base;
     }
-    const device=automationStrong(automationTriggerDeviceName({deviceId:condition.deviceId}));
+    /* Koşul tetikleyiciyle aynı cihazı okuyorsa ad iki kez yazılmaz: satır hemen tetikleyicinin
+       altında durur, "aynı cihaz" oraya işaret eder ve cümle kısalır. Başka cihazda ad yazılır.
+       İki biçim var, çünkü şablonun devamı iki türlü: durum cümlesinde ad yalın durur
+       ("aynı cihaz varlık algılandı ise"), okuma cümlesinde okumanın sahibidir
+       ("aynı cihazın ışık düzeyi"). İngilizcede de aynı ayrım ("the same device" / "…'s"). */
+    const sameDevice=Boolean(wizard&&wizard.triggerDeviceId&&condition.deviceId===wizard.triggerDeviceId);
+    const deviceName=owner=>automationStrong(sameDevice
+      ?t(owner?"automationCondSameDeviceOwner":"automationCondSameDeviceName")
+      :automationTriggerDeviceName({deviceId:condition.deviceId}));
+    const device=deviceName(false);
     // §9.2 — süre koşulu cümlede "…dir/…dır" yönünü taşır ki "sonra kapat" ile karışmasın.
     // Parça birleştirme yok: süreli her biçimin kendi tam şablonu var.
     const held=Number.isFinite(condition.forSeconds)&&condition.forSeconds>0;
@@ -1428,12 +1437,13 @@
       const sensor=state.devices.find(item=>item.id===condition.deviceId)||null;
       const unit=automationPropertyUnit(sensor,condition.property);
       const reading=esc(automationPropertyLabel(sensor,condition.property));
+      const owner=deviceName(true);
       const amount=value=>automationStrong(`${value}${unit}`);
       if(condition.above!==undefined&&condition.below!==undefined)
-        return t(key("automationCondBetween"),{device,reading,from:amount(condition.above),to:amount(condition.below),duration})+fresh;
+        return t(key("automationCondBetween"),{device:owner,reading,from:amount(condition.above),to:amount(condition.below),duration})+fresh;
       const above=condition.above!==undefined;
       return t(key(above?"automationCondAbove":"automationCondBelow"),{
-        device,reading,value:amount(above?condition.above:condition.below),duration
+        device:owner,reading,value:amount(above?condition.above:condition.below),duration
       })+fresh;
     }
     const event=esc(automationConditionEventLabel(condition));
@@ -2224,7 +2234,7 @@
       nodes.push({
         state:"done",fresh:wizard.fresh===`cond-${index}`,
         body:automationSummaryHtml(
-          automationConditionLine(condition),
+          automationConditionLine(condition,wizard),
           `data-automation-edit-cond="${index}"`,
           false,
           `data-automation-remove-cond="${index}"`,
@@ -2251,10 +2261,14 @@
       return;
     }
     if(!wizard.conditions.length){
+      // "Her zaman çalışsın" satırı bölümün bugünkü durumunu söyler; sönük olduğu için kullanıcı
+      // onu bilgi sanıp geçiyordu. Altına aynı "+ … ekle" düğmesi konur: koşul eklemenin yeri
+      // ikinci koşuldakiyle aynı biçimde, aranmadan görünür.
       nodes.push({state:"branch",body:automationSummaryHtml(
         esc(t("automationCondAlwaysLine")),'data-automation-stage="cond"',true,null,
         automationSummaryAction(true,"automationCondAddAria","automationCondChangeAria")
       )});
+      nodes.push({state:"branch",body:automationAddHtml(t("automationAddFirstCondition"),'data-automation-add-cond="1"')});
       return;
     }
     if(wizard.conditions.length<maxAutomationConditions){
