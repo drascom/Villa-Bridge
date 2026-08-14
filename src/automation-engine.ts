@@ -582,6 +582,30 @@ interface FollowWrite {
   handle: unknown;
 }
 
+/**
+ * §2.7 — bir çalışma boyunca dondurulan tek kanal okuması. Üç damga birlikte donar, çünkü üçü de
+ * aynı soruyu farklı açıdan sorar ve karışık okunurlarsa kendi içinde tutarsız bir karar çıkar.
+ */
+interface RunReading {
+  value: JsonScalar | undefined;
+  since: Date | null;
+  reportedAt: Date | null;
+}
+
+/**
+ * §2.7 — bir kuralın **tek çalışmasının** anlık görüntüsü. Kural çalışmaya başladığında koşulların
+ * okuduğu kanallar bir kez okunur; çalışmanın sonuna kadar (gecikmeli eylemler dahil) aynı görüntü
+ * kullanılır. Sebebi geri besleme döngüsüdür: kural ışığı yakınca ışık düzeyi değişir, ama o
+ * çalışma "yakmadan önceki" dünyaya göre karar vermiş olmalıdır.
+ *
+ * `depth` bir sayaçtır: kural meşgulken gelen yeni istek `execute`'a yeniden girer ve aynı
+ * görüntüyü paylaşır. Sayaç sıfıra inince görüntü düşer, yani **bir sonraki çalışma tazedir**.
+ */
+interface RunSnapshot {
+  depth: number;
+  readings: Map<string, RunReading>;
+}
+
 /** Bekleyen bir "sonra kapat"; zamanlayıcı tutamacı kalıcı değildir. */
 interface PendingAutoOff extends Omit<AutomationAutoOffEntry, "dueAt"> {
   /** Sayaç işliyorsa bitiş anı (ms); `idle` hareket beklerken null. */
@@ -612,6 +636,8 @@ export class AutomationEngine {
    * seri sıfırdan sayılır.
    */
   private readonly heldFired = new Set<string>();
+  /** §2.7 — `automationId` → çalışan kuralın dondurulmuş okumaları; çalışma bitince silinir. */
+  private readonly runSnapshots = new Map<string, RunSnapshot>();
   /** Durum dosyası yazımları sıraya girer; son yazan kazansın diye zincirlenir. */
   private autoOffWrite: Promise<void> = Promise.resolve();
   /** Bekleyen `delay` sayaçları — motor durunca serbest bırakılır, kalıcı değildir. */
@@ -1218,12 +1244,16 @@ export class AutomationEngine {
    * zaten kuralın kendi değeridir. Sayısal eşikli tetikleyicide okunacak tek bir yön yoktur;
    * değer çözülemezse davranış eskisi gibi kalır (eylem atlanır).
    */
-  private manualMatchValue(automation: Automation): JsonScalar | undefined {
+  private manualMatchValue(
+    automation: Automation,
+    snapshot: RunSnapshot
+  ): JsonScalar | undefined {
     for (const trigger of automation.triggers) {
       if (trigger.type !== "deviceState") continue;
       if (trigger.equals !== undefined) return trigger.equals;
       if (trigger.above !== undefined || trigger.below !== undefined) continue;
-      const value = this.options.deviceState?.(trigger.deviceId, trigger.property);
+      // §2.7 — bu da çalışmanın okuması: koşullarla aynı anlık görüntüden gelir.
+      const value = this.snapshotReading(snapshot, trigger.deviceId, trigger.property).value;
       if (value !== undefined) return value;
     }
     return undefined;
@@ -1244,13 +1274,77 @@ export class AutomationEngine {
     return this.dispatch(automation, undefined, { kind: "manual" });
   }
 
+  /**
+   * §2.7 — çalışmanın anlık görüntüsünü alır. Zaten varsa (kural meşgulken gelen yeni istek)
+   * aynısı paylaşılır ve sayaç artar; yeni bir çalışma başlıyorsa boş bir görüntü kurulur.
+   */
+  private acquireSnapshot(automationId: string): RunSnapshot {
+    const existing = this.runSnapshots.get(automationId);
+    if (existing) {
+      existing.depth += 1;
+      return existing;
+    }
+    const snapshot: RunSnapshot = { depth: 1, readings: new Map() };
+    this.runSnapshots.set(automationId, snapshot);
+    return snapshot;
+  }
+
+  private releaseSnapshot(automationId: string): void {
+    const snapshot = this.runSnapshots.get(automationId);
+    if (!snapshot) return;
+    snapshot.depth -= 1;
+    if (snapshot.depth <= 0) this.runSnapshots.delete(automationId);
+  }
+
+  /**
+   * §2.7 — kanalı **bir kez** okur ve çalışma boyunca aynı sonucu döndürür. İlk okuma tetikleme
+   * anındadır; sonraki her soru (gecikmeden sonra tekrar değerlendirme, meşgulken sıraya giren
+   * istek) aynı yanıtı alır.
+   */
+  private snapshotReading(
+    snapshot: RunSnapshot,
+    deviceId: string,
+    property: string
+  ): RunReading {
+    const key = `${deviceId}|${property}`;
+    const cached = snapshot.readings.get(key);
+    if (cached) return cached;
+    const reading: RunReading = {
+      value: this.options.deviceState?.(deviceId, property),
+      since: this.options.stateSince?.(deviceId, property) ?? null,
+      reportedAt: this.options.stateReportedAt?.(deviceId, property) ?? null
+    };
+    snapshot.readings.set(key, reading);
+    return reading;
+  }
+
+  /**
+   * §2.7 — çalışmanın kabuğu: anlık görüntü burada alınır ve **her çıkışta** (hata dahil) bırakılır.
+   * Kapsam bilinçli olarak eylem dizisinin sonuna kadardır: `delay` ve sıraya giren istek içeride,
+   * "sonra kapat" zamanlayıcısı dışarıdadır — o saatler sonra ateşleyebilir, dondurulmuş bir okuma
+   * o zaman veri değil, hurda olurdu (zaten koşul da okumaz).
+   */
   private async execute(
     automation: Automation,
     event?: AutomationDeviceEvent,
     trigger: AutomationRunTriggerInfo = { kind: "manual" }
   ): Promise<AutomationRunResult> {
+    const snapshot = this.acquireSnapshot(automation.id);
+    try {
+      return await this.executeWithSnapshot(automation, snapshot, event, trigger);
+    } finally {
+      this.releaseSnapshot(automation.id);
+    }
+  }
+
+  private async executeWithSnapshot(
+    automation: Automation,
+    snapshot: RunSnapshot,
+    event?: AutomationDeviceEvent,
+    trigger: AutomationRunTriggerInfo = { kind: "manual" }
+  ): Promise<AutomationRunResult> {
     const triggerValue = automationTriggerMatchValue(trigger)
-      ?? (trigger.kind === "manual" ? this.manualMatchValue(automation) : undefined);
+      ?? (trigger.kind === "manual" ? this.manualMatchValue(automation, snapshot) : undefined);
     const actions = automation.actions
       .filter((action) => automationActionApplies(action, event, triggerValue));
     // Hiçbir eylem eşleşmediyse çalıştırma sayılmaz: ne kilit alınır ne de `lastRunOk` bozulur.
@@ -1271,17 +1365,19 @@ export class AutomationEngine {
       const anyMode = automation.conditionMode === "any";
       const now = this.now();
       // Güneş uçlu aralıklar için o günün güneş saatleri; hesap yerel gün başına önbelleklidir.
+      // §2.7 — üç okuma da anlık görüntüden gelir: değer, "ne zamandır aynı" ve "ne zaman rapor
+      // edildi". Kural kendi eylemiyle bu üçünü de değiştirebilir; çalışma boyunca donarlar.
       const evaluation = evaluateAutomationConditions(
         automation.conditions,
         now,
-        (deviceId, property) => this.options.deviceState?.(deviceId, property),
+        (deviceId, property) => this.snapshotReading(snapshot, deviceId, property).value,
         {
           mode: automation.conditionMode,
           times: this.resolveSun(now).times,
           stateSince: (deviceId, property) =>
-            this.options.stateSince?.(deviceId, property) ?? null,
+            this.snapshotReading(snapshot, deviceId, property).since,
           stateReportedAt: (deviceId, property) =>
-            this.options.stateReportedAt?.(deviceId, property) ?? null
+            this.snapshotReading(snapshot, deviceId, property).reportedAt
         }
       );
       if (!evaluation.ok) {
