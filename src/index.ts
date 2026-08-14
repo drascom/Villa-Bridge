@@ -412,11 +412,20 @@ function sendAsset(
 }
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
-const themePackages = await loadThemePackages(resolve(moduleDir, "../public/themes"));
+/* Bozuk bir tema dosyası EVİ DÜŞÜRMEZ: paket başına denenir, hatalı olan atlanır ve loglanır;
+   geriye tek paket kalmazsa yükleyici gömülü varsayılana düşer. Varsayılan kimlik de listeden
+   seçilir — tercih edilen paket atlanmışsa elde kalan ilk paket varsayılan olur, yoksa
+   `appearance.json` doğrulaması var olmayan bir kimliğe takılırdı. */
+const themePackages = await loadThemePackages(resolve(moduleDir, "../public/themes"), (name, error) => {
+  console.warn(`Tema paketi atlandı (${name}): ${error instanceof Error ? error.message : String(error)}`);
+});
+const defaultThemePackageId = themePackages.some((item) => item.id === "villa-liquid-glass")
+  ? "villa-liquid-glass"
+  : themePackages[0].id;
 const appearanceStore = new AppearanceStore(
   resolve(dirname(configPath), "appearance.json"),
   themePackages,
-  "villa-liquid-glass"
+  defaultThemePackageId
 );
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
 const dashboardETag = assetETag(dashboard);
