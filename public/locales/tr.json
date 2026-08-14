@@ -351,6 +351,7 @@
     "homeControlReady": "Ev kontrolü hazır",
     "pairingCountdown": "Yakındaki cihazı eşleştirme moduna alın · {count} saniye kaldı",
     "operationFailed": "İşlem tamamlanamadı.",
+    "stalePageReload": "Bu sayfa önbellekteki eski bir kopyadan açıldı, bazı düğmeler çalışmıyor. Sayfayı yenileyin.",
     "serverUnreachable": "Sunucuya ulaşılamıyor",
     "searchStarted": "Yeni cihaz araması başladı.",
     "searchStopped": "Cihaz araması durduruldu.",

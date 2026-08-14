@@ -214,6 +214,27 @@
   const locationSearchInputs={clock:"#clockCitySearch",weather:"#weatherLocationSearch",home:"#homeLocationSearch"};
   const $=selector=>document.querySelector(selector);
   const $$=selector=>[...document.querySelectorAll(selector)];
+  /* BAYAT SAYFA KORUMASI. Panelin bağlama zinciri (`99-bind.js`) tek bir uzun üst düzey blok:
+     aradığı düğüm yoksa `null.onchange=` fırlatır ve o noktadan SONRAKİ hiçbir düğme bağlanmaz —
+     panel yarım açılır. Bu, tarayıcıda eski `index.html` ile yeni JS buluşunca oluyor.
+     `$b` YALNIZ bağlama içindir: düğüm varsa kendisi döner, yoksa olay/atama yutan bir vekil
+     döner ve zincir devam eder. Hata yutulmaz — eksik her seçici bir kez konsola yazılır,
+     `initialize` de kullanıcıya "sert yenile" uyarısı gösterir. Okuma/yazma için `$` kullanılır;
+     orada `null` gerçek bir hata olarak kalmalı. */
+  const missingBindTargets=new Set();
+  const bindNoop=()=>{};
+  const bindStub=()=>typeof Proxy==="function"
+    ?new Proxy({},{get:()=>bindNoop,set:()=>true})
+    :{addEventListener:bindNoop,removeEventListener:bindNoop,close:bindNoop,click:bindNoop,focus:bindNoop};
+  const $b=selector=>{
+    const node=document.querySelector(selector);
+    if(node)return node;
+    if(!missingBindTargets.has(selector)){
+      missingBindTargets.add(selector);
+      console.warn(`Panel: bağlanacak öğe yok (${selector}). Sayfanın HTML'i JS'inden eski olabilir — sert yenileme gerekir.`);
+    }
+    return bindStub();
+  };
   const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
   const t=(key,values={})=>(translations[state.language]?.[key]||translations.en?.[key]||key).replace(/\{(\w+)\}/g,(_,name)=>values[name]??"");
   const commandKey=(id,property)=>JSON.stringify([id,property]);

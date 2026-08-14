@@ -351,6 +351,7 @@
     "homeControlReady": "Home control ready",
     "pairingCountdown": "Put the nearby device into pairing mode · {count} seconds left",
     "operationFailed": "Could not complete the operation.",
+    "stalePageReload": "This page was loaded from an old cached copy, so some buttons are inactive. Reload the page.",
     "serverUnreachable": "Server unavailable",
     "searchStarted": "Device search started.",
     "searchStopped": "Device search stopped.",

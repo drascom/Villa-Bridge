@@ -397,7 +397,22 @@ app.get<{ Querystring: { limit?: string } }>("/api/debug/network-events", async 
  * bedava). Başlığını kendi koymayan her yanıt (API'ler) aşağıdaki `onSend` kancasıyla
  * `no-store` alır. Dosya adı listesi yok: ETag, açılışta belleğe okunan gövdenin kendisinden
  * hesaplanır, dolayısıyla panel dosyası ekleme/çıkarma akışı değişmez.
+ *
+ * NEDEN `?v=` / içerik hash'li dosya adı DEĞİL: sürüm damgası yalnız "yeni HTML + eski JS"
+ * eşleşmemesini çözer. Panelde yaşanan arıza bunun TERSİ — "eski HTML + yeni JS": eski HTML
+ * eski damgayı ister, sunucuda o damga diye bir şey yoktur, sonuç yine karışık sürümdür.
+ * Tek gerçek kaldıraç HTML'in asla bayat kullanılmamasıdır (aşağıdaki `htmlCacheControl`),
+ * ve o sağlanınca damganın kazandıracağı şey LAN'da birkaç milisaniyelik 304'tür. Karşılığında
+ * `index.html`'i açılışta yeniden yazmak (panel-graph'ın doğruladığı `<script src>` listesinden
+ * ayrışan ikinci bir gerçek) gerekirdi; alınmadı.
  */
+/**
+ * HTML her istekte YENİDEN DOĞRULANIR. `no-cache` tek başına bunu zaten söyler; `max-age=0,
+ * must-revalidate` araya giren eski/aptal vekillere aynı şeyi ikinci kez, tartışmasız söyler.
+ * Değişmediyse yanıt yine gövdesiz 304'tür — maliyet bir tur, kazanç HTML ile JS'in sürümünün
+ * ASLA ayrışmaması.
+ */
+const htmlCacheControl = "no-cache, max-age=0, must-revalidate";
 function assetETag(body: string | Buffer): string {
   return `"${createHash("sha256").update(body).digest("base64url")}"`;
 }
@@ -418,9 +433,10 @@ function sendAsset(
   reply: FastifyReply,
   contentType: string,
   body: string | Buffer,
-  etag: string
+  etag: string,
+  cacheControl = "no-cache"
 ): FastifyReply {
-  reply.header("Cache-Control", "no-cache").header("ETag", etag);
+  reply.header("Cache-Control", cacheControl).header("ETag", etag);
   if (etagMatches(request.headers["if-none-match"], etag)) return reply.code(304).send();
   return reply.type(contentType).send(body);
 }
@@ -485,6 +501,48 @@ for (const route of panelAssetRoutes) {
   const contentType = route.endsWith(".css") ? "text/css; charset=utf-8" : "text/javascript; charset=utf-8";
   const etag = assetETag(body);
   app.get(route, async (request, reply) => sendAsset(request, reply, contentType, body, etag));
+}
+
+/**
+ * SERVICE WORKER KURTARMA KAPISI.
+ *
+ * Panelin kendi service worker'ı YOK ve hiç olmadı; buna rağmen sunucu günlüklerinde
+ * `GET /sw-modern.js -> 404` görülüyor. Bunu isteyen tek şey, bir istemcide hâlâ KAYITLI duran
+ * eski bir service worker'dır (aynı köken üzerinde daha önce çalışmış bir kurulum). Kayıtlı bir
+ * worker gezinme isteklerine kendi önbelleğinden yanıt verebilir: kullanıcı normal yenilerken
+ * BAYAT `index.html` alır ama betikler ağdan tazedir — "eski HTML + yeni JS" tam olarak budur.
+ * Sert yenileme (Shift+Reload) service worker'ı ATLADIĞI için sorun orada kaybolur; şikâyetin
+ * imzası birebir uyuyor. Sunucu başlıkları bu durumda çaresizdir, yanıtı sunan tarayıcının
+ * içindeki worker'dır.
+ *
+ * Tarayıcı kayıtlı worker'ın betiğini düzenli olarak yeniden indirir. Bugün 404 dönüyor;
+ * 404 güncellemeyi BAŞARISIZ sayar ve eski worker olduğu gibi kalır — kilit budur. Bu rota
+ * onun yerine geçerli ama kendini imha eden bir worker sunar: kurulur kurulmaz tüm
+ * `CacheStorage` girdilerini siler, kaydını iptal eder ve açık sekmeleri bir kez tazeler.
+ * Sonrasında kayıt yok olur, bu rotayı bir daha kimse istemez.
+ *
+ * `index.html` içine gömülecek bir `unregister()` betiği bu istemcileri KURTARAMAZDI: o betik
+ * yeni HTML'de yaşar, worker ise eski HTML'i servis ediyor — hiç çalışmazdı.
+ */
+const serviceWorkerKillSwitch = `self.addEventListener("install",()=>self.skipWaiting());
+self.addEventListener("activate",event=>{
+  event.waitUntil((async()=>{
+    try{
+      const keys=await caches.keys();
+      await Promise.all(keys.map(key=>caches.delete(key)));
+    }catch{}
+    try{await self.registration.unregister()}catch{}
+    try{
+      const windows=await self.clients.matchAll({type:"window"});
+      for(const client of windows){try{await client.navigate(client.url)}catch{}}
+    }catch{}
+  })());
+});
+`;
+const serviceWorkerKillSwitchETag = assetETag(serviceWorkerKillSwitch);
+for (const route of ["/sw-modern.js", "/sw.js", "/service-worker.js"]) {
+  app.get(route, async (request, reply) =>
+    sendAsset(request, reply, "text/javascript; charset=utf-8", serviceWorkerKillSwitch, serviceWorkerKillSwitchETag));
 }
 
 app.get("/assets/dashboard-landscape.jpg", async (request, reply) =>
@@ -1704,7 +1762,7 @@ app.post<{ Body?: { confirmation?: unknown; backup?: unknown } }>(
 );
 
 app.get("/", async (request, reply) =>
-  sendAsset(request, reply, "text/html; charset=utf-8", dashboard, dashboardETag));
+  sendAsset(request, reply, "text/html; charset=utf-8", dashboard, dashboardETag, htmlCacheControl));
 
 type EmbeddedVillaBridgeGlobal = typeof globalThis & {
   __villaBridgeReady?: boolean;
