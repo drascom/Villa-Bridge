@@ -36,11 +36,24 @@
     $$("#widgetCatalog [data-remove-widget]").forEach(button=>button.onclick=()=>removeDashboardWidget(button.dataset.removeWidget));
     $$("[data-edit-group]").forEach(button=>button.onclick=()=>openGroupEditor(button.dataset.editGroup));
   }
+  /* İKİ SÜTUNLU ANA EKRANIN KOŞULU — panel.css'teki blokların BİREBİR aynısı olmak ZORUNDA.
+     Yerleşim şöyle kuruluyor: `#home .widget-board` iki sütun (`--hub-column` + kalanı), hub
+     birinci sütunda, ray ise `grid-column:1/-1` ile hub'ın ÜSTÜNDE duran tam genişlikte bir
+     katman. Hub sütununu görünür tutan tek şey rayın `padding-left`i; ray kaydırılır kaydırılmaz
+     kartlar hub'ın üstüne biner. O yüzden kaydırma başlayınca hub sönerek çekilir ve oklar belirir
+     — ikisini de bu koşul açıyor.
+     KOŞUL CSS'TEN AYRIŞIRSA yerleşim bozulmuş gibi görünür: burada eskiden yalnız
+     `max-height:900px` vardı, CSS'te ise ikinci bir kol daha var (`min-width:1000px`). Geniş ama
+     900px'ten UZUN ekranda (1280×1024, 1440×1000, 1512×982 …) CSS iki sütuna geçiyor, JS ise
+     "yatay değil" diyordu: oklar `enabled=false` ile zorla gizleniyor, hub hiç sönmüyordu.
+     Sonuç kullanıcının gördüğü tabloydu — kartlar en solda, saat/hava bloğu onların altında.
+     `scripts/check-home-layout.mjs` bu metnin CSS koşuluyla aynı kalmasını denetler. */
+  const homeOverlayMediaQuery="(orientation: landscape) and (max-height: 900px), (orientation: landscape) and (min-width: 1000px)";
   function updateWidgetScrollHint(){
     const rail=$("#widgetRail");
     const quick=$("#homeTabs");
     if(!rail||!quick)return;
-    const landscape=window.matchMedia("(orientation: landscape) and (max-height: 900px)").matches;
+    const landscape=window.matchMedia(homeOverlayMediaQuery).matches;
     const update=(scroller,left,right,enabled)=>{
       const hasBefore=scroller.scrollLeft>8;
       const hasAfter=scroller.scrollWidth-scroller.clientWidth-scroller.scrollLeft>8;
