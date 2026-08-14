@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { writeJsonAtomic } from "./atomic-file.js";
+import type { AutomationRunStateStore } from "./automation-run-state.js";
 import { isHexColor, numericControlKinds } from "./device-controls.js";
 import type { DeviceControlView, JsonScalar } from "./types.js";
 
@@ -317,8 +318,13 @@ export interface Automation {
    */
   conditionMode?: "all" | "any";
   actions: AutomationAction[];
-  lastRunAt: string | null;
-  lastRunOk: boolean | null;
+  /**
+   * Son çalışma — **tanımın parçası değildir**, `AutomationRunStateStore` tutar ve
+   * `AutomationsStore` okurken listeye ekler. Diske yazılan tanım dosyasında bu alanlar bulunmaz;
+   * eski dosyalarda varsa okunur ve durum dosyasına taşınır (bkz. `automation-run-state.ts`).
+   */
+  lastRunAt?: string | null;
+  lastRunOk?: boolean | null;
   /** Yoksa kural insanındır — bkz. `AutomationAgentStamp`. */
   agent?: AutomationAgentStamp;
 }
@@ -985,16 +991,8 @@ export const validateAutomations = (
     // Eski dosyalarda alan hep var ve boş; yokluğunu da kabul ederiz (geriye dönük uyumluluk).
     const conditions = validateConditions(candidate.conditions ?? []);
     const conditionMode = validateConditionMode(candidate.conditionMode);
-    const lastRunAt = candidate.lastRunAt;
-    if (lastRunAt !== undefined && lastRunAt !== null) {
-      if (typeof lastRunAt !== "string" || Number.isNaN(Date.parse(lastRunAt))) {
-        throw new Error("Otomasyon son çalışma zamanı geçersiz.");
-      }
-    }
-    const lastRunOk = candidate.lastRunOk;
-    if (lastRunOk !== undefined && lastRunOk !== null && typeof lastRunOk !== "boolean") {
-      throw new Error("Otomasyon son çalışma sonucu geçersiz.");
-    }
+    // `lastRunAt`/`lastRunOk` gelirse **sessizce düşer**: çalışma durumu tanımın parçası değildir
+    // (eski dosyalar ve eski paneller alanı gönderdiği için reddetmek değil, yok saymak doğru).
     const agent = validateAgentStamp(candidate.agent);
     const triggers = validateTriggers(candidate.triggers);
     const actions = validateActions(candidate.actions, lookup, groupLookup);
@@ -1076,9 +1074,7 @@ export const validateAutomations = (
       enabled: candidate.enabled !== false,
       triggers,
       conditions,
-      actions,
-      lastRunAt: typeof lastRunAt === "string" ? lastRunAt : null,
-      lastRunOk: typeof lastRunOk === "boolean" ? lastRunOk : null
+      actions
     };
     // Yalnız "any" korunur; varsayılan alan hiç görünmez (yukarıdaki gerekçe).
     if (conditionMode) automation.conditionMode = conditionMode;
@@ -1259,14 +1255,28 @@ export class AutomationsStore {
      */
     private readonly lookupRevision?: () => number,
     /** Grup eylemlerinin üyelerini çözer; verilmezse grup içi kilit/siren denetimi atlanır. */
-    private readonly groupLookup?: AutomationGroupLookup
+    private readonly groupLookup?: AutomationGroupLookup,
+    /**
+     * Son çalışma bilgisi. Tanım dosyasına **yazılmaz**; okuma yolunda listeye eklenir, böylece
+     * API sözleşmesi (panel kartının alt satırı) değişmeden kalır.
+     */
+    private readonly runState?: AutomationRunStateStore
   ) {}
+
+  /** Tanım + çalışma durumu; disk temsili yalnız tanımı taşır. */
+  private decorate(automations: Automation[]): Automation[] {
+    const runState = this.runState;
+    if (!runState) return automations.slice();
+    return automations.map((automation) => ({ ...automation, ...runState.snapshot(automation.id) }));
+  }
 
   /**
    * Otomasyonlar her cihaz olayında okunur (§6). Diskten okuyup 64 kuralı yeniden doğrulamak
    * olay başına milisaniyeler yiyordu; dosya damgası değişmedikçe önbellekten dönülür.
    */
   async get(): Promise<Automation[]> {
+    // Çalışma durumu bir kez okunur; sonraki çağrılarda bellekten gelir.
+    await this.runState?.load();
     let stamp: { mtimeNs: bigint; size: bigint } | null = null;
     try {
       const info = await stat(this.path, { bigint: true });
@@ -1284,7 +1294,7 @@ export class AutomationsStore {
       && cached.size === stamp.size
       && cached.lookupRevision === revision
     ) {
-      return cached.automations.slice();
+      return this.decorate(cached.automations);
     }
     let automations: Automation[];
     try {
@@ -1299,14 +1309,21 @@ export class AutomationsStore {
       throw error;
     }
     this.cache = { ...stamp, lookupRevision: revision, automations };
-    return automations.slice();
+    return this.decorate(automations);
   }
 
+  /**
+   * Tanım dosyası **yalnız buradan** yazılır: kullanıcı (ya da ajan) kuralları değiştirdiğinde.
+   * `validateAutomations` çalışma alanlarını düşürdüğü için yazılan dosya yalnız tanımı taşır;
+   * eski dosyalardaki `lastRunAt`/`lastRunOk` ilk düzenlemede kendiliğinden temizlenir.
+   */
   async save(value: unknown): Promise<Automation[]> {
     const automations = validateAutomations(value, this.lookup, this.groupLookup);
     await writeJsonAtomic(this.path, automations, { mode: 0o600 });
     await this.remember(automations);
-    return automations;
+    // Silinen kuralın tarihçesi durum dosyasında birikmesin.
+    await this.runState?.prune(automations.map((automation) => automation.id));
+    return this.decorate(automations);
   }
 
   /** Yazdıktan sonra önbelleği taze damgayla tazeler; aynı milisaniyede yazma yarışı kalmasın. */
@@ -1328,12 +1345,15 @@ export class AutomationsStore {
     return this.save(removeDeviceFromAutomations(await this.get(), deviceId));
   }
 
+  /**
+   * Çalışma sonucu **tanım dosyasına yazılmaz**; ayrı durum dosyasına düşer. Kural yoksa hiçbir
+   * şey yazılmaz — silinmiş kuralın tarihçesi geri gelmesin.
+   */
   async markRun(id: string, ok: boolean, at: Date = new Date()): Promise<Automation[]> {
     const automations = await this.get();
     const normalizedId = id.trim().toLowerCase();
     if (!automations.some((automation) => automation.id === normalizedId)) return automations;
-    return this.save(automations.map((automation) => automation.id === normalizedId
-      ? { ...automation, lastRunAt: at.toISOString(), lastRunOk: ok }
-      : automation));
+    await this.runState?.markRun(normalizedId, ok, at);
+    return this.decorate(automations);
   }
 }

@@ -8,6 +8,7 @@ import { AppearanceStore } from "./appearance-store.js";
 import { loadAliases, saveAliases } from "./aliases.js";
 import { AutomationEngine } from "./automation-engine.js";
 import { AutomationRunLog } from "./automation-runs.js";
+import { AutomationRunStateStore } from "./automation-run-state.js";
 import { AutomationBackupStore } from "./automation-backup.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { CelestialService } from "./celestial-service.js";
@@ -115,11 +116,24 @@ const homeVisibilityStore = new HomeVisibilityStore(
 );
 const automationGroupLookup = (groupId: string): { memberIds: string[] } | undefined =>
   store.getGroups().find((group) => group.id === groupId);
+// Çalışma durumu tanım dosyasından ayrı durur: kural değişmediği hâlde `automations.json`
+// yeniden yazılmasın (yedek/sürüm gürültüsü ve yazma anındaki kesinti riski).
+const automationRunState = new AutomationRunStateStore(
+  resolve(dirname(configPath), "automation-state.json"),
+  {
+    legacyAutomationsPath: resolve(dirname(configPath), "automations.json"),
+    onError: (message) => {
+      recentErrors.record({ operation: "automation-state", statusCode: 500, message });
+      console.error(message);
+    }
+  }
+);
 const automationsStore = new AutomationsStore(
   resolve(dirname(configPath), "automations.json"),
   (deviceId) => store.getDevice(deviceId),
   () => store.topologyRevision,
-  automationGroupLookup
+  automationGroupLookup,
+  automationRunState
 );
 // Ajan yazmalarının yedeği; yalnız `/mcp` yolunda alınır, panelden kaydetmede alınmaz.
 const automationBackups = new AutomationBackupStore(

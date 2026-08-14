@@ -960,8 +960,8 @@ const automationView = (automation: Automation): JsonObject => ({
   conditions: automation.conditions as unknown as JsonObject[],
   ...(automation.conditionMode === undefined ? {} : { conditionMode: automation.conditionMode }),
   actions: automation.actions as unknown as JsonObject[],
-  lastRunAt: automation.lastRunAt,
-  lastRunOk: automation.lastRunOk,
+  lastRunAt: automation.lastRunAt ?? null,
+  lastRunOk: automation.lastRunOk ?? null,
   agent: agentView(automation)
 });
 
@@ -994,9 +994,9 @@ const listAutomations = (
       triggers: automation.triggers.map((trigger) => triggerText(trigger, label)),
       conditions: automation.conditions.map((condition) => conditionText(condition, label)),
       actions: automation.actions.map((action) => actionText(action, label)),
-      lastRun: automation.lastRunAt === null
-        ? null
-        : { at: automation.lastRunAt, ok: automation.lastRunOk },
+      lastRun: automation.lastRunAt
+        ? { at: automation.lastRunAt, ok: automation.lastRunOk ?? null }
+        : null,
       agent: agentView(automation)
     }));
   return { count: rows.length, automations: rows };
@@ -1066,9 +1066,8 @@ const writeAutomation = async (
   const candidate = {
     ...(body as JsonObject),
     id: previous?.id ?? newAutomationId(),
-    // Çalışma geçmişi kuralın değil sunucunun bilgisidir; güncelleme onu sıfırlamaz.
-    lastRunAt: previous?.lastRunAt ?? null,
-    lastRunOk: previous?.lastRunOk ?? null,
+    // Çalışma geçmişi kuralın değil sunucunun bilgisidir: ayrı durum dosyasında durur, kural
+    // gövdesiyle taşınmaz. Güncelleme onu sıfırlamaz çünkü tanıma hiç dokunmaz.
     ...stamp
   };
   const next = previous === null
