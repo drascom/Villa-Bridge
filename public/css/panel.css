@@ -1621,21 +1621,18 @@
    aynı iki kart 440px olur. Kaydırma kaybolmadı, yalnız hizalandı: fazla kart varsa ray yine
    kayar, `scroll-snap-type:x mandatory` + her kartta `scroll-snap-align:start` sayesinde her
    duruş bir kart kenarına oturur, yani hiçbir duruşta yarım kart kalmaz. */#home .widget-rail .widget-card{grid-row:1;grid-column:span 1;min-height:0;height:100%;overflow:hidden}#home .widget-rail .group-widget{grid-column:span 1;display:grid;grid-template-rows:auto minmax(0,1fr)}#home .widget-rail .group-control-grid,#home .group-panel .group-control-grid{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:none}#home .widget-rail .group-control-grid::-webkit-scrollbar,#home .group-panel .group-control-grid::-webkit-scrollbar{display:none}/* Birleşik "Ev durumu" kartı da rayın tek kart genişliğini kullanır: ara genişlik (eski 3 birim)
-   kalktı, çünkü karışık genişlikler sayfa kenarlarını kaydırıp yarım kart doğuruyordu. */#home .widget-rail [data-widget="summary"]{grid-column:span 1}#home #widgetEmpty{grid-row:1;grid-column:1/-1}#home .group-panel{grid-column:1/-1;grid-row:1;min-height:0;height:100%;margin:0 0 0 calc(var(--hub-column) + 10px);overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr)}#home .quick-grid.grid-view{height:88px;gap:10px}#home .strip-row .quick-card-add,#home .strip-row>.quick-scroll-hint{height:88px}#home .quick-grid.grid-view .quick-card{height:88px}/* Liste kartın ALT bölümü: kalan boyu artık sabit bir pay değil, üstündeki erişilebilirlik
+   kalktı, çünkü karışık genişlikler sayfa kenarlarını kaydırıp yarım kart doğuruyordu. */#home .widget-rail [data-widget="summary"]{grid-column:span 1}#home #widgetEmpty{grid-row:1;grid-column:1/-1}#home .group-panel{grid-column:1/-1;grid-row:1;min-height:0;height:100%;margin:0 0 0 calc(var(--hub-column) + 10px);overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr)}#home .quick-grid.grid-view{height:88px;gap:10px}#home .strip-row .quick-card-add{height:88px}#home .quick-grid.grid-view .quick-card{height:88px}/* Liste kartın ALT bölümü: kalan boyu artık sabit bir pay değil, üstündeki erişilebilirlik
    bölümünün gerçek boyu belirler. Kaç satır çizileceğini `widgetListCapacity` ölçer; buradaki
-   `overflow:hidden` yalnız son çare kırpmadır — kart yine tek widget yüksekliğinde kalır. */#home .widget-list{min-height:0;margin-top:12px;gap:0;overflow:hidden}#home .hub-date{margin-top:clamp(3px,.7vh,6px);font-size:clamp(16px,2.4vh,20px)}#home .hub-cities{margin-top:clamp(3px,.7vh,7px)}#home .hub-city{min-height:0;padding:clamp(2px,.5vh,5px) 0}#home .hub-alarm,#home .hub-weather{margin-top:clamp(4px,.8vh,8px)}#home .hub-zone-weather>.hub-label{margin-top:clamp(6px,1.2vh,11px)}#home .hub-w-temp{font-size:clamp(29px,5.7vh,44px)}#home .hub-hint{display:none}#home .group-summary{margin-top:7px}#home .home-summary{gap:14px;margin-top:0}#home .widget-value{margin-top:14px}#home .widget-scroll-hint,#home .quick-scroll-hint{z-index:8;display:grid;place-items:center;padding:0;border:1px solid var(--forest);color:var(--on-forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}#home .widget-scroll-hint{position:absolute;top:calc(50% - 24px);width:38px;height:48px;border-radius:15px}#home .widget-scroll-hint.scroll-hint-left{left:6px}#home .widget-scroll-hint.scroll-hint-right{right:6px}/* Şerit okları kartların üstüne binmez: mutlak konum yerine şeridin üçüncü/birinci sütunu olurlar,
-   gizliyken de yerlerini korur ki her kaydırmada şerit zıplamasın. Şeridin İKİ UCUNA yapışırlar:
-   kabın yatay dolgusu sıfırlandı (`.quick-control-widget{padding:5px 0}`), `gap` yalnız öğelerin
-   ARASINA düştüğü için ok ile kart arası nefes payı durur ama okla köşe arası boşluk kalmaz.
-   Mutlak konum kullanılmadığından ilk/son kartı örtme riski de yok. */#home .strip-row>.quick-scroll-hint{position:static;flex:0 0 auto;width:clamp(40px,4.2vw,52px);min-width:40px;border-radius:999px}/* Son kart ok/artı düğmelerinin ALTINA girmesin. Sorun kaydırma mesafesi değildi, üç ayrı kural:
-   (1) Düğmeler şeritten ayrı bir alan tutar: sağdaki ok kaydırıcıdan ek bir payla ayrılır, yani
-       kaydırıcının sağ kenarı her zaman düğmelerin SOLUNDA biter.
-   (2) Kaydırıcının sonundaki boşluk `padding-inline-end` ile verilemez — esnek kaydırıcılarda o
+   `overflow:hidden` yalnız son çare kırpmadır — kart yine tek widget yüksekliğinde kalır. */#home .widget-list{min-height:0;margin-top:12px;gap:0;overflow:hidden}#home .hub-date{margin-top:clamp(3px,.7vh,6px);font-size:clamp(16px,2.4vh,20px)}#home .hub-cities{margin-top:clamp(3px,.7vh,7px)}#home .hub-city{min-height:0;padding:clamp(2px,.5vh,5px) 0}#home .hub-alarm,#home .hub-weather{margin-top:clamp(4px,.8vh,8px)}#home .hub-zone-weather>.hub-label{margin-top:clamp(6px,1.2vh,11px)}#home .hub-w-temp{font-size:clamp(29px,5.7vh,44px)}#home .hub-hint{display:none}#home .group-summary{margin-top:7px}#home .home-summary{gap:14px;margin-top:0}#home .widget-value{margin-top:14px}#home .widget-scroll-hint,#home .quick-scroll-hint{z-index:8;display:grid;place-items:center;padding:0;border:1px solid var(--forest);color:var(--on-forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}#home .widget-scroll-hint{position:absolute;top:calc(50% - 24px);width:38px;height:48px;border-radius:15px}#home .widget-scroll-hint.scroll-hint-left{left:6px}#home .widget-scroll-hint.scroll-hint-right{right:6px}/* Şerit oklarının konumu ve yüzeyi bu dosyanın SONUNDAKİ şerit bloğunda: artık satırın bir
+   sütunu değil, üstünde duran mutlak konumlu yuvarlak cam düğmeler ve kartlar altlarından
+   kayıyor. Buradaki değerler yalnız ortak ok iskeleti (ızgara, ikon, gizlenme) için kalır. */
+/* Son kart artı düğmesinin ALTINA girmesin. Sorun kaydırma mesafesi değildi, iki kural:
+   (1) Kaydırıcının sonundaki boşluk `padding-inline-end` ile verilemez — esnek kaydırıcılarda o
        dolgu kaydırma alanına eklenmez, bu yüzden yerine gerçek bir ara parça (::after) konur.
-   (3) Son kartın tutunma noktası `end`: `proximity` yakalaması kaydırmayı sondan geri çekip son
+   (2) Son kartın tutunma noktası `end`: `proximity` yakalaması kaydırmayı sondan geri çekip son
        kartı kırpıyordu; artık kaydırmanın sonu da geçerli bir tutunma noktası.
    Ara parça 8px'i aşmaz: kaydırma ipuçlarının JS eşiği (`scrollWidth-clientWidth>8`) yüzünden
-   kartlar sığdığında oklar yanlışlıkla belirmesin. */#home .strip-row>#homeTabs{padding-inline:0;scroll-padding-inline:0}#home .strip-row>#homeTabs::after{content:"";flex:0 0 clamp(6px,.8vw,8px);align-self:stretch}#home .strip-row>#homeTabs .home-tab-list>.quick-card:last-child{scroll-snap-align:end}#home .strip-row>.quick-scroll-hint.scroll-hint-right{margin-inline-start:clamp(6px,1vw,12px)}#home .widget-scroll-hint[hidden]{display:none}#home .strip-row>.quick-scroll-hint[hidden]{visibility:hidden;pointer-events:none}#home .quick-scroll-hint:focus-visible{outline:3px solid var(--on-forest);outline-offset:-6px;box-shadow:0 0 0 3px var(--forest)}#home .widget-scroll-hint svg{width:20px;height:20px}#home .quick-scroll-hint svg{width:clamp(17px,1.8vw,22px);height:clamp(17px,1.8vw,22px)}#home .widget-scroll-hint svg,#home .quick-scroll-hint svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.system-alert-bar{position:fixed;z-index:9;top:0;left:0;right:0;min-height:56px;margin:0;border-width:0 0 1px;border-radius:0;font-size:20px}.system-alert-icon,.system-alert-icon svg{width:28px;height:28px}.system-alert-count{font-size:16px}body.has-system-alert main{padding-top:70px}body.has-system-alert #home{--home-top:70px}}
+   kartlar sığdığında oklar yanlışlıkla belirmesin. */#home .strip-row>#homeTabs::after{content:"";flex:0 0 clamp(6px,.8vw,8px);align-self:stretch}#home .strip-row>#homeTabs .home-tab-list>.quick-card:last-child{scroll-snap-align:end}#home .widget-scroll-hint[hidden]{display:none}#home .strip-row>.quick-scroll-hint[hidden]{visibility:hidden;pointer-events:none}#home .widget-scroll-hint svg{width:20px;height:20px}#home .quick-scroll-hint svg{width:clamp(17px,1.8vw,22px);height:clamp(17px,1.8vw,22px)}#home .widget-scroll-hint svg,#home .quick-scroll-hint svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.system-alert-bar{position:fixed;z-index:9;top:0;left:0;right:0;min-height:56px;margin:0;border-width:0 0 1px;border-radius:0;font-size:20px}.system-alert-icon,.system-alert-icon svg{width:28px;height:28px}.system-alert-count{font-size:16px}body.has-system-alert main{padding-top:70px}body.has-system-alert #home{--home-top:70px}}
     /* Dar yatay ekranda `main` üst dolgusu 24px: kartların boyu kendiliğinden ona göre kısalır. */
     @media(orientation:landscape) and (max-height:900px) and (max-width:900px){#home{--home-top:24px}}
     /* Dar yatay ekranda (800×480 gibi) iki kart 200px'e düşerdi — döşeme ızgarası tek sütuna iner,
@@ -1651,7 +1648,7 @@
        ve konum marjları), hava sahnesinin boyu ve alt şerit payı kısıldı — içerik kaydırmadan
        sığar. Saat rakamı ve yazı boyutları bilerek küçültülmedi. */
     @media(orientation:landscape) and (max-height:560px){#home .hub-w-stat-extra{display:none}#home .hub-city:nth-child(n+2){display:none}/* 800×480 sınıfı: göstergeler ve olay satırı bir kademe daha küçülür, üçü de yan yana kalır. */#home .home-summary{gap:12px}#home .summary-chip{gap:5px;min-height:26px}#home .summary-chip .device-type-svg{width:18px;height:18px}#home .summary-chip b{font-size:19px}#home .widget-list-row{padding:8px 0;font-size:17px}#home [data-widget="summary"] .widget-list-row{font-size:15px}#home [data-widget="summary"] .event-mark{width:25px;height:25px;font-size:15px}#home [data-widget="summary"] .widget-list-row time,#home .activity-quiet{font-size:12.5px}#home .activity-quiet{margin-top:8px;padding-top:8px}}
-    @media(orientation:landscape) and (max-height:900px),(orientation:landscape) and (min-width:1000px){#home [data-widget="quick"]{height:68px}#home .quick-control-widget{padding:5px 0}#home .widget-board.editing [data-widget="quick"]{height:80px}#home .widget-board.editing .widget-rail{gap:18px}#home .quick-control-widget,#home .widget-rail,#home .group-panel{margin-top:0}#home .quick-grid.grid-view,#home .quick-grid.grid-view .quick-card,#home .strip-row .quick-card-add,#home .strip-row>.quick-scroll-hint{height:56px}}
+    @media(orientation:landscape) and (max-height:900px),(orientation:landscape) and (min-width:1000px){#home [data-widget="quick"]{height:68px}#home .quick-control-widget{padding:5px 0}#home .widget-board.editing [data-widget="quick"]{height:80px}#home .widget-board.editing .widget-rail{gap:18px}#home .quick-control-widget,#home .widget-rail,#home .group-panel{margin-top:0}#home .quick-grid.grid-view,#home .quick-grid.grid-view .quick-card,#home .strip-row .quick-card-add{height:56px}}
     /* Hub kartların arkasında: rail kaydırılınca sönerek gizlenir, hareket kısıtlıysa geçiş yok. */
     @media(orientation:landscape) and (max-height:900px) and (prefers-reduced-motion:reduce),(orientation:landscape) and (min-width:1000px) and (prefers-reduced-motion:reduce){#home .home-hub{transition:none}}
     @media(orientation:landscape) and (max-height:900px),(orientation:landscape) and (min-width:1000px){#devices .toolbar{padding-block:clamp(6px,1.1vh,10px) clamp(9px,1.7vh,14px);margin-bottom:8px}#home .home-actions{gap:var(--head-action-gap)}#home .home-actions button,#refreshButton{display:grid;place-items:center;flex:none;padding:0;border:1px solid transparent;border-radius:12px;color:var(--forest);background:var(--forest-soft);box-shadow:none}#refreshButton{width:46px;height:46px;min-width:46px}#home .home-actions button{width:var(--head-action-w);height:var(--head-action-h);min-width:var(--head-action-w);border-radius:999px}body[data-active-view="home"] #home .home-actions button{color:var(--forest);border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}#home .home-action-glyph,#devices .page-action-glyph{display:block}#home .home-action-glyph{width:26px;height:26px}#home .home-action-label,#devices #refreshButton .page-action-label{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}#devices .room-filter{gap:6px;margin-bottom:8px}#devices .room-chip{min-height:34px;padding:6px 12px;font-size:12px}}
@@ -2550,15 +2547,54 @@
        motor kaldırıldı. Ayın görünürlüğü zaten tek yerden geliyor — `--moon-disc`, gündüz sıfır. */
 
     /* ALT HIZLI ERİŞİM BARI — içerik üstüne `fixed` katman olarak binmez. Ana pano üç satırlı
-       akışın ikinci satırını kendisine ayırır; kart satırı ile arasında gerçek grid boşluğu vardır. */
+       akışın ikinci satırını kendisine ayırır; kart satırı ile arasında gerçek grid boşluğu vardır.
+       ŞERİDİN KENDİ ZEMİNİ YOK (aşağıdaki blokta kaldırılıyor): burada kalan yalnız GEOMETRİ —
+       tam genişliğe taşma, iç dolgu ve satır yüksekliği. */
     @media(orientation:landscape) and (min-width:901px) and (max-height:900px),(orientation:landscape) and (min-width:1000px){
       body[data-active-view="home"] main{padding-bottom:20px}
       #home.active{height:calc(100dvh - var(--home-top) - 20px - env(safe-area-inset-bottom))}
       #home .widget-board{max-height:none;grid-template-rows:minmax(0,1fr) auto;row-gap:12px;overflow:visible}
-      #home [data-widget="quick"]{position:relative;z-index:4;left:auto;right:auto;bottom:auto;grid-column:1/-1;grid-row:2;height:auto;min-height:80px;margin:0 calc(-1 * var(--page-gutter)) calc(-1 * (20px + env(safe-area-inset-bottom)));padding:9px var(--page-gutter) calc(11px + env(safe-area-inset-bottom));overflow:hidden;border-top:1px solid var(--theme-glass-edge,var(--glass-tile-brd));background:var(--theme-glass-nav,var(--glass-card));box-shadow:inset 0 1px 0 var(--theme-glass-sheen),0 -12px 30px rgba(18,35,52,.16);-webkit-backdrop-filter:blur(var(--theme-glass-blur,20px)) saturate(var(--theme-glass-saturation,1.3));backdrop-filter:blur(var(--theme-glass-blur,20px)) saturate(var(--theme-glass-saturation,1.3))}
+      #home [data-widget="quick"]{position:relative;z-index:4;left:auto;right:auto;bottom:auto;grid-column:1/-1;grid-row:2;height:auto;min-height:80px;margin:0 calc(-1 * var(--page-gutter)) calc(-1 * (20px + env(safe-area-inset-bottom)));padding:9px var(--page-gutter) calc(11px + env(safe-area-inset-bottom));overflow:hidden}
       #home .home-hub,#home .widget-rail,#home .group-panel{grid-row:1}
       #home .quick-control-widget .strip-row{height:58px}
-      #home .quick-grid.grid-view,#home .quick-grid.grid-view .quick-card,#home .strip-row .quick-card-add,#home .strip-row>.quick-scroll-hint{height:58px}
+      #home .quick-grid.grid-view,#home .quick-grid.grid-view .quick-card,#home .strip-row .quick-card-add{height:58px}
+    }
+
+    /* ŞERİT: ZEMİN YOK · DÜĞMELER YÜZER · OKLAR ÜSTTE VE ARKASI BULANIK
+       Kullanıcının cümlesi: "butonların background rengini komple kaldıralım, havada yüzüyor gibi
+       olsunlar… okların olduğu div'ler kompakt ve butonlar tam onun kenarında bitiyor — butonlar
+       alttan kayar gibi olsun, o okların da arkası blur olsun."
+       ÜÇ KARAR:
+       1) ŞERİDİN KABI KALKAR. Eskiden `[data-widget="quick"]` bir bar çiziyordu: üst çizgi,
+          `--theme-glass-nav` dolgusu, yukarı vuran `0 -12px 30px` gölge ve kendi `backdrop-filter`ı.
+          Gökyüzü artık doğrudan görünür; şeridi tanımlayan kutu yok, yalnız düğmeler var.
+          `backdrop-filter` sayısı da DÜŞER (şeridin bir katmanı gitti, iki ok geldi: net +1).
+       2) DÜĞMELER KENDİ CAMLARIYLA YÜZER. Kendi yüzeylerini (`--theme-glass-tile` + iç ışık
+          çizgisi) ve gölgelerini zaten taşıyorlardı; gölge ifadesi 82'de daraltıldı
+          (`0 1px 2px` temas + `0 2px 6px` kaldırma). Ölçülen en dar komşu boşluğu 8px (dar
+          yatayda `gap:8px`, tablette 10px); 6px yarıçap yanlara 3px taşar, yani iki komşunun
+          taşması 8px'lik boşlukta bile ortada alfası sıfırlanmış uçlarıyla ancak buluşur —
+          "tünel" bandı kurulmaz.
+       3) OKLAR ÜSTTE, KARTLAR ALTINDAN KAYAR. Ok artık şeridin bir SÜTUNU değil (o yüzden dar
+          kutu görünümü ve kartın okun kenarında bitmesi vardı), `.strip-row` üstünde MUTLAK
+          konumlu yuvarlak bir düğme. Kaydırma alanı artık satırın tamamı: kart okun altına
+          girer, orada kesilmez — ÖRTME, kırpma değil. Okun arkası `backdrop-filter` ile bulanık,
+          böylece altından geçen kart okuma alanını bozmaz.
+          KART OKUN ALTINDA MAHSUR KALMAZ: okları JS uçlarda gizliyor (`updateWidgetScrollHint`,
+          50-widgets.js — `hasBefore`/`hasAfter`), yani sona kaydırıldığında sağ ok yok olur ve
+          son kart tamamen açılır. Yastıklama (`scroll-padding-inline`) da okun genişliği kadar:
+          `scroll-snap` bir kartı okun altına yaslamaz.
+       DOKUNMA HEDEFİ: okun çapı `clamp(44px,4.6vw,50px)` — 1024 CSS px'te 47px, 800'de 44px;
+       ikisi de 44px eşiğinin üstünde. Odak halkası dışarı alındı (eski `-6px` offset yeşil
+       dolguya göreydi, cam yüzeyde görünmezdi). */
+    @media(orientation:landscape) and (max-height:900px),(orientation:landscape) and (min-width:1000px){
+      #home [data-widget="quick"]{border:0;border-radius:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+      #home .strip-row{--strip-arrow:clamp(44px,4.6vw,50px)}
+      #home .strip-row>#homeTabs{flex:1 1 auto;min-width:0;padding-inline:0;scroll-padding-inline:calc(var(--strip-arrow) + 8px)}
+      #home .strip-row>.quick-scroll-hint{position:absolute;top:50%;z-index:8;flex:none;width:var(--strip-arrow);min-width:0;height:var(--strip-arrow);margin:0;transform:translateY(-50%);border:1px solid var(--theme-glass-edge,var(--glass-tile-brd));border-radius:999px;color:var(--theme-ink,var(--glass-ink));background:var(--theme-glass-nav,var(--glass-tile));box-shadow:inset 0 1px 0 var(--theme-glass-sheen,rgba(255,255,255,.28)),0 1px 2px rgba(6,12,20,.34),0 2px 6px rgba(6,12,20,.2);-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5)}
+      #home .strip-row>.quick-scroll-hint.scroll-hint-left{left:0;right:auto;margin-inline-start:0}
+      #home .strip-row>.quick-scroll-hint.scroll-hint-right{left:auto;right:0;margin-inline-start:0}
+      #home .quick-scroll-hint:focus-visible{outline:3px solid var(--theme-accent,var(--forest));outline-offset:2px;box-shadow:inset 0 1px 0 var(--theme-glass-sheen,rgba(255,255,255,.28)),0 1px 2px rgba(6,12,20,.34),0 2px 6px rgba(6,12,20,.2)}
     }
 
     /* Tema paketlerinin yönetim ekranı. Renk girdileri küçük tabletlerde de tek elle
