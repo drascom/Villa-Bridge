@@ -9,7 +9,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertPanelGraph } from "./panel-graph.mjs";
+import { assertHomeLayout } from "./check-home-layout.mjs";
 import { assertRuntimeModuleGraph } from "./runtime-module-graph.mjs";
+import { assertThemePackages } from "./check-theme-packages.mjs";
+import { verifyAstronomy } from "./verify-astronomy.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -19,6 +22,15 @@ async function main() {
 
   const runtime = await assertRuntimeModuleGraph(path.join(projectRoot, "apps", "runtime"));
   console.log(`Calisma zamani modul grafigi tamam: ${runtime.resolved.length} modul.`);
+
+  const themes = await assertThemePackages(projectRoot);
+  console.log(`Tema paketleri tamam: ${themes.length} paket.`);
+
+  await verifyAstronomy(projectRoot);
+  console.log("Astronomi dogrulamasi tamam.");
+
+  await assertHomeLayout(projectRoot);
+  console.log("1024x640 ana ekran akis denetimi tamam.");
 }
 
 main().catch((error) => {

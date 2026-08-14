@@ -4,11 +4,13 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerAccessControl } from "./access-control.js";
+import { AppearanceStore } from "./appearance-store.js";
 import { loadAliases, saveAliases } from "./aliases.js";
 import { AutomationEngine } from "./automation-engine.js";
 import { AutomationRunLog } from "./automation-runs.js";
 import { AutomationBackupStore } from "./automation-backup.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
+import { CelestialService } from "./celestial-service.js";
 import { AgentTokenStore } from "./agent-tokens.js";
 import { AuthStore, type AuthRole } from "./auth-store.js";
 import { loadConfig } from "./config.js";
@@ -54,6 +56,7 @@ import { SelfHealStateStore } from "./self-heal.js";
 import { SettingsStore } from "./settings-store.js";
 import type { ZigbeeSource } from "./source.js";
 import type { JsonObject } from "./types.js";
+import { loadThemePackages } from "./theme-package.js";
 import { WeatherLocationStore, WeatherService } from "./weather.js";
 import { WorldClockStore } from "./world-clock.js";
 import {
@@ -124,7 +127,10 @@ const automationBackups = new AutomationBackupStore(
   resolve(dirname(configPath), "automation-backups")
 );
 // Konum yalnız güneş tetikleyicisi için; panelden girilen değer yapılandırmanın önüne geçer.
-const locationStore = new LocationStore(resolve(dirname(configPath), "location.json"));
+const locationStore = new LocationStore(
+  resolve(dirname(configPath), "location.json"),
+  config.location?.timeZone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")
+);
 let homeLocation: HomeLocation | null = null;
 let homeLocationSource: "file" | "config" | null = null;
 try {
@@ -137,6 +143,7 @@ if (!homeLocation && config.location) {
   homeLocation = config.location;
   homeLocationSource = "config";
 }
+const celestialService = new CelestialService(() => homeLocation);
 const deviceNotesStore = new DeviceNotesStore(resolve(dirname(configPath), "device-notes.json"));
 const installationStateStore = new InstallationStateStore(
   resolve(dirname(configPath), "installation-state.json")
@@ -405,6 +412,12 @@ function sendAsset(
 }
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
+const themePackages = await loadThemePackages(resolve(moduleDir, "../public/themes"));
+const appearanceStore = new AppearanceStore(
+  resolve(dirname(configPath), "appearance.json"),
+  themePackages,
+  "villa-liquid-glass"
+);
 const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
 const dashboardETag = assetETag(dashboard);
 const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
@@ -436,6 +449,8 @@ const panelAssetRoutes = [
   "/js/60-pairing.js",
   "/js/70-settings.js",
   "/js/80-zigbee-tools.js",
+  "/js/82-theme-packages.js",
+  "/js/84-celestial-view.js",
   "/js/88-simple-link.js",
   "/js/90-shell.js",
   "/js/panel-automation.js",
@@ -1158,19 +1173,32 @@ app.get("/api/settings/location", async () => ({
   ok: true,
   location: homeLocation,
   source: homeLocationSource,
-  sun: automationEngine.sunSummary()
+  sun: automationEngine.sunSummary(),
+  timeZoneVerificationRequired: locationStore.needsTimeZoneVerification
 }));
 
-app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown; label?: unknown } }>(
+app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown; timeZone?: unknown; label?: unknown } }>(
   "/api/settings/location",
   async (request, reply) => {
     try {
       const body = request.body ?? {};
-      const raw = body.location ?? { latitude: body.latitude, longitude: body.longitude, label: body.label };
+      const raw = body.location ?? {
+        latitude: body.latitude,
+        longitude: body.longitude,
+        timeZone: body.timeZone,
+        label: body.label
+      };
       const location = await locationStore.save(raw);
       homeLocation = location;
       homeLocationSource = "file";
-      return { ok: true, location, source: homeLocationSource, sun: automationEngine.sunSummary() };
+      celestialService.invalidate();
+      return {
+        ok: true,
+        location,
+        source: homeLocationSource,
+        sun: automationEngine.sunSummary(),
+        timeZoneVerificationRequired: false
+      };
     } catch (error) {
       return reply.code(400).send({
         ok: false,
@@ -1179,6 +1207,36 @@ app.put<{ Body?: { location?: unknown; latitude?: unknown; longitude?: unknown; 
     }
   }
 );
+
+app.get<{ Querystring: { at?: string } }>("/api/celestial", async (request, reply) => {
+  let at: Date | undefined;
+  if (request.query.at !== undefined) {
+    at = new Date(request.query.at);
+    const distance = Math.abs(at.valueOf() - Date.now());
+    if (Number.isNaN(at.valueOf()) || distance > 2 * 366 * 24 * 60 * 60 * 1000) {
+      return reply.code(400).send({ ok: false, error: "Önizleme zamanı bugünden en fazla iki yıl uzakta olabilir." });
+    }
+  }
+  return { ok: true, celestial: celestialService.snapshot(at) };
+});
+
+app.get("/api/theme-packages", async () => ({ ok: true, packages: themePackages }));
+
+app.get("/api/appearance", async (_request, reply) => {
+  try {
+    return { ok: true, appearance: await appearanceStore.get() };
+  } catch (error) {
+    return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.put<{ Body?: unknown }>("/api/appearance", async (request, reply) => {
+  try {
+    return { ok: true, appearance: await appearanceStore.save(request.body) };
+  } catch (error) {
+    return reply.code(400).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
 
 /**
  * Hava durumu — veri ve seçili şehir sunucudan. Okuma ev sakinine açık (yetki tablosunda),

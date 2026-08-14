@@ -48,6 +48,9 @@ const residentRoutes = new Set([
   // Konum okuması güneş kuralının saatini göstermek için gerekir; **yazma** listelenmez,
   // dolayısıyla yönetici ister (evin koordinatı kurulum ayarıdır).
   "GET /api/settings/location",
+  "GET /api/celestial",
+  "GET /api/theme-packages",
+  "GET /api/appearance",
   // Hava durumu ana ekranın parçası: okuması herkese açık. **Konum yazma** (`PUT
   // /api/weather/location`) listede YOKTUR, yönetici ister — bir ekranda yapılan seçim evdeki
   // bütün panelleri değiştirir. Şehir araması ev sakininin de açtığı pencerelerde (dünya saati)

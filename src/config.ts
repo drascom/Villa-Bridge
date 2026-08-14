@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import YAML from "yaml";
+import { isValidTimeZone } from "./astronomy.js";
 import { isValidLatitude, isValidLongitude } from "./sun.js";
 
 interface FileConfig {
@@ -31,6 +32,7 @@ interface FileConfig {
   location?: {
     latitude?: number;
     longitude?: number;
+    timeZone?: string;
   };
   selfHealing?: {
     enabled?: boolean;
@@ -145,6 +147,7 @@ export interface AppConfig {
   location?: {
     latitude: number;
     longitude: number;
+    timeZone: string;
   };
   /**
    * Otomatik onarım. Faz 1: cihaz kendini ilan edince raporlama ayarları yeniden yazılır.
@@ -267,11 +270,18 @@ export async function loadConfig(): Promise<AppConfig> {
   const longitude = process.env.VILLA_BRIDGE_LONGITUDE !== undefined
     ? Number(process.env.VILLA_BRIDGE_LONGITUDE)
     : file.location?.longitude;
+  const timeZone = process.env.VILLA_BRIDGE_TIME_ZONE
+    ?? file.location?.timeZone
+    ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+    ?? "UTC";
   if (latitude !== undefined || longitude !== undefined) {
     if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
       throw new Error("Konum için enlem (-90..90) ve boylam (-180..180) birlikte verilmelidir.");
     }
-    result.location = { latitude, longitude };
+    if (!isValidTimeZone(timeZone)) {
+      throw new Error("Konum için Europe/London biçiminde geçerli bir IANA saat dilimi verilmelidir.");
+    }
+    result.location = { latitude, longitude, timeZone };
   }
   if (
     !Number.isInteger(result.alerts.lowBatteryThreshold)

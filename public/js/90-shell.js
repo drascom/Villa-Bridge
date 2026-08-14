@@ -350,6 +350,7 @@
     // diğer tüm kiplerde panel sabit sisteme düşer. Tema (`data-theme`) bundan bağımsızdır —
     // sabit sistemde de light ve dark ikisi de var. CSS tarafı `panel.css` içinde.
     document.documentElement.dataset.sky=state.themeMode==="sun"?"live":"fixed";
+    if(typeof applyThemePackage==="function")applyThemePackage(state.themeMode);
     document.documentElement.style.colorScheme=resolved;
     document.querySelector('meta[name="theme-color"]').content=resolved==="dark"?"#101514":"#edf0f2";
     const resolvedLabel=t(resolved==="dark"?"themeDark":"themeLight");
@@ -875,8 +876,13 @@
     delete document.documentElement.dataset.sunGround;
   }
   function syncSunGround(){
-    if(state.themeMode==="sun")startSunGround();
-    else stopSunGround();
+    if(state.themeMode==="sun"){
+      startSunGround();
+      if(typeof startCelestialTheme==="function"&&state.auth.authenticated)startCelestialTheme();
+    }else{
+      stopSunGround();
+      if(typeof stopCelestialTheme==="function")stopCelestialTheme();
+    }
   }
   function setThemeMode(mode){
     if(!["light","dark","sun","system"].includes(mode))return;

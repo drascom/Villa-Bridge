@@ -232,13 +232,16 @@
   $("#alarmWeekday").onchange=saveAlarmSetting;
   $("#stopAlarm").onclick=stopAlarmRing;
   $("#alarmDialog").addEventListener("close",stopAlarmRing);
+  $("#themePackageSelect").onchange=async event=>{await selectThemePackage(event.target.value);renderAppearanceSettings()};
+  $("#saveThemeOverrides").onclick=persistAppearancePalette;
+  $("#resetThemeOverrides").onclick=resetAppearancePalette;
   /* Otomatik oynatma kısıtı: ses bağlamı ilk kullanıcı dokunuşunda kurulur ve canlı tutulur.
      Dinleyici kalıcıdır — bağlam tarayıcı tarafından askıya alınırsa (uyku, sekme değişimi)
      bir sonraki dokunuş onu geri getirir. */
   ["pointerdown","keydown","touchstart"].forEach(type=>document.addEventListener(type,unlockAlarmAudio,{capture:true,passive:true}));
   async function startAuthenticatedApplication(){
     if(applicationStarted){
-      const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones()];
+      const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),initializeThemeRuntime()];
       if(state.auth.user?.role==="admin")reload.push(loadSettings());
       await Promise.allSettled(reload);
       await migrateLocalGroups();
@@ -248,7 +251,7 @@
     }
     applicationStarted=true;
     setupPullToRefresh();setupQuickMouseScrolling();configureAndroidActions();bindScreensaver();bindWidgetControls();applyWidgetLayout();
-    const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),loadInstallationOnboarding()];
+    const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),loadInstallationOnboarding(),initializeThemeRuntime()];
     if(state.auth.user?.role==="admin")startup.push(loadSettings());
     await Promise.allSettled(startup);
     await migrateLocalGroups();

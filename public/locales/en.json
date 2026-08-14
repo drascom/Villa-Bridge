@@ -1249,6 +1249,20 @@
     "agentTokenRevoke": "Revoke",
     "agentTokenRevokeConfirm": "Revoke the token “{name}”? The assistant using it loses access immediately.",
     "agentTokenRevoked": "Token revoked.",
-    "agentTokenEmpty": "No assistant token yet."
+    "agentTokenEmpty": "No assistant token yet.",
+    "timeZone": "Time zone",
+    "timeZoneInvalid": "Choose a valid IANA time zone such as Europe/London.",
+    "homeLocationTimeZoneVerify": "Please verify the migrated time zone.",
+    "appearancePackageTitle": "Appearance package",
+    "appearancePackageLead": "Choose a material family and tune fixed or solar colours without changing the sun behaviour.",
+    "themePackage": "Theme package",
+    "pageColor": "Page",
+    "accentColor": "Accent",
+    "skyTopColor": "Sky top",
+    "skyBottomColor": "Sky bottom",
+    "resetThemeColors": "Reset colours",
+    "saveThemeColors": "Save colours",
+    "themeColorsSaved": "Theme colours saved.",
+    "themeColorsReset": "Theme colours reset."
   }
 }

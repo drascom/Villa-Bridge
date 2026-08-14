@@ -12,6 +12,24 @@ Tasarım referansı: [Light, Dark ve By the Sun önizlemesi](./villa-theme-previ
 
 Bu önizleme üretim kodu değildir. Renk ailesi, cam yüzey hiyerarşisi, açık/kapalı cihaz durumları ve mevcut tablet yerleşimi için kabul referansıdır.
 
+## Uygulama durumu — `feature/modular-solar-theme`
+
+Bu planın çalışan ilk sürümü ayrı özellik dalında uygulanmıştır; `main` değiştirilmemiştir.
+
+Tamamlanan çekirdek kapsam:
+
+- IANA saat dilimli `HomeLocation` v2 ve eski konum kayıtları için doğrulama uyarısı;
+- ortak, bağımlılıksız güneş/ay hesaplama motoru ve seçilmiş önizleme zamanı destekli `/api/celestial`;
+- otomasyon saat/gün karşılaştırmalarının ev konumunun saat dilimine bağlanması;
+- doğrulanan `villa-current` ve `villa-liquid-glass` JSON tema paketleri;
+- sunucuda atomik saklanan Light, Dark ve dört solar durak renk özelleştirmeleri;
+- paket runtime'ı, ilk-kare önbelleği ve gerçek güneş yüksekliğine göre solar renk geçişi;
+- gerçek ay konumu/ufuk görünürlüğü;
+- kartlardan ayrı grid satırında, tam genişlikte alt hızlı erişim barı;
+- `1024×640` yerleşim akışı, astronomi ve tema paketlerini `npm test` kapısında koruyan denetimler.
+
+Sonraki genişletme kapsamı: kullanıcı tema paketi içe/dışa aktarma, gelişmiş malzeme kontrolleri ve otomatik kontrast uyarılarıdır. Bunlar çekirdek paket seçimi, renk düzenleme veya By the Sun davranışı için gerekli değildir.
+
 ## 2. Temel mimari kararı
 
 Tema paketi yalnızca **nasıl görüneceğini**, sistem davranışı ise **hangi anda hangi durumda olduğunu** belirleyecek.

@@ -1249,6 +1249,20 @@
     "agentTokenRevoke": "İptal et",
     "agentTokenRevokeConfirm": "“{name}” token'ı iptal edilsin mi? Onu kullanan asistan anında erişimini kaybeder.",
     "agentTokenRevoked": "Token iptal edildi.",
-    "agentTokenEmpty": "Henüz asistan token'ı yok."
+    "agentTokenEmpty": "Henüz asistan token'ı yok.",
+    "timeZone": "Saat dilimi",
+    "timeZoneInvalid": "Europe/Istanbul gibi geçerli bir IANA saat dilimi seçin.",
+    "homeLocationTimeZoneVerify": "Taşınan saat dilimini doğrulayın.",
+    "appearancePackageTitle": "Görünüm paketi",
+    "appearancePackageLead": "Güneşe bağlı davranışı değiştirmeden malzeme ailesini seçin; sabit ve güneş renklerini ayarlayın.",
+    "themePackage": "Tema paketi",
+    "pageColor": "Sayfa",
+    "accentColor": "Vurgu",
+    "skyTopColor": "Gökyüzü üstü",
+    "skyBottomColor": "Gökyüzü altı",
+    "resetThemeColors": "Renkleri sıfırla",
+    "saveThemeColors": "Renkleri kaydet",
+    "themeColorsSaved": "Tema renkleri kaydedildi.",
+    "themeColorsReset": "Tema renkleri sıfırlandı."
   }
 }

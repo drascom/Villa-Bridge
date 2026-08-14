@@ -19,6 +19,48 @@
       await loadAgentTokens();
     }catch(error){showToast(t("settingsUnavailable"),true)}
   }
+  const themeHex=value=>{
+    const text=String(value||"").trim();
+    if(/^#[0-9a-f]{6}$/i.test(text))return text;
+    const match=text.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    return match?`#${[match[1],match[2],match[3]].map(part=>Math.max(0,Math.min(255,Number(part))).toString(16).padStart(2,"0")).join("")}`:"#000000";
+  };
+  function renderAppearanceSettings(){
+    const select=$("#themePackageSelect");
+    if(!select||!themeRuntime.ready)return;
+    const active=activeThemePackage();
+    select.innerHTML=themeRuntime.packages.map(item=>`<option value="${esc(item.id)}">${esc(item.name)}</option>`).join("");
+    select.value=active?.id||"";
+    const overrides=themeRuntime.appearance?.overrides?.[active?.id]||{};
+    $$('[data-theme-override]').forEach(input=>{
+      const parts=input.dataset.themeOverride.split(".");
+      let value;
+      if(parts[0]==="solar")value=overrides.solar?.[parts[1]]?.[parts[2]]??active?.palettes.solar.anchors[parts[1]].colors[parts[2]];
+      else value=overrides[parts[0]]?.[parts[1]]??active?.palettes[parts[0]].colors[parts[1]];
+      input.value=themeHex(value);
+    });
+  }
+  async function persistAppearancePalette(){
+    const theme=activeThemePackage();
+    if(!theme)return;
+    const item={light:{},dark:{},solar:{night:{},dawn:{},day:{},dusk:{}}};
+    $$('[data-theme-override]').forEach(input=>{
+      const parts=input.dataset.themeOverride.split(".");
+      if(parts[0]==="solar")item.solar[parts[1]][parts[2]]=input.value;
+      else item[parts[0]][parts[1]]=input.value;
+    });
+    try{await saveThemeOverrides({[theme.id]:item});showToast(t("themeColorsSaved"));renderAppearanceSettings()}
+    catch(error){showToast(error.message,true)}
+  }
+  async function resetAppearancePalette(){
+    const theme=activeThemePackage();
+    if(!theme||!themeRuntime.appearance)return;
+    const overrides={...themeRuntime.appearance.overrides};delete overrides[theme.id];
+    try{
+      const response=await api("/api/appearance",{method:"PUT",body:JSON.stringify({...themeRuntime.appearance,overrides})});
+      themeRuntime.appearance=response.appearance;applyThemePackage();renderAppearanceSettings();showToast(t("themeColorsReset"));
+    }catch(error){showToast(error.message,true)}
+  }
   /* Ajan token'ları: kullanıcının kendi yazdığı LLM istemcisi `/mcp` ucuna bu token'la bağlanır.
      Ham değer yalnız üretim yanıtında bir kez gelir; listede yalnız ad ve zaman damgaları durur.
      Kart `data-admin-only` taşır, ev kullanıcısı hiç görmez. */

@@ -2397,3 +2397,74 @@
     .alarm-stop{min-width:min(360px,80vw);min-height:74px;margin-top:16px;font-size:clamp(19px,2.4vw,25px);font-weight:800}
     @media(prefers-reduced-motion:no-preference){.alarm-ring-glyph{animation:alarm-swing 1.9s ease-in-out infinite}}
     @keyframes alarm-swing{0%,55%,100%{transform:rotate(0)}10%,30%,50%{transform:rotate(-13deg)}20%,40%{transform:rotate(13deg)}}
+
+    /* MODÜLER TEMA KÖPRÜSÜ — paket runtime'ı yalnız semantik `--theme-*` değerlerini yazar.
+       Eski bileşenler geçiş boyunca bu alias'lardan beslenir; paket serbest CSS çalıştıramaz. */
+    :root[data-theme-package]{
+      --paper:var(--theme-page);--ink:var(--theme-ink);--muted:var(--theme-ink-soft);
+      --glass-ink:var(--theme-ink);--glass-ink-soft:var(--theme-ink-soft);--glass-sub:var(--theme-ink-soft);
+      --glass-card:var(--theme-glass-card);--glass-tile:var(--theme-glass-tile);
+      --glass-card-brd:var(--theme-glass-edge);--glass-tile-brd:var(--theme-glass-edge);
+      --glass-sheen:inset 0 1px 0 var(--theme-glass-sheen),inset 0 -1px 0 rgba(17,35,52,.08);
+      --glass-shadow:var(--theme-glass-shadow);--glass-blur:var(--theme-glass-blur);
+      --glass-sat:var(--theme-glass-saturation);--glass-card-bright:var(--theme-glass-brightness);
+      --glass-filter:blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturation)) brightness(var(--theme-glass-brightness));
+      --glass-filter-chip:blur(calc(var(--theme-glass-blur) * .65)) saturate(var(--theme-glass-saturation));
+      --glass-accent:var(--theme-accent);--glass-accent-soft:var(--theme-accent-soft);
+      --forest:var(--theme-accent);--forest-soft:var(--theme-accent-soft);
+      --home-control:var(--theme-glass-tile);--home-border:var(--theme-glass-edge);
+      --home-float-shadow:var(--theme-glass-shadow);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .widget-card{
+      border-color:var(--theme-glass-edge);color:var(--theme-ink);background:var(--theme-glass-card);
+      box-shadow:inset 0 1px 0 var(--theme-glass-sheen),var(--theme-glass-shadow);
+      -webkit-backdrop-filter:blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturation));
+      backdrop-filter:blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturation));
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile,
+    :root[data-theme-package] body[data-active-view="home"] #home .quick-card{
+      border-color:var(--theme-glass-edge);color:var(--theme-ink);background:var(--theme-glass-tile);
+      box-shadow:inset 0 1px 0 var(--theme-glass-sheen),var(--theme-glass-shadow);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.on{
+      border-color:var(--theme-state-on);color:var(--theme-ink);background:var(--theme-glass-tile);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.on .device-status-icon{
+      color:var(--theme-state-on);background:var(--theme-accent-soft);box-shadow:inset 0 0 0 1px var(--theme-state-on);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.active{
+      border-color:var(--theme-state-active);color:var(--theme-ink);background:var(--theme-glass-tile);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.alert{
+      border-color:var(--theme-state-alert);color:var(--theme-ink);background:var(--theme-glass-tile);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.alert .device-status-icon{
+      color:var(--theme-state-alert);background:var(--theme-accent-soft);box-shadow:inset 0 0 0 1px var(--theme-state-alert);
+    }
+    :root[data-theme-package][data-moon-visible="off"] .sky-moon-screen{opacity:0!important}
+
+    /* ALT HIZLI ERİŞİM BARI — içerik üstüne `fixed` katman olarak binmez. Ana pano üç satırlı
+       akışın ikinci satırını kendisine ayırır; kart satırı ile arasında gerçek grid boşluğu vardır. */
+    @media(orientation:landscape) and (min-width:901px) and (max-height:900px),(orientation:landscape) and (min-width:1000px){
+      body[data-active-view="home"] main{padding-bottom:20px}
+      #home.active{height:calc(100dvh - var(--home-top) - 20px - env(safe-area-inset-bottom))}
+      #home .widget-board{max-height:none;grid-template-rows:minmax(0,1fr) auto;row-gap:12px;overflow:visible}
+      #home [data-widget="quick"]{position:relative;z-index:4;left:auto;right:auto;bottom:auto;grid-column:1/-1;grid-row:2;height:auto;min-height:80px;margin:0 calc(-1 * var(--page-gutter)) calc(-1 * (20px + env(safe-area-inset-bottom)));padding:9px var(--page-gutter) calc(11px + env(safe-area-inset-bottom));overflow:hidden;border-top:1px solid var(--theme-glass-edge,var(--glass-tile-brd));background:var(--theme-glass-nav,var(--glass-card));box-shadow:inset 0 1px 0 var(--theme-glass-sheen),0 -12px 30px rgba(18,35,52,.16);-webkit-backdrop-filter:blur(var(--theme-glass-blur,20px)) saturate(var(--theme-glass-saturation,1.3));backdrop-filter:blur(var(--theme-glass-blur,20px)) saturate(var(--theme-glass-saturation,1.3))}
+      #home .home-hub,#home .widget-rail,#home .group-panel{grid-row:1}
+      #home .quick-control-widget .strip-row{height:58px}
+      #home .quick-grid.grid-view,#home .quick-grid.grid-view .quick-card,#home .strip-row .quick-card-add,#home .strip-row>.quick-scroll-hint{height:58px}
+    }
+
+    /* Tema paketlerinin yönetim ekranı. Renk girdileri küçük tabletlerde de tek elle
+       kullanılabilecek kadar geniş, ancak kartın kalan ayarlarını aşağı itmeyecek kadar sıkıdır. */
+    .appearance-settings-card{display:grid;gap:18px}
+    .appearance-package-row{display:grid;grid-template-columns:minmax(220px,420px);gap:12px}
+    .appearance-package-row .setting-field{margin:0}
+    .appearance-palette-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .appearance-palette-grid fieldset{min-width:0;margin:0;padding:14px;border:1px solid var(--line);border-radius:15px;background:var(--surface-soft)}
+    .appearance-palette-grid legend{padding:0 6px;color:var(--ink);font-weight:750}
+    .appearance-palette-grid label{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;color:var(--muted);font-size:13px;font-weight:650}
+    .appearance-palette-grid input[type="color"]{width:52px;height:34px;padding:2px;border:1px solid var(--line);border-radius:10px;background:var(--paper);cursor:pointer}
+    .appearance-settings-actions{display:flex;justify-content:flex-end;gap:10px}
+    @media(max-width:900px){.appearance-palette-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:560px){.appearance-package-row,.appearance-palette-grid{grid-template-columns:1fr}.appearance-settings-actions{align-items:stretch;flex-direction:column-reverse}.appearance-settings-actions button{width:100%}}

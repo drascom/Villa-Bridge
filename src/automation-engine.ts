@@ -28,7 +28,7 @@ import type {
   AutomationRunTriggerInfo
 } from "./automation-runs.js";
 import type { HomeLocation } from "./location.js";
-import { localNoon, sunTimes, type SunTimes } from "./sun.js";
+import { sunTimes, type SunTimes } from "./sun.js";
 import type { DeviceControlView, JsonObject, JsonScalar } from "./types.js";
 
 /** Tur aralığı: dakika kilidi sayesinde aynı dakikada yalnızca bir kez çalışır. */
@@ -131,21 +131,71 @@ export interface AutomationEngineOptions {
 
 const pad = (value: number): string => String(value).padStart(2, "0");
 
+interface ClockParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  weekday: number;
+}
+
+const clockParts = (date: Date, timeZone?: string): ClockParts => {
+  if (!timeZone) {
+    const weekday = date.getDay();
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      weekday: weekday === 0 ? 7 : weekday
+    };
+  }
+  const values: Record<string, string> = {};
+  for (const part of new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    weekday: "short"
+  }).formatToParts(date)) {
+    if (part.type !== "literal") values[part.type] = part.value;
+  }
+  const weekdays: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+    weekday: weekdays[values.weekday] ?? 1
+  };
+};
+
 /** Yerel dakika damgası — "YYYY-MM-DD HH:MM". */
-export const localMinuteStamp = (date: Date): string =>
-  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-  + ` ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+export const localMinuteStamp = (date: Date, timeZone?: string): string => {
+  const parts = clockParts(date, timeZone);
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)} ${pad(parts.hour)}:${pad(parts.minute)}`;
+};
 
 /** Yerel gün damgası — "YYYY-MM-DD". */
-export const localDayStamp = (date: Date): string =>
-  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+export const localDayStamp = (date: Date, timeZone?: string): string => {
+  const parts = clockParts(date, timeZone);
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+};
 
 /** Yerel saat damgası — "HH:MM". */
-export const localTimeStamp = (date: Date): string =>
-  `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+export const localTimeStamp = (date: Date, timeZone?: string): string => {
+  const parts = clockParts(date, timeZone);
+  return `${pad(parts.hour)}:${pad(parts.minute)}`;
+};
 
 /** 1 = Pazartesi … 7 = Pazar. */
-export const isoWeekday = (date: Date): number => date.getDay() === 0 ? 7 : date.getDay();
+export const isoWeekday = (date: Date, timeZone?: string): number => clockParts(date, timeZone).weekday;
 
 const previousWeekday = (weekday: number): number => weekday === 1 ? 7 : weekday - 1;
 
@@ -168,14 +218,18 @@ const sunMoment = (
 
 export const automationSunTime = (
   trigger: AutomationSunTrigger,
-  times: SunTimes | null
+  times: SunTimes | null,
+  timeZone?: string
 ): string | null => {
   const moment = sunMoment(trigger.event, trigger.offsetMinutes, times);
-  return moment ? localTimeStamp(moment) : null;
+  return moment ? localTimeStamp(moment, timeZone) : null;
 };
 
 /** Gün içi dakika (0..1439) — sarma kontrolü dize değil, sayı karşılaştırmasıyla yapılır. */
-const minutesOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
+const minutesOfDay = (date: Date, timeZone?: string): number => {
+  const parts = clockParts(date, timeZone);
+  return parts.hour * 60 + parts.minute;
+};
 
 /**
  * §2.3 — aralık ucunun gün içi dakikası. Güneş ucu konum yoksa ya da güneş o gün ufku kesmiyorsa
@@ -183,7 +237,8 @@ const minutesOfDay = (date: Date): number => date.getHours() * 60 + date.getMinu
  */
 export const automationTimePointMinutes = (
   point: AutomationTimePoint,
-  times: SunTimes | null
+  times: SunTimes | null,
+  timeZone?: string
 ): number | null => {
   if (point.kind === "clock") {
     const hour = Number(point.at.slice(0, 2));
@@ -192,7 +247,7 @@ export const automationTimePointMinutes = (
     return hour * 60 + minute;
   }
   const moment = sunMoment(point.event, point.offsetMinutes, times);
-  return moment ? minutesOfDay(moment) : null;
+  return moment ? minutesOfDay(moment, timeZone) : null;
 };
 
 /** Dakikadan "HH:MM" — günlükteki sebep metni güneş ucunu da okunur saatle yazsın diye. */
@@ -203,10 +258,11 @@ const minuteStampOf = (minutes: number): string =>
 export const automationDueTrigger = (
   automation: Automation,
   date: Date,
-  times: SunTimes | null = null
+  times: SunTimes | null = null,
+  timeZone?: string
 ): AutomationTimeTrigger | AutomationSunTrigger | null => {
-  const time = localTimeStamp(date);
-  const weekday = isoWeekday(date);
+  const time = localTimeStamp(date, timeZone);
+  const weekday = isoWeekday(date, timeZone);
   for (const trigger of automation.triggers) {
     if (trigger.type === "time") {
       if (trigger.at === time && trigger.days.includes(weekday)) return trigger;
@@ -214,7 +270,7 @@ export const automationDueTrigger = (
     }
     if (trigger.type !== "sun") continue;
     if (!trigger.days.includes(weekday)) continue;
-    if (automationSunTime(trigger, times) === time) return trigger;
+    if (automationSunTime(trigger, times, timeZone) === time) return trigger;
   }
   return null;
 };
@@ -222,8 +278,9 @@ export const automationDueTrigger = (
 export const automationDueAt = (
   automation: Automation,
   date: Date,
-  times: SunTimes | null = null
-): boolean => automationDueTrigger(automation, date, times) !== null;
+  times: SunTimes | null = null,
+  timeZone?: string
+): boolean => automationDueTrigger(automation, date, times, timeZone) !== null;
 
 /** §4 — koşul değerlendirmesinin isteğe bağlı ayarları; sonraki adımlar bu nesneyi büyütür. */
 export interface AutomationConditionOptions {
@@ -231,6 +288,8 @@ export interface AutomationConditionOptions {
   mode?: "all" | "any";
   /** §2.3 — güneş uçlu aralıklar için o günün güneş saatleri; yoksa o koşul sağlanmaz. */
   times?: SunTimes | null;
+  /** Saat ve gün karşılaştırmalarında ev konumunun IANA saat dilimi. */
+  timeZone?: string;
   /**
    * §4.1 — kanalın şu anki değeri ne zamandan beri aynı (`DeviceStore` değişim defteri).
    * `null` "bilinmiyor" demektir; süre koşulu bunu kapalı tarafa yorumlar (§2.5).
@@ -257,8 +316,8 @@ export const evaluateAutomationConditions = (
   for (const condition of conditions) {
     if (condition.type === "timeRange") {
       const times = options.times ?? null;
-      const from = automationTimePointMinutes(condition.from, times);
-      const to = automationTimePointMinutes(condition.to, times);
+      const from = automationTimePointMinutes(condition.from, times, options.timeZone);
+      const to = automationTimePointMinutes(condition.to, times, options.timeZone);
       if (from === null || to === null) {
         // Güneş ucu hesaplanamıyor: kapalı tarafa düşülür ve sebebi günlükte durur.
         results.push({
@@ -269,7 +328,7 @@ export const evaluateAutomationConditions = (
         });
         continue;
       }
-      const now = minutesOfDay(date);
+      const now = minutesOfDay(date, options.timeZone);
       // Gece yarısını aşan aralık: 22:00→06:00 iki parçadan oluşur.
       const wraps = from > to;
       const inRange = wraps ? now >= from || now < to : now >= from && now < to;
@@ -277,7 +336,7 @@ export const evaluateAutomationConditions = (
         results.push({
           type: "timeRange",
           ok: false,
-          reason: `Saat ${localTimeStamp(date)}, `
+          reason: `Saat ${localTimeStamp(date, options.timeZone)}, `
             + `${minuteStampOf(from)}-${minuteStampOf(to)} aralığının dışında.`
         });
         continue;
@@ -285,8 +344,8 @@ export const evaluateAutomationConditions = (
       if (condition.days) {
         // Aralık geceyi aşıyorsa ve şu an sabah tarafındaysak, gün ölçütü dünü gösterir.
         const weekday = wraps && now < to
-          ? previousWeekday(isoWeekday(date))
-          : isoWeekday(date);
+          ? previousWeekday(isoWeekday(date, options.timeZone))
+          : isoWeekday(date, options.timeZone);
         if (!condition.days.includes(weekday)) {
           results.push({ type: "timeRange", ok: false, reason: "Aralığın günü tutmuyor." });
           continue;
@@ -650,6 +709,7 @@ export class AutomationEngine {
     day: string;
     latitude: number;
     longitude: number;
+    timeZone: string;
     times: SunTimes | null;
   } | null = null;
   /** Güneş sorununun günlüğe günde bir kez düşmesi için: otomasyon → yerel gün. */
@@ -685,19 +745,21 @@ export class AutomationEngine {
   } {
     const location = this.options.location?.() ?? null;
     if (!location) return { times: null, reason: "locationMissing" };
-    const day = localDayStamp(date);
+    const day = localDayStamp(date, location.timeZone);
     const cached = this.sunCache;
     if (
       !cached
       || cached.day !== day
       || cached.latitude !== location.latitude
       || cached.longitude !== location.longitude
+      || cached.timeZone !== location.timeZone
     ) {
-      const times = sunTimes(localNoon(date), location.latitude, location.longitude);
+      const times = sunTimes(date, location.latitude, location.longitude, location.timeZone);
       this.sunCache = {
         day,
         latitude: location.latitude,
         longitude: location.longitude,
+        timeZone: location.timeZone,
         times: times.sunrise && times.sunset ? times : null
       };
     }
@@ -740,9 +802,10 @@ export class AutomationEngine {
   sunSummary(): { sunrise: string | null; sunset: string | null; reason: string | null } {
     const date = this.now();
     const { times, reason } = this.resolveSun(date);
+    const timeZone = this.options.location?.()?.timeZone;
     return {
-      sunrise: times?.sunrise ? localTimeStamp(times.sunrise) : null,
-      sunset: times?.sunset ? localTimeStamp(times.sunset) : null,
+      sunrise: times?.sunrise ? localTimeStamp(times.sunrise, timeZone) : null,
+      sunset: times?.sunset ? localTimeStamp(times.sunset, timeZone) : null,
       reason
     };
   }
@@ -753,7 +816,7 @@ export class AutomationEngine {
     date: Date,
     reason: "locationMissing" | "sunUnavailable"
   ): void {
-    const day = localDayStamp(date);
+    const day = localDayStamp(date, this.options.location?.()?.timeZone);
     if (this.sunNotices.get(automation.id) === day) return;
     this.sunNotices.set(automation.id, day);
     const detail = reason === "locationMissing"
@@ -816,7 +879,8 @@ export class AutomationEngine {
       return;
     }
     const date = this.now();
-    const stamp = localMinuteStamp(date);
+    const timeZone = this.options.location?.()?.timeZone;
+    const stamp = localMinuteStamp(date, timeZone);
     const sun = this.resolveSun(date);
     for (const automation of automations) {
       if (!automation.enabled) continue;
@@ -826,7 +890,7 @@ export class AutomationEngine {
       if (sun.reason && automation.triggers.some((trigger) => trigger.type === "sun")) {
         this.noteSunProblem(automation, date, sun.reason);
       }
-      const trigger = automationDueTrigger(automation, date, sun.times);
+      const trigger = automationDueTrigger(automation, date, sun.times, timeZone);
       if (!trigger) continue;
       this.firedMinutes.set(automation.id, stamp);
       // §9.1 — güneş yolunda olay adı da yazılır: hem günlükte görünür hem `when` eşlemesini besler.
@@ -1374,6 +1438,7 @@ export class AutomationEngine {
         {
           mode: automation.conditionMode,
           times: this.resolveSun(now).times,
+          timeZone: this.options.location?.()?.timeZone,
           stateSince: (deviceId, property) =>
             this.snapshotReading(snapshot, deviceId, property).since,
           stateReportedAt: (deviceId, property) =>

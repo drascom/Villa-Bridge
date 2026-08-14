@@ -625,6 +625,7 @@
     state.homeLocation=data.location||null;
     state.homeLocationSource=data.source||null;
     state.automationSun=data.sun||null;
+    state.homeLocationTimeZoneVerificationRequired=data.timeZoneVerificationRequired===true;
     renderHomeLocation();
   }
   // Kayıtlı yerin adı; ad yoksa (elle girilmiş koordinat) sayılar gösterilir, "enlem/boylam" denmez.
@@ -641,11 +642,14 @@
     if(choose){choose.disabled=readOnly;choose.hidden=readOnly}
     const latitude=$("#homeLatitude");
     const longitude=$("#homeLongitude");
-    if(latitude&&longitude){
+    const timeZone=$("#homeTimeZone");
+    if(latitude&&longitude&&timeZone){
       if(document.activeElement!==latitude)latitude.value=state.homeLocation?String(state.homeLocation.latitude):"";
       if(document.activeElement!==longitude)longitude.value=state.homeLocation?String(state.homeLocation.longitude):"";
+      if(document.activeElement!==timeZone)timeZone.value=state.homeLocation?.timeZone||"";
       latitude.readOnly=readOnly;
       longitude.readOnly=readOnly;
+      timeZone.readOnly=readOnly;
     }
     const save=$("#saveHomeLocation");
     if(save){save.disabled=readOnly;save.hidden=readOnly}
@@ -658,18 +662,22 @@
     else if(sun?.sunrise&&sun?.sunset)note.textContent=t("homeLocationSunTimes",{sunrise:sun.sunrise,sunset:sun.sunset});
     else note.textContent=readOnly?t("homeLocationReadOnly"):"";
     if(readOnly&&state.homeLocation)note.textContent=`${note.textContent} ${t("homeLocationReadOnly")}`.trim();
+    if(state.homeLocationTimeZoneVerificationRequired)note.textContent=`${note.textContent} ${t("homeLocationTimeZoneVerify")}`.trim();
   }
   // Tek yazma yolu: seçilen yer de elle girilen koordinat da buradan geçer. Ad varsa sunucuya yazılır.
-  async function persistHomeLocation({latitude,longitude,label}){
+  async function persistHomeLocation({latitude,longitude,timeZone,label}){
     if(isResidentSession())return false;
     if(!Number.isFinite(latitude)||latitude<-90||latitude>90){showToast(t("latitudeInvalid"),true);return false}
     if(!Number.isFinite(longitude)||longitude<-180||longitude>180){showToast(t("longitudeInvalid"),true);return false}
+    const zone=String(timeZone||"").trim();
+    try{new Intl.DateTimeFormat("en",{timeZone:zone}).format(new Date())}catch{showToast(t("timeZoneInvalid"),true);return false}
     const name=String(label??"").trim().slice(0,80);
     try{
-      const data=await api("/api/settings/location",{method:"PUT",body:JSON.stringify(name?{latitude,longitude,label:name}:{latitude,longitude})});
+      const data=await api("/api/settings/location",{method:"PUT",body:JSON.stringify(name?{latitude,longitude,timeZone:zone,label:name}:{latitude,longitude,timeZone:zone})});
       state.homeLocation=data.location||null;
       state.homeLocationSource=data.source||null;
       state.automationSun=data.sun||null;
+      state.homeLocationTimeZoneVerificationRequired=false;
       renderHomeLocation();
       renderAutomations();
       renderLocationSearchResults("home");
@@ -679,10 +687,10 @@
   }
   async function saveHomeLocationForm(event){
     event?.preventDefault?.();
-    await persistHomeLocation({latitude:Number($("#homeLatitude").value),longitude:Number($("#homeLongitude").value)});
+    await persistHomeLocation({latitude:Number($("#homeLatitude").value),longitude:Number($("#homeLongitude").value),timeZone:$("#homeTimeZone").value});
   }
   async function chooseHomeLocation(location){
-    const saved=await persistHomeLocation({latitude:Number(location?.latitude),longitude:Number(location?.longitude),label:location?.name});
+    const saved=await persistHomeLocation({latitude:Number(location?.latitude),longitude:Number(location?.longitude),timeZone:location?.timeZone,label:location?.name});
     if(saved)$("#homeLocationDialog")?.close();
   }
   function openHomeLocationManager(){
@@ -704,7 +712,7 @@
   function useWeatherLocationForHome(){
     const weather=weatherState.location;
     if(!weather)return;
-    chooseHomeLocation({latitude:weather.latitude,longitude:weather.longitude,name:locationName(weather)});
+    chooseHomeLocation({latitude:weather.latitude,longitude:weather.longitude,timeZone:weather.timeZone,name:locationName(weather)});
   }
   // Güneş satırı pasifken kullanıcı çıkmaza düşmesin: doğrudan konum kartına götürür.
   function openHomeLocationSettings(){
