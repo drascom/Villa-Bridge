@@ -71,10 +71,18 @@
          RENK YOLCULUĞU (kullanıcının tarifi): iki saatlik kızıllık (doğuştan 60 dk önce başlar,
          doğuş anında doruk, 60 dk sonra biter — pencereler `skyPhases`'te) → berrak mavi gündüz
          → yayın tepesinde HAFİF altın → yine kızıllık → lacivert gece. */
-      --sky-dawn:linear-gradient(180deg,rgba(54,56,106,var(--sky-a-dawn)) 0%,rgba(146,84,84,var(--sky-a-dawn)) 48%,rgba(222,124,64,var(--sky-a-dawn)) 100%);
-      --sky-day:linear-gradient(168deg,rgba(126,186,236,var(--sky-a-day)) 0%,rgba(92,160,222,var(--sky-a-day)) 52%,rgba(158,203,232,var(--sky-a-day)) 100%);
-      --sky-dusk:linear-gradient(180deg,rgba(48,46,92,var(--sky-a-dusk)) 0%,rgba(176,84,54,var(--sky-a-dusk)) 46%,rgba(150,58,34,var(--sky-a-dusk)) 100%);
-      --sky-night:linear-gradient(180deg,#0b1330 0%,#070c1e 55%,#05080f 100%);
+      /* RENK ARTIK TEMA PAKETİNDEN GELİR, GEOMETRİ BURADA KALIR. Her aşama kendi ÇAPASININ
+         `skyTop`/`skyBottom` renginden kurulur (`--theme-<çapa>-sky-top-rgb` … 82-theme-packages.js
+         dört çapayı birden yazar); orta durak iki ucun tam ortasıdır, yani durak SAYISI ve
+         konumları — dolayısıyla `body::before`'daki dört listenin hizası — hiç değişmez.
+         Yedek değerler panelin kendi paletidir: paket gelmezse ya da JS düşerse gökyüzü aynen
+         eski haliyle boyanır. Alfa zinciri (`--sky-a-*`) dokunulmadan durur; karışımı yapan
+         hâlâ bizim ağırlıklarımızdır. Renk üçlü olarak gelir çünkü bir arka plan KATMANINA
+         ayrıca opaklık verilemez — alfa duraklarda durmak zorunda. */
+      --sky-dawn:linear-gradient(180deg,rgba(var(--theme-dawn-sky-top-rgb,54,56,106),var(--sky-a-dawn)) 0%,rgba(var(--theme-dawn-sky-mid-rgb,146,84,84),var(--sky-a-dawn)) 48%,rgba(var(--theme-dawn-sky-bottom-rgb,222,124,64),var(--sky-a-dawn)) 100%);
+      --sky-day:linear-gradient(168deg,rgba(var(--theme-day-sky-top-rgb,126,186,236),var(--sky-a-day)) 0%,rgba(var(--theme-day-sky-mid-rgb,92,160,222),var(--sky-a-day)) 52%,rgba(var(--theme-day-sky-bottom-rgb,158,203,232),var(--sky-a-day)) 100%);
+      --sky-dusk:linear-gradient(180deg,rgba(var(--theme-dusk-sky-top-rgb,48,46,92),var(--sky-a-dusk)) 0%,rgba(var(--theme-dusk-sky-mid-rgb,176,84,54),var(--sky-a-dusk)) 46%,rgba(var(--theme-dusk-sky-bottom-rgb,150,58,34),var(--sky-a-dusk)) 100%);
+      --sky-night:linear-gradient(180deg,rgba(var(--theme-night-sky-top-rgb,11,19,48),1) 0%,rgba(var(--theme-night-sky-mid-rgb,7,12,30),1) 55%,rgba(var(--theme-night-sky-bottom-rgb,5,8,15),1) 100%);
       /* ÖĞLE ALTINI — mavinin ÜSTÜNE binen ince sıcak yıkama, ayrı bir aşama değil bir TON.
          Alfası güneşin yüksekliğinden gelir (`--sky-a-noon`, JS yazar: gündüz ağırlığı ×
          yükseklik², tavan .28), yani yayın tepesinde doruğa çıkar ve sabah/akşam kenarlarına
@@ -86,10 +94,17 @@
          Gündüz tonları rgb üçlüsüdür, çünkü alfası değişkenden geliyor (`color-mix` yok).
          Gökyüzü paleti gibi bu dörtlü de TEMADAN BAĞIMSIZDIR: gece tonu lacivert gökten bir tık
          açıktır (yoksa karanlıkta kaybolur), gündüz tonu berrak maviden belirgin koyudur ama
-         siyah değil — uzaktaki tepe, gri levha değil. */
-      --mountain-night:#131c30;--mountain-night-top:#1c2740;
-      --mountain-day:86,112,140;--mountain-day-top:120,146,172;
-      --star-color:255,255,255;--star-warm:255,247,232;--star-cool:222,236,255;
+         siyah değil — uzaktaki tepe, gri levha değil.
+         RENK PAKETTEN: taban gece çapasının `mountainNear`/`mountainFar` çifti, üstteki gündüz
+         katmanı ise ŞAFAK · GÜNDÜZ · BATIM çapalarının (gece payı dışarıda bırakılarak
+         normalize edilmiş) karışımıdır — yani dağ da gün içinde mor şafaktan mavi öğleye akar.
+         `-top` = `mountainFar` (uzak, hava perspektifiyle AÇIK), taban = `mountainNear`. */
+      --mountain-night:rgba(var(--theme-night-mountain-near-rgb,19,28,48),1);--mountain-night-top:rgba(var(--theme-night-mountain-far-rgb,28,39,64),1);
+      --mountain-day:var(--theme-mountain-near-day-rgb,86,112,140);--mountain-day-top:var(--theme-mountain-far-day-rgb,120,146,172);
+      /* Yıldızın RENGİ paketten (`stars`), PARLAKLIĞI motordan (`--star-a`): katman sayısı,
+         deseni ve döşeme boyutları değişmedi. Sıcak/soğuk varyantlar ana renkten ayrı durur —
+         gerçek gökyüzünde de yıldızlar tek renk değildir. */
+      --star-color:var(--theme-stars-rgb,255,255,255);--star-warm:255,247,232;--star-cool:222,236,255;
       /* YILDIZ ALANI BEŞ KATMAN — üçü ince nokta (eskiler), ikisi YENİ ve daha İRİ. Kullanıcının
          isteği "aralarda büyük yıldızlar da olsun": gerçek gökyüzünde de birkaç parlak yıldız
          geri kalan tozun arasından ayrışır. Büyükler SEYREK olsun diye döşeme boyutları büyük
@@ -147,8 +162,11 @@
       /* DİSK BÜYÜK VE SICAK — referans pen'in ölçüsü (15vw) ve renk yolculuğu (#f90 → #fc0 → #ff0).
          Eski 5.2vmin'lik beyazımsı nokta bej gökyüzünde seçilmiyordu; kullanıcının şikâyeti buydu.
          `vmin` bilerek: tablet yatay da dikey de dönüyor, disk iki yönde de aynı büyüklükte kalsın. */
+      /* DİSKİN RENGİ PAKETTEN (`sun`), boyu ve yayı motordan. Paket tek renk taşır; çekirdek onun
+         doymuş ucu, kenar beyaza açılmışıdır (ikisini de JS türetir, `color-mix` yok). */
       --sun-angle:0deg;--sun-size:12.5vmin;--sun-disc:0;--sun-glow:0;
-      --sun-core:#ff9d10;--sun-mid:#ffc61a;--sun-rim:rgba(255,247,102,.85);--sun-halo:255,214,102;
+      --sun-core:var(--theme-sun-core,#ff9d10);--sun-mid:var(--theme-sun,#ffc61a);
+      --sun-rim:var(--theme-sun-rim,rgba(255,247,102,.85));--sun-halo:var(--theme-sun-rgb,255,214,102);
       /* AY DEĞİŞKENLERİ — varsayılan "ay yok" (`--moon-disc:0`), panel geceleyin yazar.
          AYIN YÜZÜ ARTIK GERÇEK BİR DOKU (`--moon-tex`), evre ise onu KESEN bir maske; karanlık
          yarım hâlâ hiç boyanmıyor, çünkü boyanmıyor değil KESİLİYOR. `--moon-dark` diye bir
@@ -160,6 +178,9 @@
          DOKU TELİFİ: NASA/SVS "Moon Phase and Libration 2019" (LRO LOLA+WAC) tek karesi —
          NASA görselleri kamu malıdır, atıf istenir; rotası `src/index.ts` içinde. */
       --moon-angle:0deg;--moon-disc:0;--moon-glow:0;--moon-size:15.5vmin;--moon-term:50%;
+      /* AYIN YÜZÜ DOKUDUR VE PAKET ONU BOYAMAZ. Paketin `moon` rengi yalnız HALENİN tonudur
+         (`--moon-halo`, CSS'te `drop-shadow`); doku her paket ve her saatte aynı NASA karesi. */
+      --moon-halo:var(--theme-moon-rgb,232,240,255);
       --moon-tex:url("/assets/moon-texture.jpg");
       --moon-side:100%;--moon-carve:none;--moon-bulge:0;
       /* TABAN AİLE KOYU ÇİPTİR — ilk kare için. Kart da döşeme de koyu yarı saydam, üstündeki
@@ -687,7 +708,7 @@
        yalnız soluk ve geçiş durur, konum ve tonlama saate göre doğru sürer. Durduğu yerde taban
        kuralın halesi görünür ve o hale iki durağın tam ortasıdır — donmuş kare çirkin olmaz. */
     :root[data-sky="live"]::before,
-    :root[data-sky="live"] .sky-stage-sun{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(255,247,102,0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-breath 16s ease-in-out alternate infinite}
+    :root[data-sky="live"] .sky-stage-sun{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(var(--sun-halo),0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-breath 16s ease-in-out alternate infinite}
     @keyframes panel-sun-breath{from{box-shadow:0 0 calc(var(--sun-size) * 1.9) calc(var(--sun-size) * .62) rgba(var(--sun-halo),calc(var(--sun-glow) * .26))}to{box-shadow:0 0 calc(var(--sun-size) * 2.9) calc(var(--sun-size) * .98) rgba(var(--sun-halo),calc(var(--sun-glow) * .26))}}
     /* AY — GERÇEK DOKU + EVRE MASKESİ, HALE İLE ŞEKİL AYRI ÖĞELERDE.
        Kol tekniği güneşle aynı, yön de aynı (soldan doğar, sağdan batar; açıyı JS yazar). Tek
@@ -751,11 +772,11 @@
        Kural yalnız `data-sky="live"` içindir; sabit kipte düğüm `display:none` ile hiç kurulmaz —
        ne doku indirilir ne maske hesaplanır. */
     .sky-moon{display:none}
-    :root[data-sky="live"] .sky-moon{display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);opacity:var(--moon-disc);filter:drop-shadow(0 0 calc(var(--moon-size) * .22) rgba(232,240,255,calc(var(--moon-glow) * .6))) drop-shadow(0 0 calc(var(--moon-size) * .63) rgba(232,240,255,calc(var(--moon-glow) * .4)));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-breath 16s ease-in-out alternate infinite}
+    :root[data-sky="live"] .sky-moon{display:block;pointer-events:none;left:50%;top:106%;width:var(--moon-size);height:var(--moon-size);margin:calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);opacity:var(--moon-disc);filter:drop-shadow(0 0 calc(var(--moon-size) * .22) rgba(var(--moon-halo),calc(var(--moon-glow) * .6))) drop-shadow(0 0 calc(var(--moon-size) * .63) rgba(var(--moon-halo),calc(var(--moon-glow) * .4)));transform:rotate(var(--moon-angle)) translateY(calc(-1 * var(--sky-arm))) rotate(calc(-1 * var(--moon-angle)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-moon-breath 16s ease-in-out alternate infinite}
     /* Ekrandaki ay gökyüzünün katmanında (`position:fixed`), önizleme kartındaki ay kendi
        sahnesinde (`position:absolute`) durur; ikisi de aynı `--moon-*` sözleşmesini okur. */
     :root[data-sky="live"] .sky-moon-screen{position:fixed;z-index:-2}
-    @keyframes panel-moon-breath{from{filter:drop-shadow(0 0 calc(var(--moon-size) * .17) rgba(232,240,255,calc(var(--moon-glow) * .6))) drop-shadow(0 0 calc(var(--moon-size) * .48) rgba(232,240,255,calc(var(--moon-glow) * .4)))}to{filter:drop-shadow(0 0 calc(var(--moon-size) * .27) rgba(232,240,255,calc(var(--moon-glow) * .6))) drop-shadow(0 0 calc(var(--moon-size) * .78) rgba(232,240,255,calc(var(--moon-glow) * .4)))}}
+    @keyframes panel-moon-breath{from{filter:drop-shadow(0 0 calc(var(--moon-size) * .17) rgba(var(--moon-halo),calc(var(--moon-glow) * .6))) drop-shadow(0 0 calc(var(--moon-size) * .48) rgba(var(--moon-halo),calc(var(--moon-glow) * .4)))}to{filter:drop-shadow(0 0 calc(var(--moon-size) * .27) rgba(var(--moon-halo),calc(var(--moon-glow) * .6))) drop-shadow(0 0 calc(var(--moon-size) * .78) rgba(var(--moon-halo),calc(var(--moon-glow) * .4)))}}
     /* Diskin kendisi: dairesel pencere. Dokunun kare karesi buradan taşmasın diye `overflow`
        kapalı; `border-radius` aynı zamanda maskelerin %101'lik rampasını da keser. */
     .sky-moon-face{position:absolute;inset:0;border-radius:50%;overflow:hidden}
@@ -2441,7 +2462,49 @@
     :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.alert .device-status-icon{
       color:var(--theme-state-alert);background:var(--theme-accent-soft);box-shadow:inset 0 0 0 1px var(--theme-state-alert);
     }
-    :root[data-theme-package][data-moon-visible="off"] .sky-moon-screen{opacity:0!important}
+    /* CANLI KİPTE MÜREKKEP VE CAM DA PAKETTEN — TEK KARIŞIM, TEK EKSEN.
+       Bugüne kadar kartın mürekkebi ve dolgusu `--sky-lum` ekseninden türüyordu (`applyPlateInk`),
+       paketin `ink`/`inkSoft`/`glass*` değerleri ise yalnız sabit kipte okunuyordu. İki ayrı
+       kaynak demek, eşikte iki ayrı davranış demekti. Artık ikisi de dört çapanın AYNI
+       ağırlıklarla karışımıdır (`resolvedSolarPalette`, 84): gün içinde kesintisiz akar ve
+       gün doğumu/batımı eşiğinde `data-theme` dönerken hiçbir değer basamak yapmaz — çünkü
+       buradaki hiçbir değer `data-theme` koluna bakmıyor.
+       ÖZGÜLLÜK: `:root[data-sky="live"]:not([data-theme="dark"])` ile eşit (0,3,0); bu blok
+       dosyada SONRA geldiği için kazanır. Yalnız `data-theme-package` varken, yani paket
+       gerçekten yüklendiğinde devreye girer — paket yoksa panelin kendi `--sky-plate-*` ekseni
+       aynen yürürlükte kalır.
+       KAPSAM DIŞI, bilerek: durum merdiveni (`--glass-on/active/alert/off`) ve kartın kenar/gölge
+       katmanları. Onlar parlaklık değil ANLAM taşıyor ve gökyüzünün tarafını tutmaları gerekiyor;
+       paketin tek renkli `state*` tokenları yanan döşemenin beş işaretli dilini karşılamıyor. */
+    :root[data-theme-package][data-sky="live"]{
+      --glass-card:var(--theme-glass-card);
+      --glass-tile:var(--theme-glass-tile);
+      /* Malzeme de karışımdan gelir (doygunluk · parlaklık), YALNIZ BULANIKLIK YARIÇAPI hariç:
+         o tablette ölçülmüş bir performans kararıdır (16px → 12px) ve iki bantta da aynı kalır —
+         hem eşikte 12↔24 sıçraması olmaz hem de `backdrop-filter` maliyeti büyümez. */
+      --glass-blur:12px;
+      --glass-sat:var(--theme-glass-saturation);--glass-card-bright:var(--theme-glass-brightness);
+      --glass-plate-ink:var(--theme-ink);--glass-plate-ink-soft:var(--theme-ink-soft);
+      --glass-plate-sub:var(--theme-ink-soft);
+      --glass-plate-line:var(--theme-ink-line);--glass-plate-inset:var(--theme-ink-inset);
+      --hub-muted:var(--theme-ink-soft);
+      /* ÇİP AİLESİ DE AYNI MÜREKKEBE DÖNER — ZORUNLU, İSTEĞE BAĞLI DEĞİL. Döşemenin dolgusu artık
+         paketten geliyor ve paket gündüz AÇIK bir döşeme veriyor; panelin kendi canlı-kip dili
+         ise döşemeyi koyu varsayıp yazısını BEYAZ tutuyordu. İkisi bir arada okunmaz bir yüzey
+         eder, o yüzden dolguyla birlikte mürekkep, ayraç ve harf konturu tek pakette döner.
+         HARFİN KONTURU KALIYOR AMA TARAF DEĞİŞTİRİYOR: eski `--glass-tile-text-shadow` beyaz
+         yazının koyu döşeme üstündeki sigortasıydı ve sabit koyuydu. Mürekkep artık gün içinde
+         kutup değiştirdiği için kontur da onunla dönmeli — `--sky-plate-shadow` tam olarak bu:
+         JS dakikada bir mürekkebin KARŞI tarafında hesaplıyor (gündüz beyaz, gece koyu).
+         ALACAKARANLIK BANDI bunun için var: paletin mürekkebi şafakta ve batımda kutup
+         değiştirdiğinden sürekli bir karışım orta griden geçmek zorunda (günde ~79 dk 3:1'in
+         altında; ölçüm raporda). Kontur o dakikalarda harfin kenarını tutar. */
+      --glass-ink:var(--theme-ink);--glass-ink-soft:var(--theme-ink-soft);--glass-sub:var(--theme-ink-soft);
+      --glass-line:var(--theme-ink-line);--glass-inset:var(--theme-ink-inset);
+      --glass-tile-text-shadow:var(--sky-plate-shadow,none);
+    }
+    /* `data-moon-visible` KALKTI: onu yazan tek yer ikinci motordu (astronomi yoklaması) ve o
+       motor kaldırıldı. Ayın görünürlüğü zaten tek yerden geliyor — `--moon-disc`, gündüz sıfır. */
 
     /* ALT HIZLI ERİŞİM BARI — içerik üstüne `fixed` katman olarak binmez. Ana pano üç satırlı
        akışın ikinci satırını kendisine ayırır; kart satırı ile arasında gerçek grid boşluğu vardır. */

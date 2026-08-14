@@ -803,6 +803,13 @@
       +phases.dusk*skyPhaseLight.dusk+nightWeight*skyPhaseLight.night;
     root.style.setProperty("--sky-lum",skyLum.toFixed(3));
     applyPlateInk(root,skyLum,Math.min(1,phases.dawn+phases.dusk));
+    /* PALET AYNI AĞIRLIKLARLA. Tema paketi dört çapa (gece · şafak · gündüz · batım) verir;
+       karışımı burada hesaplanan HAM ağırlıklar yapar — CSS'e giden zincir alfası değil, çünkü
+       zincir yalnız üst üste binen gökyüzü katmanları içindir. Paket yoksa (ya da henüz
+       gelmediyse) hiçbir şey olmaz: CSS'teki yedek değerler panelin kendi paletidir. */
+    if(typeof setSolarThemeWeights==="function"){
+      setSolarThemeWeights({night:nightWeight,dawn:phases.dawn,day:phases.day,dusk:phases.dusk});
+    }
     // GÜNEŞ KOLU: doğuşta -90°, tepede 0°, batışta +90°. Ufkun biraz altına da inebilsin diye
     // ilerleme dar bir payla dışarı taşar; disk zaten orada sönmüş olur.
     const arc=Math.max(-.12,Math.min(1.12,progress));
@@ -875,14 +882,12 @@
     sunGroundState.started=false;
     delete document.documentElement.dataset.sunGround;
   }
+  /* TEK MOTOR: gökyüzünün ağırlıkları da paleti de `applySunGround` sürer, ayrı bir tema
+     zamanlayıcısı YOK (eski `refreshCelestialTheme` kaldırıldı). Kip "güneşe göre" değilse
+     dakikalık iş tümüyle durur; paketin sabit paletini `applyThemePackage` yazar. */
   function syncSunGround(){
-    if(state.themeMode==="sun"){
-      startSunGround();
-      if(typeof startCelestialTheme==="function"&&state.auth.authenticated)startCelestialTheme();
-    }else{
-      stopSunGround();
-      if(typeof stopCelestialTheme==="function")stopCelestialTheme();
-    }
+    if(state.themeMode==="sun")startSunGround();
+    else stopSunGround();
   }
   function setThemeMode(mode){
     if(!["light","dark","sun","system"].includes(mode))return;
