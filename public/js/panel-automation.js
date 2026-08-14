@@ -1272,17 +1272,47 @@
     const control=(device?.controls||[]).find(item=>item.property===property);
     return control?.unit||"";
   };
+  /* Adım cihaz/ölçüm tablosuna dayanmaz — öyle bir tablo tutulamaz, her cihaz kendi biriminde
+     kendi büyüklüğünde konuşur. Cihaz kendi kumandasında bir `step` bildiriyorsa o kullanılır;
+     bildirmiyorsa adım **o an okunan değerin büyüklüğünden** türetilir. Ölçü şu: bir uçtan öbür
+     uca gitmek yüzlerce tık istememeli ama tek haneli bir okumada da hassasiyet kaybolmamalı,
+     yani adım okumanın kabaca yüzde biri ile onda biri arasında kalsın. */
+  const automationAutoStep=value=>{
+    const size=Math.abs(Number(value)||0);
+    if(size<10)return 1;
+    if(size<100)return 5;
+    if(size<1000)return 10;
+    if(size<10000)return 50;
+    return 100;
+  };
   const automationThresholdStepFor=(device,property)=>{
     const control=(device?.controls||[]).find(item=>item.property===property);
-    return Number.isFinite(control?.step)&&control.step>0?control.step:1;
+    if(Number.isFinite(control?.step)&&control.step>0)return control.step;
+    return automationAutoStep(device?.state?.[property]);
+  };
+  /* Eşik kadranı: iki adım düğmesi + **elle yazılabilen** alan. Adım otomatik olduğu için tam
+     değeri yazmak yine mümkün olmalı; alan `change` ile okunur (odak kaybı ya da Enter), böylece
+     yazarken ekran baştan çizilip imleç kaçmaz. Birim etiketi uydurulmaz: cihaz bir birim
+     bildiriyorsa o, bildirmiyorsa okunan alanın kendi adı yazılır. */
+  const automationThresholdDialHtml=({value,size,stepAttr,token,valueAttr,unitText,ariaLabel})=>{
+    const step=(amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" ${stepAttr}="${esc(token(amount))}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
+    const field=`<input class="automation-time-value automation-time-field" type="number" inputmode="decimal" step="any" ${valueAttr} value="${esc(String(value))}" aria-label="${esc(ariaLabel)}">`;
+    return`<div class="automation-time" role="group" aria-label="${esc(ariaLabel)}"><div class="automation-time-unit">${step(size,"automationThresholdUp","+")}${field}${step(-size,"automationThresholdDown","−")}</div><span class="automation-time-unit-label">${esc(unitText)}</span></div>`;
   };
   function automationThresholdHtml(wizard){
     const device=state.devices.find(item=>item.id===wizard.triggerDeviceId)||null;
     const unit=automationPropertyUnit(device,wizard.triggerProperty);
+    const reading=automationPropertyLabel(device,wizard.triggerProperty);
     const choice=(value,key)=>automationChoiceHtml(value==="above"?"on":"off",key,wizard.thresholdDir===value,`data-automation-threshold-dir="${value}"`);
-    const step=(amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-threshold-step="${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
-    const size=automationThresholdStepFor(device,wizard.triggerProperty);
-    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(automationPropertyLabel(device,wizard.triggerProperty))}</p><div class="automation-choices">${choice("above","automationThresholdAbove")}${choice("below","automationThresholdBelow")}</div></div></div><div class="automation-time" role="group" aria-label="${esc(t("automationThresholdValueLabel"))}"><div class="automation-time-unit">${step(size,"automationThresholdUp","+")}<span class="automation-time-value">${esc(String(wizard.thresholdValue))}</span>${step(-size,"automationThresholdDown","−")}</div><span class="automation-time-unit-label">${esc(unit||t("automationThresholdValueLabel"))}</span></div><p class="automation-hint">${esc(t("automationThresholdHint"))}</p>${automationTrigForHtml(wizard)}`;
+    const dial=automationThresholdDialHtml({
+      value:wizard.thresholdValue,
+      size:automationThresholdStepFor(device,wizard.triggerProperty),
+      stepAttr:"data-automation-threshold-step",token:amount=>String(amount),
+      valueAttr:'data-automation-threshold-value="1"',
+      // "Değer" yerine okunan alanın kendi adı: "30 Işık düzeyi" diye okunur.
+      unitText:unit||reading,ariaLabel:reading
+    });
+    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(reading)}</p><div class="automation-choices">${choice("above","automationThresholdAbove")}${choice("below","automationThresholdBelow")}</div></div></div>${dial}<p class="automation-hint">${esc(t("automationThresholdHint"))}</p>${automationTrigForHtml(wizard)}`;
   }
   // ————— koşullar (§5.3). Yalnız VE; en fazla dört tane. Boşsa kural her zaman çalışır.
   const maxAutomationConditions=4;
@@ -1532,13 +1562,20 @@
   function automationCondThresholdHtml(draft,device){
     const unit=automationPropertyUnit(device,draft.property);
     const size=automationThresholdStepFor(device,draft.property);
+    const reading=automationPropertyLabel(device,draft.property);
     const choice=(value,key)=>automationChoiceHtml(value==="below"?"off":"on",key,draft.thresholdDir===value,`data-automation-cond-threshold-dir="${value}"`);
-    const step=(edge,amount,labelKey,glyph)=>`<button class="automation-time-step" type="button" data-automation-cond-threshold-step="${edge}:${amount}" aria-label="${esc(t(labelKey))}">${glyph}</button>`;
-    const dial=(edge,labelKey)=>`<div class="automation-time" role="group" aria-label="${esc(t(labelKey))}"><div class="automation-time-unit">${step(edge,size,"automationThresholdUp","+")}<span class="automation-time-value">${esc(String(draft[edge]))}</span>${step(edge,-size,"automationThresholdDown","−")}</div><span class="automation-time-unit-label">${esc(unit||t(labelKey))}</span></div>`;
+    // Tek kadranda birim/alan adı yazılır; "arasında"da iki kadranı ayıran şey alt/üst sınır
+    // etiketidir — orada ikisine de aynı adı yazmak hangisinin hangisi olduğunu gizlerdi.
+    const dial=(edge,label)=>automationThresholdDialHtml({
+      value:draft[edge],size,
+      stepAttr:"data-automation-cond-threshold-step",token:amount=>`${edge}:${amount}`,
+      valueAttr:`data-automation-cond-threshold-value="${edge}"`,
+      unitText:unit||label,ariaLabel:label
+    });
     const dials=draft.thresholdDir==="between"
-      ?`${dial("above","automationCondThresholdFrom")}${dial("below","automationCondThresholdTo")}`
-      :dial(draft.thresholdDir==="below"?"below":"above","automationThresholdValueLabel");
-    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(automationPropertyLabel(device,draft.property))}</p><div class="automation-choices">${choice("above","automationCondAbove")}${choice("below","automationCondBelow")}${choice("between","automationCondBetween")}</div></div></div>${dials}<p class="automation-hint">${esc(t("automationCondThresholdHint"))}</p>`;
+      ?`${dial("above",t("automationCondThresholdFrom"))}${dial("below",t("automationCondThresholdTo"))}`
+      :dial(draft.thresholdDir==="below"?"below":"above",reading);
+    return`<div class="automation-parts"><div class="automation-part"><p class="automation-part-name">${esc(reading)}</p><div class="automation-choices">${choice("above","automationCondAbove")}${choice("below","automationCondBelow")}${choice("between","automationCondBetween")}</div></div></div>${dials}<p class="automation-hint">${esc(t("automationCondThresholdHint"))}</p>`;
   }
   // §9.2 — "şu kadar süredir böyleyse" satırı. Eylem adımındaki "sonra kapat"la aynı kelimeleri
   // kullandığı için karışıyordu: bu satır varsayılan olarak kapalı durur, kendi görsel dilini
@@ -2394,6 +2431,8 @@
     $$("[data-automation-open-location]").forEach(button=>button.onclick=()=>openHomeLocationSettings());
     $$("[data-automation-threshold-dir]").forEach(button=>button.onclick=()=>chooseAutomationThresholdDir(button.dataset.automationThresholdDir));
     $$("[data-automation-threshold-step]").forEach(button=>button.onclick=()=>stepAutomationThreshold(Number(button.dataset.automationThresholdStep)));
+    // Elle giriş `change` ile okunur (odak kaybı / Enter): yazarken ekran baştan çizilmez.
+    $$("[data-automation-threshold-value]").forEach(input=>{input.onchange=()=>setAutomationThresholdValue(input.value)});
     $$("[data-automation-trig-for]").forEach(button=>button.onclick=()=>toggleAutomationTrigFor(button.dataset.automationTrigFor));
     // Sayaç dakika gösterir: değer dakikaya yuvarlanır, 0:01 altına inmez, 24:00 üstüne çıkmaz.
     const trigForMinutes=()=>automationForMinutes(state.automationWizard?.triggerForSeconds);
@@ -2418,6 +2457,7 @@
     $$("[data-automation-cond-mode]").forEach(button=>button.onclick=()=>chooseAutomationCondMode(button.dataset.automationCondMode));
     $$("[data-automation-cond-threshold-dir]").forEach(button=>button.onclick=()=>chooseAutomationCondThresholdDir(button.dataset.automationCondThresholdDir));
     $$("[data-automation-cond-threshold-step]").forEach(button=>button.onclick=()=>stepAutomationCondThreshold(button.dataset.automationCondThresholdStep));
+    $$("[data-automation-cond-threshold-value]").forEach(input=>{input.onchange=()=>setAutomationCondThreshold(input.dataset.automationCondThresholdValue,input.value)});
     $$("[data-automation-cond-for]").forEach(button=>button.onclick=()=>toggleAutomationCondFor(button.dataset.automationCondFor));
     // Sayaç dakika gösterir: değer dakikaya yuvarlanır, 0:01 altına inmez, 24:00 üstüne çıkmaz.
     const condForMinutes=()=>automationForMinutes(state.automationWizard?.draftCondition?.forSeconds);
@@ -2846,6 +2886,29 @@
     if(!wizard||!Number.isFinite(amount))return;
     const next=Math.round((wizard.thresholdValue+amount)*1000)/1000;
     wizard.thresholdValue=next;
+    automationRedraw();
+  }
+  /* Elle girilen eşik. Adım otomatik olduğu için tam değer yazılabilmeli; okunamayan bir giriş
+     sessizce kabul edilmez, ekran son geçerli değere döner (virgül de ondalık ayracı sayılır). */
+  const automationTypedNumber=raw=>{
+    // Boş alan sıfır değildir: `Number("")` sıfır döndüğü için ayrıca elenir.
+    const text=String(raw??"").trim().replace(",",".");
+    if(!text)return null;
+    const parsed=Number(text);
+    return Number.isFinite(parsed)?Math.round(parsed*1000)/1000:null;
+  };
+  function setAutomationThresholdValue(raw){
+    const wizard=state.automationWizard;
+    if(!wizard)return;
+    const next=automationTypedNumber(raw);
+    if(next!==null)wizard.thresholdValue=next;
+    automationRedraw();
+  }
+  function setAutomationCondThreshold(edge,raw){
+    const draft=state.automationWizard?.draftCondition;
+    if(!draft||(edge!=="above"&&edge!=="below"))return;
+    const next=automationTypedNumber(raw);
+    if(next!==null)draft[edge]=next;
     automationRedraw();
   }
   // Hangi anın ayarlandığını değiştirir; seçim silinmez, ayarlar ana özeldir.

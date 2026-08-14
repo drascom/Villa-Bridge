@@ -2029,6 +2029,12 @@
     .automation-settle{animation:automation-settle .3s cubic-bezier(.22,.68,.3,1) backwards}
     @media(prefers-reduced-motion:reduce){.automation-enter>*,.automation-enter>.automation-options>*,.automation-leaving,.automation-settle{animation:none!important}}
     .automation-time{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}.automation-time-unit{display:grid;gap:9px;justify-items:center}.automation-time-value{min-width:88px;font:800 42px/1 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}.automation-time-step{width:88px;min-height:60px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-soft);font-size:27px;font-weight:800;touch-action:manipulation}.automation-time-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-time-colon{font:800 34px/1 system-ui,sans-serif}
+    /* Eşik kadranının yazılabilir alanı: kadranın kendi rakam dilini aynen taşır, yalnız
+       dokunulabilir olduğunu söyleyen sessiz bir zemini ve odakta bir çerçevesi vardır.
+       Tarayıcının kendi ok düğmeleri kapalı — adım zaten kadranın iki düğmesinde. */
+    .automation-time-field{width:clamp(96px,15vw,132px);padding:4px 6px;border:1px solid transparent;border-radius:12px;background:var(--surface-soft);color:var(--ink);-moz-appearance:textfield;appearance:textfield}
+    .automation-time-field:focus{border-color:var(--forest);outline:none}
+    .automation-time-field::-webkit-outer-spin-button,.automation-time-field::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
     .automation-days{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.automation-day{min-height:44px;padding:9px 15px;border:1px solid var(--line);border-radius:999px;color:var(--ink);background:var(--surface);font-size:13px;font-weight:750;touch-action:manipulation}.automation-day:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}.automation-day.active{border-color:var(--forest);background:var(--forest-soft)}
     /* Hedefin kanalları ve eşleme yönleri: satır adı + eylem pill'leri. Pill kendi renginde metin ve
        ince kenarlık taşır; dolgusu aynı renkten süzülür. `currentColor` alfası yerine iki katman
