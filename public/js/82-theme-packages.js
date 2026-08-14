@@ -55,9 +55,17 @@
     materials:{...base.materials}
   });
   let themeCacheWrittenAt=0;
+  /* GÖLGE DAR VE YUMUŞAK — YARIÇAP KOMŞU BOŞLUĞUNDAN KÜÇÜK. Paket profilleri ilk turda geniş
+     yazılmıştı (`0 18px 40px` / `0 10px 28px`); 40px bulanıklık kenardan ~20px dışarı taşar,
+     oysa ölçülen en dar gerçek boşluk 8px (dar yatayda `#home .quick-grid.grid-view{gap:8px}`),
+     tablette 10px. İki komşunun gölgesi aradaki boşlukta üst üste binip tek koyu bant kuruyordu —
+     panelin kendi kümelerinde daha önce "tünel" diye düzeltilen hatanın aynısı, paket yolundan
+     geri gelmişti. Yeni ifade iki katmanlı: `0 1px 2px` TEMAS gölgesi düğmeyi zemine bağlar,
+     `0 2px 6px` KALDIRMA gölgesi yüzme hissini verir. 6px yanlara 3px taşar; 8px'lik en dar
+     boşlukta bile iki komşunun taşması ancak alfası sıfırlanmış uçlarıyla buluşur. */
   const themeShadowValue=profile=>profile==="floating"
-    ?"0 18px 40px rgba(8,18,28,.26)"
-    :profile==="soft"?"0 10px 28px rgba(18,42,58,.16)":"none";
+    ?"0 1px 2px rgba(0,0,0,.42),0 2px 6px rgba(0,0,0,.26)"
+    :profile==="soft"?"0 1px 2px rgba(16,26,38,.17),0 2px 6px rgba(16,26,38,.12)":"none";
   function applyResolvedThemePalette(palette,meta={}){
     if(!palette?.colors)return;
     const root=document.documentElement;
@@ -70,6 +78,14 @@
     const ink=parseThemeColor(palette.colors.ink);
     root.style.setProperty("--theme-ink-line",themeRgba(ink,.16));
     root.style.setProperty("--theme-ink-inset",themeRgba(ink,.07));
+    /* KAPALI DÖŞEMENİN HALKASI. `stateOffline` paketin tek "sönük" rengi ve bugüne kadar hiçbir
+       kural onu okumuyordu — paket bağlandıktan sonra kapalı döşeme, tabanın parlak cam kenarını
+       ve panelin ESKİ (beyazımsı) `--glass-off-sub` mürekkebini birlikte kullanıyordu; gündüz
+       açık pakette bu 1,02:1 demekti, yani ikon ve alt satır yok olurdu. Halka artık bundan
+       türer. Yalnız HALKA: ölçüldüğünde `stateOffline` gliflik doygunluğa sahip değil (gündüz
+       3,38:1, şafak 2,95:1), o yüzden ikonun ve alt satırın mürekkebi `inkSoft` kalır. */
+    const offline=parseThemeColor(palette.colors.stateOffline||palette.colors.inkSoft);
+    root.style.setProperty("--theme-state-offline-line",themeRgba(offline,.55));
     const material=palette.materials||{};
     root.style.setProperty("--theme-glass-blur",`${Number(material.blur)||0}px`);
     root.style.setProperty("--theme-glass-saturation",String(Number(material.saturation)||1));

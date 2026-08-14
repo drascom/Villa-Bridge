@@ -2435,6 +2435,12 @@
       --forest:var(--theme-accent);--forest-soft:var(--theme-accent-soft);
       --home-control:var(--theme-glass-tile);--home-border:var(--theme-glass-edge);
       --home-float-shadow:var(--theme-glass-shadow);
+      /* Kapalı ailesi de pakete bağlanır (gerekçe ve ölçüm aşağıda, `.off` kuralında). Buradaki
+         alias'lar `--glass-off-*` okuyan öbür tüketiciler içindir; ana ekran döşemesinin kendisi
+         aşağıda doğrudan `--theme-*` yazan kuralla çözülür, çünkü sabit/canlı kip blokları bu
+         değişkenlerin bir kısmını daha özgül biçimde yeniden yazıyor. */
+      --glass-off:var(--theme-glass-card);--glass-off-brd:var(--theme-state-offline-line);
+      --glass-off-sub:var(--theme-ink-soft);--glass-off-chip:var(--theme-ink-inset);
     }
     :root[data-theme-package] body[data-active-view="home"] #home .widget-card{
       border-color:var(--theme-glass-edge);color:var(--theme-ink);background:var(--theme-glass-card);
@@ -2461,6 +2467,43 @@
     }
     :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.alert .device-status-icon{
       color:var(--theme-state-alert);background:var(--theme-accent-soft);box-shadow:inset 0 0 0 1px var(--theme-state-alert);
+    }
+    /* KAPALI DÖŞEME — PAKET YOLUNUN EKSİK BASAMAĞI.
+       KÖK SEBEP: yukarıdaki taban kuralı (`… #home .group-control-tile`, özgüllük 1-4-1) panelin
+       kendi `.off/.offline` kuralından (1-3-1) DAHA özgül. Paket bağlandığı andan itibaren kapalı
+       döşeme de tabanın AÇIK cam dolgusunu ve parlak kenarını alıyordu; buna karşılık alt satırın
+       ve ikonun rengi hâlâ `--glass-off-sub`tan, yani panelin canlı-kip için yazılmış BEYAZIMSI
+       mürekkebinden (`rgba(226,236,232,.7)`) geliyordu. Açık cam + beyaz mürekkep = gündüz 1,02:1,
+       şafakta 1,16:1 — kullanıcının gördüğü "ikon ve alt satır kayboldu" tam olarak budur.
+       Paketin `stateOffline` tokenı ise hiçbir kural tarafından okunmuyordu.
+       ÇÖZÜM ÜÇ PARÇA, hepsi paket tokenlarından (yani hem `fixed` hem `live` yolunda aynı):
+         1) YÜZEY bir basamak geri çekilir: dolgu döşemeninki değil KARTINKİ (`--theme-glass-card`)
+            ve iç parlaklık çizgisi düşer. Altı paletin hepsinde kart dolgusu döşeme dolgusundan
+            incedir, yani "kapalı" yönü her fazda AŞAĞI.
+         2) KENAR paketin `stateOffline`ından türer (`--theme-state-offline-line`, 82). Tabanın
+            parlak beyaz cam kenarına karşı sönük gri halka — ayrımı asıl taşıyan işaret bu.
+         3) MÜREKKEP okunur kalır: alt satır ve ikon glifi `--theme-ink-soft`. Kapalı, yanandan
+            RENKLE ayrılır (nötr ↔ kehribar), okunmazlıkla değil — "sönük" sakin demek, yok demek
+            değil.
+       ÖLÇÜM (paketin altı paleti; kapalı döşemenin bileşkesi üstünde):
+         alt satır 4,35:1 (şafak · en dar) · 5,03 gündüz · 5,03 batım · 7,64 gece ·
+                   5,25 sabit-açık · 7,04 sabit-koyu
+         ikon glifi 4,07:1 (şafak · en dar) · 4,70 gündüz · 4,32 batım · 6,55 gece ·
+                   4,96 sabit-açık · 6,04 sabit-koyu
+       Hepsi AA üstü. `stateOffline`ın KENDİSİ glif rengi olarak denendi ve bırakıldı: gündüz
+       3,38:1, şafak 2,95:1 — küçük ikon için yeterli değil, halka için yeterli. */
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.off,
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.offline{
+      --muted:var(--theme-ink-soft);
+      border-color:var(--theme-state-offline-line);color:var(--theme-ink);background:var(--theme-glass-card);
+      box-shadow:var(--theme-glass-shadow);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.off .group-control-copy small,
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile.offline .group-control-copy small{
+      color:var(--theme-ink-soft);
+    }
+    :root[data-theme-package] body[data-active-view="home"] #home .group-control-tile .device-status-icon.muted{
+      color:var(--theme-ink-soft);background:var(--theme-ink-inset);box-shadow:inset 0 0 0 1px var(--theme-state-offline-line);
     }
     /* CANLI KİPTE MÜREKKEP VE CAM DA PAKETTEN — TEK KARIŞIM, TEK EKSEN.
        Bugüne kadar kartın mürekkebi ve dolgusu `--sky-lum` ekseninden türüyordu (`applyPlateInk`),
