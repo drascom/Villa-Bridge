@@ -476,23 +476,106 @@
     const failed=automation.lastRunOk===false;
     return`<span class="automation-card-chip${failed?" warn":""}">${t(failed?"automationLastRunFailed":"automationLastRun",{time:ago(automation.lastRunAt)})}</span>`;
   };
-  // "Neden çalışmadı?" — kuralın kendi çalışma geçmişi kartın içinde açılır.
-  const automationRunRowHtml=run=>{
+  /* Geçmiş SON 5 çalışmayla sınırlı. Sınır ISTEKTE uygulanır, panelde kırpılarak değil: sunucunun
+     okuyucusu günlüğü sondan tarar ve sayı dolunca durur (`automation-runs.ts`), yani `limit=5`
+     dosyadan okunan satırı da yanıtı da küçültür. Panelde kırpmak aynı işi yaptırıp fazlasını
+     atmak olurdu. Tek kaynak burası; çizim de aynı sabiti savunma amaçlı kullanır. */
+  const automationRunHistoryLimit=5;
+  /* Alt satır "son çalışma SAATİ" der: bugünse saat, değilse gün + saat. `ago()` saatte durduğu
+     için dünkü çalışma "31 saat önce" diye görünüyordu; kullanıcı saati istedi. */
+  const automationRunClock=iso=>{
+    const at=new Date(iso||"");
+    if(Number.isNaN(at.getTime()))return"";
+    const locale=state.language==="tr"?"tr-TR":"en-GB";
+    const sameDay=at.toDateString()===new Date().toDateString();
+    return at.toLocaleString(locale,sameDay
+      ?{hour:"2-digit",minute:"2-digit"}
+      :{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+  };
+  const automationRunFullClock=iso=>{
+    const at=new Date(iso||"");
+    if(Number.isNaN(at.getTime()))return"";
+    return at.toLocaleString(state.language==="tr"?"tr-TR":"en-GB");
+  };
+  // Günlükteki kimlik IEEE adresi; insan cihazın adını tanır, adresi değil.
+  const automationRunDeviceName=id=>{
+    const key=String(id||"");
+    if(!key)return"";
+    return state.devices.find(device=>device.id===key)?.name||key;
+  };
+  const automationRunTriggerKindText=trigger=>{
+    const kind=trigger?.kind;
+    if(!kind)return"";
+    const key=`automationRunTrigger_${kind}`;
+    const text=t(key);
+    return text===key?"":text;
+  };
+  // Tetikleyen olay VE değeri: "cihaz olayı · Salon sensör · occupancy = true · 63 sn boyunca".
+  const automationRunTriggerText=trigger=>{
+    if(!trigger)return"";
+    const value=trigger.value===undefined||trigger.value===null?"":String(trigger.value);
+    const held=Number(trigger.heldSeconds);
+    return[
+      automationRunTriggerKindText(trigger),
+      automationRunDeviceName(trigger.deviceId),
+      trigger.property?(value?`${trigger.property} = ${value}`:String(trigger.property)):value,
+      Number.isFinite(held)&&held>0?t("automationRunHeld",{duration:automationDurationTextShort(held)}):""
+    ].filter(Boolean).join(" · ");
+  };
+  const automationRunFactHtml=(label,value)=>value
+    ?`<div class="automation-run-fact"><dt>${esc(label)}</dt><dd>${value}</dd></div>`
+    :"";
+  const automationRunItemHtml=(ok,text,error)=>`<li class="automation-run-item ${ok?"is-ok":"is-failed"}"><span class="automation-run-glyph" aria-hidden="true">${ok?"✓":"✕"}</span><span>${esc(text)}${error?` <span class="automation-run-item-error">${esc(error)}</span>`:""}</span></li>`;
+  /* Ayrıntı: "otomasyon neden çalışmadı" sorusu karta bakarak yanıtlanır. Kayıt zaten zengin
+     (sonuç, sebep kodu, açıklama, tetikleyici, koşullar, eylem eylem sonuç) — burada okunur hale
+     gelir. Boş alan hiç basılmaz; kayıt eskiyse ayrıntı kendiliğinden kısalır. */
+  const automationRunDetailHtml=run=>{
+    const reason=[run?.reason?automationReasonText(run.reason):"",String(run?.detail||"").trim()]
+      .filter(Boolean).join(" — ");
+    const conditions=(Array.isArray(run?.conditions)?run.conditions:[])
+      .map(item=>automationRunItemHtml(item?.ok!==false,String(item?.type||""),item?.ok===false?String(item?.reason||""):""))
+      .join("");
+    const actions=(Array.isArray(run?.actions)?run.actions:[])
+      .map(item=>automationRunItemHtml(
+        item?.ok!==false,
+        [String(item?.type||""),automationRunDeviceName(item?.target)].filter(Boolean).join(" · "),
+        item?.ok===false?String(item?.error||""):""
+      ))
+      .join("");
+    const body=[
+      automationRunFactHtml(t("automationRunDetailWhen"),esc(automationRunFullClock(run?.at))),
+      automationRunFactHtml(t("automationRunDetailReason"),esc(reason)),
+      automationRunFactHtml(t("automationRunDetailTrigger"),esc(automationRunTriggerText(run?.trigger))),
+      automationRunFactHtml(t("automationRunDetailConditions"),conditions?`<ul class="automation-run-items">${conditions}</ul>`:""),
+      automationRunFactHtml(
+        t("automationRunDetailActions"),
+        actions?`<ul class="automation-run-items">${actions}</ul>`:esc(t("automationRunNoAction"))
+      )
+    ].join("");
+    return`<dl class="automation-run-detail">${body}</dl>`;
+  };
+  // "Neden çalışmadı?" — kuralın kendi çalışma geçmişi kartın içinde açılır, satır satır.
+  const automationRunRowHtml=(run,key)=>{
     const outcome=String(run?.outcome||"");
     const glyph=automationOutcomeGlyphs[outcome]||"·";
     const reason=run?.reason?automationReasonText(run.reason):"";
-    const trigger=run?.trigger?.kind?t(`automationRunTrigger_${run.trigger.kind}`):"";
-    const meta=[reason,trigger===`automationRunTrigger_${run?.trigger?.kind}`?"":trigger].filter(Boolean).join(" · ");
-    return`<li class="automation-run-row is-${esc(outcome)}"><time datetime="${esc(run?.at||"")}">${esc(ago(run?.at))}</time><span class="automation-run-outcome"><span class="automation-run-glyph" aria-hidden="true">${glyph}</span>${esc(automationOutcomeText(outcome))}</span><span class="automation-run-reason">${esc(meta)}</span></li>`;
+    const meta=[reason,automationRunTriggerKindText(run?.trigger)].filter(Boolean).join(" · ");
+    const open=state.automationRunDetail===key;
+    return`<li class="automation-run-row is-${esc(outcome)}"><button class="automation-run-head" type="button" data-automation-run-detail="${esc(key)}" aria-expanded="${open}"><time datetime="${esc(run?.at||"")}">${esc(automationRunClock(run?.at))}</time><span class="automation-run-outcome"><span class="automation-run-glyph" aria-hidden="true">${glyph}</span>${esc(automationOutcomeText(outcome))}</span><span class="automation-run-reason">${esc(meta)}</span></button>${open?automationRunDetailHtml(run):""}</li>`;
   };
   const automationRunsHtml=automation=>{
     if(state.automationRunsOpen!==automation.id)return"";
     const runs=state.automationRuns[automation.id];
     if(runs===undefined)return`<div class="automation-runs"><p class="automation-runs-empty">${esc(t("automationRunsLoading"))}</p></div>`;
+    // Günlük dosyası yoksa/okunamıyorsa sunucu 503 döner: bunu "hiç çalışmadı" diye göstermek
+    // yalan olur, ayrı cümlesi var.
+    if(!Array.isArray(runs))return`<div class="automation-runs"><p class="automation-runs-empty">${esc(t("automationRunsUnavailable"))}</p></div>`;
     // Kart "son çalışma" der ama günlük boşsa çelişki gibi görünür: günlüğün kuraldan yeni
     // olduğunu tek cümleyle söyler. Yalnız bu durumda — hiç çalışmamış kuralda eski cümle kalır.
     if(!runs.length)return`<div class="automation-runs"><p class="automation-runs-empty">${esc(t(automation.lastRunAt?"automationRunsOlderThanLog":"automationRunsEmpty"))}</p></div>`;
-    return`<div class="automation-runs"><ul class="automation-run-list">${runs.map(automationRunRowHtml).join("")}</ul></div>`;
+    const rows=runs.slice(0,automationRunHistoryLimit)
+      .map((run,index)=>automationRunRowHtml(run,`${automation.id}|${index}`)).join("");
+    return`<div class="automation-runs"><ul class="automation-run-list">${rows}</ul></div>`;
   };
   // Ajanın yazdığı kural ayırt edilir: kim yazdı ve ne zaman, işaretin ipucunda durur. Panelden
   // düzenlenen kural sihirbazda sıfırdan kurulduğu için damgayı kaybeder — kural artık insanındır.
@@ -569,6 +652,7 @@
     $$("[data-automation-toggle]").forEach(button=>button.onclick=event=>{event.stopPropagation();toggleAutomationEnabled(button.dataset.automationToggle)});
     $$("[data-automation-menu]").forEach(button=>button.onclick=event=>{event.stopPropagation();openAutomationActions(button.dataset.automationMenu)});
     $$("[data-automation-runs]").forEach(button=>button.onclick=event=>{event.stopPropagation();toggleAutomationRuns(button.dataset.automationRuns)});
+    $$("[data-automation-run-detail]").forEach(button=>button.onclick=event=>{event.stopPropagation();toggleAutomationRunDetail(button.dataset.automationRunDetail)});
     // Kart gövdesine tek dokunuş doğrudan düzenlemeyi açar; seçenekler görünür "⋯" düğmesinde.
     $$("[data-automation-card]").forEach(card=>{
       card.onclick=event=>{
@@ -577,21 +661,29 @@
       };
     });
   }
-  // Geçmiş açılınca sunucudan çekilir; başarısız olursa boş kalmaz, sebebi yazar.
+  /* Geçmiş açılınca sunucudan çekilir; başarısız olursa boş kalmaz, sebebi yazar. Okunamayan
+     günlük "hiç çalışmadı" DEĞİLDİR: dizi yerine işaret bırakılır, çizim ayrı cümle yazar. */
   async function toggleAutomationRuns(id){
     if(!id)return;
-    if(state.automationRunsOpen===id){state.automationRunsOpen=null;renderAutomations();return}
+    if(state.automationRunsOpen===id){state.automationRunsOpen=null;state.automationRunDetail=null;renderAutomations();return}
     state.automationRunsOpen=id;
+    state.automationRunDetail=null;
     delete state.automationRuns[id];
     renderAutomations();
     try{
-      const data=await api(`/api/automations/${encodeURIComponent(id)}/runs?limit=20`);
+      const data=await api(`/api/automations/${encodeURIComponent(id)}/runs?limit=${automationRunHistoryLimit}`);
       state.automationRuns[id]=Array.isArray(data.runs)?data.runs:[];
     }catch(error){
-      state.automationRuns[id]=[];
+      state.automationRuns[id]={error:true};
       showToast(error.message,true);
     }
     if(state.automationRunsOpen===id)renderAutomations();
+  }
+  // Tek satır açık kalır: ikinci satıra dokunmak birincisini kapatır, liste kısa durur.
+  function toggleAutomationRunDetail(key){
+    if(!key)return;
+    state.automationRunDetail=state.automationRunDetail===key?null:key;
+    renderAutomations();
   }
   // İleri/Kaydet iki yerde durur (üstte ve altta) ama tek davranıştır; Geri yalnız altta kalır.
   // Tek birincil eylem: alttaki düğme. Üstteki kopya kaldırıldı, hangisinin asıl olduğu sorusu bitti.
