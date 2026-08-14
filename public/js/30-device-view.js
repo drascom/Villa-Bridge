@@ -623,9 +623,17 @@
   const readingValueText=reading=>{
     const value=reading?.value;
     if(value===null||value===undefined)return t("unknownState");
-    // İkili ölçüm cihazdan ya boolean ya da kendi `value_on/value_off` dizesiyle gelir:
-    // boolean'a dile çevrilmiş karşılık, dizeye cihazın kendi sözcüğü yazılır.
-    if(typeof value==="boolean")return t(value?"readingYes":"readingNo");
+    /* İkili ölçüm cihazdan ya boolean ya da kendi sözcüğüyle gelir (`ON`, `open`, `alarm`…).
+       Eşleme cihazın kendi bildirdiği uçlarla yapılır (`value_on`/`value_off`); tanım yoksa
+       boolean da aynı iki etikete düşer. Karşılaştırma tip-gevşek: Z2M uçları sayı da olabilir. */
+    if(reading.type==="binary"){
+      const same=other=>other!==undefined&&other!==null&&String(value)===String(other);
+      // Cihazın kendi bildirdiği uçlar önce gelir: ters kutuplu ikili ölçümde (`value_on:false`)
+      // ham boolean'a bakmak yanlış etiketi verirdi.
+      if(same(reading.valueOn))return t("readingOn");
+      if(same(reading.valueOff))return t("readingOff");
+    }
+    if(typeof value==="boolean")return t(value?"readingOn":"readingOff");
     if(typeof value==="number"){
       // Ondalık gürültüsü kırpılır (21.599999998 → 21.6); tam sayı olduğu gibi kalır.
       const rounded=Number.isInteger(value)?value:Math.round(value*100)/100;

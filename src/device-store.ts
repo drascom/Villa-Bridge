@@ -261,11 +261,15 @@ function readableFeatures(exposes: unknown): Omit<DeviceReadingView, "value">[] 
     if ((access & 1) !== 0 && (access & 2) === 0 && property && !nonReadingProperties.has(property)) {
       const name = typeof value.name === "string" ? value.name : property;
       const category = typeof value.category === "string" ? value.category : parent.category;
+      const valueOn = scalar(value.value_on);
+      const valueOff = scalar(value.value_off);
       features.set(property, {
         property,
         name: readingLabel(value.label, name),
         type: typeof value.type === "string" ? value.type : "",
         ...(typeof value.unit === "string" && value.unit.length > 0 ? { unit: value.unit } : {}),
+        ...(valueOn === undefined ? {} : { valueOn }),
+        ...(valueOff === undefined ? {} : { valueOff }),
         ...(category ? { category } : {}),
         ...(parent.name ? { parentName: parent.name } : {})
       });

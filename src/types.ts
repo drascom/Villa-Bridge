@@ -103,6 +103,12 @@ export interface DeviceReadingView {
   /** Z2M expose tipi: `numeric` | `binary` | `enum` | `text` … Tanım yoksa boş dize. */
   type: string;
   unit?: string;
+  /**
+   * İkili ölçümün cihaz tarafındaki iki ucu (`ON`/`OFF`, `open`/`closed`, `true`/`false`…).
+   * Panel ham dizeyi göstermek yerine bunlarla eşleyip dile çevirir.
+   */
+  valueOn?: JsonScalar;
+  valueOff?: JsonScalar;
   /** `state`ten okunan son değer; henüz gelmediyse `null`. */
   value: JsonScalar | null;
   /** `config` | `diagnostic` — panelde ikinci sınıf gösterim için. */
