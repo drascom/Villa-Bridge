@@ -3,6 +3,7 @@ package com.villabridge.android
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -48,6 +49,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        applyOrientationLock()
         setContentView(R.layout.activity_main)
         enterImmersiveMode()
         requestNotificationPermission()
@@ -319,6 +321,20 @@ class MainActivity : Activity() {
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 81)
         }
+    }
+
+    /**
+     * Yön kilidi cihaz sınıfına göre: telefonda (smallestScreenWidthDp < 600) dikey kilitli,
+     * tablette serbest. Ayrım `res/values-sw600dp/orientation.xml` niteleyicisiyle yapılır;
+     * model adına ya da piksel sayısına bakılmaz.
+     */
+    private fun applyOrientationLock() {
+        if (!resources.getBoolean(R.bool.lock_portrait_orientation)) return
+        // Çoklu pencerede pencere ölçüsü cihaz sınıfını yanıltır ve sistem istenen yönü zaten
+        // yok sayar; katlanabilir/bölünmüş ekranda dokunma.
+        if (isInMultiWindowMode) return
+        // Saydam/çeviri temalı özel durumlarda setRequestedOrientation istisna atabilir.
+        runCatching { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT }
     }
 
     private fun enterImmersiveMode() {
