@@ -220,6 +220,33 @@
         <div class="settings-actions"><div><strong data-i18n="restartNoticeTitle">A restart is required</strong><div class="settings-note" data-i18n="restartNotice">Saving creates recoverable backups and restarts Villa Bridge. Device names and Zigbee network keys are not changed.</div></div><button id="saveSettings" class="primary" type="submit" data-i18n="saveAndRestart">Save and restart</button></div>
       </form>
       <article id="androidRuntimeCard" class="setting-card runtime-card" hidden><div><h2 data-i18n="runtimeTitle">Villa Bridge runtime</h2><p data-i18n="runtimeLead">Stop Zigbee, MQTT and Matter together when this tablet must release the home network.</p><span id="runtimeStatusText" class="runtime-state" data-i18n="runtimeRunning">System running</span></div><button id="stopRuntime" class="danger-button" type="button" data-i18n="runtimeStop">Stop entire system</button></article>
+      <!-- DUVARDAKİ TABLET. Buradaki her ayar kullanıcıya AİT ve paylaşılan panelde durur;
+           Android tarafı yalnızca uygular (ayrı bir Android ayar ekranı YOKTUR). Kart, köprü
+           yöntemleri olmayan bir tarayıcıda kendiliğinden gizli kalır. -->
+      <article id="tabletCareCard" class="setting-card tablet-care-card" hidden>
+        <div><h2 data-i18n="tabletCareTitle">Wall tablet</h2><p data-i18n="tabletCareLead">Keep the tablet awake and running as the home controller, and decide what the screen does when nobody is in the room.</p></div>
+        <div class="tablet-care-status">
+          <div class="tablet-care-row"><div><strong data-i18n="batteryGuardTitle">Background protection</strong><small data-i18n="batteryGuardLead">Android may put sleeping apps to sleep for good. Exempting Villa Bridge keeps Zigbee, MQTT and Matter alive while the screen is off. You can refuse, and you can take it back later.</small></div><div class="tablet-care-action"><span id="batteryGuardStatus" class="tablet-care-badge">—</span><button id="requestBatteryExemption" class="secondary" type="button" data-i18n="batteryGuardAction">Ask Android</button></div></div>
+          <div class="tablet-care-row"><div><strong data-i18n="watchdogTitle">Automatic restart</strong><small id="watchdogSummary" data-i18n="watchdogHealthy">The system has not crashed since the last stable start.</small></div></div>
+        </div>
+        <div class="tablet-screen-grid">
+          <label class="setting-field"><span data-i18n="screenModeLabel">When nobody touches the screen</span><select id="screenMode"><option value="always" data-i18n="screenModeAlways">Keep it lit</option><option value="dim" data-i18n="screenModeDim">Dim it down</option><option value="sleep" data-i18n="screenModeSleep">Let the screen sleep</option></select><small data-i18n="screenModeHelp">Dimming keeps the panel readable and a touch brings it straight back. Sleeping saves the most power, but the screen then needs the power button to come back.</small></label>
+          <label class="setting-field"><span data-i18n="screenIdleLabel">Wait this long first</span><select id="screenIdleSeconds"><option value="30" data-i18n="screenIdle30">30 seconds</option><option value="60" data-i18n="screenIdle60">1 minute</option><option value="120" data-i18n="screenIdle120">2 minutes</option><option value="300" data-i18n="screenIdle300">5 minutes</option><option value="900" data-i18n="screenIdle900">15 minutes</option></select></label>
+          <label class="setting-field"><span data-i18n="screenBrightnessLabel">Brightness while in use</span><input id="screenBrightness" type="range" min="5" max="100" step="5"><small><span id="screenBrightnessValue">—</span></small></label>
+          <label class="setting-field"><span data-i18n="screenDimBrightnessLabel">Brightness while dimmed</span><input id="screenDimBrightness" type="range" min="2" max="60" step="2"><small><span id="screenDimBrightnessValue">—</span></small></label>
+          <label class="setting-toggle"><input id="screenSystemBrightness" type="checkbox"><span data-i18n="screenSystemBrightnessLabel">Use the tablet’s own brightness while in use</span></label>
+          <label class="setting-toggle"><input id="screenTouchToWake" type="checkbox"><span data-i18n="screenTouchToWakeLabel">A touch on the dimmed screen only wakes it</span></label>
+        </div>
+        <div class="tablet-screen-night">
+          <label class="setting-toggle"><input id="screenNightEnabled" type="checkbox"><span data-i18n="screenNightLabel">Dim further at night</span></label>
+          <div class="tablet-night-fields">
+            <label class="setting-field"><span data-i18n="screenNightStart">From</span><input id="screenNightStart" type="time"></label>
+            <label class="setting-field"><span data-i18n="screenNightEnd">Until</span><input id="screenNightEnd" type="time"></label>
+            <label class="setting-field"><span data-i18n="screenNightBrightness">Night brightness</span><input id="screenNightBrightness" type="range" min="1" max="40" step="1"><small><span id="screenNightBrightnessValue">—</span></small></label>
+          </div>
+          <p id="screenNightState" class="tablet-night-state" role="status" hidden data-i18n="screenNightActive">Night brightness is in effect right now.</p>
+        </div>
+      </article>
       <article id="homeBackupCard" class="setting-card backup-card home-backup-card" data-admin-only>
         <div class="backup-shield home-backup-shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z"/><path d="M12 12v9"/><path d="m3 7.5 9 4.5 9-4.5"/></svg></div>
         <div><h2 data-i18n="homeBackupTitle">Backup</h2><p data-i18n="homeBackupLead">One file with everything: rooms, device and button names, automations, favourites, notes and the Zigbee network itself.</p><p class="backup-warning" data-i18n="fullBackupKeyWarning">This file contains your Zigbee network key. Keep it private — never e-mail it or upload it to a shared folder.</p></div>

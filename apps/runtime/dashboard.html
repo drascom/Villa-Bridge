@@ -44,6 +44,17 @@
   const $=id=>document.getElementById(id);
   const setStatus=(id,ok,text)=>{const el=$(id);el.className=`status ${ok===true?"good":ok===false?"bad":""}`;el.innerHTML=`<span class="dot"></span>${text}`};
   async function json(url,options){const response=await fetch(url,{headers:{"content-type":"application/json"},...options});return response.json()}
+  /* Konagin yasam dongusu: calisma zamani kendi olumunu goremez, konak bildirir. Hic bildirim
+     gelmediyse (Linux'ta systemd bunu yapmiyor) satir sessizce kendi haline birakilir. */
+  function renderHostLifecycle(host){
+    if(!host)return;
+    const line=host.exhausted
+      ?`Runtime restarts exhausted after ${host.restarts} consecutive failures (last exit code ${host.lastExitCode}).`
+      :host.restarts>0
+        ?`Runtime restarted ${host.restarts}/${host.maxRestarts} times · next backoff ${Math.round(host.nextDelayMs/1000)} s · last exit code ${host.lastExitCode}.`
+        :"Runtime has not crashed since the last stable start.";
+    $("runtimeResult").textContent=line;
+  }
   async function refresh(){
     try{
       const data=await json("/api/android/diagnostics");
@@ -55,6 +66,7 @@
       setStatus("matterStatus",data.matter.ready,data.matter.ready?"Devices exposed to Matter":data.matter.error||"Waiting for bridge");
       $("address").textContent=data.addresses[0]?.address||"No LAN address";
       setStatus("arch",data.multicast.available,`${data.architecture} · mDNS ${data.multicast.available?"ready":"unavailable"}`);
+      renderHostLifecycle(data.host);
     }catch(error){setStatus("coreStatus",false,error.message)}
   }
   $("probeForm").onsubmit=async event=>{

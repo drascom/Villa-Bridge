@@ -5,6 +5,8 @@
     <string name="service_running">Villa Bridge çalışıyor</string>
     <string name="service_stopping">Villa Bridge durduruluyor…</string>
     <string name="service_error">Villa Bridge kontrol edilmeli</string>
+    <string name="service_restarting">Villa Bridge %1$d sn içinde yeniden başlıyor (%2$d. deneme)</string>
+    <string name="service_exhausted">Villa Bridge tekrarlanan hatalardan sonra durdu. Yeniden denemek için uygulamayı açın.</string>
     <string name="runtime_starting_title">Villa Bridge başlatılıyor</string>
     <string name="runtime_stage_preparing">Yerel çalışma ortamı hazırlanıyor…</string>
     <string name="runtime_stage_configuration">Ev yapılandırması kontrol ediliyor…</string>

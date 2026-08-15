@@ -5,6 +5,8 @@
     <string name="service_running">Villa Bridge is running</string>
     <string name="service_stopping">Villa Bridge is stopping…</string>
     <string name="service_error">Villa Bridge needs attention</string>
+    <string name="service_restarting">Villa Bridge restarts in %1$d s (attempt %2$d)</string>
+    <string name="service_exhausted">Villa Bridge stopped after repeated failures. Open the app to try again.</string>
     <string name="runtime_starting_title">Starting Villa Bridge</string>
     <string name="runtime_stage_preparing">Preparing the local runtime…</string>
     <string name="runtime_stage_configuration">Checking the home configuration…</string>

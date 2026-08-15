@@ -17,8 +17,20 @@ short, a system update restarts the device, and battery or sleep restrictions
 can pause background work. Villa Bridge pushes back on all three — a foreground
 service with wake, Wi-Fi and multicast locks, a boot receiver, and automatic
 restart after an unexpected exit — but the operating system has the final word.
-Exclude the app from battery optimisation, keep the tablet on mains power, and
-expect an occasional restart. If the house should keep running while nobody is
+
+The restart is deliberately **not** unconditional. Because the Node runtime
+shares the process, restarting it means killing that process, so an unbounded
+retry would turn a bad configuration into a tablet that reboots itself every
+second. The watchdog backs off exponentially (5 s, 10 s, 20 s … capped at
+300 s), gives up after eight consecutive failures, and resets its counter once
+the runtime has stayed healthy for two minutes. Its state is reported to the
+runtime, so `/api/android/diagnostics` and the wall tablet card in the panel
+settings both show how many restarts happened and why. A user-pressed Start or
+a device reboot clears the counter.
+
+Battery optimisation is asked for, never forced: the panel explains what the
+exemption buys and offers the button, and a refusal is a supported state.
+Keep the tablet on mains power and expect an occasional restart. If the house should keep running while nobody is
 watching it, put the controller on a Linux/Raspberry Pi host and let the tablet
 run as a monitor; LAN discovery makes that switch by itself.
 
@@ -170,8 +182,18 @@ different mechanisms for that, and they are not equally strong:
 
   Villa Bridge does not ship a device-admin receiver yet, so today the app
   cannot be made device owner and screen pinning is the practical option. The
-  APK does hide the system bars and keeps the screen on, which covers most of
-  what a wall panel needs.
+  APK does hide the system bars and manages the screen itself, which covers
+  most of what a wall panel needs.
+
+### Screen behaviour
+
+What the screen does when nobody touches it — stay lit, dim, or sleep, how long
+it waits, how bright it is, and whether a night window dims it further — is a
+**panel** setting (Settings → Wall tablet), not an Android one. There is no
+Android settings screen: the panel decides and sends the numbers in effect right
+now, and the host only writes them to its own window. System brightness is never
+changed. The host keeps the last applied values so a tablet rebooting at 3 a.m.
+does not light the room while the panel loads.
 
 Provisioning files, credentials, and network keys must never enter Git. Keep
 app-private device-protected directories at mode `0700` and files at `0600`.

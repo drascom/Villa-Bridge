@@ -30,7 +30,11 @@ const runtime = {
   peerWatch: null,
   lastProbe: null,
   provisioning: { provisioned: false, setupPending: false, reason: "Not checked." },
-  firstRun: null
+  firstRun: null,
+  // Konagin yasam dongusu defteri (Android'de on plan servisi, Linux'ta systemd). Calisma
+  // zamani kendi olumunu goremez; kac kez ve neden yeniden baslatildigini ancak konak bilir,
+  // o yuzden konak buraya bildirir ve tanilama tek yerden okunur. Bildirilmediyse `null`.
+  host: null
 };
 
 function parseArguments(argv) {
@@ -139,6 +143,7 @@ function diagnostics(config) {
     core: runtime.core,
     matter: runtime.matter,
     multicast: runtime.multicast,
+    host: runtime.host,
     peerWatch: runtime.peerWatch,
     lastProbe: runtime.lastProbe,
     endpoints: {
@@ -148,6 +153,24 @@ function diagnostics(config) {
       mqtt: `mqtt://${config.mqttHost}:${config.mqttPort}`,
       matterbridge: "ws://127.0.0.1:8283"
     }
+  };
+}
+
+/** Konak raporunu sinirlari belli sayilara indirger; gelen her sey dogrulanir. */
+function hostState(input) {
+  const number = (value, max) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.min(Math.floor(parsed), max) : 0;
+  };
+  return {
+    restarts: number(input?.restarts, 10000),
+    lastExitCode: Number.isFinite(Number(input?.lastExitCode)) ? Number(input.lastExitCode) : 0,
+    lastFailureAt: number(input?.lastFailureAt, Number.MAX_SAFE_INTEGER) || null,
+    nextDelayMs: number(input?.nextDelayMs, 86_400_000),
+    maxDelayMs: number(input?.maxDelayMs, 86_400_000),
+    maxRestarts: number(input?.maxRestarts, 10000),
+    exhausted: input?.exhausted === true,
+    reportedAt: new Date().toISOString()
   };
 }
 
@@ -387,6 +410,27 @@ function createHttpServer(config, hooks = {}) {
           shutdownRequested = true;
           setImmediate(() => void hooks.shutdown?.());
         }
+        return;
+      }
+      /*
+       * Konagin yasam dongusu raporu. Yalnizca yerelden ve denetim jetonuyla kabul edilir —
+       * ayni kapi kapatma ucuyla ayni guven sinirinda. Icerik SAYIDIR: kac yeniden baslatma,
+       * son cikis kodu, siradaki geri cekilme suresi. Konak adi ya da konak-ozel bir alan
+       * beklenmez; hem Android on plan servisi hem baska bir denetleyici ayni sozlesmeyi
+       * kullanabilir.
+       */
+      if (request.method === "POST" && url.pathname === "/api/android/runtime/host-state") {
+        const bearer = /^Bearer (.+)$/.exec(request.headers.authorization || "")?.[1] || "";
+        if (
+          !isLocalRequest(request) ||
+          !config.controlToken ||
+          !safeCredentialEqual(bearer, config.controlToken)
+        ) {
+          sendJson(response, 403, { ok: false, error: "Runtime control was denied." });
+          return;
+        }
+        runtime.host = hostState(await readJson(request));
+        sendJson(response, 200, { ok: true, host: runtime.host });
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/android/probe/tcp") {

@@ -621,6 +621,132 @@
       setup.innerHTML=`<span class="auth-runtime-dot" aria-hidden="true"></span><div><strong>${t("localFirstAdminTitle")}</strong><small>${t("localFirstAdminLead")}</small></div>`;
     }
   }
+  /* DUVARDAKİ TABLETİN EKRANI VE AYAKTA KALMASI.
+     Kullanıcının gördüğü her ayar burada — Android tarafında ayar ekranı yoktur, orası yalnız
+     uygular. Bu yüzden gece penceresinin ne zaman başladığına, hangi kademenin ne demek
+     olduğuna karar veren taraf da burasıdır: köprüye yalnızca "şu an geçerli olan" sayılar
+     gider (kip, bekleme süresi, iki parlaklık). Tercihler cihazda kalır (`localStorage`) —
+     duvardaki tabletin ekran davranışı evin ortak ayarı değil, o cihazın kendi ayarıdır. */
+  const screenPolicyStorageKey="villa-screen-policy";
+  const screenPolicyDefaults={mode:"always",idleSeconds:120,systemBrightness:true,brightness:80,dimBrightness:12,touchToWake:true,nightEnabled:false,nightStart:"23:00",nightEnd:"07:00",nightBrightness:6};
+  const screenIdleChoices=[30,60,120,300,900];
+  const screenPolicyPreferences=(()=>{
+    const stored=(()=>{try{return JSON.parse(localStorage.getItem(screenPolicyStorageKey)||"null")}catch{return null}})();
+    const value={...screenPolicyDefaults,...(stored&&typeof stored==="object"?stored:{})};
+    const clamp=(number,minimum,maximum,fallback)=>Number.isFinite(Number(number))?Math.min(maximum,Math.max(minimum,Math.round(Number(number)))):fallback;
+    const clock=(text,fallback)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(String(text))?String(text):fallback;
+    return{
+      mode:["always","dim","sleep"].includes(value.mode)?value.mode:screenPolicyDefaults.mode,
+      idleSeconds:screenIdleChoices.includes(Number(value.idleSeconds))?Number(value.idleSeconds):screenPolicyDefaults.idleSeconds,
+      systemBrightness:value.systemBrightness!==false,
+      brightness:clamp(value.brightness,5,100,screenPolicyDefaults.brightness),
+      dimBrightness:clamp(value.dimBrightness,2,60,screenPolicyDefaults.dimBrightness),
+      touchToWake:value.touchToWake!==false,
+      nightEnabled:value.nightEnabled===true,
+      nightStart:clock(value.nightStart,screenPolicyDefaults.nightStart),
+      nightEnd:clock(value.nightEnd,screenPolicyDefaults.nightEnd),
+      nightBrightness:clamp(value.nightBrightness,1,40,screenPolicyDefaults.nightBrightness)
+    };
+  })();
+  let screenPolicyTimer=null;
+  const screenBridgeAvailable=()=>typeof window.VillaAndroid?.applyScreenPolicy==="function";
+  function saveScreenPreferences(){try{localStorage.setItem(screenPolicyStorageKey,JSON.stringify(screenPolicyPreferences))}catch{}}
+  /* Gece penceresi gece yarısını aşabilir (23:00 → 07:00); o durumda "aralık dışı" değil
+     "iki parçanın birleşimi" aranır. */
+  function screenNightActive(now=new Date()){
+    if(!screenPolicyPreferences.nightEnabled)return false;
+    const minutes=text=>{const[hour,minute]=String(text).split(":").map(Number);return hour*60+minute};
+    const current=now.getHours()*60+now.getMinutes();
+    const start=minutes(screenPolicyPreferences.nightStart);
+    const end=minutes(screenPolicyPreferences.nightEnd);
+    if(start===end)return false;
+    return start<end?current>=start&&current<end:current>=start||current<end;
+  }
+  function effectiveScreenPolicy(){
+    const night=screenNightActive();
+    const active=night?screenPolicyPreferences.nightBrightness:(screenPolicyPreferences.systemBrightness?-1:screenPolicyPreferences.brightness);
+    const idle=night?Math.min(screenPolicyPreferences.nightBrightness,screenPolicyPreferences.dimBrightness):screenPolicyPreferences.dimBrightness;
+    return{
+      mode:screenPolicyPreferences.mode,
+      idleSeconds:screenPolicyPreferences.mode==="always"?0:screenPolicyPreferences.idleSeconds,
+      activeBrightness:active,
+      idleBrightness:idle,
+      touchToWake:screenPolicyPreferences.touchToWake
+    };
+  }
+  function pushScreenPolicy(){
+    if(!screenBridgeAvailable())return;
+    try{window.VillaAndroid.applyScreenPolicy(JSON.stringify(effectiveScreenPolicy()))}
+    catch(error){showToast(t("screenPolicyFailed",{error:error.message}),true)}
+  }
+  function updateScreenPreference(patch){
+    Object.assign(screenPolicyPreferences,patch);
+    saveScreenPreferences();
+    pushScreenPolicy();
+    renderTabletCare();
+  }
+  function hostStatusSnapshot(){
+    if(typeof window.VillaAndroid?.hostStatus!=="function")return null;
+    try{return JSON.parse(window.VillaAndroid.hostStatus())}catch{return null}
+  }
+  function requestBatteryExemption(){
+    if(typeof window.VillaAndroid?.requestBatteryExemption!=="function")return showToast(t("batteryGuardAndroidOnly"),true);
+    window.VillaAndroid.requestBatteryExemption();
+    /* Sistem penceresi kendi başına açılır; kullanıcı geri döndüğünde durum tazelensin.
+       Reddetmek serbest — panel bir daha sormaz, yalnız durumu gösterir. */
+    setTimeout(renderTabletCare,2000);
+  }
+  function renderTabletCare(){
+    const card=$("#tabletCareCard");
+    if(!card)return;
+    const available=screenBridgeAvailable();
+    card.hidden=!available;
+    if(!available)return;
+    const status=hostStatusSnapshot();
+    const exempt=status?.batteryExempt===true;
+    $("#batteryGuardStatus").textContent=t(exempt?"batteryGuardProtected":"batteryGuardLimited");
+    $("#batteryGuardStatus").className=exempt?"tablet-care-badge online-text":"tablet-care-badge unknown-text";
+    $("#requestBatteryExemption").textContent=t(exempt?"batteryGuardReview":"batteryGuardAction");
+    const restarts=Number(status?.restarts||0);
+    $("#watchdogSummary").textContent=status?.exhausted===true
+      ?t("watchdogExhausted",{count:restarts})
+      :restarts>0
+        ?t("watchdogRestarts",{count:restarts,max:Number(status?.maxRestarts||0),seconds:Math.round(Number(status?.nextDelayMs||0)/1000),code:Number(status?.lastExitCode||0)})
+        :t("watchdogHealthy");
+    $("#screenMode").value=screenPolicyPreferences.mode;
+    $("#screenIdleSeconds").value=String(screenPolicyPreferences.idleSeconds);
+    $("#screenIdleSeconds").disabled=screenPolicyPreferences.mode==="always";
+    $("#screenSystemBrightness").checked=screenPolicyPreferences.systemBrightness;
+    $("#screenBrightness").value=String(screenPolicyPreferences.brightness);
+    $("#screenBrightness").disabled=screenPolicyPreferences.systemBrightness;
+    $("#screenBrightnessValue").textContent=screenPolicyPreferences.systemBrightness?t("screenBrightnessSystem"):`${screenPolicyPreferences.brightness}%`;
+    $("#screenDimBrightness").value=String(screenPolicyPreferences.dimBrightness);
+    $("#screenDimBrightness").disabled=screenPolicyPreferences.mode!=="dim";
+    $("#screenDimBrightnessValue").textContent=`${screenPolicyPreferences.dimBrightness}%`;
+    $("#screenTouchToWake").checked=screenPolicyPreferences.touchToWake;
+    $("#screenTouchToWake").disabled=screenPolicyPreferences.mode!=="dim";
+    $("#screenNightEnabled").checked=screenPolicyPreferences.nightEnabled;
+    $("#screenNightStart").value=screenPolicyPreferences.nightStart;
+    $("#screenNightEnd").value=screenPolicyPreferences.nightEnd;
+    $("#screenNightBrightness").value=String(screenPolicyPreferences.nightBrightness);
+    $("#screenNightBrightnessValue").textContent=`${screenPolicyPreferences.nightBrightness}%`;
+    $$("#tabletCareCard .tablet-night-fields .setting-field").forEach(field=>field.classList.toggle("disabled",!screenPolicyPreferences.nightEnabled));
+    ["#screenNightStart","#screenNightEnd","#screenNightBrightness"].forEach(id=>{$(id).disabled=!screenPolicyPreferences.nightEnabled});
+    $("#screenNightState").hidden=!screenNightActive();
+  }
+  /* Gece penceresi dakikada bir yeniden değerlendirilir: saat 23:00'ü geçtiğinde ekran kimse
+     dokunmadan kararmalı. Zamanlayıcı yalnız Android kabuğunda kurulur. */
+  function startScreenPolicyTimer(){
+    if(screenPolicyTimer||!screenBridgeAvailable())return;
+    let wasNight=screenNightActive();
+    screenPolicyTimer=setInterval(()=>{
+      const night=screenNightActive();
+      if(night===wasNight)return;
+      wasNight=night;
+      pushScreenPolicy();
+      renderTabletCare();
+    },60000);
+  }
   function configureAndroidActions(){
     const button=$("#openWifiSettings");
     const available=typeof window.VillaAndroid?.openWifiSettings==="function";
@@ -638,6 +764,11 @@
     if(runtimeAvailable){
       $("#runtimeStatusText").textContent=t(status==="stopped"?"runtimeStopped":"runtimeRunning");
     }
+    /* Ekran ilkesi her açılışta yeniden gönderilir: kabuk son bilinen ilkeyi saklıyor olsa da
+       kaynak burasıdır, panel açıldığında ikisi mutlaka aynı olmalı. */
+    pushScreenPolicy();
+    startScreenPolicyTimer();
+    renderTabletCare();
   }
   function openWifiSettings(){
     if(typeof window.VillaAndroid?.openWifiSettings==="function"){

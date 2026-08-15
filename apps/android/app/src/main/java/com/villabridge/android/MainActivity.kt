@@ -1,6 +1,7 @@
 package com.villabridge.android
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.DownloadManager
 import android.content.Intent
@@ -12,7 +13,9 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -50,10 +53,18 @@ class MainActivity : Activity() {
     @Volatile private var runtimeMode = "starting"
     private var pendingGeolocationCallback: GeolocationPermissions.Callback? = null
     private var pendingGeolocationOrigin: String? = null
+    @Volatile private var screenPolicy = ScreenPolicy.DEFAULT
+    private var screenDimmed = false
+    private var swallowingWakeGesture = false
+    private val enterIdleRunnable = Runnable { enterIdleScreen() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Kayitli ekran ilkesi panel yuklenmeden ONCE uygulanir: gece yarisi yeniden acilan
+        // tablet, panel ayaga kalkana kadar gecen saniyelerde odayi aydinlatmasin.
+        screenPolicy = ScreenPolicyStore.load(this)
+        applyScreenWindowState()
+        scheduleScreenIdle()
         applyOrientationLock()
         setContentView(R.layout.activity_main)
         enterImmersiveMode()
@@ -72,8 +83,90 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         enterImmersiveMode()
+        noteScreenActivity()
         synchronizeRuntimeUi(startService = false)
     }
+
+    override fun onPause() {
+        // Arka planda sayac isletmenin anlami yok; geri donuste `onResume` yeniden kurar.
+        mainHandler.removeCallbacks(enterIdleRunnable)
+        super.onPause()
+    }
+
+    /**
+     * DOKUNUNCA UYANMA. Ekran karartilmisken gelen ilk dokunus yalnizca parlakligi geri getirir;
+     * `touchToWake` acikken o hareketin tamami yutulur, yani duvara uzanan el yanlislikla bir
+     * isigi sondurmez. Kalan her dokunus bosta kalma sayacini bastan baslatir.
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val wasDimmed = screenDimmed
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            swallowingWakeGesture = wasDimmed && screenPolicy.touchToWake
+        }
+        noteScreenActivity()
+        val swallow = swallowingWakeGesture
+        if (
+            event.actionMasked == MotionEvent.ACTION_UP ||
+            event.actionMasked == MotionEvent.ACTION_CANCEL
+        ) {
+            swallowingWakeGesture = false
+        }
+        if (swallow) return true
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun noteScreenActivity() {
+        if (screenDimmed) {
+            screenDimmed = false
+            applyScreenWindowState()
+        }
+        scheduleScreenIdle()
+    }
+
+    private fun scheduleScreenIdle() {
+        mainHandler.removeCallbacks(enterIdleRunnable)
+        if (screenPolicy.mode == ScreenPolicy.MODE_ALWAYS || screenPolicy.idleSeconds <= 0) return
+        mainHandler.postDelayed(enterIdleRunnable, screenPolicy.idleSeconds * 1_000L)
+    }
+
+    private fun enterIdleScreen() {
+        if (screenDimmed) return
+        screenDimmed = true
+        applyScreenWindowState()
+    }
+
+    /**
+     * Ilke yalnizca BU PENCEREYE yazilir: cihazin sistem parlakligina dokunulmaz, uygulamadan
+     * cikildiginda tablet kendi ayarina doner. `sleep` kipinde tek yapilan ekrani acik tutma
+     * bayragini birakmaktir; ekrani ne zaman sondurecegine Android'in kendi zaman asimi karar
+     * verir ve o ekrani geri getiren sey guc dugmesidir.
+     */
+    private fun applyScreenWindowState() {
+        val keepOn = !(screenPolicy.mode == ScreenPolicy.MODE_SLEEP && screenDimmed)
+        if (keepOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        val level = if (screenDimmed && screenPolicy.mode == ScreenPolicy.MODE_DIM) {
+            screenPolicy.idleBrightness
+        } else {
+            screenPolicy.activeBrightness
+        }
+        val attributes = window.attributes
+        attributes.screenBrightness = if (level < 0) {
+            WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        } else {
+            // Sifir "ekran kapali" degil "en dusuk okunabilir" demektir: tam sifirda bazi
+            // panellerde arka isik tumden soner ve ekran olu gorunur.
+            (level / 100f).coerceIn(0.02f, 1f)
+        }
+        window.attributes = attributes
+    }
+
+    private fun batteryOptimizationExempt(): Boolean = runCatching {
+        (getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
+    }.getOrDefault(false)
 
     override fun onDestroy() {
         pendingGeolocationCallback?.invoke(pendingGeolocationOrigin, false, false)
@@ -436,6 +529,62 @@ class MainActivity : Activity() {
         @android.webkit.JavascriptInterface
         fun stopRuntime() {
             runOnUiThread { this@MainActivity.stopRuntime() }
+        }
+
+        /**
+         * Konagin durumu tek okumada: pil muafiyeti, yeniden baslatma defteri ve su an
+         * uygulanan ekran ilkesi. Panel bunu ayar kartinda gosterir; ayni bilgi calisma
+         * zamanina da bildirildigi icin `/api/android/diagnostics` uzerinden de gorunur.
+         */
+        @android.webkit.JavascriptInterface
+        fun hostStatus(): String {
+            val report = RuntimeWatchdog.report(this@MainActivity)
+            return JSONObject()
+                .put("batteryExempt", batteryOptimizationExempt())
+                .put("restarts", report.failures)
+                .put("lastExitCode", report.lastExitCode)
+                .put("lastFailureAt", report.lastFailureAt)
+                .put("nextDelayMs", report.nextDelayMs)
+                .put("exhausted", report.exhausted)
+                .put("maxRestarts", RuntimeWatchdog.MAX_FAILURES)
+                .put("screen", screenPolicy.toJson())
+                .toString()
+        }
+
+        /**
+         * Pil muafiyeti ISTEGI — zorlama yok. Muafiyet zaten varsa sistem listesi acilir ki
+         * kullanici istedigi zaman geri alabilsin. Aciklama panelde, karar kullanicinin.
+         */
+        @SuppressLint("BatteryLife")
+        @android.webkit.JavascriptInterface
+        fun requestBatteryExemption() {
+            runOnUiThread {
+                val settingsIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                if (batteryOptimizationExempt()) {
+                    runCatching { startActivity(settingsIntent) }
+                    return@runOnUiThread
+                }
+                val request = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:$packageName"))
+                runCatching { startActivity(request) }
+                    .onFailure { runCatching { startActivity(settingsIntent) } }
+            }
+        }
+
+        /**
+         * Ekran ilkesini uygular. Gelen degerler SAYIDIR: hangi saatte gece basladigina,
+         * hangi kademenin ne demek oldugune panel karar verir; burada takvim yoktur.
+         */
+        @android.webkit.JavascriptInterface
+        fun applyScreenPolicy(policy: String) {
+            val parsed = ScreenPolicy.fromJson(policy) ?: return
+            runOnUiThread {
+                screenPolicy = parsed
+                ScreenPolicyStore.save(this@MainActivity, parsed)
+                screenDimmed = false
+                applyScreenWindowState()
+                scheduleScreenIdle()
+            }
         }
     }
 
