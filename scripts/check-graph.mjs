@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { assertPanelGraph } from "./panel-graph.mjs";
 import { assertHomeLayout } from "./check-home-layout.mjs";
 import { assertRuntimeModuleGraph } from "./runtime-module-graph.mjs";
+import { assertHostAdapters } from "./check-host-adapters.mjs";
 import { assertThemePackages } from "./check-theme-packages.mjs";
 import { assertPanelInk } from "./check-panel-ink.mjs";
 import { verifyAstronomy } from "./verify-astronomy.mjs";
@@ -23,6 +24,12 @@ async function main() {
 
   const runtime = await assertRuntimeModuleGraph(path.join(projectRoot, "apps", "runtime"));
   console.log(`Calisma zamani modul grafigi tamam: ${runtime.resolved.length} modul.`);
+
+  const adapters = await assertHostAdapters(projectRoot);
+  console.log(
+    `Konak adaptoru siniri tamam: ${adapters.files} dosya, ${adapters.flags} calisma zamani bayragi, ` +
+      `${adapters.bridgeCount} JS koprusu yontemi.`
+  );
 
   const themes = await assertThemePackages(projectRoot);
   console.log(`Tema paketleri tamam: ${themes.length} paket.`);

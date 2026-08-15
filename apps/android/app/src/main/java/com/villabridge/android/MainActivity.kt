@@ -398,17 +398,18 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Panele acilan tek Android-ozel yuzey. Buradaki her yontem yalnizca bu konakta
+     * var olan bir yetenektir, bu yuzden ortak kodda (`public/js`, `apps/runtime`)
+     * ozellik denetimiyle cagrilan bir tuketicisi olmak zorundadir; sahipsiz yontem
+     * `scripts/check-host-adapters.mjs` tarafindan reddedilir.
+     */
     inner class AndroidBridge {
         @android.webkit.JavascriptInterface
         fun openPowerSettings() {
             runOnUiThread {
                 startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             }
-        }
-
-        @android.webkit.JavascriptInterface
-        fun reload() {
-            runOnUiThread { webView.reload() }
         }
 
         @android.webkit.JavascriptInterface
@@ -430,11 +431,8 @@ class MainActivity : Activity() {
         fun connectedServerAddress(): String =
             if (runtimeMode == "android-monitor") trustedDashboardOrigin.host.orEmpty() else ""
 
-        @android.webkit.JavascriptInterface
-        fun startRuntime() {
-            runOnUiThread { this@MainActivity.startRuntime() }
-        }
-
+        // Calisma zamanini yeniden BASLATMAK panelden yapilamaz: durdurulunca panel de
+        // kapanir, geri acma yolu bu ekrandaki native "Start Villa Bridge" dugmesidir.
         @android.webkit.JavascriptInterface
         fun stopRuntime() {
             runOnUiThread { this@MainActivity.stopRuntime() }

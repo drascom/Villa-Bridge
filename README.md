@@ -179,6 +179,15 @@ and verified on the LAN, Android automatically becomes a dashboard-only monitor
 and leaves the service stack disabled. This validation is device-specific and
 is not yet a general production-readiness claim.
 
+A tablet is not as dependable as an always-on server: Android can kill the
+runtime under memory pressure, system updates reboot the device, and battery or
+sleep restrictions may pause background work. On Android the coordinator must
+also be reached over the network (SLZB or another Zigbee-over-IP adapter) — USB
+coordinator sticks are supported only on the Linux/Pi installation. If you want
+a wall tablet locked to the dashboard, read the kiosk notes in the
+[Android alpha guide](apps/android/README.md) before setting the tablet up:
+true kiosk mode has to be arranged on a factory-fresh device.
+
 ## Contributing
 
 Ideas, device reports and pull requests are welcome. Read

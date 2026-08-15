@@ -9,6 +9,26 @@ core, or Matterbridge. Otherwise it starts the complete local stack.
 Firewalled Linux/Pi hosts must allow UDP `8093` and the configured dashboard
 TCP port on the trusted home LAN.
 
+## What a tablet host can and cannot promise
+
+A tablet is a good dashboard and a workable controller, but it is not the equal
+of an always-on server. Android may kill the runtime process when memory runs
+short, a system update restarts the device, and battery or sleep restrictions
+can pause background work. Villa Bridge pushes back on all three — a foreground
+service with wake, Wi-Fi and multicast locks, a boot receiver, and automatic
+restart after an unexpected exit — but the operating system has the final word.
+Exclude the app from battery optimisation, keep the tablet on mains power, and
+expect an occasional restart. If the house should keep running while nobody is
+watching it, put the controller on a Linux/Raspberry Pi host and let the tablet
+run as a monitor; LAN discovery makes that switch by itself.
+
+**Use a network coordinator.** On Android the coordinator must be reachable over
+TCP — an SLZB or another Zigbee-over-IP adapter. A USB coordinator stick is not
+supported here: the core reports `zigbee.serialSupported` as false whenever the
+node role is `android`, so the dashboard offers only a `tcp://` address. The
+serial path exists solely for a Linux/Raspberry Pi installation. A network
+coordinator also survives the tablet being unplugged, moved, or replaced.
+
 ## Runtime Architecture
 
 | Port | Service |
@@ -52,10 +72,6 @@ Host requirements are JDK 17, Android SDK 35, NDK `27.2.12479018`, CMake
 ```sh
 npm install
 npm test
-npx --yes node@18.20.4 --test \
-  apps/runtime/lan-discovery.test.cjs \
-  apps/runtime/main.test.cjs \
-  apps/runtime/orchestration.test.cjs
 npm run android:build
 JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
   apps/android/gradlew -p apps/android lintDebug testDebugUnitTest
@@ -130,6 +146,32 @@ an `unprovisioned` reason if a configuration file cannot be read at all.
 For Home Assistant, use the tablet's stable LAN address, port `1883`, and the
 same `mqtt.user`/`mqtt.password` values. Do not put credentials in screenshots,
 logs, committed YAML, or shell history.
+
+### Kiosk mode
+
+A wall tablet is usually meant to show only Villa Bridge. Android has two
+different mechanisms for that, and they are not equally strong:
+
+- **Screen pinning** is available on any tablet (Settings → Security → App
+  pinning). It needs no preparation, but the user can leave it by holding Back
+  and Overview. Treat it as a convenience, not a lock.
+- **Real kiosk (lock task) mode** requires the app to be the **device owner**,
+  and a device owner can only be set on a tablet that has no accounts on it yet:
+
+  ```sh
+  adb shell dpm set-device-owner com.villabridge.android/<device-admin-receiver>
+  ```
+
+  On a tablet that already has a Google account the command fails, and the only
+  way forward is a factory reset. So this belongs at the start of the install
+  procedure, not at the end: factory-reset the tablet, skip the account during
+  setup, connect Wi-Fi, enable USB debugging, install the APK, then set the
+  device owner. Undoing it later needs another reset.
+
+  Villa Bridge does not ship a device-admin receiver yet, so today the app
+  cannot be made device owner and screen pinning is the practical option. The
+  APK does hide the system bars and keeps the screen on, which covers most of
+  what a wall panel needs.
 
 Provisioning files, credentials, and network keys must never enter Git. Keep
 app-private device-protected directories at mode `0700` and files at `0600`.

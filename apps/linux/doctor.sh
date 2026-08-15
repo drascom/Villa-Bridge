@@ -37,17 +37,29 @@ else
   FAILED=1
 fi
 
-check test -f "$DATA_DIR/provisioning.json"
-check test -f "$DATA_DIR/config/villa-bridge.yaml"
-check test -f "$DATA_DIR/zigbee/configuration.yaml"
+# Yalnizca dizinin kendisi burada denetlenir: onu isletim sistemi duzeyinde
+# `install.sh` yaratir. ICINDEKI dosyalari paylasilan calisma zamani tohumlar
+# (apps/runtime/first-run.cjs), cunku Android tablette kabuk ve kurulum betigi
+# yoktur. Dosya listesini burada tekrarlamak o bilgiyi tek konaga hapsederdi;
+# tohumlamanin sonucu asagida diagnostics uzerinden sorulur.
+check test -d "$DATA_DIR"
 check systemctl is-enabled villa-bridge.service
 check systemctl is-active villa-bridge.service
 
 if command -v curl >/dev/null 2>&1; then
   # A fresh install is not "not ready", it is "waiting for the setup wizard".
   # Reporting that as a failure would send people looking for a broken service.
-  MODE="$(curl --silent --max-time 3 http://127.0.0.1:8092/api/android/diagnostics \
-    | sed -n 's/.*"mode":"\([^"]*\)".*/\1/p')"
+  DIAGNOSTICS="$(curl --silent --max-time 3 \
+    http://127.0.0.1:8092/api/android/diagnostics 2>/dev/null || true)"
+  MODE="$(printf '%s' "$DIAGNOSTICS" | sed -n 's/.*"mode":"\([^"]*\)".*/\1/p')"
+  # Ilk acilis tohumlamasinin sonucunu calisma zamani bildirir; hangi dosyalari
+  # yazdigi onun bilgisidir, bu betigin degil.
+  if [ -n "$DIAGNOSTICS" ]; then
+    case "$DIAGNOSTICS" in
+      *'"provisioned":true'*) printf 'OK   runtime configuration is seeded and readable\n' ;;
+      *) printf 'INFO runtime reports no usable configuration yet\n' ;;
+    esac
+  fi
   case "$MODE" in
     *-setup)
       printf 'INFO runtime is in setup mode; no coordinator is owned yet\n'

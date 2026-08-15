@@ -56,7 +56,7 @@ object NodeRuntime {
                 arrayOf(
                     "node",
                     File(projectDirectory, "main.cjs").absolutePath,
-                    "--host=127.0.0.1",
+                    "--core-host=127.0.0.1",
                     "--diagnostics-port=8092",
                     "--mqtt-host=0.0.0.0",
                     "--mqtt-port=1883",

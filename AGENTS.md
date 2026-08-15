@@ -21,6 +21,20 @@ family (`--glass-*`), so never hard-code colors into individual rules.
 Deployment units and the Matterbridge alias hook are in `deploy/`; safe defaults
 are in `config/default.yaml`.
 
+The brain is shared: `src/`, `public/` and `apps/runtime/`. `apps/android/` and
+`apps/linux/` carry host-specific launching, packaging and lifecycle code only.
+No capability a user can reach may live in a host adapter — if it does, the two
+hosts fork and the feature silently exists on one of them. Anything a host
+"prepares" (configuration, generated keys, seeded files) belongs in
+`apps/runtime/first-run.cjs`, which both hosts run; the host passes `--data-dir`
+and asks `/api/android/diagnostics` for the result. `scripts/check-host-adapters.mjs`
+(part of `npm run check`) enforces the mechanically checkable part of this:
+unknown runtime flags, shared config/state file names, device-model and home
+protocol identifiers, and Android JS-bridge methods with no consumer in shared
+code. It deliberately does not scan for domain words in general — user-visible
+strings like "Connecting to the Zigbee coordinator" are legitimate in a host
+splash screen, and such a rule would only produce noise.
+
 ## Build, Check, and Development Commands
 
 - `npm install` installs Node.js dependencies.
