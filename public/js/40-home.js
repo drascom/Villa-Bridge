@@ -466,7 +466,8 @@
     const lowBatteryFact=$("#lowBatteryCount");
     lowBatteryFact.textContent=t("lowBatteryDevices",{count:lowBatteryDevices});
     lowBatteryFact.hidden=lowBatteryDevices===0;
-    $("#chooseZigbeeRestore").hidden=state.health?.mode!=="direct";
+    // Ayrı Zigbee geri yükleme düğmesi kalktı: tek yedek düğmesi her kipte durur, uygulanamayan
+    // bölümü sunucu reddeder (`/api/backup/full/restore`).
     applyZigbeeAdapterOwnership();
     renderPairingRouters();
     renderZigbeeGroups();
