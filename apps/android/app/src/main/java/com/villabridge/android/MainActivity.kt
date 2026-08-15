@@ -15,10 +15,12 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.WebResourceError
@@ -130,6 +132,9 @@ class MainActivity : Activity() {
 
     @Suppress("SetJavaScriptEnabled")
     private fun configureWebView() {
+        // Hata ayiklama yapisinda uzaktan denetim acilir (chrome://inspect). Yayim yapisinda
+        // KAPALI kalir: acik birakmak panelin tamamini USB'den surulebilir hale getirirdi.
+        if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.setGeolocationEnabled(true)
@@ -148,6 +153,22 @@ class MainActivity : Activity() {
             enqueueDownload(url, userAgent, contentDisposition, mimeType)
         }
         webView.webChromeClient = object : WebChromeClient() {
+            /*
+             * Panelin konsolu logcat'e baglanir. Bunsuz tablette olan bir JS hatasi HICBIR
+             * yerde gorunmuyordu: WebView konsol satirlarini kendiliginden logcat'e yazmaz,
+             * cihazda da acilacak bir gelistirici araci yok. Bir kere yasandi — panel yarim
+             * calisti ve elde tek kanit "menu acilmiyor" cumlesiydi.
+             */
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                val line = "${message.message()} (${message.sourceId()}:${message.lineNumber()})"
+                when (message.messageLevel()) {
+                    ConsoleMessage.MessageLevel.ERROR -> Log.e(TAG, line)
+                    ConsoleMessage.MessageLevel.WARNING -> Log.w(TAG, line)
+                    else -> Log.i(TAG, line)
+                }
+                return true
+            }
+
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String,
                 callback: GeolocationPermissions.Callback
@@ -566,6 +587,8 @@ class MainActivity : Activity() {
             val mode: String?
         )
 
+        /** Panelin konsol satirlari bu etiketle logcat'e dusuyor: `adb logcat -s VillaPanel`. */
+        private const val TAG = "VillaPanel"
         private const val DASHBOARD_URL = "http://127.0.0.1:8091/"
         private const val HEALTH_URL = "http://127.0.0.1:8091/api/health"
         private const val DIAGNOSTICS_URL = "http://127.0.0.1:8092/api/android/diagnostics"

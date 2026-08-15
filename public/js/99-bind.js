@@ -22,7 +22,19 @@
     state.appMenuOpener=null;
     if(opener&&opener.isConnected&&opener.offsetParent!==null)opener.focus();
   });
-  $b("#appMenuDialog").addEventListener("click",event=>{if(event.target===$("#appMenuDialog"))closeAppMenu()});
+  /* ARKA PLANA DOKUNUNCA KAPANIR — AMA YALNIZ ORADA BAŞLAYAN DOKUNUŞTA.
+     Tek parmak dokunuşu `pointerdown → pointerup → click` üretir ve menü `click` içinde açılır.
+     Yalnız `click` hedefine bakan bir kural, menüyü AÇAN dokunuşun kendisiyle menüyü kapatabilir:
+     dokunuş menü yokken başlar, menü açılır, aynı hareketin devamı artık modal katmanın üstüne
+     düşer. Sonuç kullanıcıya "menü hiç açılmıyor" gibi görünür — tek kare bile durmaz.
+     Bu yüzden kapanma iki koşula bağlı: hareket arka planda BAŞLAMIŞ ve orada BİTMİŞ olmalı. */
+  let appMenuBackdropPointer=false;
+  $b("#appMenuDialog").addEventListener("pointerdown",event=>{appMenuBackdropPointer=event.target===$("#appMenuDialog")});
+  $b("#appMenuDialog").addEventListener("click",event=>{
+    const onBackdrop=event.target===$("#appMenuDialog")&&appMenuBackdropPointer;
+    appMenuBackdropPointer=false;
+    if(onBackdrop)closeAppMenu();
+  });
   $$("[data-device-layout]").forEach(button=>button.onclick=()=>setDeviceLayout(button.dataset.deviceLayout));
   window.addEventListener("resize",()=>{if(state.deviceLayout==="grid")applyDeviceColumns(state.deviceColumns)},{passive:true});
   function syncSearchClear(){$("#clearSearch").hidden=$("#search").value.length===0}

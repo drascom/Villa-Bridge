@@ -290,7 +290,7 @@
     }
     const wifi=$("#onboardingWifiSettings");
     if(wifi){
-      wifi.hidden=typeof window.VillaAndroid?.openWifiSettings!=="function";
+      wifi.hidden=!bridgeSafe(()=>typeof window.VillaAndroid?.openWifiSettings==="function",false);
       wifi.onclick=openWifiSettings;
     }
   }
@@ -581,8 +581,8 @@
     $("#toggleHaSetup").setAttribute("aria-expanded",String(setupExpanded));
   }
   function connectedServerAddress(){
-    const discoveredAddress=state.androidMonitor&&typeof window.VillaAndroid?.connectedServerAddress==="function"
-      ?String(window.VillaAndroid.connectedServerAddress()||"").trim():"";
+    const discoveredAddress=state.androidMonitor&&bridgeSafe(()=>typeof window.VillaAndroid?.connectedServerAddress==="function",false)
+      ?String(bridgeSafe(()=>window.VillaAndroid?.connectedServerAddress(),"")||"").trim():"";
     return discoveredAddress||state.network?.preferredAddress||state.network?.addresses?.[0]||t("ipUnavailable");
   }
   function renderConnectedServerAddress(){
@@ -593,7 +593,7 @@
     renderAuthRuntimeContext();
   }
   function renderAuthRuntimeContext(){
-    const runtimeAvailable=typeof window.VillaAndroid?.runtimeStatus==="function";
+    const runtimeAvailable=bridgeSafe(()=>typeof window.VillaAndroid?.runtimeStatus==="function",false);
     const ensureContext=(form,id,before)=>{
       let context=$("#"+id);
       if(context)return context;
@@ -652,7 +652,7 @@
   /* Karartma şu anda UYGULANMIŞ durumda mı. `state.screensaverOpen` ile aynı şey değil:
      ekran koruyucu açılırken önce cihazın parlaklığı okunur, karartma ondan sonra yazılır. */
   let screenDimApplied=false;
-  const screenBridgeAvailable=()=>typeof window.VillaAndroid?.applyScreenPolicy==="function";
+  const screenBridgeAvailable=()=>bridgeSafe(()=>typeof window.VillaAndroid?.applyScreenPolicy==="function",false);
   function saveScreenPreferences(){try{localStorage.setItem(screenPolicyStorageKey,JSON.stringify(screenPolicyPreferences))}catch{}}
   /* Gece penceresi gece yarısını aşabilir (23:00 → 07:00); o durumda "aralık dışı" değil
      "iki parçanın birleşimi" aranır. */
@@ -682,8 +682,8 @@
   }
   function pushScreenPolicy(dimmed=screenDimApplied){
     if(!screenBridgeAvailable())return;
-    try{window.VillaAndroid.applyScreenPolicy(JSON.stringify(effectiveScreenPolicy(dimmed)))}
-    catch(error){showToast(t("screenPolicyFailed",{error:error.message}),true)}
+    const payload=JSON.stringify(effectiveScreenPolicy(dimmed));
+    bridgeSafe(()=>window.VillaAndroid?.applyScreenPolicy(payload));
   }
   /* EKRAN KORUYUCUYLA TEK SAYAÇ. Kararma ayrı bir zamanlayıcıya bağlı değil: panelin zaten
      var olan ekran koruyucusu açılınca karartır, dokunup kapatılınca geri getirir. Bekleme
@@ -727,12 +727,16 @@
     scheduleScreensaver();
   }
   function hostStatusSnapshot(){
-    if(typeof window.VillaAndroid?.hostStatus!=="function")return null;
-    try{return JSON.parse(window.VillaAndroid.hostStatus())}catch{return null}
+    const raw=bridgeSafe(()=>window.VillaAndroid?.hostStatus());
+    if(typeof raw!=="string"||!raw)return null;
+    /* Ayrıştırma da köprünün parçası: konak bir gün geçersiz ya da kırpılmış JSON dönerse
+       satır boş kalır, panel ayakta kalır. */
+    const parsed=bridgeSafe(()=>JSON.parse(raw));
+    return parsed&&typeof parsed==="object"?parsed:null;
   }
   function requestBatteryExemption(){
-    if(typeof window.VillaAndroid?.requestBatteryExemption!=="function")return showToast(t("batteryGuardAndroidOnly"),true);
-    window.VillaAndroid.requestBatteryExemption();
+    if(!bridgeSafe(()=>typeof window.VillaAndroid?.requestBatteryExemption==="function",false))return showToast(t("batteryGuardAndroidOnly"),true);
+    bridgeSafe(()=>window.VillaAndroid?.requestBatteryExemption());
     /* Sistem penceresi kendi başına açılır; kullanıcı geri döndüğünde durum tazelensin.
        Reddetmek serbest — panel bir daha sormaz, yalnız durumu gösterir. */
     setTimeout(renderTabletCare,2000);
@@ -765,8 +769,8 @@
     updateScreenPreference({brightness:Math.min(100,Math.max(5,Math.round(Number(level)||70)))});
   }
   function requestSystemBrightnessPermission(){
-    if(typeof window.VillaAndroid?.requestSystemBrightnessPermission!=="function")return showToast(t("screenBrightnessAndroidOnly"),true);
-    window.VillaAndroid.requestSystemBrightnessPermission();
+    if(!bridgeSafe(()=>typeof window.VillaAndroid?.requestSystemBrightnessPermission==="function",false))return showToast(t("screenBrightnessAndroidOnly"),true);
+    bridgeSafe(()=>window.VillaAndroid?.requestSystemBrightnessPermission());
     setTimeout(()=>{renderMenuBrightness();renderTabletCare()},2000);
   }
   function renderTabletCare(){
@@ -818,21 +822,29 @@
       renderMenuBrightness();
     },60000);
   }
+  /* AÇILIŞI KESEMEZ. `initialize()` bu işlevi oturum açılmadan ÖNCE çağırıyor: burada fırlayan
+     bir hata `loadAuthSession()`e hiç gelinmemesi, yani hiç açılmayan bir panel demekti. Aynı
+     işlev bağlama zincirinde de `bindScreensaver()`den önce duruyor. Bu yüzden gövde tümüyle
+     korunuyor — konak yüzeyi eksik ya da bozuksa panel o yeteneksiz devam eder. */
   function configureAndroidActions(){
+    try{renderAndroidActions()}
+    catch(error){console.warn("Panel: Android yüzeyi hazırlanamadı; panel bu yeteneksiz devam ediyor.",error)}
+  }
+  function renderAndroidActions(){
     const button=$("#openWifiSettings");
-    const available=typeof window.VillaAndroid?.openWifiSettings==="function";
-    button.hidden=!available;
+    const available=bridgeSafe(()=>typeof window.VillaAndroid?.openWifiSettings==="function",false);
+    if(button)button.hidden=!available;
     const runtimeAvailable=
-      typeof window.VillaAndroid?.stopRuntime==="function"&&
-      typeof window.VillaAndroid?.runtimeStatus==="function";
+      bridgeSafe(()=>typeof window.VillaAndroid?.stopRuntime==="function",false)&&
+      bridgeSafe(()=>typeof window.VillaAndroid?.runtimeStatus==="function",false);
     document.body.classList.toggle("android-app",runtimeAvailable);
-    const status=runtimeAvailable?window.VillaAndroid.runtimeStatus():"";
+    const status=runtimeAvailable?String(bridgeSafe(()=>window.VillaAndroid?.runtimeStatus(),"")||""):"";
     state.androidMonitor=status==="android-monitor";
-    $("#tabletIpGuide").hidden=state.androidMonitor;
-    $("#androidRuntimeCard").hidden=!runtimeAvailable||status==="android-monitor";
+    if($("#tabletIpGuide"))$("#tabletIpGuide").hidden=state.androidMonitor;
+    if($("#androidRuntimeCard"))$("#androidRuntimeCard").hidden=!runtimeAvailable||status==="android-monitor";
     renderConnectedServerAddress();
     renderSystemAlertBar();
-    if(runtimeAvailable){
+    if(runtimeAvailable&&$("#runtimeStatusText")){
       $("#runtimeStatusText").textContent=t(status==="stopped"?"runtimeStopped":"runtimeRunning");
     }
     /* Açılışta önce cihazın kendi parlaklığı okunur (kullanıcı Android ayarlarından
@@ -845,21 +857,27 @@
     renderTabletCare();
     renderMenuBrightness();
   }
+  /* Ekran koruyucu kancası panelin en sıcak yolunda (her açılış/kapanış): köprü hatası
+     ekran koruyucunun kendisini bozmamalı, saat/tarih her hâlde görünmeli. */
+  function safeScreensaverDimming(dimmed){
+    try{applyScreensaverDimming(dimmed)}
+    catch(error){console.warn("Panel: ekran koruyucu kararması uygulanamadı.",error)}
+  }
   function openWifiSettings(){
-    if(typeof window.VillaAndroid?.openWifiSettings==="function"){
-      window.VillaAndroid.openWifiSettings();
+    if(bridgeSafe(()=>typeof window.VillaAndroid?.openWifiSettings==="function",false)){
+      bridgeSafe(()=>window.VillaAndroid?.openWifiSettings());
       return;
     }
     showToast(t("wifiSettingsAndroidOnly"),true);
   }
   function stopAndroidRuntime(){
-    if(typeof window.VillaAndroid?.stopRuntime!=="function")return;
+    if(!bridgeSafe(()=>typeof window.VillaAndroid?.stopRuntime==="function",false))return;
     $("#runtimeStopDialog").showModal();
   }
   function confirmAndroidRuntimeStop(){
     $("#runtimeStopDialog").close();
     $("#stopRuntime").disabled=true;
-    window.VillaAndroid.stopRuntime();
+    bridgeSafe(()=>window.VillaAndroid?.stopRuntime());
   }
   function toggleHomeAssistantSetup(){
     const details=$("#haSetupDetails");

@@ -235,6 +235,24 @@
     }
     return bindStub();
   };
+  /* KONAK KÖPRÜSÜ ASLA PANELİ DÜŞÜREMEZ. `window.VillaAndroid` bir Java nesnesidir: yöntem
+     çağrısı Java tarafında istisna atarsa, dönen değer beklenmedikse ya da köprü henüz
+     enjekte edilmemişse JS tarafında hata fırlar. O hata çağıran akışı (menü açılışı, ilk
+     kurulum, bağlama zinciri) ortasından keserdi ve masaüstünde HİÇ görünmezdi — orada köprü
+     yok, kod erkenden dönüyor. Bu yüzden köprüye giden her çağrı buradan geçer: hata yutulmaz
+     (konsola bir kez yazılır) ama yayılmaz da; çağıran yedek değerle devam eder. */
+  const bridgeFailures=new Set();
+  const bridgeSafe=(run,fallback=null)=>{
+    try{return run()}
+    catch(error){
+      const signature=String(error?.message||error);
+      if(!bridgeFailures.has(signature)){
+        bridgeFailures.add(signature);
+        console.warn(`Panel: Android köprüsü çağrısı başarısız (${signature}). Panel bu yeteneksiz devam ediyor.`);
+      }
+      return fallback;
+    }
+  };
   const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
   const t=(key,values={})=>(translations[state.language]?.[key]||translations.en?.[key]||key).replace(/\{(\w+)\}/g,(_,name)=>values[name]??"");
   const commandKey=(id,property)=>JSON.stringify([id,property]);

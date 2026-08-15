@@ -2,14 +2,17 @@
     const dialog=$("#appMenuDialog");
     if(!dialog||dialog.open)return;
     state.appMenuOpener=button||null;
-    /* Menü her açılışında parlaklık satırı cihazdan tazelenir: kullanıcı Android ayarlarından
-       değiştirmiş olabilir, kaydırıcı onu göstermeli. */
-    adoptSystemBrightness();
-    renderMenuBrightness();
     $$("[data-app-menu]").forEach(item=>item.setAttribute("aria-expanded","true"));
+    /* MENÜ ÖNCE AÇILIR. İçindeki satırların çizimi bundan SONRA gelir ve hiçbiri açılışa engel
+       olamaz: menü panelin tek gezinme yoludur, bir satırın hatası kullanıcıyı uygulamanın
+       içinde kilitlerdi. (Parlaklık satırı konak köprüsüne gidiyor; köprü çağrısı en beklenmedik
+       yerde hata fırlatabilir.) */
     dialog.showModal();
     const active=dialog.querySelector(".nav-button.active:not([hidden])")||dialog.querySelector(".nav-button");
     if(active)active.focus();
+    // Kullanıcı Android ayarlarından parlaklığı değiştirmiş olabilir; kaydırıcı onu göstermeli.
+    try{adoptSystemBrightness();renderMenuBrightness()}
+    catch(error){console.warn("Panel: parlaklık satırı çizilemedi.",error)}
   }
   function closeAppMenu(){
     const dialog=$("#appMenuDialog");
@@ -1062,7 +1065,7 @@
     overlay.focus();
     /* Duvardaki tablette ekran koruyucu aynı zamanda kararma anıdır: saat/tarih ekranda
        kalır, parlaklık düşer, dokunulunca ikisi birden geri gelir. */
-    applyScreensaverDimming(true);
+    safeScreensaverDimming(true);
   }
   function closeScreensaver(){
     clearScreensaverClock();
@@ -1070,7 +1073,7 @@
     state.screensaverOpen=false;
     document.body.classList.remove("screensaver-open");
     $("#screensaver").hidden=true;
-    applyScreensaverDimming(false);
+    safeScreensaverDimming(false);
   }
   function dismissScreensaver(event){
     if(event){event.preventDefault();event.stopPropagation()}
