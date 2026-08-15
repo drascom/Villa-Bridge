@@ -4,63 +4,112 @@ Linux and Raspberry Pi use the same TypeScript core, dashboard, embedded MQTT
 broker and Matterbridge orchestration as Android. Only the host lifecycle is
 different: Android uses a foreground service; Linux uses `systemd`.
 
-## Supported Hosts
+This is the **installation** path. If you want to hack on the code instead, see
+"Develop on your own machine" in the [root README](../../README.md); the two are
+separate and should not be mixed on the same host.
 
-- Debian 12 on x86-64, including LXC
-- Raspberry Pi OS/Debian 12 on 64-bit ARM (`arm64`)
-- Node.js 22 or newer
+## Supported hosts
 
-Use a 64-bit operating system. The initial Pi target is Pi 4 or newer; smaller
-models may work but are not yet performance-tested.
+- Debian 12 or 13 on x86-64, including LXC
+- Raspberry Pi OS / Debian on 64-bit ARM (`arm64`)
+- systemd, and root access
 
 ## Install
 
-Clone the repository into a stable path such as `/opt/villa-bridge`, then run:
-
 ```sh
-sudo apps/linux/install-node.sh
-sudo apps/linux/install.sh
+git clone https://github.com/drascom/Villa-Bridge.git /opt/Villa-Bridge
+sudo /opt/Villa-Bridge/apps/linux/install.sh
 ```
 
-The installer builds the common core, installs the shared runtime, creates an
-unprivileged `villa-bridge` service account, and enables (but does not start)
-the service. It never overwrites existing private configuration.
+That is the whole installation. No file has to be edited by hand.
 
-Copy your private Zigbee2MQTT-compatible configuration to:
+`install.sh` only does operating-system level work:
+
+- checks for `curl`, `git`, `tar`, `xz-utils` and `ca-certificates`, and offers
+  to install the missing ones (a bare Debian image has almost none of them),
+- checks for Node.js 22+ and offers to install it into `/usr/local`,
+- creates the unprivileged `villa-bridge` service account, adds it to `dialout`
+  for USB coordinators, and creates `/var/lib/villa-bridge` with that ownership,
+- builds the core (`npm ci && npm run build`) and installs the shared runtime,
+- installs, enables and starts the `villa-bridge` systemd unit,
+- prints the dashboard address.
+
+It asks before installing anything. Over SSH or in any other non-interactive
+run, pass `--yes` (or set `ASSUME_YES=1`); without a terminal and without the
+flag it stops with an explanation instead of hanging on a prompt. `--no-start`
+installs and enables the service without starting it.
+
+The installer is idempotent: running it again on a working host rebuilds the
+code and refreshes the unit, and never rewrites configuration or data.
+
+### Prerequisite packages
+
+If you prefer to install them yourself before running the installer:
+
+```sh
+sudo apt-get install -y --no-install-recommends curl git tar xz-utils ca-certificates
+```
+
+`git` has to exist before the clone, so in practice only the rest is new.
+
+## Finish the setup in the dashboard
+
+Open `http://<host-ip>:8091` and complete the setup wizard. The first start
+creates everything the service needs by itself — `provisioning.json`,
+`config/villa-bridge.yaml` and `zigbee/configuration.yaml` are generated from the
+templates in `apps/runtime/templates/`, with a **freshly generated random Zigbee
+network key, extended pan id, pan id and MQTT password** for this installation.
+
+Until you enter the coordinator address in the wizard, `zigbee/configuration.yaml`
+holds a placeholder address (`tcp://192.0.2.10:6638`, an RFC 5737 documentation
+address). While that placeholder is in place Villa Bridge **connects to no
+coordinator at all** — the HTTP server and dashboard come up, the Zigbee stack
+does not. The wizard writes the real address and restarts the service, and only
+then is the coordinator taken over.
+
+### Joining an existing Zigbee network
+
+The generated network parameters mean a fresh installation forms a **new**
+Zigbee network. If you are pointing Villa Bridge at a coordinator that already
+runs your house, do not let it form a new network — that would orphan every
+paired device. Before the first start, copy your existing Zigbee2MQTT
+`configuration.yaml` (or at least its `advanced:` block with `pan_id`,
+`ext_pan_id` and `network_key`, plus `serial:`) to:
 
 ```text
 /var/lib/villa-bridge/zigbee/configuration.yaml
 ```
 
-Use `configuration.example.yaml` in that directory as a guide. Keep the
-coordinator network key and MQTT password private. Ensure no other process owns
-the same Zigbee coordinator before starting direct mode.
+Nothing ever overwrites an existing file there, so the values you put in place
+are the values that are used. Also restore your coordinator backup and device
+database from the dashboard (Zigbee tools → restore) if you have one.
+
+## Service management
 
 ```sh
-sudo systemctl start villa-bridge
-sudo apps/linux/doctor.sh
-sudo journalctl -u villa-bridge -f
-```
-
-Open `http://<host-ip>:8091`. Home Assistant connects to `<host-ip>:1883`
-using the MQTT credentials in the private Zigbee configuration. Matter
-commissioning uses UDP `5540`. A full start can take around 40 seconds while
-the Zigbee database and Matter endpoints are restored; `doctor.sh` waits up to
-60 seconds for readiness.
-
-## Service Management
-
-```sh
-sudo systemctl stop villa-bridge
+sudo systemctl status villa-bridge
 sudo systemctl restart villa-bridge
 sudo systemctl disable --now villa-bridge
+sudo /opt/Villa-Bridge/apps/linux/doctor.sh
 ```
+
+Read the logs with `--all`; without it `journalctl` hides long lines as
+`[NNB blob data]`:
+
+```sh
+sudo journalctl -u villa-bridge --all -f
+```
+
+Home Assistant connects to `<host-ip>:1883` with the MQTT credentials shown in
+the dashboard under Connections. Matter commissioning uses UDP `5540`. A full
+start takes around 40 seconds while the Zigbee database and Matter endpoints are
+restored.
 
 Mutable files stay under `/var/lib/villa-bridge`; the checkout contains only
 code. Updating the checkout and rerunning `install.sh` rebuilds the service
 without replacing configuration.
 
-## Branch and Release Model
+## Branch and release model
 
 The repository keeps one shared `main` branch. Platform work is developed in a
 short-lived topic branch and merged after its target tests pass. Android,

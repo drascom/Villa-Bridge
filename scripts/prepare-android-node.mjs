@@ -31,15 +31,21 @@ const lazySerialPortPatch = path.join(
   "zigbee-herdsman-serialPort.js"
 );
 
+// Ilk acilis sablonlari da pakete girer: tablette kabuk yok, `install.sh` yok.
+// Bunlar eksik olursa ilk acilis tohumlamasi (first-run.cjs) cihazda coker.
 const requiredFiles = [
   "dashboard.html",
+  "first-run.cjs",
   "lan-discovery.cjs",
   "main.cjs",
   "matter-bigint-guard.cjs",
   "orchestration.cjs",
   "peer-watch.cjs",
   "package-lock.json",
-  "package.json"
+  "package.json",
+  "templates/configuration.example.yaml",
+  "templates/provisioning.example.json",
+  "templates/villa-bridge.example.yaml"
 ];
 
 async function run(command, arguments_, options = {}) {
@@ -131,7 +137,10 @@ async function prepare() {
     await access(path.join(projectRoot, "dist", "index.js"));
 
     for (const file of requiredFiles) {
-      await cp(path.join(runtimeSource, file), path.join(stagedProject, file));
+      const target = path.join(stagedProject, file);
+      // `templates/` gibi alt dizinler icin hedef dizin once acilmali.
+      await mkdir(path.dirname(target), { recursive: true });
+      await cp(path.join(runtimeSource, file), target);
     }
     await mkdir(bundledCore, { recursive: true });
     await cp(path.join(projectRoot, "dist"), path.join(bundledCore, "dist"), {

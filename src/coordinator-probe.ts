@@ -15,6 +15,29 @@ import { createConnection } from "node:net";
 /** SLZB-06 ve benzeri ağ koordinatörlerinin öntanımlı ham TCP portu. */
 export const defaultCoordinatorPort = 6638;
 
+/**
+ * "Koordinatör henüz girilmedi" işaretçisi. RFC 5737 belgeleme aralığından seçilmiştir;
+ * gerçek bir koordinatör olamaz. İlk açılışta üretilen `configuration.yaml` bu adresle
+ * gelir ve çekirdek bu adresi gördüğü sürece **hiçbir Zigbee oturumu açmaz** — kurulum
+ * sihirbazı bitene kadar koordinatör sahiplenilmez.
+ *
+ * Aynı sabit `apps/runtime/first-run.cjs` içinde de vardır (CommonJS tarafı); ikisi
+ * birlikte değişmelidir.
+ */
+export const placeholderCoordinatorAddress = "tcp://192.0.2.10:6638";
+
+/** Adres hâlâ yer tutucu mu? Boş/okunamaz değer de "girilmemiş" sayılır. */
+export const isPlaceholderCoordinatorAddress = (value: unknown): boolean => {
+  if (typeof value !== "string") return true;
+  const text = value.trim();
+  if (text.length === 0) return true;
+  try {
+    return parseCoordinatorAddress(text).value === placeholderCoordinatorAddress;
+  } catch {
+    return true;
+  }
+};
+
 export type CoordinatorAddressKind = "tcp" | "serial";
 
 export interface CoordinatorAddress {

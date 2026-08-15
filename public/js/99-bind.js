@@ -260,7 +260,9 @@
     await migrateWeatherLocation();
     // Aynı kural dünya saati şehirleri için: sunucuda liste yoksa cihazdaki bir kez yukarı taşınır.
     await migrateWorldClockZones();
-    if(!onboardingComplete())openOnboarding();
+    /* `state.setupPending`: sunucu kurulumu yarım. Tarayıcıda "tamamlandı" işareti olsa bile
+       sihirbaz açılır — yarım kurulumu atlatan tek şey olmasın. */
+    if(!onboardingComplete()||state.setupPending===true)openOnboarding();
     else requestAnimationFrame(maybeStartDashboardTour);
     setInterval(()=>{if(!document.hidden&&state.auth.authenticated)refresh()},8000);
     scheduleWorldClockTick();

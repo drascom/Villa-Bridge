@@ -11,6 +11,7 @@ const Aedes = require("aedes");
 const mqtt = require("mqtt");
 const { discoverVillaBridgeServer, resolveVillaBridgeNodeId } = require("./lan-discovery.cjs");
 const { createPeerProbe, startPeerWatcher } = require("./peer-watch.cjs");
+const { ensureFirstRunFiles } = require("./first-run.cjs");
 const {
   loadProvisioning,
   matterbridgeReady,
@@ -28,7 +29,8 @@ const runtime = {
   // Three-channel peer watching (phase 2): observation only, never a take-over.
   peerWatch: null,
   lastProbe: null,
-  provisioning: { provisioned: false, reason: "Not checked." }
+  provisioning: { provisioned: false, setupPending: false, reason: "Not checked." },
+  firstRun: null
 };
 
 function parseArguments(argv) {
@@ -97,8 +99,10 @@ function networkAddresses() {
 
 function diagnostics(config) {
   const monitorReady = runtime.monitor?.ready === true;
+  const setupPending = runtime.provisioning.setupPending === true;
   const standaloneReady =
     runtime.provisioning.provisioned &&
+    !setupPending &&
     runtime.mqtt.listening &&
     runtime.mqtt.selfTest &&
     !runtime.mqtt.error &&
@@ -106,11 +110,14 @@ function diagnostics(config) {
     runtime.matter.ready;
   const ready = monitorReady || standaloneReady;
   const runtimePlatform = config.platform || "android";
+  // `-setup`: panel ayakta ve sihirbaz calisiyor, ama hicbir koordinator sahiplenilmedi.
   const mode = monitorReady
     ? "android-monitor"
-    : runtime.provisioning.provisioned
-      ? `${runtimePlatform}-standalone`
-      : `${runtimePlatform}-unprovisioned`;
+    : !runtime.provisioning.provisioned
+      ? `${runtimePlatform}-unprovisioned`
+      : setupPending
+        ? `${runtimePlatform}-setup`
+        : `${runtimePlatform}-standalone`;
   const dashboard = monitorReady
     ? runtime.monitor.dashboardUrl
     : `http://${config.coreHost}:${config.corePort}/`;
@@ -127,6 +134,7 @@ function diagnostics(config) {
     addresses: networkAddresses(),
     monitor: runtime.monitor,
     provisioning: runtime.provisioning,
+    firstRun: runtime.firstRun,
     mqtt: runtime.mqtt,
     core: runtime.core,
     matter: runtime.matter,
@@ -416,9 +424,23 @@ async function start() {
     }, null, 2)
   );
 
+  // Ilk acilis tohumlamasi kabuk betiginde DEGIL burada: Android'de kabuk yok.
+  // Var olan dosyaya dokunmaz; ikinci calistirmada hicbir sey degismez.
+  try {
+    const firstRun = ensureFirstRunFiles(config);
+    runtime.firstRun = { created: firstRun.created, kept: firstRun.kept.length };
+    if (firstRun.created.length > 0) {
+      console.log(`Villa Bridge ilk acilis dosyalari uretildi: ${firstRun.created.join(", ")}`);
+    }
+  } catch (error) {
+    runtime.firstRun = { created: [], kept: 0, error: error.message };
+    console.error("Villa Bridge ilk acilis dosyalari uretilemedi:", error);
+  }
+
   const provision = loadProvisioning(config);
   runtime.provisioning = {
     provisioned: provision.provisioned,
+    setupPending: provision.setupPending === true,
     reason: provision.reason,
     configPath: provision.sourceConfigPath
       ? path.relative(config.dataDir, provision.sourceConfigPath)
@@ -529,12 +551,26 @@ async function start() {
           error: null,
           endpoint: `http://${config.coreHost}:${config.corePort}`
         };
+        if (provision.setupPending === true) {
+          const host = networkAddresses()[0]?.address || config.coreHost;
+          console.warn(
+            "Villa Bridge kurulum kipinde: hicbir koordinatore baglanilmadi. " +
+            `Kuruluma panelden devam edin: http://${host}:${config.corePort}`
+          );
+        }
       } catch (error) {
         runtime.core = { status: "failed", ready: false, error: error.message };
         console.error("Villa Bridge direct core failed:", error);
       }
 
-      if (!provision.matterEnabled) {
+      if (provision.setupPending === true) {
+        // Kurulum bitmeden Matter'a cihaz yayinlanmaz: ortada bir Zigbee agi yok.
+        runtime.matter = {
+          status: "setup",
+          ready: false,
+          error: "Matterbridge waits for the setup wizard to finish."
+        };
+      } else if (!provision.matterEnabled) {
         runtime.matter = { status: "disabled", ready: true, error: null };
       } else if (!runtime.core.ready) {
         runtime.matter = {

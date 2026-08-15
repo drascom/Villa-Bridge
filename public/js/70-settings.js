@@ -64,6 +64,8 @@
       state.network=data.network||null;
       state.mqttAccess=data.mqttAccess||null;
       state.zigbeeCapabilities=data.zigbee||null;
+      /* Kurulum yarımsa sihirbaz zorunludur: sunucu koordinatöre hiç bağlanmamıştır. */
+      state.setupPending=data.setupPending===true;
       renderConnectedServerAddress();
       $("#zigbeeAdapterUrl").value=state.settings.zigbee.adapterUrl;
       clearAdapterTestResult($("#zigbeeAdapterTestResult"));
@@ -262,7 +264,9 @@
     if(step===5)body=onboardingHero("ready","setupReadyTitle","setupReadyLead",`<div class="onboarding-summary"><div class="onboarding-summary-row"><span>Zigbee</span><code>${esc(draft.zigbeeAdapterUrl)}</code></div><div class="onboarding-summary-row"><span>MQTT</span><code>${esc(draft.mqttUrl)}</code></div><div class="onboarding-summary-row"><span>Matter</span><code>${esc(draft.matterWsUrl)}</code></div></div>`);
     $("#onboardingBody").innerHTML=body;
     $("#onboardingBack").hidden=step===0;
-    $("#skipOnboarding").hidden=step===5;
+    /* Kurulum yarımken atlama yoktur: sunucu koordinatörsüz duruyor, atlayan kullanıcı
+       çalışmayan bir panelle baş başa kalırdı. */
+    $("#skipOnboarding").hidden=step===5||state.setupPending===true;
     $(".onboarding-actions").classList.toggle("final",step===5);
     $("#onboardingNext").textContent=t(step===5?"finishSetup":"next");
     $$("[data-onboarding-language]").forEach(button=>button.onclick=()=>{
@@ -319,7 +323,9 @@
     state.onboardingStep=0;
     state.onboardingDraft=state.remoteOnboarding?{}:{
       language:state.language,
-      zigbeeAdapterUrl:state.settings.zigbee.adapterUrl,
+      /* İlk kurulumda kayıtlı değer yer tutucudur (`tcp://192.0.2.10:6638`); alan boş açılır
+         ki kullanıcı sahte bir adresi kendi adresi sanmasın. */
+      zigbeeAdapterUrl:state.setupPending===true?"":state.settings.zigbee.adapterUrl,
       /* Kayıtlı adres bile olsa sihirbaz test görmeden ilerlemez: kurulumu bitiren kişi
          adresin ŞU AN yanıt verdiğini görmüş olmalı. */
       zigbeeAdapterVerified:false,
@@ -362,6 +368,13 @@
         showToast(t("setupSavedRestart"));
       }
       await markOnboardingComplete();
+      /* İlk kurulumda koordinatör adresi yalnızca dosyaya yazıldı; onu sahiplenmek için
+         servis yeniden başlamalı. Mevcut apply deseni kullanılır — Android'de de aynı uç. */
+      if(state.setupPending===true){
+        state.setupPending=false;
+        await api("/api/settings/apply",{method:"POST",body:JSON.stringify({confirmation:"APPLY"})});
+        showToast(t("setupSavedRestart"));
+      }
       $("#onboardingDialog").close();
       activateView("devices");
       window.scrollTo({top:0,behavior:"smooth"});

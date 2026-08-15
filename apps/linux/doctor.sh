@@ -44,8 +44,22 @@ check systemctl is-enabled villa-bridge.service
 check systemctl is-active villa-bridge.service
 
 if command -v curl >/dev/null 2>&1; then
-  wait_for_ready
-  check curl --fail --silent --max-time 3 http://127.0.0.1:8091/api/health
+  # A fresh install is not "not ready", it is "waiting for the setup wizard".
+  # Reporting that as a failure would send people looking for a broken service.
+  MODE="$(curl --silent --max-time 3 http://127.0.0.1:8092/api/android/diagnostics \
+    | sed -n 's/.*"mode":"\([^"]*\)".*/\1/p')"
+  case "$MODE" in
+    *-setup)
+      printf 'INFO runtime is in setup mode; no coordinator is owned yet\n'
+      printf '     finish the setup at http://%s:8091\n' \
+        "$(hostname -I 2>/dev/null | awk '{print $1}')"
+      check curl --fail --silent --max-time 3 http://127.0.0.1:8091/api/health
+      ;;
+    *)
+      wait_for_ready
+      check curl --fail --silent --max-time 3 http://127.0.0.1:8091/api/health
+      ;;
+  esac
 fi
 
 if [ "$FAILED" -ne 0 ]; then

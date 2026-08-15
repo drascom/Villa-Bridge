@@ -110,10 +110,33 @@ Android, Linux, and Raspberry Pi are built from one `main` branch. The shared
 runtime lives in `apps/runtime`; platform folders contain only host-specific
 launching, packaging, and lifecycle code.
 
-## Try it locally
+## Install it on a home server
 
-You need Node.js 22+, an MQTT broker and an existing Zigbee2MQTT installation
-for the default shadow mode.
+This is the path for running Villa Bridge in a house, on a Debian machine, an
+LXC container or a Raspberry Pi:
+
+```sh
+git clone https://github.com/drascom/Villa-Bridge.git /opt/Villa-Bridge
+sudo /opt/Villa-Bridge/apps/linux/install.sh
+```
+
+Then open `http://<host-ip>:8091` and finish the setup in the dashboard wizard.
+No configuration file has to be edited by hand: the first start generates its
+own configuration, including a Zigbee network key that is unique to your
+installation, and Villa Bridge connects to no coordinator until you enter the
+coordinator address in the wizard. Full details, including how to join an
+**existing** Zigbee network instead of forming a new one, are in the
+[Linux and Raspberry Pi guide](apps/linux/README.md). On an Android tablet the
+same setup happens entirely in the app; see the
+[Android alpha guide](apps/android/README.md).
+
+Home Assistant users can open **Connections**, copy the displayed MQTT details
+and enable discovery when ready. Discovery is off by default.
+
+## Develop on your own machine
+
+This is the path for working on the code, not for running a house. It starts the
+core alone, without the installer, the service account or the systemd unit.
 
 ```sh
 git clone https://github.com/drascom/Villa-Bridge.git
@@ -122,12 +145,10 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:8091`. Review `config/default.yaml` before connecting a
-real system. Matterbridge is optional unless you want Alexa or Apple Home
-pairing.
-
-Home Assistant users can open **Connections**, copy the displayed MQTT details
-and enable discovery when ready. Discovery is off by default.
+Open `http://localhost:8091`. `npm run dev` reads `config/default.yaml`, which
+is in shadow mode: it needs an MQTT broker and an existing Zigbee2MQTT install
+to observe. Review that file before pointing it at a real system, and run
+`npm test` (build plus the structural gate) before submitting changes.
 
 ## Add a language
 

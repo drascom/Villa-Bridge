@@ -5,6 +5,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const YAML = require("yaml");
 const { installMatterBigIntGuard } = require("./matter-bigint-guard.cjs");
+const { PLACEHOLDER_COORDINATOR } = require("./first-run.cjs");
 
 const PROVISIONING_FILE = "provisioning.json";
 const LEGACY_PROVISIONING_FILE = "android-provisioning.json";
@@ -54,6 +55,7 @@ function loadProvisioning(config) {
     if (!fs.existsSync(sourceConfigPath)) {
       return {
         provisioned: false,
+        setupPending: false,
         reason: `Waiting for ${path.relative(config.dataDir, sourceConfigPath)}.`,
         provisionFile,
         sourceConfigPath,
@@ -82,6 +84,7 @@ function loadProvisioning(config) {
     if (!fs.existsSync(z2mConfigPath)) {
       return {
         provisioned: false,
+        setupPending: false,
         reason: `Waiting for ${path.relative(config.dataDir, z2mConfigPath)}.`,
         provisionFile,
         sourceConfigPath,
@@ -100,6 +103,13 @@ function loadProvisioning(config) {
       ? z2m.mqtt.password
       : null;
     const mqttAuthRequired = mqttUsername !== null && mqttPassword !== null;
+    /**
+     * "Kuruldu mu" olcutu artik dosyanin VARLIGI degil, koordinator adresinin gercekten
+     * girilmis olmasidir. Yer tutucu adres duruyorsa panel ve HTTP acilir (sihirbaz orada
+     * calisir) ama hicbir koordinator sahiplenilmez — ilk acilis guvenligi budur.
+     */
+    const coordinatorAddress = typeof z2m.serial?.port === "string" ? z2m.serial.port.trim() : "";
+    const setupPending = coordinatorAddress === "" || coordinatorAddress === PLACEHOLDER_COORDINATOR;
 
     const runtimeDir = path.join(config.dataDir, "runtime");
     const resolvedConfigPath = path.join(runtimeDir, "villa-bridge.yaml");
@@ -124,7 +134,8 @@ function loadProvisioning(config) {
 
     return {
       provisioned: true,
-      reason: null,
+      setupPending,
+      reason: setupPending ? "Coordinator address is not set yet; finish the setup wizard." : null,
       provisionFile,
       sourceConfigPath,
       resolvedConfigPath,
@@ -138,6 +149,7 @@ function loadProvisioning(config) {
   } catch (error) {
     return {
       provisioned: false,
+      setupPending: false,
       reason: errorMessage(error),
       provisionFile,
       sourceConfigPath: null,

@@ -74,22 +74,33 @@ without explicit approval. During physical verification, only the designated
 **Balcony LED Controller** may be switched; all other device checks must remain
 read-only.
 
-## Secure Provisioning
+## First start and provisioning
 
-Use [android-provisioning.json](provisioning/android-provisioning.json) and
-[villa-bridge.yaml](provisioning/villa-bridge.yaml) as templates. Never edit
-the templates with real network keys or commit a live Zigbee2MQTT
-`configuration.yaml`.
-
-The runtime reads these private files from its device-protected `villa-data`
-directory:
+Nothing has to be pushed to the tablet. On its first start the shared runtime
+seeds its own device-protected `villa-data` directory from the templates bundled
+in the APK (`apps/runtime/templates/`), generating a Zigbee network key,
+extended pan id, pan id and MQTT password that are unique to this tablet:
 
 ```text
 villa-data/
-├── android-provisioning.json
+├── provisioning.json
 ├── config/villa-bridge.yaml
 └── zigbee/configuration.yaml
 ```
+
+Existing files are never overwritten, so an already provisioned tablet — and its
+legacy `android-provisioning.json` — is left alone.
+
+The seeded Zigbee configuration carries a placeholder coordinator address
+(`tcp://192.0.2.10:6638`). While it is in place the runtime starts in **setup
+mode**: the dashboard is served and the setup wizard runs, but no coordinator is
+opened and Matterbridge stays down. Enter the coordinator address in the wizard;
+it writes the real configuration and restarts the runtime.
+
+Because the generated parameters describe a **new** Zigbee network, a tablet
+pointed at a coordinator that already runs a house must be given the existing
+network parameters first — on Android that currently means pushing an existing
+`configuration.yaml` with `adb` as shown below, before the first start.
 
 For a debug installation, stop the app and stream files directly into its
 private storage; this avoids leaving credentials in shared tablet storage:
@@ -101,12 +112,6 @@ adb shell run-as com.villabridge.android mkdir -p \
   /data/user_de/0/com.villabridge.android/files/villa-data/zigbee
 
 adb exec-out run-as com.villabridge.android sh -c \
-  'cat > /data/user_de/0/com.villabridge.android/files/villa-data/android-provisioning.json' \
-  < apps/android/provisioning/android-provisioning.json
-adb exec-out run-as com.villabridge.android sh -c \
-  'cat > /data/user_de/0/com.villabridge.android/files/villa-data/config/villa-bridge.yaml' \
-  < apps/android/provisioning/villa-bridge.yaml
-adb exec-out run-as com.villabridge.android sh -c \
   'cat > /data/user_de/0/com.villabridge.android/files/villa-data/zigbee/configuration.yaml' \
   < /secure/path/to/zigbee2mqtt-configuration.yaml
 adb shell run-as com.villabridge.android chmod 700 \
@@ -114,15 +119,13 @@ adb shell run-as com.villabridge.android chmod 700 \
   /data/user_de/0/com.villabridge.android/files/villa-data/config \
   /data/user_de/0/com.villabridge.android/files/villa-data/zigbee
 adb shell run-as com.villabridge.android chmod 600 \
-  /data/user_de/0/com.villabridge.android/files/villa-data/android-provisioning.json \
-  /data/user_de/0/com.villabridge.android/files/villa-data/config/villa-bridge.yaml \
   /data/user_de/0/com.villabridge.android/files/villa-data/zigbee/configuration.yaml
 ```
 
-The Zigbee configuration must contain the cloned network parameters and TCP
-coordinator settings required by direct mode. If either configuration file is
-absent or invalid, `/api/ready` returns `503` with an `unprovisioned` reason
-instead of starting partially.
+That pushed configuration must contain the cloned network parameters and TCP
+coordinator settings required by direct mode. `/api/ready` returns `503` while
+the runtime is still in `android-setup` mode (waiting for the wizard) and with
+an `unprovisioned` reason if a configuration file cannot be read at all.
 
 For Home Assistant, use the tablet's stable LAN address, port `1883`, and the
 same `mqtt.user`/`mqtt.password` values. Do not put credentials in screenshots,

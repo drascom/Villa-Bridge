@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import YAML from "yaml";
+import { isPlaceholderCoordinatorAddress } from "./coordinator-probe.js";
 import { isValidTimeZone } from "./astronomy.js";
 import { isValidLatitude, isValidLongitude } from "./sun.js";
 
@@ -121,6 +122,13 @@ export interface DirectZigbeeConfig {
 
 export interface AppConfig {
   mode: "shadow" | "direct";
+  /**
+   * Kurulum henüz bitmedi: koordinatör adresi girilmemiş ya da ağ ayarları eksik.
+   * Bu doğruyken HTTP ve panel **açılır** (sihirbaz orada çalışır) ama Zigbee yığını
+   * hiç başlatılmaz. "Kuruldu mu" ölçütü dosyanın varlığı değil, adresin girilmiş
+   * olmasıdır; ilk açılışta hiçbir koordinatör sahiplenilmez.
+   */
+  setupPending: boolean;
   pairingControl: boolean;
   mqtt: {
     url: string;
@@ -211,6 +219,7 @@ export async function loadConfig(): Promise<AppConfig> {
 
   const result: AppConfig = {
     mode: requestedMode,
+    setupPending: false,
     pairingControl: process.env.VILLA_BRIDGE_PAIRING_CONTROL
       ? process.env.VILLA_BRIDGE_PAIRING_CONTROL === "true"
       : file.pairingControl === true,
@@ -294,16 +303,20 @@ export async function loadConfig(): Promise<AppConfig> {
     const serial = z2m.serial;
     const advanced = z2m.advanced;
     const adapters = ["deconz", "ember", "zstack", "zboss", "zigate", "ezsp", "zoh"] as const;
-    if (
-      !serial?.port || !serial.adapter ||
-      !adapters.includes(serial.adapter as (typeof adapters)[number]) ||
-      typeof advanced?.channel !== "number" ||
-      typeof advanced.pan_id !== "number" ||
-      !Array.isArray(advanced.ext_pan_id) ||
-      !Array.isArray(advanced.network_key)
-    ) {
-      throw new Error("Doğrudan Zigbee modu için klonlanmış ağ ve SLZB ayarları eksik.");
-    }
+    /**
+     * Eskiden burada hata fırlatılırdı; sonuç kısır döngüydü: sihirbaza ulaşmak için
+     * sihirbazın soracağı ayarları elle yazmak gerekiyordu. Artık eksik/yer tutucu
+     * ayar süreci öldürmez — `setupPending` işaretlenir, panel açılır, Zigbee yığını
+     * hiç kurulmaz (`src/index.ts` bu bayrağı görünce inert kaynak kullanır).
+     */
+    const networkComplete =
+      Boolean(serial?.adapter) &&
+      adapters.includes(serial?.adapter as (typeof adapters)[number]) &&
+      typeof advanced?.channel === "number" &&
+      typeof advanced.pan_id === "number" &&
+      Array.isArray(advanced.ext_pan_id) &&
+      Array.isArray(advanced.network_key);
+    result.setupPending = !networkComplete || isPlaceholderCoordinatorAddress(serial?.port);
     const dataDir = file.zigbee?.dataDir ?? (z2mPath ? dirname(z2mPath) : "/opt/zigbee2mqtt/data");
     result.zigbee = {
       dataDir,
@@ -312,22 +325,25 @@ export async function loadConfig(): Promise<AppConfig> {
         ?? file.zigbee?.externalConvertersDir
         ?? join(dataDir, "external_converters"),
       serial: {
-        path: serial.port,
-        baudRate: serial.baudrate ?? 115200,
-        rtscts: serial.rtscts,
-        adapter: serial.adapter as (typeof adapters)[number]
+        // Kurulum bitmeden bu değerler yalnız panele gösterilir; hiçbir porta bağlanılmaz.
+        path: serial?.port ?? "",
+        baudRate: serial?.baudrate ?? 115200,
+        rtscts: serial?.rtscts,
+        adapter: adapters.includes(serial?.adapter as (typeof adapters)[number])
+          ? serial?.adapter as (typeof adapters)[number]
+          : "zstack"
       },
       network: {
-        channel: advanced.channel,
-        panId: advanced.pan_id,
-        extendedPanId: advanced.ext_pan_id,
-        networkKey: advanced.network_key
+        channel: typeof advanced?.channel === "number" ? advanced.channel : 15,
+        panId: typeof advanced?.pan_id === "number" ? advanced.pan_id : 0,
+        extendedPanId: Array.isArray(advanced?.ext_pan_id) ? advanced.ext_pan_id : [],
+        networkKey: Array.isArray(advanced?.network_key) ? advanced.network_key : []
       },
       adapter: {
-        concurrent: advanced.adapter_concurrent,
-        delay: advanced.adapter_delay,
-        disableLed: serial.disable_led,
-        transmitPower: advanced.transmit_power
+        concurrent: advanced?.adapter_concurrent,
+        delay: advanced?.adapter_delay,
+        disableLed: serial?.disable_led,
+        transmitPower: advanced?.transmit_power
       },
       devices: z2m.devices ?? {},
       groups: z2m.groups ?? {}

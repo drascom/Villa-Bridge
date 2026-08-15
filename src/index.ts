@@ -237,7 +237,10 @@ const discoveryRecord = createVillaBridgeDiscoveryRecord(
   {
     nodeId,
     state: "standby",
-    coordinatorId: villaBridgeCoordinatorId(config.zigbee?.serial.path)
+    // Kurulum bitmeden koordinatör kimliği duyurulmaz: ortada sahiplenilen bir koordinatör yok.
+    coordinatorId: villaBridgeCoordinatorId(
+      config.setupPending ? undefined : config.zigbee?.serial.path
+    )
   }
 );
 /** Koordinatör oturumunun durumu; `source.start()` sonucuna göre güncellenir. */
@@ -274,7 +277,16 @@ const deviceNetworkEventLog = new DeviceNetworkEventLog(
   }
 );
 let source: ZigbeeSource;
-if (config.mode === "direct") {
+if (config.setupPending) {
+  // Kurulum bitmeden koordinatör SAHİPLENİLMEZ. `DirectZigbeeSource` hiç kurulmaz:
+  // yer tutucu ağ ayarlarıyla bağlanmak var olan bir Zigbee ağını yeniden kurabilir.
+  const { SetupZigbeeSource } = await import("./setup-zigbee-source.js");
+  source = new SetupZigbeeSource();
+  console.warn(
+    "Villa Bridge kurulum kipinde açıldı: koordinatör adresi girilmedi, hiçbir Zigbee "
+    + "oturumu başlatılmadı. Kuruluma panelden devam edin."
+  );
+} else if (config.mode === "direct") {
   if (!config.zigbee) throw new Error("Doğrudan Zigbee ayarları bulunamadı.");
   const { DirectZigbeeSource } = await import("./direct-zigbee-source.js");
   const selfHealStateStore = new SelfHealStateStore(
@@ -1640,6 +1652,11 @@ app.get("/api/settings", async (_request, reply) => {
     return {
       ok: true,
       settings: await settingsStore.get(),
+      /**
+       * Kurulum bitmedi mi? Panel bunu görünce sihirbazı zorunlu kılar: yerel "tamamlandı"
+       * işareti taşıyan bir tarayıcı bile yarım kurulumu atlayamasın.
+       */
+      setupPending: config.setupPending,
       // Konak yeteneği: seri koordinatör yolu yalnız sunucu/Pi kurulumunda girilebilir.
       zigbee: { serialSupported: settingsStore.serialSupported, defaultPort: defaultCoordinatorPort },
       network: getNetworkInfo(),
@@ -1731,7 +1748,7 @@ app.post<{ Body?: { address?: unknown } }>("/api/settings/zigbee-adapter/test", 
   } catch {
     activeAddress = null;
   }
-  if (config.mode === "direct" && activeAddress === address.value) {
+  if (config.mode === "direct" && !config.setupPending && activeAddress === address.value) {
     return {
       ok: true,
       result: {
@@ -1915,25 +1932,33 @@ if (nodeRole !== "disabled") {
   peerWatcher.start();
 }
 
-try {
-  await source.start();
-  applyCoordinatorStatus("ready");
-  coordinatorError = null;
-  automationEngine.start();
-  // Kaynak ayaktayken: süresi geçmiş kapatmalar hemen uygulanır, kalanlar kaldığı yerden sürer.
-  await automationEngine.restoreAutoOff();
-} catch (error) {
-  // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
+if (config.setupPending) {
+  // Kurulum kipi: koordinatör oturumu hiç denenmez, otomasyon motoru da beklemede kalır.
+  // Düğüm ağda "standby" görünür, böylece hiçbir eş bu düğümü sahip sanmaz.
   applyCoordinatorStatus("coordinator-unavailable");
-  coordinatorError = error instanceof Error ? error.message : String(error);
-  recentErrors.record({
-    operation: "source.start",
-    statusCode: 503,
-    message: coordinatorError
-  });
-  console.error(
-    `Zigbee kaynağı başlatılamadı, düğüm koordinatörsüz sürüyor: ${coordinatorError}`
-  );
+  coordinatorError = "Kurulum tamamlanmadı: koordinatör adresi girilmedi.";
+  console.log("Kurulum sihirbazı bekleniyor; Zigbee kaynağı bilerek başlatılmadı.");
+} else {
+  try {
+    await source.start();
+    applyCoordinatorStatus("ready");
+    coordinatorError = null;
+    automationEngine.start();
+    // Kaynak ayaktayken: süresi geçmiş kapatmalar hemen uygulanır, kalanlar kaldığı yerden sürer.
+    await automationEngine.restoreAutoOff();
+  } catch (error) {
+    // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
+    applyCoordinatorStatus("coordinator-unavailable");
+    coordinatorError = error instanceof Error ? error.message : String(error);
+    recentErrors.record({
+      operation: "source.start",
+      statusCode: 503,
+      message: coordinatorError
+    });
+    console.error(
+      `Zigbee kaynağı başlatılamadı, düğüm koordinatörsüz sürüyor: ${coordinatorError}`
+    );
+  }
 }
 // Hava durumu koordinatörden bağımsızdır: Zigbee kaynağı düşse de panel havayı görmeye devam eder.
 // Açılışı beklemeye değmez, arka planda kurulur; konum yoksa hiç dışarıya çıkmaz.
