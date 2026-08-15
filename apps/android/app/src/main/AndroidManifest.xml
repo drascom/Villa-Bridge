@@ -15,6 +15,10 @@
     <!-- Muafiyet ISTENIR, dayatilmaz: kullanici sistem penceresinde reddedebilir ve uygulama
          reddedilmis hâlde de calisir (yalnizca uyku kisitlarina takilir). -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Parlaklik cihazin KENDI ayarina yazilsin diye. Ozel izindir: calisma zamaninda
+         sorulamaz, kullanici sistem ekranindan verir. Verilmezse uygulama pencere duzeyi
+         parlaklikla calismaya devam eder. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
     <application
         android:allowBackup="false"

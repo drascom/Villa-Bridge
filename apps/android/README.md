@@ -187,13 +187,31 @@ different mechanisms for that, and they are not equally strong:
 
 ### Screen behaviour
 
-What the screen does when nobody touches it — stay lit, dim, or sleep, how long
-it waits, how bright it is, and whether a night window dims it further — is a
-**panel** setting (Settings → Wall tablet), not an Android one. There is no
-Android settings screen: the panel decides and sends the numbers in effect right
-now, and the host only writes them to its own window. System brightness is never
-changed. The host keeps the last applied values so a tablet rebooting at 3 a.m.
-does not light the room while the panel loads.
+Brightness is a **panel** control, and a daily one: the slider lives in the app
+menu (the hamburger), with no admin restriction, because a resident should be
+able to dim the wall tablet. The setup-grade parts — how long before the
+screensaver appears, whether the screen dims with it, and the night window —
+live in Settings → Wall tablet. There is no Android settings screen.
+
+There is **one idle timer**, and it is the panel's existing screensaver (clock,
+date, weather). When it opens the host dims; a touch dismisses it and the host
+restores. The host runs no timer of its own and swallows no touches — the
+screensaver overlay already absorbs the first tap, so nothing is toggled by
+accident.
+
+Brightness is written to the tablet's **own** setting
+(`Settings.System.SCREEN_BRIGHTNESS`), so the value matches what Android
+settings show and a change made there is picked up by the panel on the next
+menu open. That needs the special `WRITE_SETTINGS` permission, requested from
+the panel with an explanation and never forced. **Without it the app keeps
+working** and falls back to window-level brightness, which dims only the Villa
+Bridge screen; the menu says so and offers the permission button.
+
+Automatic brightness is handled explicitly: while the light sensor drives the
+screen, a written value is taken back on the next reading and the slider would
+appear dead. So the first panel-set brightness switches
+`SCREEN_BRIGHTNESS_MODE` to manual, and — because that is a visible device
+change — the menu states that automatic brightness was switched off.
 
 Provisioning files, credentials, and network keys must never enter Git. Keep
 app-private device-protected directories at mode `0700` and files at `0600`.

@@ -15,7 +15,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -54,17 +53,15 @@ class MainActivity : Activity() {
     private var pendingGeolocationCallback: GeolocationPermissions.Callback? = null
     private var pendingGeolocationOrigin: String? = null
     @Volatile private var screenPolicy = ScreenPolicy.DEFAULT
-    private var screenDimmed = false
-    private var swallowingWakeGesture = false
-    private val enterIdleRunnable = Runnable { enterIdleScreen() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Kayitli ekran ilkesi panel yuklenmeden ONCE uygulanir: gece yarisi yeniden acilan
-        // tablet, panel ayaga kalkana kadar gecen saniyelerde odayi aydinlatmasin.
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Cihaz ayarina yazabiliyorsak geri yuklenecek bir sey yok: sistem parlakligi zaten
+        // yeniden acilistan sag cikar. Yalnizca pencere duzeyine dusen (izinsiz) kurulumda
+        // son bilinen deger panel yuklenmeden once geri konur.
         screenPolicy = ScreenPolicyStore.load(this)
-        applyScreenWindowState()
-        scheduleScreenIdle()
+        if (!SystemBrightness.canWrite(this)) applyScreenPolicyNow(screenPolicy)
         applyOrientationLock()
         setContentView(R.layout.activity_main)
         enterImmersiveMode()
@@ -83,78 +80,31 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         enterImmersiveMode()
-        noteScreenActivity()
         synchronizeRuntimeUi(startService = false)
     }
 
+    /**
+     * Uygulamadan cikilirken kararma geri alinir. Kararma cihaz ayarina yazildigi icin bu sart:
+     * ekran koruyucu acikken ana ekrana donen kullanici, tableti karanlik birakmis olurdu.
+     */
     override fun onPause() {
-        // Arka planda sayac isletmenin anlami yok; geri donuste `onResume` yeniden kurar.
-        mainHandler.removeCallbacks(enterIdleRunnable)
+        if (screenPolicy.dimmed) applyScreenPolicyNow(screenPolicy.copy(dimmed = false))
         super.onPause()
     }
 
     /**
-     * DOKUNUNCA UYANMA. Ekran karartilmisken gelen ilk dokunus yalnizca parlakligi geri getirir;
-     * `touchToWake` acikken o hareketin tamami yutulur, yani duvara uzanan el yanlislikla bir
-     * isigi sondurmez. Kalan her dokunus bosta kalma sayacini bastan baslatir.
+     * Panelin verdigi degeri uygular. Once cihazin KENDI ayari denenir — kullanici Android
+     * ayarlarindan bakinca ayni degeri gorsun diye. Izin yoksa pencere duzeyine dusulur;
+     * o durumda deger yalnizca bu ekranda gecerlidir ve panel bunu kullaniciya yazar.
      */
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        val wasDimmed = screenDimmed
-        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            swallowingWakeGesture = wasDimmed && screenPolicy.touchToWake
-        }
-        noteScreenActivity()
-        val swallow = swallowingWakeGesture
-        if (
-            event.actionMasked == MotionEvent.ACTION_UP ||
-            event.actionMasked == MotionEvent.ACTION_CANCEL
-        ) {
-            swallowingWakeGesture = false
-        }
-        if (swallow) return true
-        return super.dispatchTouchEvent(event)
-    }
-
-    private fun noteScreenActivity() {
-        if (screenDimmed) {
-            screenDimmed = false
-            applyScreenWindowState()
-        }
-        scheduleScreenIdle()
-    }
-
-    private fun scheduleScreenIdle() {
-        mainHandler.removeCallbacks(enterIdleRunnable)
-        if (screenPolicy.mode == ScreenPolicy.MODE_ALWAYS || screenPolicy.idleSeconds <= 0) return
-        mainHandler.postDelayed(enterIdleRunnable, screenPolicy.idleSeconds * 1_000L)
-    }
-
-    private fun enterIdleScreen() {
-        if (screenDimmed) return
-        screenDimmed = true
-        applyScreenWindowState()
-    }
-
-    /**
-     * Ilke yalnizca BU PENCEREYE yazilir: cihazin sistem parlakligina dokunulmaz, uygulamadan
-     * cikildiginda tablet kendi ayarina doner. `sleep` kipinde tek yapilan ekrani acik tutma
-     * bayragini birakmaktir; ekrani ne zaman sondurecegine Android'in kendi zaman asimi karar
-     * verir ve o ekrani geri getiren sey guc dugmesidir.
-     */
-    private fun applyScreenWindowState() {
-        val keepOn = !(screenPolicy.mode == ScreenPolicy.MODE_SLEEP && screenDimmed)
-        if (keepOn) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        } else {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-        val level = if (screenDimmed && screenPolicy.mode == ScreenPolicy.MODE_DIM) {
-            screenPolicy.idleBrightness
-        } else {
-            screenPolicy.activeBrightness
-        }
+    private fun applyScreenPolicyNow(policy: ScreenPolicy) {
+        screenPolicy = policy
+        val level = policy.effective
+        val wroteSystemValue = SystemBrightness.apply(this, level)
         val attributes = window.attributes
-        attributes.screenBrightness = if (level < 0) {
+        attributes.screenBrightness = if (wroteSystemValue || level < 0) {
+            // Cihaz ayari yazildiysa pencere ortusu KALKMALI, yoksa sistem degeri ekrana
+            // hic yansimaz ve iki katman birbiriyle yarisir.
             WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         } else {
             // Sifir "ekran kapali" degil "en dusuk okunabilir" demektir: tam sifirda bazi
@@ -539,15 +489,22 @@ class MainActivity : Activity() {
         @android.webkit.JavascriptInterface
         fun hostStatus(): String {
             val report = RuntimeWatchdog.report(this@MainActivity)
+            val systemWritable = SystemBrightness.canWrite(this@MainActivity)
+            val screen = screenPolicy.toJson()
+                .put("systemWritable", systemWritable)
+                .put("automatic", SystemBrightness.automatic(this@MainActivity))
+                // Cihazin SU ANKI parlakligi: kullanici Android ayarlarindan degistirdiyse
+                // panel kaydiricisi bir sonraki acilista onu gosterir.
+                .put("currentBrightness", if (systemWritable) SystemBrightness.current(this@MainActivity) else -1)
             return JSONObject()
                 .put("batteryExempt", batteryOptimizationExempt())
+                .put("screen", screen)
                 .put("restarts", report.failures)
                 .put("lastExitCode", report.lastExitCode)
                 .put("lastFailureAt", report.lastFailureAt)
                 .put("nextDelayMs", report.nextDelayMs)
                 .put("exhausted", report.exhausted)
                 .put("maxRestarts", RuntimeWatchdog.MAX_FAILURES)
-                .put("screen", screenPolicy.toJson())
                 .toString()
         }
 
@@ -572,18 +529,31 @@ class MainActivity : Activity() {
         }
 
         /**
-         * Ekran ilkesini uygular. Gelen degerler SAYIDIR: hangi saatte gece basladigina,
-         * hangi kademenin ne demek oldugune panel karar verir; burada takvim yoktur.
+         * Ekran ilkesini uygular. Gelen degerler SAYIDIR: bekleme suresini panelin ekran
+         * koruyucusu sayar, gece penceresinin ne zaman basladigina panel karar verir. Konak
+         * yalnizca "su an sunu uygula" komutunu yerine getirir.
          */
         @android.webkit.JavascriptInterface
         fun applyScreenPolicy(policy: String) {
             val parsed = ScreenPolicy.fromJson(policy) ?: return
             runOnUiThread {
-                screenPolicy = parsed
                 ScreenPolicyStore.save(this@MainActivity, parsed)
-                screenDimmed = false
-                applyScreenWindowState()
-                scheduleScreenIdle()
+                applyScreenPolicyNow(parsed)
+            }
+        }
+
+        /**
+         * Cihazin kendi parlaklik ayarina yazma izni. Ozel bir izindir: calisma zamaninda
+         * sorulamaz, yalnizca sistem ekrani acilir. Reddetmek desteklenen bir durumdur —
+         * uygulama pencere duzeyi parlaklikla calismaya devam eder.
+         */
+        @android.webkit.JavascriptInterface
+        fun requestSystemBrightnessPermission() {
+            runOnUiThread {
+                val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
+                    .setData(Uri.parse("package:$packageName"))
+                runCatching { startActivity(intent) }
+                    .onFailure { runCatching { startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)) } }
             }
         }
     }

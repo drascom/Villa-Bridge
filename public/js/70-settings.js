@@ -628,7 +628,7 @@
      gider (kip, bekleme süresi, iki parlaklık). Tercihler cihazda kalır (`localStorage`) —
      duvardaki tabletin ekran davranışı evin ortak ayarı değil, o cihazın kendi ayarıdır. */
   const screenPolicyStorageKey="villa-screen-policy";
-  const screenPolicyDefaults={mode:"always",idleSeconds:120,systemBrightness:true,brightness:80,dimBrightness:12,touchToWake:true,nightEnabled:false,nightStart:"23:00",nightEnd:"07:00",nightBrightness:6};
+  const screenPolicyDefaults={brightness:-1,idleSeconds:120,dimEnabled:true,dimBrightness:12,nightEnabled:false,nightStart:"23:00",nightEnd:"07:00",nightBrightness:6};
   const screenIdleChoices=[30,60,120,300,900];
   const screenPolicyPreferences=(()=>{
     const stored=(()=>{try{return JSON.parse(localStorage.getItem(screenPolicyStorageKey)||"null")}catch{return null}})();
@@ -636,12 +636,12 @@
     const clamp=(number,minimum,maximum,fallback)=>Number.isFinite(Number(number))?Math.min(maximum,Math.max(minimum,Math.round(Number(number)))):fallback;
     const clock=(text,fallback)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(String(text))?String(text):fallback;
     return{
-      mode:["always","dim","sleep"].includes(value.mode)?value.mode:screenPolicyDefaults.mode,
+      /* -1 "henüz elleşilmedi" demek: panel cihazın kendi parlaklığını olduğu gibi bırakır ve
+         açılışta oradan okur. Kullanıcı kaydırıcıyı ilk kez oynattığında gerçek bir değer olur. */
+      brightness:Number(value.brightness)===-1?-1:clamp(value.brightness,5,100,screenPolicyDefaults.brightness),
       idleSeconds:screenIdleChoices.includes(Number(value.idleSeconds))?Number(value.idleSeconds):screenPolicyDefaults.idleSeconds,
-      systemBrightness:value.systemBrightness!==false,
-      brightness:clamp(value.brightness,5,100,screenPolicyDefaults.brightness),
+      dimEnabled:value.dimEnabled!==false,
       dimBrightness:clamp(value.dimBrightness,2,60,screenPolicyDefaults.dimBrightness),
-      touchToWake:value.touchToWake!==false,
       nightEnabled:value.nightEnabled===true,
       nightStart:clock(value.nightStart,screenPolicyDefaults.nightStart),
       nightEnd:clock(value.nightEnd,screenPolicyDefaults.nightEnd),
@@ -649,6 +649,9 @@
     };
   })();
   let screenPolicyTimer=null;
+  /* Karartma şu anda UYGULANMIŞ durumda mı. `state.screensaverOpen` ile aynı şey değil:
+     ekran koruyucu açılırken önce cihazın parlaklığı okunur, karartma ondan sonra yazılır. */
+  let screenDimApplied=false;
   const screenBridgeAvailable=()=>typeof window.VillaAndroid?.applyScreenPolicy==="function";
   function saveScreenPreferences(){try{localStorage.setItem(screenPolicyStorageKey,JSON.stringify(screenPolicyPreferences))}catch{}}
   /* Gece penceresi gece yarısını aşabilir (23:00 → 07:00); o durumda "aralık dışı" değil
@@ -662,28 +665,66 @@
     if(start===end)return false;
     return start<end?current>=start&&current<end:current>=start||current<end;
   }
-  function effectiveScreenPolicy(){
+  /* Köprüye giden ilke: kullanımdaki değer, kararmış değer ve şu anda hangisinde olduğumuz.
+     Gece penceresi açıksa ikisi de gece değerlerine düşer. `-1` "dokunma" demektir — kullanıcı
+     kaydırıcıyı hiç oynatmadıysa tabletin kendi parlaklığı olduğu gibi kalır. */
+  function effectiveScreenPolicy(dimmed){
     const night=screenNightActive();
-    const active=night?screenPolicyPreferences.nightBrightness:(screenPolicyPreferences.systemBrightness?-1:screenPolicyPreferences.brightness);
-    const idle=night?Math.min(screenPolicyPreferences.nightBrightness,screenPolicyPreferences.dimBrightness):screenPolicyPreferences.dimBrightness;
+    const active=night?screenPolicyPreferences.nightBrightness:screenPolicyPreferences.brightness;
+    const dim=night
+      ?Math.min(screenPolicyPreferences.nightBrightness,screenPolicyPreferences.dimBrightness)
+      :screenPolicyPreferences.dimBrightness;
     return{
-      mode:screenPolicyPreferences.mode,
-      idleSeconds:screenPolicyPreferences.mode==="always"?0:screenPolicyPreferences.idleSeconds,
       activeBrightness:active,
-      idleBrightness:idle,
-      touchToWake:screenPolicyPreferences.touchToWake
+      idleBrightness:screenPolicyPreferences.dimEnabled?dim:active,
+      dimmed:dimmed===true
     };
   }
-  function pushScreenPolicy(){
+  function pushScreenPolicy(dimmed=screenDimApplied){
     if(!screenBridgeAvailable())return;
-    try{window.VillaAndroid.applyScreenPolicy(JSON.stringify(effectiveScreenPolicy()))}
+    try{window.VillaAndroid.applyScreenPolicy(JSON.stringify(effectiveScreenPolicy(dimmed)))}
     catch(error){showToast(t("screenPolicyFailed",{error:error.message}),true)}
+  }
+  /* EKRAN KORUYUCUYLA TEK SAYAÇ. Kararma ayrı bir zamanlayıcıya bağlı değil: panelin zaten
+     var olan ekran koruyucusu açılınca karartır, dokunup kapatılınca geri getirir. Bekleme
+     süresi de aynı ayardan gelir (`screensaverDelay`), böylece iki farklı süre olmaz. */
+  function applyScreensaverDimming(dimmed){
+    if(!screenBridgeAvailable())return;
+    /* Karartmadan ÖNCE cihazın o anki parlaklığı okunur, yoksa geri getirilecek bir değer
+       kalmaz: kullanıcı kaydırıcıya hiç dokunmadıysa tercih `-1` ("dokunma") olurdu ve ekran
+       koruyucu kapandığında ekran kararmış hâlde kalırdı. */
+    if(dimmed)adoptSystemBrightness();
+    screenDimApplied=dimmed===true;
+    pushScreenPolicy(dimmed);
+  }
+  /* Cihazın kendi parlaklığını panele okumak: kullanıcı Android ayarlarından değiştirdiyse
+     kaydırıcı bir sonraki açılışta o değeri gösterir. Gece penceresi işlerken okunmaz —
+     o an ekranda duran değer bizim yazdığımız gece değeridir, onu "kullanıcı tercihi" sanmak
+     gündüz parlaklığını gecenin üstüne yazardı. */
+  function adoptSystemBrightness(){
+    const screen=hostStatusSnapshot()?.screen;
+    /* Kararma uygulanmışken ya da gece penceresi işlerken okunmaz: o an ekranda duran değer
+       zaten bizim yazdığımızdır, onu "kullanıcı tercihi" sanmak gündüz parlaklığını gecenin
+       üstüne yazardı. */
+    if(!screen||screen.systemWritable!==true||screenNightActive()||screenDimApplied)return;
+    const current=Number(screen.currentBrightness);
+    if(!Number.isFinite(current)||current<1)return;
+    if(current===screenPolicyPreferences.brightness)return;
+    screenPolicyPreferences.brightness=current;
+    saveScreenPreferences();
   }
   function updateScreenPreference(patch){
     Object.assign(screenPolicyPreferences,patch);
     saveScreenPreferences();
     pushScreenPolicy();
+    refreshScreensaverDelay();
     renderTabletCare();
+    renderMenuBrightness();
+  }
+  /* Bekleme süresi ekran koruyucunun süresidir; değişince sayaç yeniden kurulur. */
+  function refreshScreensaverDelay(){
+    screensaverDelay=screenPolicyPreferences.idleSeconds*1000;
+    scheduleScreensaver();
   }
   function hostStatusSnapshot(){
     if(typeof window.VillaAndroid?.hostStatus!=="function")return null;
@@ -696,6 +737,38 @@
        Reddetmek serbest — panel bir daha sormaz, yalnız durumu gösterir. */
     setTimeout(renderTabletCare,2000);
   }
+  /* PARLAKLIK UYGULAMA MENÜSÜNDE. Günlük bir ayardır, kurulum ayarı değil: yönetici kısıtı
+     yok, ev sakini de duvardaki tabletin parlaklığını değiştirebilir. Kurulum nitelikli olan
+     (gece penceresi, bekleme süresi, kararma) ayarlar sayfasındaki kartta kalır. */
+  function renderMenuBrightness(){
+    const row=$("#appMenuBrightness");
+    if(!row)return;
+    const available=screenBridgeAvailable();
+    row.hidden=!available;
+    if(!available)return;
+    const screen=hostStatusSnapshot()?.screen;
+    const level=screenPolicyPreferences.brightness>0
+      ?screenPolicyPreferences.brightness
+      :Number(screen?.currentBrightness)>0?Number(screen.currentBrightness):70;
+    $("#menuBrightness").value=String(level);
+    $("#menuBrightnessValue").textContent=`${level}%`;
+    /* İzin yoksa uygulama çalışmaya devam eder; kaydırıcı yalnızca bu ekranı karartır.
+       Kullanıcı bunu bilsin diye satır açıkça yazılır, düğme zorlamaz. */
+    const fallback=available&&screen?.systemWritable!==true;
+    $("#menuBrightnessNote").hidden=!fallback;
+    $("#grantSystemBrightness").hidden=!fallback;
+    /* Otomatik parlaklık açıkken elle yazılan değeri ışık sensörü geri alır; ilk elle
+       ayarda kip elle kipe alınıyor ve bu sessizce yapılmıyor. */
+    $("#menuBrightnessAutoNote").hidden=screen?.automatic!==true;
+  }
+  function setMenuBrightness(level){
+    updateScreenPreference({brightness:Math.min(100,Math.max(5,Math.round(Number(level)||70)))});
+  }
+  function requestSystemBrightnessPermission(){
+    if(typeof window.VillaAndroid?.requestSystemBrightnessPermission!=="function")return showToast(t("screenBrightnessAndroidOnly"),true);
+    window.VillaAndroid.requestSystemBrightnessPermission();
+    setTimeout(()=>{renderMenuBrightness();renderTabletCare()},2000);
+  }
   function renderTabletCare(){
     const card=$("#tabletCareCard");
     if(!card)return;
@@ -707,24 +780,21 @@
     $("#batteryGuardStatus").textContent=t(exempt?"batteryGuardProtected":"batteryGuardLimited");
     $("#batteryGuardStatus").className=exempt?"tablet-care-badge online-text":"tablet-care-badge unknown-text";
     $("#requestBatteryExemption").textContent=t(exempt?"batteryGuardReview":"batteryGuardAction");
+    const systemWritable=status?.screen?.systemWritable===true;
+    $("#systemBrightnessStatus").textContent=t(systemWritable?"screenBrightnessSystemOn":"screenBrightnessSystemOff");
+    $("#systemBrightnessStatus").className=systemWritable?"tablet-care-badge online-text":"tablet-care-badge unknown-text";
+    $("#grantSystemBrightnessCard").hidden=systemWritable;
     const restarts=Number(status?.restarts||0);
     $("#watchdogSummary").textContent=status?.exhausted===true
       ?t("watchdogExhausted",{count:restarts})
       :restarts>0
         ?t("watchdogRestarts",{count:restarts,max:Number(status?.maxRestarts||0),seconds:Math.round(Number(status?.nextDelayMs||0)/1000),code:Number(status?.lastExitCode||0)})
         :t("watchdogHealthy");
-    $("#screenMode").value=screenPolicyPreferences.mode;
     $("#screenIdleSeconds").value=String(screenPolicyPreferences.idleSeconds);
-    $("#screenIdleSeconds").disabled=screenPolicyPreferences.mode==="always";
-    $("#screenSystemBrightness").checked=screenPolicyPreferences.systemBrightness;
-    $("#screenBrightness").value=String(screenPolicyPreferences.brightness);
-    $("#screenBrightness").disabled=screenPolicyPreferences.systemBrightness;
-    $("#screenBrightnessValue").textContent=screenPolicyPreferences.systemBrightness?t("screenBrightnessSystem"):`${screenPolicyPreferences.brightness}%`;
+    $("#screenDimEnabled").checked=screenPolicyPreferences.dimEnabled;
     $("#screenDimBrightness").value=String(screenPolicyPreferences.dimBrightness);
-    $("#screenDimBrightness").disabled=screenPolicyPreferences.mode!=="dim";
+    $("#screenDimBrightness").disabled=!screenPolicyPreferences.dimEnabled;
     $("#screenDimBrightnessValue").textContent=`${screenPolicyPreferences.dimBrightness}%`;
-    $("#screenTouchToWake").checked=screenPolicyPreferences.touchToWake;
-    $("#screenTouchToWake").disabled=screenPolicyPreferences.mode!=="dim";
     $("#screenNightEnabled").checked=screenPolicyPreferences.nightEnabled;
     $("#screenNightStart").value=screenPolicyPreferences.nightStart;
     $("#screenNightEnd").value=screenPolicyPreferences.nightEnd;
@@ -745,6 +815,7 @@
       wasNight=night;
       pushScreenPolicy();
       renderTabletCare();
+      renderMenuBrightness();
     },60000);
   }
   function configureAndroidActions(){
@@ -764,11 +835,15 @@
     if(runtimeAvailable){
       $("#runtimeStatusText").textContent=t(status==="stopped"?"runtimeStopped":"runtimeRunning");
     }
-    /* Ekran ilkesi her açılışta yeniden gönderilir: kabuk son bilinen ilkeyi saklıyor olsa da
-       kaynak burasıdır, panel açıldığında ikisi mutlaka aynı olmalı. */
-    pushScreenPolicy();
+    /* Açılışta önce cihazın kendi parlaklığı okunur (kullanıcı Android ayarlarından
+       değiştirmiş olabilir), sonra yalnız gece penceresi işliyorsa yazılır. Elleşilmemiş
+       bir tabletin parlaklığı panel açıldı diye değişmez. */
+    adoptSystemBrightness();
+    if(screenNightActive())pushScreenPolicy();
+    refreshScreensaverDelay();
     startScreenPolicyTimer();
     renderTabletCare();
+    renderMenuBrightness();
   }
   function openWifiSettings(){
     if(typeof window.VillaAndroid?.openWifiSettings==="function"){

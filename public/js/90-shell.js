@@ -2,6 +2,10 @@
     const dialog=$("#appMenuDialog");
     if(!dialog||dialog.open)return;
     state.appMenuOpener=button||null;
+    /* Menü her açılışında parlaklık satırı cihazdan tazelenir: kullanıcı Android ayarlarından
+       değiştirmiş olabilir, kaydırıcı onu göstermeli. */
+    adoptSystemBrightness();
+    renderMenuBrightness();
     $$("[data-app-menu]").forEach(item=>item.setAttribute("aria-expanded","true"));
     dialog.showModal();
     const active=dialog.querySelector(".nav-button.active:not([hidden])")||dialog.querySelector(".nav-button");
@@ -963,7 +967,10 @@
     if($("#onboardingDialog").open)renderOnboarding();
     if(state.coach)renderCoach();
   }
-  const screensaverDelay=120000;
+  /* Bekleme süresi artık sabit değil: duvardaki tablet kartındaki "önce bu kadar beklensin"
+     ayarı bunu sürer (`refreshScreensaverDelay`). Tek sayaç budur — kararma da buna bağlı,
+     ayrı bir boşta kalma zamanlayıcısı yok. */
+  let screensaverDelay=screenPolicyPreferences.idleSeconds*1000;
   let screensaverTimer=null;
   let screensaverClockTimer=null;
   function clearScreensaverTimer(){if(screensaverTimer!==null){clearTimeout(screensaverTimer);screensaverTimer=null}}
@@ -1053,6 +1060,9 @@
     renderScreensaver();
     scheduleScreensaverClock();
     overlay.focus();
+    /* Duvardaki tablette ekran koruyucu aynı zamanda kararma anıdır: saat/tarih ekranda
+       kalır, parlaklık düşer, dokunulunca ikisi birden geri gelir. */
+    applyScreensaverDimming(true);
   }
   function closeScreensaver(){
     clearScreensaverClock();
@@ -1060,6 +1070,7 @@
     state.screensaverOpen=false;
     document.body.classList.remove("screensaver-open");
     $("#screensaver").hidden=true;
+    applyScreensaverDimming(false);
   }
   function dismissScreensaver(event){
     if(event){event.preventDefault();event.stopPropagation()}

@@ -970,6 +970,8 @@
     .app-menu-utilities{display:flex;flex-direction:column;gap:9px;padding-top:12px;border-top:1px solid var(--menu-line)}
     .app-menu-utility{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .app-menu-utility-stack{align-items:stretch;flex-direction:column;gap:8px}
+    /* PARLAKLIK SATIRI. Kaydırıcı parmakla sürülüyor: dokunma hedefi 44px'in altına inmemeli. */
+    #appMenuBrightness[hidden]{display:none}.app-menu-brightness{display:flex;align-items:center;gap:clamp(8px,1.4vw,14px)}.app-menu-brightness input[type="range"]{flex:1 1 auto;min-width:0;height:44px}.app-menu-brightness-icon{width:20px;height:20px;flex:0 0 auto;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round}.app-menu-brightness-value{min-width:4ch;color:var(--muted);font:800 12px/1 system-ui,sans-serif;text-align:right}.app-menu-brightness-note{color:var(--muted);font-size:11px;line-height:1.45}.app-menu-brightness-note[hidden]{display:none}.app-menu-brightness-grant{align-self:flex-start;min-height:40px}.app-menu-brightness-grant[hidden]{display:none}
     .app-menu-utility-label{color:var(--menu-sub);font:800 10px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase}
     /* Görünüm 2×2: dört seçenek de görünür kalır, "Güneşe göre" gibi uzun etiket kırpılmaz. */
     .app-menu-modal .theme-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border:1px solid var(--menu-line);border-radius:12px;background:var(--menu-inset)}

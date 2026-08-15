@@ -227,15 +227,13 @@
         <div><h2 data-i18n="tabletCareTitle">Wall tablet</h2><p data-i18n="tabletCareLead">Keep the tablet awake and running as the home controller, and decide what the screen does when nobody is in the room.</p></div>
         <div class="tablet-care-status">
           <div class="tablet-care-row"><div><strong data-i18n="batteryGuardTitle">Background protection</strong><small data-i18n="batteryGuardLead">Android may put sleeping apps to sleep for good. Exempting Villa Bridge keeps Zigbee, MQTT and Matter alive while the screen is off. You can refuse, and you can take it back later.</small></div><div class="tablet-care-action"><span id="batteryGuardStatus" class="tablet-care-badge">—</span><button id="requestBatteryExemption" class="secondary" type="button" data-i18n="batteryGuardAction">Ask Android</button></div></div>
+          <div class="tablet-care-row"><div><strong data-i18n="screenBrightnessSystemTitle">Brightness follows the tablet</strong><small data-i18n="screenBrightnessSystemLead">With permission, the slider in the menu writes the tablet’s own brightness setting — the same value you see in Android settings, and a change made there comes back here. Without it Villa Bridge still works, but the slider only dims its own screen.</small></div><div class="tablet-care-action"><span id="systemBrightnessStatus" class="tablet-care-badge">—</span><button id="grantSystemBrightnessCard" class="secondary" type="button" data-i18n="screenBrightnessGrant">Allow</button></div></div>
           <div class="tablet-care-row"><div><strong data-i18n="watchdogTitle">Automatic restart</strong><small id="watchdogSummary" data-i18n="watchdogHealthy">The system has not crashed since the last stable start.</small></div></div>
         </div>
         <div class="tablet-screen-grid">
-          <label class="setting-field"><span data-i18n="screenModeLabel">When nobody touches the screen</span><select id="screenMode"><option value="always" data-i18n="screenModeAlways">Keep it lit</option><option value="dim" data-i18n="screenModeDim">Dim it down</option><option value="sleep" data-i18n="screenModeSleep">Let the screen sleep</option></select><small data-i18n="screenModeHelp">Dimming keeps the panel readable and a touch brings it straight back. Sleeping saves the most power, but the screen then needs the power button to come back.</small></label>
-          <label class="setting-field"><span data-i18n="screenIdleLabel">Wait this long first</span><select id="screenIdleSeconds"><option value="30" data-i18n="screenIdle30">30 seconds</option><option value="60" data-i18n="screenIdle60">1 minute</option><option value="120" data-i18n="screenIdle120">2 minutes</option><option value="300" data-i18n="screenIdle300">5 minutes</option><option value="900" data-i18n="screenIdle900">15 minutes</option></select></label>
-          <label class="setting-field"><span data-i18n="screenBrightnessLabel">Brightness while in use</span><input id="screenBrightness" type="range" min="5" max="100" step="5"><small><span id="screenBrightnessValue">—</span></small></label>
-          <label class="setting-field"><span data-i18n="screenDimBrightnessLabel">Brightness while dimmed</span><input id="screenDimBrightness" type="range" min="2" max="60" step="2"><small><span id="screenDimBrightnessValue">—</span></small></label>
-          <label class="setting-toggle"><input id="screenSystemBrightness" type="checkbox"><span data-i18n="screenSystemBrightnessLabel">Use the tablet’s own brightness while in use</span></label>
-          <label class="setting-toggle"><input id="screenTouchToWake" type="checkbox"><span data-i18n="screenTouchToWakeLabel">A touch on the dimmed screen only wakes it</span></label>
+          <label class="setting-field"><span data-i18n="screenIdleLabel">Show the screensaver after</span><select id="screenIdleSeconds"><option value="30" data-i18n="screenIdle30">30 seconds</option><option value="60" data-i18n="screenIdle60">1 minute</option><option value="120" data-i18n="screenIdle120">2 minutes</option><option value="300" data-i18n="screenIdle300">5 minutes</option><option value="900" data-i18n="screenIdle900">15 minutes</option></select><small data-i18n="screenIdleHelp">The clock and date screen appears after this long on the home view, and a touch brings the panel back.</small></label>
+          <label class="setting-field"><span data-i18n="screenDimBrightnessLabel">Brightness while the screensaver shows</span><input id="screenDimBrightness" type="range" min="2" max="60" step="2"><small><span id="screenDimBrightnessValue">—</span></small></label>
+          <label class="setting-toggle"><input id="screenDimEnabled" type="checkbox"><span data-i18n="screenDimEnabledLabel">Dim the screen while the screensaver shows</span></label>
         </div>
         <div class="tablet-screen-night">
           <label class="setting-toggle"><input id="screenNightEnabled" type="checkbox"><span data-i18n="screenNightLabel">Dim further at night</span></label>
@@ -380,6 +378,23 @@
            dili (ikon + başlık + açıklama) taşısın diye. -->
       <div class="app-menu-nav app-menu-nav-appearance">
         <button class="nav-button" type="button" data-view="skySettings"><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="17" cy="6.5" r="2.5"/><path d="M3 19h18"/><path d="m3 19 5.5-8 3.5 4.6L14.5 12l6.5 7"/></svg></span><span class="app-menu-text"><b data-i18n="navBackground">Background</b><span data-i18n="navBackgroundLead">Milky Way, stars and the ridge</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+      <!-- PARLAKLIK. Menüde duruyor çünkü günlük bir ayardır: `data-admin-only` bilerek YOK,
+           ev sakini de duvardaki tabletin parlaklığını değiştirebilmeli. İzin varsa doğrudan
+           cihazın kendi parlaklık ayarını yazar; yoksa satır bunu söyler ve yalnız bu ekranı
+           karartır. Kurulum nitelikli ayarlar (bekleme süresi, kararma, gece) Ayarlar
+           sayfasındaki "Duvardaki tablet" kartında. -->
+      <div id="appMenuBrightness" class="app-menu-utility app-menu-utility-stack" hidden>
+        <span class="app-menu-utility-label" data-i18n="screenBrightnessLabel">Brightness</span>
+        <div class="app-menu-brightness">
+          <svg class="app-menu-brightness-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.4"/></svg>
+          <input id="menuBrightness" type="range" min="5" max="100" step="5" data-i18n-aria="screenBrightnessLabel" aria-label="Brightness">
+          <svg class="app-menu-brightness-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9"/></svg>
+          <span id="menuBrightnessValue" class="app-menu-brightness-value">—</span>
+        </div>
+        <small id="menuBrightnessNote" class="app-menu-brightness-note" hidden data-i18n="screenBrightnessNeedsPermission">Right now this only dims Villa Bridge’s own screen. Allow it to write the tablet’s brightness setting to change the device itself.</small>
+        <button id="grantSystemBrightness" class="quiet app-menu-brightness-grant" type="button" hidden data-i18n="screenBrightnessGrant">Allow</button>
+        <small id="menuBrightnessAutoNote" class="app-menu-brightness-note" hidden data-i18n="screenBrightnessAutoOff">Automatic brightness was switched off so this slider can hold its value.</small>
       </div>
       <div class="app-menu-utility"><span class="app-menu-utility-label" data-i18n="language">Language</span><div class="language-switch" role="group" data-i18n-aria="language" aria-label="Language"><button type="button" data-language="en" class="active">EN</button><button type="button" data-language="tr">TR</button></div></div>
     </div>
