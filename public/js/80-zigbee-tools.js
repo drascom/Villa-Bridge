@@ -414,74 +414,59 @@
       await scanTouchlink();
     }catch(error){showToast(error.message,true)}
   }
-  async function downloadZigbeeBackup(){
-    const button=$("#downloadZigbeeBackup");
+  /* TEK YEDEK — ayarlar, odalar ve Zigbee ağı tek bir dosyada (`/api/backup/full`, ZIP).
+     Eski iki düğme (ev yedeği + Zigbee yedeği) kaldırıldı; uçlar sunucuda duruyor.
+
+     İNDİRME NEDEN BLOB DEĞİL: eski kod yanıtı `fetch` ile belleğe alıp `URL.createObjectURL` +
+     `<a download>` ile kaydediyordu ve BAŞARI BİLDİRİMİNİ tıklamanın gerçekten dosya bırakıp
+     bırakmadığına BAKMADAN gösteriyordu — kullanıcının gördüğü "indirildi diyor ama dosya yok"
+     tam olarak buydu. Artık indirmeyi tarayıcının kendi yolu yapıyor: gizli bir çerçeve sunucu
+     ucuna gider, sunucu `Content-Disposition: attachment` yollar, tarayıcı gezinmeyi indirmeye
+     çevirir. Bu çevrim gerçekleştiğinde çerçevenin `load` olayı HİÇ ateşlenmez; ateşlenmesi
+     sunucunun belge (yani hata) döndürdüğü anlamına gelir. Doğru/yanlış ayrımı buradan gelir,
+     tahminden değil. */
+  const backupDownloadCleanupDelay=60000;
+  function downloadFullBackup(){
+    const button=$("#downloadFullBackup");
     button.disabled=true;
-    try{
-      const response=await fetch("/api/zigbee/backup",{cache:"no-store"});
-      if(!response.ok){
-        const data=await response.json().catch(()=>({}));
-        throw new Error(data.error||t("operationFailed"));
-      }
-      const blob=await response.blob();
-      const disposition=response.headers.get("content-disposition")||"";
-      const filename=/filename="([^"]+)"/.exec(disposition)?.[1]||"villa-bridge-zigbee-backup.json";
-      const url=URL.createObjectURL(blob);
-      const link=document.createElement("a");
-      link.href=url;
-      link.download=filename;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),1_000);
-      showToast(t("backupReady"));
-    }catch(error){showToast(error.message,true)}
-    finally{button.disabled=false}
-  }
-  async function restoreZigbeeBackup(event){
-    const input=event.currentTarget;
-    const file=input.files?.[0];
-    input.value="";
-    if(!file)return;
-    try{
-      if(file.size>30*1024*1024)throw new Error(t("invalidBackupFile"));
-      const backup=JSON.parse(await file.text());
-      if(!confirm(t("restoreConfirm")))return;
-      $("#chooseZigbeeRestore").disabled=true;
-      await api("/api/zigbee/restore",{method:"POST",body:JSON.stringify({confirmation:"RESTORE",backup})});
-      showToast(t("restoreStarting"));
-      waitForRestart();
-    }catch(error){
-      $("#chooseZigbeeRestore").disabled=false;
-      showToast(error instanceof SyntaxError?t("invalidBackupFile"):error.message,true);
-    }
+    const frame=document.createElement("iframe");
+    frame.hidden=true;
+    frame.setAttribute("aria-hidden","true");
+    frame.addEventListener("load",()=>{
+      let message=t("operationFailed");
+      try{
+        const data=JSON.parse(frame.contentDocument?.body?.textContent||"");
+        if(data&&data.error)message=data.error;
+      }catch{}
+      frame.remove();
+      button.disabled=false;
+      showToast(message,true);
+    });
+    document.body.append(frame);
+    frame.src="/api/backup/full";
+    showToast(t("backupPreparing"));
+    setTimeout(()=>{button.disabled=false},3000);
+    setTimeout(()=>{if(frame.isConnected)frame.remove()},backupDownloadCleanupDelay);
   }
   let pendingHomeBackup=null;
-  async function downloadHomeBackup(){
-    const button=$("#downloadHomeBackup");
-    button.disabled=true;
-    try{
-      const data=await api("/api/backup");
-      const stamp=new Date().toISOString().slice(0,10);
-      const blob=new Blob([JSON.stringify(data.backup,null,2)+"\n"],{type:"application/json"});
-      const url=URL.createObjectURL(blob);
-      const link=document.createElement("a");
-      link.href=url;
-      link.download=`villa-yedek-${stamp}.json`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),1_000);
-      showToast(t("homeBackupSaved"));
-    }catch(error){showToast(error.message,true)}
-    finally{button.disabled=false}
+  /* Dosya sunucuya base64 gövdeyle gider: ZIP ikili, panelin `api()` yardımcısı ise JSON
+     konuşuyor. Parça parça kodlanır, tek seferde `String.fromCharCode(...bytes)` çağrısı
+     birkaç MB'lık dosyada yığın taşırırdı. */
+  async function encodeBackupFile(file){
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    let binary="";
+    for(let index=0;index<bytes.length;index+=0x8000){
+      binary+=String.fromCharCode.apply(null,bytes.subarray(index,index+0x8000));
+    }
+    return btoa(binary);
   }
   function selectedHomeBackupMode(){
     return $$("input[name=homeBackupMode]").find(radio=>radio.checked)?.value||"merge";
   }
-  function renderHomeBackupSummary(summary){
+  function renderHomeBackupSummary(preview){
     const host=$("#homeBackupSummary");
     host.textContent="";
+    const summary=preview?.summary;
     const sections=(summary?.sections||[]).filter(section=>section.incoming>0||section.removed>0);
     sections.forEach(section=>{
       const row=document.createElement("div");
@@ -495,17 +480,41 @@
       row.append(name,detail);
       host.append(row);
     });
-    if(!sections.length){
+    if(preview?.zigbee){
+      const row=document.createElement("div");
+      row.className="home-backup-row";
+      const name=document.createElement("strong");
+      name.textContent=t("homeBackupSectionZigbee");
+      const detail=document.createElement("span");
+      detail.textContent=t("homeBackupZigbeeFiles",{count:preview.zigbee.files});
+      row.append(name,detail);
+      host.append(row);
+    }
+    if(!sections.length&&!preview?.zigbee){
       const empty=document.createElement("p");
       empty.textContent=t("homeBackupNothing");
       host.append(empty);
     }
-    const note=document.createElement("p");
-    note.className="home-backup-note";
-    note.textContent=summary?.totalSkippedMissingDevices>0
-      ?t("homeBackupSkipped",{count:summary.totalSkippedMissingDevices})
-      :t("homeBackupNoSkips");
-    host.append(note);
+    if(summary){
+      const note=document.createElement("p");
+      note.className="home-backup-note";
+      note.textContent=summary.totalSkippedMissingDevices>0
+        ?t("homeBackupSkipped",{count:summary.totalSkippedMissingDevices})
+        :t("homeBackupNoSkips");
+      host.append(note);
+    }
+    if(preview?.zigbeeArchiveOnly){
+      const note=document.createElement("p");
+      note.className="home-backup-note";
+      note.textContent=t("homeBackupZigbeeArchiveOnly");
+      host.append(note);
+    }
+    if(preview?.zigbee){
+      const note=document.createElement("p");
+      note.className="home-backup-note";
+      note.textContent=t("homeBackupRestartNote");
+      host.append(note);
+    }
   }
   async function previewHomeBackup(){
     if(!pendingHomeBackup)return;
@@ -513,22 +522,26 @@
     button.disabled=true;
     $("#homeBackupSummary").textContent=t("homeBackupChecking");
     try{
-      const data=await api("/api/backup/preview",{method:"POST",body:JSON.stringify({backup:pendingHomeBackup,mode:selectedHomeBackupMode()})});
-      renderHomeBackupSummary(data.summary);
+      const data=await api("/api/backup/full/preview",{method:"POST",body:JSON.stringify({file:pendingHomeBackup,mode:selectedHomeBackupMode()})});
+      renderHomeBackupSummary(data);
       button.disabled=false;
     }catch(error){$("#homeBackupSummary").textContent=error.message}
   }
-  async function chooseHomeRestore(event){
+  /* Tek "Yedeği geri yükle" akışı: dosya tipi İÇERİĞİNDEN tanınır (sunucuda), böylece hem yeni
+     birleşik ZIP hem de kullanıcının elindeki eski ev-only / zigbee-only JSON dosyaları aynı
+     düğmeden yüklenir. */
+  async function chooseFullRestore(event){
     const input=event.currentTarget;
     const file=input.files?.[0];
     input.value="";
     if(!file)return;
     try{
-      if(file.size>30*1024*1024)throw new Error(t("homeBackupInvalidFile"));
-      pendingHomeBackup=JSON.parse(await file.text());
+      // Sunucudaki `maximumFullBackupBytes` ile aynı sınır: base64 gövde 30 MB'ı aşmasın.
+      if(file.size>20*1024*1024||file.size===0)throw new Error(t("homeBackupInvalidFile"));
+      pendingHomeBackup=await encodeBackupFile(file);
     }catch(error){
       pendingHomeBackup=null;
-      showToast(error instanceof SyntaxError?t("homeBackupInvalidFile"):error.message,true);
+      showToast(error.message||t("homeBackupInvalidFile"),true);
       return;
     }
     $$("input[name=homeBackupMode]").forEach(radio=>{radio.checked=radio.value==="merge"});
@@ -546,9 +559,15 @@
     const button=$("#confirmHomeRestore");
     button.disabled=true;
     try{
-      await api("/api/backup/restore",{method:"POST",body:JSON.stringify({backup:pendingHomeBackup,mode:selectedHomeBackupMode()})});
+      const data=await api("/api/backup/full/restore",{method:"POST",body:JSON.stringify({
+        file:pendingHomeBackup,
+        mode:selectedHomeBackupMode(),
+        confirmation:"RESTORE"
+      })});
       pendingHomeBackup=null;
       $("#homeBackupDialog").close();
+      // Zigbee bölümü de geldiyse her şey yerine kondu ve servis TEK SEFER iniyor.
+      if(data.restarting){showToast(t("restoreStarting"));waitForRestart();return}
       showToast(t("homeBackupRestored"));
       await Promise.allSettled([refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations()]);
       render();

@@ -15,4 +15,6 @@
     <string name="runtime_stopped_title">Villa Bridge is stopped</string>
     <string name="runtime_stopped_message">Zigbee, MQTT and Matter services are off. Start the system when this tablet is ready to become the home controller again.</string>
     <string name="runtime_start">Start Villa Bridge</string>
+    <string name="download_started">Saving to your Downloads folder…</string>
+    <string name="download_failed">The download could not be started on this tablet.</string>
 </resources>

@@ -68,8 +68,15 @@ import { WorldClockStore } from "./world-clock.js";
 import {
   applyPendingZigbeeNetworkRestore,
   createZigbeeNetworkBackup,
-  stageZigbeeNetworkRestore
+  stageZigbeeNetworkRestore,
+  validateZigbeeNetworkBackup
 } from "./zigbee-backup.js";
+import {
+  buildFullBackup,
+  maximumFullBackupBytes,
+  parseBackupUpload,
+  type ParsedBackupUpload
+} from "./full-backup.js";
 
 const config = await loadConfig();
 if (config.zigbee && await applyPendingZigbeeNetworkRestore(config.zigbee.dataDir)) {
@@ -1461,6 +1468,138 @@ app.post<{ Body?: { backup?: unknown; mode?: unknown } }>(
     }
   }
 );
+
+/**
+ * BİRLEŞİK YEDEK — panelin tek "Yedek al" düğmesi buraya gelir.
+ *
+ * Eski uçlar (`GET /api/backup`, `GET /api/zigbee/backup`) yerinde bırakıldı: betikler ve eski
+ * akışlar onları kullanıyor olabilir. Panelde görünen tek düğme artık bu uçtur.
+ *
+ * İndirme düz bir gezinmedir (`window.location`), blob değil: oturum çerezle taşındığı için
+ * masaüstünde de Android WebView'de de tarayıcının normal indirme yolu çalışır.
+ */
+const collectZigbeeBackupSection = async (): Promise<{
+  zigbee?: unknown;
+  zigbeeArchive?: Buffer;
+  zigbeeNote?: string;
+}> => {
+  try {
+    const prepared = await source.prepareNetworkBackup();
+    // Shadow kipi: Zigbee2MQTT kendi arşivini verir, zarfımıza sığmaz — olduğu gibi taşınır.
+    if (prepared) return { zigbeeArchive: prepared.body };
+    if (!config.zigbee) return { zigbeeNote: "Yerel Zigbee veri dizini bulunamadı." };
+    return { zigbee: await createZigbeeNetworkBackup(config.zigbee.dataDir) };
+  } catch (error) {
+    // Koordinatör hazır değilse bütün yedeği kaybetmeyiz; ev bölümü yine de iner.
+    return { zigbeeNote: error instanceof Error ? error.message : String(error) };
+  }
+};
+
+app.get("/api/backup/full", async (_request, reply) => {
+  try {
+    const now = new Date();
+    const home = await homeBackupService.create(now);
+    const archive = buildFullBackup({ home, ...(await collectZigbeeBackupSection()) }, now);
+    const stamp = now.toISOString().slice(0, 10);
+    return reply
+      .header("Content-Disposition", `attachment; filename="villa-yedek-${stamp}.zip"`)
+      .header("Cache-Control", "no-store")
+      .type("application/zip")
+      .send(archive);
+  } catch (error) {
+    return reply.code(503).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+const decodeBackupUpload = (value: unknown): ParsedBackupUpload => {
+  if (typeof value !== "string" || value.length === 0) throw new Error("Yedek dosyası alınamadı.");
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(value)) throw new Error("Yedek dosyası kodlaması geçersiz.");
+  const data = Buffer.from(value, "base64");
+  if (data.length === 0 || data.length > maximumFullBackupBytes) {
+    throw new Error("Yedek dosyası boyutu geçersiz.");
+  }
+  return parseBackupUpload(data);
+};
+
+interface FullRestoreBody {
+  file?: unknown;
+  mode?: unknown;
+  confirmation?: unknown;
+}
+
+/** Yüklenen dosyanın içine bakar: hangi bölümler var, ev bölümü uygulanınca ne olur. */
+app.post<{ Body?: FullRestoreBody }>("/api/backup/full/preview", async (request, reply) => {
+  const mode: HomeBackupMode = request.body?.mode === "replace" ? "replace" : "merge";
+  try {
+    const parsed = decodeBackupUpload(request.body?.file);
+    const home = parsed.home === undefined
+      ? null
+      : await homeBackupService.preview(parsed.home, mode);
+    let zigbeeFiles = 0;
+    if (parsed.zigbee !== undefined) {
+      zigbeeFiles = validateZigbeeNetworkBackup(parsed.zigbee).decoded.size;
+    }
+    return {
+      ok: true,
+      kind: parsed.kind,
+      createdAt: parsed.createdAt,
+      summary: home,
+      zigbee: parsed.zigbee !== undefined ? { files: zigbeeFiles } : null,
+      zigbeeArchiveOnly: parsed.zigbeeArchiveOnly
+    };
+  } catch (error) {
+    return reply.code(400).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
+ * TEK YENİDEN BAŞLATMA: önce ev bölümü atomik olarak yazılır, sonra Zigbee bölümü diske
+ * sıraya alınır, en sonda servis BİR KEZ iner. Eski `/api/zigbee/restore` dosyayı yerleştirip
+ * hemen SIGTERM atıyordu; birleşik akışta yarım geri yükleme + erken restart olmaz.
+ */
+app.post<{ Body?: FullRestoreBody }>("/api/backup/full/restore", async (request, reply) => {
+  if (request.body?.confirmation !== "RESTORE") {
+    return reply.code(400).send({ ok: false, error: "Geri yükleme onayı geçersiz." });
+  }
+  if (request.body?.mode !== "merge" && request.body?.mode !== "replace") {
+    return reply.code(400).send({ ok: false, error: "Geri yükleme biçimi geçersiz." });
+  }
+  const mode: HomeBackupMode = request.body.mode;
+  try {
+    const parsed = decodeBackupUpload(request.body.file);
+    if (parsed.zigbee !== undefined && !config.zigbee) {
+      throw new Error("Yerel Zigbee ağı bu çalışma modunda kullanılmıyor.");
+    }
+    // Zigbee bölümü diske dokunmadan ÖNCE doğrulanır: bozuksa hiçbir şey değişmez.
+    if (parsed.zigbee !== undefined) validateZigbeeNetworkBackup(parsed.zigbee);
+
+    let summary = null;
+    if (parsed.home !== undefined) {
+      summary = await homeBackupService.restore(parsed.home, mode);
+      imagePreferences = await imagesStore.get();
+      store.setImagePreferences(imagePreferences);
+    }
+    let restarting = false;
+    if (parsed.zigbee !== undefined && config.zigbee) {
+      await stageZigbeeNetworkRestore(config.zigbee.dataDir, parsed.zigbee);
+      restarting = true;
+      const timer = setTimeout(() => process.kill(process.pid, "SIGTERM"), 750);
+      timer.unref();
+    }
+    return { ok: true, summary, restarting, zigbeeArchiveOnly: parsed.zigbeeArchiveOnly };
+  } catch (error) {
+    return reply.code(400).send({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
 
 app.put<{
   Params: { id: string };

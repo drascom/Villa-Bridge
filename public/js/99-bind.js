@@ -135,12 +135,10 @@
   $b("#copyAgentToken").onclick=copyAgentToken;
   $b("#restartOnboarding").onclick=openOnboarding;
   $b("#restartDashboardTour").onclick=restartDashboardGuide;
-  $b("#downloadZigbeeBackup").onclick=downloadZigbeeBackup;
-  $b("#chooseZigbeeRestore").onclick=()=>$("#zigbeeRestoreFile").click();
-  $b("#zigbeeRestoreFile").onchange=restoreZigbeeBackup;
-  $b("#downloadHomeBackup").onclick=downloadHomeBackup;
-  $b("#chooseHomeRestore").onclick=()=>$("#homeRestoreFile").click();
-  $b("#homeRestoreFile").onchange=chooseHomeRestore;
+  // Tek yedek: ayarlar + odalar + Zigbee ağı tek dosyada, tek düğmede.
+  $b("#downloadFullBackup").onclick=downloadFullBackup;
+  $b("#chooseFullRestore").onclick=()=>$("#fullRestoreFile").click();
+  $b("#fullRestoreFile").onchange=chooseFullRestore;
   $b("#cancelHomeRestore").onclick=closeHomeRestore;
   $b("#confirmHomeRestore").onclick=applyHomeRestore;
   $$("input[name=homeBackupMode]").forEach(radio=>{radio.onchange=previewHomeBackup});

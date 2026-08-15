@@ -2,12 +2,14 @@ package com.villabridge.android
 
 import android.Manifest
 import android.app.Activity
+import android.app.DownloadManager
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -15,6 +17,8 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.webkit.CookieManager
+import android.webkit.URLUtil
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.GeolocationPermissions
@@ -25,6 +29,7 @@ import android.webkit.WebSettings
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
@@ -92,6 +97,13 @@ class MainActivity : Activity() {
             webView.settings.safeBrowsingEnabled = true
         }
         webView.addJavascriptInterface(AndroidBridge(), "VillaAndroid")
+        // Bir WebView'in indirme işleyicisi YOKSA indirme isteği sessizce düşer: kullanıcı
+        // düğmeye basar, panel "hazırlanıyor" der, dosya hiç gelmez. Paneldeki yedek indirmesi
+        // artık düz bir sunucu gezinmesi (Content-Disposition: attachment) olduğu için buraya
+        // düşer ve sistemin indirme yöneticisine devredilir.
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            enqueueDownload(url, userAgent, contentDisposition, mimeType)
+        }
         webView.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String,
@@ -149,6 +161,39 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+
+    /**
+     * Yalnız panelin kendi kökeninden gelen indirmeler kabul edilir; başka bir adres buraya
+     * düşerse yok sayılır. Oturum çerezi isteğe elle eklenir, aksi hâlde indirme yöneticisi
+     * kimliksiz gider ve 401 alır.
+     */
+    private fun enqueueDownload(
+        url: String,
+        userAgent: String?,
+        contentDisposition: String?,
+        mimeType: String?
+    ) {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return
+        if (uri.scheme != "http" && uri.scheme != "https") return
+        if (!isTrustedDashboard(uri)) return
+        val name = runCatching { URLUtil.guessFileName(url, contentDisposition, mimeType) }
+            .getOrDefault("villa-yedek.zip")
+        val request = DownloadManager.Request(uri)
+            .setTitle(name)
+            .setMimeType(mimeType)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
+        CookieManager.getInstance().getCookie(url)?.let { request.addRequestHeader("Cookie", it) }
+        userAgent?.let { request.addRequestHeader("User-Agent", it) }
+        val started = runCatching {
+            (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+        }.isSuccess
+        Toast.makeText(
+            this,
+            if (started) R.string.download_started else R.string.download_failed,
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     override fun onRequestPermissionsResult(
