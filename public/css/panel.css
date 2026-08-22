@@ -1,36 +1,51 @@
     :root{
+      /* PALET DEMODAN GELİR, AİLE PANELİN KENDİSİDİR (Aşama 7). `Experiment/styles.css`in
+         gündüz kümesi buraya, `[data-tone="night"]` kümesi `:root[data-theme="dark"]`a
+         bağlandı; sabit sistemin iki bloğu da aynı iki kümenin yüzey karşılığını yazar.
+         İKİNCİ BİR AİLE AÇILMADI: demonun `--text`/`--accent`/`--line` adları panelin
+         `--ink`/`--forest`/`--line` adlarına DEĞER olarak taşındı, ad olarak değil.
+         `color-mix()` YOK — demodaki on karışımın panele düşenleri iki ton için AYRI AYRI
+         önceden çözülmüş `rgba` olarak yazıldı:
+           odak halkası  accent 34%      -> --forest-ring   gündüz rgba(30,98,76,.34)   · gece rgba(130,213,177,.34)
+           hub bordürü   text 24%        -> --hub-border-line gündüz rgba(23,35,31,.24) · gece rgba(243,247,244,.24)
+           hub ayracı    text 20%        -> --hub-divider-line gündüz rgba(23,35,31,.2) · gece rgba(243,247,244,.2)
+           bölge hover   surface-soft 28%-> --home-glass     gündüz rgba(233,240,237,.28)· gece rgba(43,57,57,.28)
+           tehlike zemin danger 18%      -> --danger-soft    gündüz rgba(184,72,68,.18) · gece rgba(255,133,128,.18)
+           yönetici şeridi #f2ad4a 18% + surface -> --warm   gündüz #f7ecda · gece #3c3829
+         `--forest-strong` (demo `accent-strong`) ve `--surface-strong` yeni AD değil, aynı
+         ailenin demoda zaten var olan iki basamağı; tema köprüsü de ikisini yeniden bağlar. */
       color-scheme:light;
-      --paper:#edf0f2;--surface:#fbfcfc;--surface-soft:#f3f5f6;--ink:#17211d;--ink-soft:#46534d;--muted:#66716c;--line:#dde2e4;
+      --paper:#e6eeea;--surface:rgba(248,250,249,.82);--surface-strong:rgba(252,253,252,.94);--surface-soft:rgba(233,240,237,.76);--ink:#17231f;--ink-soft:#465650;--muted:#5d6b65;--line:rgba(32,58,48,.13);
       /* `--on-danger`, `--on-forest`in tehlike ekseni karşılığıdır: DOLU tehlike zemini üstünde
          okunan mürekkep. Karar zaten iki kez ayrı ayrı verilmişti (koyu temada uyarı şeridi ve
          ekran koruyucunun uyarısı `#2a100e` yazıyordu); tek ada indirildi, yeni renk yok. */
-      --forest:#184d3b;--forest-soft:#e6f0eb;--on-forest:#fff;--sun:#e9a23b;--danger:#b83a35;--on-danger:#fff;--danger-soft:#f8e9e7;--shadow:0 12px 30px rgba(35,45,41,.07);--card-shadow:0 2px 8px rgba(35,45,41,.055);
+      --forest:#1e624c;--forest-strong:#124937;--forest-soft:#dcece5;--forest-ring:rgba(30,98,76,.34);--on-forest:#fff;--sun:#efa843;--danger:#b84844;--on-danger:#fff;--danger-soft:rgba(184,72,68,.18);--shadow:0 18px 50px rgba(22,43,35,.12);--card-shadow:0 8px 22px rgba(22,43,35,.08);
       /* Zemin düz: kartlar opak durur, kenar ve gölge panelin normal diliyle aynı. */
-      --home-glass:rgba(24,77,59,.07);--home-control:#fbfcfc;--home-border:#dde2e4;--home-float-shadow:0 2px 8px rgba(35,45,41,.055);
+      --home-glass:rgba(233,240,237,.28);--home-control:rgba(252,253,252,.94);--home-border:rgba(32,58,48,.13);--home-float-shadow:0 2px 8px rgba(35,45,41,.055);
       /* Ana ekranın saydam eylem düğmeleri: dolgu yerine ince çerçeve taşır. */
       --home-action-line:rgba(23,33,29,.34);--home-action-halo:none;--home-action-glyph-shadow:none;
       /* Başlıktaki eylem düğmeleri (ekle · düzenle · menü) parmak hedefi: yükseklik en az 60px,
          genişlik ekranla orantılı. Üst sınır masaüstünde şişmeyi keser. */
-      --head-action-h:clamp(60px,9.4vh,64px);--head-action-w:clamp(72px,8.6vw,96px);--head-action-gap:clamp(12px,1.6vw,20px);
+      --head-action-h:clamp(60px,9.4vh,64px);--head-action-w:clamp(72px,8.6vw,96px);--head-action-gap:clamp(14px,1.8vw,20px);
       /* KABUK ÖLÇÜLERİ — TEK YER. Not §5.2'nin üç kademesi ad olarak burada durur, kurallara
          tek tek px gömülmez: büyük yüzey 22–28px, orta kontrol 14–18px, kart aralığı 12–13px.
          `clamp()` + görüntü birimi: 1024×640 duvar tabletinde alt sınıra iner, geniş ekranda
          üst sınırda durur. `--rail-w` sol sabit rayın genişliği — ana sahnenin sol payını ve
          ekrana SABİTLENMİŞ şeritlerin (`.system-alert-bar`, alt hızlı kumanda şeridi) sol
          kenarını da bu tek ad taşır, yoksa ray onların altında kalırdı. */
-      --r-plate:clamp(22px,2.6vh,28px);--r-control:clamp(14px,1.8vh,18px);--card-gap:12px;
-      --rail-w:clamp(84px,8.4vw,104px);
+      --r-plate:clamp(22px,2.6vh,28px);--r-control:clamp(16px,2.6vh,19px);--card-gap:12px;
+      --rail-w:clamp(88px,9vw,104px);
       /* SICAK BİLGİLENDİRME YÜZEYİ. Yeni renk değil: `.default-pin-banner` kuralının içine
          gömülü duran iki değer (açık `#fff3d9` + `#8a610e`, koyu `#3b321f` + `#f0c675`) tek
          ada taşındı; artık mod şeridi ile PIN uyarısı aynı yüzeyi okuyor. */
-      --warm:#fff3d9;--warm-ink:#8a610e;
+      --warm:#f7ecda;--warm-ink:#8a610e;
       /* Hub'ın kendi zemini YOK: saat, tarih ve hava doğrudan kayan gradyanın üstünde durur.
          Taşıyıcı katman olmadığı için okunurluk metnin kendisinden gelir: koyu mürekkep +
          çok hafif açık hale (zeminin en açık ve en koyu bölgelerinde de harfin kenarı ayrışsın).
          `--hub-divider-line` blok içi ayraçlar için: kart değil, zemin üstünde ince bir ayrım. */
       --hub-muted:#2f3a35;
       --hub-text-shadow:0 1px 2px rgba(255,255,255,.85),0 0 12px rgba(255,255,255,.7);
-      --hub-divider-line:rgba(23,33,29,.17);
+      --hub-divider-line:rgba(23,35,31,.2);--hub-border-line:rgba(23,35,31,.24);
       /* CAM YÜZEY DİLİ — TEK AD KÜMESİ, DEĞERİ AKTİF SİSTEM YAZAR. `--sky` gökyüzünün kendisi;
          `--glass-*` ana ekranın yüzeyleri. Ana ekran bu kümeye `--home-*` kancalarını yeniden
          bağlayarak geçer (aşağıda tek yerde), diğer ekranlar opak dilde kalır.
@@ -259,19 +274,19 @@
     }
     :root[data-theme="dark"]{
       color-scheme:dark;
-      --paper:#101514;--surface:#1b2320;--surface-soft:#232d29;--ink:#edf5f0;--ink-soft:#c6d4cd;--muted:#a6b6ad;--line:#33433b;
-      --forest:#71c6a2;--forest-soft:#203d32;--on-forest:#0b1c15;--sun:#f0b65c;--danger:#f07a72;--on-danger:#2a100e;--danger-soft:#40211f;--shadow:0 18px 54px rgba(0,0,0,.28);--card-shadow:0 2px 10px rgba(0,0,0,.18);
-      --home-glass:rgba(226,239,232,.09);--home-control:#1b2320;--home-border:#33433b;--home-float-shadow:0 2px 10px rgba(0,0,0,.18);
+      --paper:#131c1e;--surface:rgba(20,30,34,.78);--surface-strong:rgba(24,35,38,.94);--surface-soft:rgba(43,57,57,.72);--ink:#f3f7f4;--ink-soft:#d3ded8;--muted:#b8c6c0;--line:rgba(230,242,235,.13);
+      --forest:#82d5b1;--forest-strong:#a8e8ca;--forest-soft:rgba(75,139,111,.28);--forest-ring:rgba(130,213,177,.34);--on-forest:#0b1c15;--sun:#f4bd68;--danger:#ff8580;--on-danger:#2a100e;--danger-soft:rgba(255,133,128,.18);--shadow:0 20px 58px rgba(0,0,0,.3);--card-shadow:0 8px 22px rgba(0,0,0,.2);
+      --home-glass:rgba(43,57,57,.28);--home-control:rgba(24,35,38,.94);--home-border:rgba(230,242,235,.13);--home-float-shadow:0 2px 10px rgba(0,0,0,.18);
       /* Sıcak yüzey koyu temada kutup değiştirir: zemin koyu, mürekkep açık kehribar. */
-      --warm:#3b321f;--warm-ink:#f0c675;
+      --warm:#3c3829;--warm-ink:#f0c675;
       /* Ayın yüzü artık dokudur, teması yoktur: aydınlık yüz her temada aynı NASA karesi,
          karanlık limb her temada kesilmiş. Bu yüzden burada ay değişkeni kalmadı. */
       /* Karanlık temada kenar açık renge döner. */
       --home-action-line:rgba(237,245,240,.42);--home-action-halo:none;--home-action-glyph-shadow:none;
       /* Koyu temada hale koyu olur: açık yazı, zeminin turuncu/açık lekelerinin üstünde de ayrışır. */
-      --hub-muted:#cddcd4;
+      --hub-muted:#b8c6c0;
       --hub-text-shadow:0 1px 3px rgba(0,0,0,.82),0 0 12px rgba(0,0,0,.7);
-      --hub-divider-line:rgba(255,255,255,.17);
+      --hub-divider-line:rgba(243,247,244,.2);--hub-border-line:rgba(243,247,244,.24);
       /* GÖKYÜZÜ VE DAĞ ARTIK BURADA TANIMLI DEĞİL: live kipin paleti temadan bağımsız tek küme
          (kökte). Koyu temada değişen yalnız iki parlaklık kelepçesi ve kartın dolgu alfası:
          zemin zaten karanlık olduğu için kart burada .24'e kadar açılabilir. */
@@ -289,11 +304,11 @@
        fotoğraf, animasyon ve zamanlayıcı YOK — hepsi hareketli sistemde kalır. */
     :root[data-sky="fixed"]:not([data-theme="dark"]){
       /* iOS'un gruplu liste zemini: çok açık nötr gri, kartlar onun üstünde beyaza yakın. */
-      --paper:#f2f3f7;--surface:#fff;--surface-soft:#eceef3;--line:rgba(17,22,28,.09);
-      --card-shadow:0 1px 3px rgba(20,28,38,.07);--shadow:0 10px 26px rgba(20,28,38,.08);
+      --paper:#eaf1ed;--surface:rgba(252,253,252,.94);--surface-strong:#fff;--surface-soft:rgba(233,240,237,.76);--line:rgba(32,58,48,.13);
+      --card-shadow:0 1px 3px rgba(22,43,35,.1);--shadow:0 18px 50px rgba(22,43,35,.12);
       --ground-wash:radial-gradient(120% 78% at 50% -12%,rgba(255,255,255,.92) 0%,rgba(255,255,255,0) 62%);
       /* Sabit zeminde hub yazısının ağır gölgeye ihtiyacı yok: zemin sakin, mürekkep koyu. */
-      --hub-text-shadow:none;--hub-muted:#4c5854;--hub-divider-line:rgba(17,22,28,.12);
+      --hub-text-shadow:none;--hub-muted:#5d6b65;--hub-divider-line:rgba(23,35,31,.2);--hub-border-line:rgba(23,35,31,.24);
       --home-glass:rgba(17,22,28,.05);--home-action-line:rgba(23,33,29,.22);
       /* KART = ÇERÇEVE, LEVHA DEĞİL. Sabit zemin oynamadığı için kartın kendi dolgusuna gerek
          yok: dolgu .04 alfada sadece bir nefes, kartı okutan tek şey KENARI. Kenar bu yüzden
@@ -336,10 +351,10 @@
     }
     :root[data-sky="fixed"][data-theme="dark"]{
       /* iOS'un koyu zemini: neredeyse siyah, hafif SOĞUK gri. */
-      --paper:#0c0e11;--surface:#161a1f;--surface-soft:#1d2228;--line:rgba(255,255,255,.1);
-      --card-shadow:0 1px 3px rgba(0,0,0,.4);--shadow:0 14px 34px rgba(0,0,0,.45);
+      --paper:#0f1618;--surface:rgba(24,35,38,.94);--surface-strong:#1c282b;--surface-soft:rgba(43,57,57,.72);--line:rgba(230,242,235,.13);
+      --card-shadow:0 1px 3px rgba(0,0,0,.4);--shadow:0 20px 58px rgba(0,0,0,.3);
       --ground-wash:radial-gradient(120% 78% at 50% -12%,rgba(126,152,190,.1) 0%,rgba(126,152,190,0) 64%);
-      --hub-text-shadow:none;--hub-muted:#b6c4be;--hub-divider-line:rgba(255,255,255,.14);
+      --hub-text-shadow:none;--hub-muted:#b8c6c0;--hub-divider-line:rgba(243,247,244,.2);--hub-border-line:rgba(243,247,244,.24);
       --home-glass:rgba(255,255,255,.07);--home-action-line:rgba(237,245,240,.34);
       /* KART = ÇERÇEVE (light ile aynı karar): dolgu beyazın .03'ünde, yani neredeyse yok;
          kenar .13'ten .20'ye çıkar ki kartın sınırı koyu zeminde de tek başına okunsun. */
@@ -1030,7 +1045,7 @@
     .device-card-header{display:flex;align-items:center;gap:13px}.device-card-copy{min-width:0;flex:1}
     .device-icon{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:50%;background:#f0f3ef;color:var(--forest)}
     .device-visual{width:54px;height:54px;flex:none;display:grid;place-items:center;border:1px solid #edf0ed;border-radius:12px;background:#fafbf9;overflow:hidden}.device-photo{grid-area:1/1;width:100%;height:100%;padding:5px;object-fit:contain;background:white}.device-fallback{grid-area:1/1;width:100%;height:100%;display:grid;place-items:center;color:var(--forest);font-size:19px;background:#f0f3ef}.device-fallback[hidden],.device-photo[hidden]{display:none}
-    .quick-card{position:relative;min-width:0;min-height:44px;display:flex;align-items:center;padding:5px 12px;border-radius:999px;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.quick-card:focus-visible,.quick-card:has(:focus-visible){outline:3px solid #90b8a7;outline-offset:2px}.quick-battery{min-height:0;display:inline-flex;align-items:center;gap:3px;padding:0;border:0;border-radius:0;color:var(--muted);background:transparent;font-size:11px;font-weight:750}.quick-battery.low{color:var(--danger)}.battery-glyph{position:relative;width:11px;height:7px;flex:none;padding:1px;border:1px solid currentColor;border-radius:2px}.battery-glyph::after{content:"";position:absolute;right:-2px;top:1px;width:1px;height:3px;border-radius:0 1px 1px 0;background:currentColor}.battery-glyph i{display:block;height:100%;max-width:100%;border-radius:1px;background:currentColor}
+    .quick-card{position:relative;min-width:0;min-height:44px;display:flex;align-items:center;padding:5px 12px;border-radius:999px;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.quick-card:focus-visible,.quick-card:has(:focus-visible){outline:3px solid var(--forest-ring);outline-offset:2px}.quick-battery{min-height:0;display:inline-flex;align-items:center;gap:3px;padding:0;border:0;border-radius:0;color:var(--muted);background:transparent;font-size:11px;font-weight:750}.quick-battery.low{color:var(--danger)}.battery-glyph{position:relative;width:11px;height:7px;flex:none;padding:1px;border:1px solid currentColor;border-radius:2px}.battery-glyph::after{content:"";position:absolute;right:-2px;top:1px;width:1px;height:3px;border-radius:0 1px 1px 0;background:currentColor}.battery-glyph i{display:block;height:100%;max-width:100%;border-radius:1px;background:currentColor}
     .quick-device-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:50%;color:var(--muted);background:#e7ece8}.quick-device-icon .device-type-svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}body.android-app dialog::backdrop{backdrop-filter:none}
     .device-name-row{min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.device-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:16px}.device-link-level{display:inline-flex;align-items:center;gap:4px;flex:none;padding:3px 6px;border-radius:999px;color:var(--muted);background:var(--surface-soft);font-size:10px;font-weight:800;line-height:1}.device-link-level svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}.device-link-level.strong{color:#24805a;background:#e2f3ea}.device-link-level.good{color:#927035;background:#fff1ca}.device-link-level.weak{color:var(--danger);background:#f9e6e3}.device-meta{color:var(--muted);font-size:12px;margin-top:3px}.online-text{color:#24805a}.offline-text{color:var(--danger)}.unknown-text{color:#927035}
     .controls{display:grid;gap:9px;margin-top:16px}.control-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding-top:12px;border-top:1px solid #edf0ed}.control-name{font-weight:650}.control-value{color:var(--muted);font-size:12px}.device-role-fixed{text-align:right;font-weight:750}.control-actions{display:flex;align-items:center;gap:8px}.visibility-toggle{width:44px;height:44px;display:grid;place-items:center;flex:none;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--forest);background:var(--forest-soft);line-height:1;touch-action:manipulation}.visibility-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.visibility-toggle.is-hidden{color:var(--muted);background:var(--surface-soft)}.visibility-toggle:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}/* Yıldız gözün kardeşi: aynı 44px yuvarlak hedef, aynı yerleşim. Dolu/boş ayrımı `aria-pressed`ten okunur. */.favorite-toggle{width:44px;height:44px;display:grid;place-items:center;flex:none;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--muted);background:var(--surface-soft);line-height:1;touch-action:manipulation}.favorite-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}.favorite-toggle[aria-pressed="true"]{color:var(--sun);border-color:var(--sun)}.favorite-toggle[aria-pressed="true"] svg{fill:currentColor}.favorite-toggle:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
@@ -1184,7 +1199,7 @@
        MÜREKKEP: blok gökyüzünün üstünde duran serbest yazıdır (kendi dolgusu yok), bu yüzden
        yukarıda tema/gökyüzü başına bağlanan `--hub-text-shadow` ve `--hub-muted` burada da
        geçerli; kural hiçbir rengi kendi içine gömmez. */
-    .home-hub{--hub-time-size:clamp(24px,3.9vh,32px);--hub-pad-y:clamp(4px,.8vh,8px);--hub-pad-x:clamp(7px,.9vw,12px);--hub-line:clamp(11px,1.7vh,13px);min-width:0;display:flex;align-items:stretch;justify-content:center;gap:clamp(5px,.7vw,10px);padding:clamp(4px,.7vh,7px) clamp(5px,.7vw,9px);border:1px solid var(--home-border);border-radius:var(--r-plate);background:transparent;box-shadow:var(--glass-sheen);text-shadow:var(--hub-text-shadow)}
+    .home-hub{--hub-time-size:clamp(24px,3.9vh,32px);--hub-pad-y:clamp(6px,1.25vh,8px);--hub-pad-x:clamp(9px,1.4vw,14px);--hub-line:clamp(11px,1.7vh,13px);min-width:0;display:flex;align-items:stretch;justify-content:center;gap:clamp(7px,1.1vw,11px);padding:clamp(4px,.7vh,7px) clamp(5px,.7vw,9px);border:1px solid var(--hub-border-line);border-radius:clamp(17px,3vh,19px);background:transparent;box-shadow:var(--glass-sheen);text-shadow:var(--hub-text-shadow)}
     .hub-zone{min-width:0;min-height:44px;display:grid;align-content:center;gap:1px;padding:var(--hub-pad-y) var(--hub-pad-x);border:0;border-radius:var(--r-control);color:inherit;background:transparent;font:inherit;text-align:left;touch-action:manipulation;transition:background .16s ease}
     .hub-zone:hover{background:var(--home-glass)}
     .hub-zone:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px;background:var(--home-glass)}
@@ -1224,7 +1239,7 @@
        ekranda 48px'de durur.
        Eski bindirme/maske düzeni kalktı: ikon yazının altına binmediği için ne negatif marj
        ne de okunurluk maskesi gerekiyor. */
-    .hub-zone-weather{--weather-scene-size:clamp(36px,6.6vh,48px);--weather-scene-op:1;display:flex;align-items:center;gap:clamp(5px,.7vw,9px)}
+    .hub-zone-weather{--weather-scene-size:clamp(36px,6.6vh,48px);--weather-scene-op:1;display:flex;align-items:center;gap:clamp(7px,1.1vw,11px)}
     :root[data-theme="dark"] .hub-zone-weather{--weather-scene-op:.95}
     .hub-weather-copy{min-width:0;display:grid;gap:1px}
     .hub-weather-scene{flex:none;display:block;width:var(--weather-scene-size);height:var(--weather-scene-size);margin:0;opacity:var(--weather-scene-op);pointer-events:none}
@@ -1379,7 +1394,7 @@
     body[data-active-view="home"] .app-menu-button{
       --ink:var(--glass-ink);--ink-soft:var(--glass-ink-soft);--muted:var(--glass-sub);
       --line:var(--glass-line);--surface:var(--glass-inset);--surface-soft:var(--glass-inset);
-      --forest:var(--glass-accent);--forest-soft:var(--glass-accent-soft);--on-forest:var(--glass-accent-ink);
+      --forest:var(--glass-accent);--forest-strong:var(--glass-accent);--forest-soft:var(--glass-accent-soft);--on-forest:var(--glass-accent-ink);
       --danger:var(--glass-danger);--danger-soft:var(--glass-danger-soft);
       color:var(--glass-ink)
     }
@@ -1392,7 +1407,7 @@
     body[data-active-view="home"] #home .widget-card{
       --ink:var(--glass-plate-ink);--ink-soft:var(--glass-plate-ink-soft);--muted:var(--glass-plate-sub);
       --line:var(--glass-plate-line);--surface:var(--glass-plate-inset);--surface-soft:var(--glass-plate-inset);
-      --forest:var(--glass-plate-accent);--forest-soft:var(--glass-plate-accent-soft);--on-forest:var(--glass-plate-accent-ink);
+      --forest:var(--glass-plate-accent);--forest-strong:var(--glass-plate-accent);--forest-soft:var(--glass-plate-accent-soft);--on-forest:var(--glass-plate-accent-ink);
       --danger:var(--glass-plate-danger);--danger-soft:var(--glass-plate-danger-soft);
       color:var(--glass-plate-ink);text-shadow:var(--glass-plate-shadow)
     }
@@ -1410,7 +1425,7 @@
     body[data-active-view="home"] #home .widget-card :where(.group-widget-actions button,.icon-button,.ov-hidden-note,.ov-switch,.tile-eye,.tile-star,.tile-width-toggle){
       --ink:var(--glass-ink);--ink-soft:var(--glass-ink-soft);--muted:var(--glass-sub);
       --line:var(--glass-line);--surface:var(--glass-inset);--surface-soft:var(--glass-inset);
-      --forest:var(--glass-accent);--forest-soft:var(--glass-accent-soft);--on-forest:var(--glass-accent-ink);
+      --forest:var(--glass-accent);--forest-strong:var(--glass-accent);--forest-soft:var(--glass-accent-soft);--on-forest:var(--glass-accent-ink);
       --danger:var(--glass-danger);--danger-soft:var(--glass-danger-soft)
     }
     /* Kartın İÇİNDEKİ durum döşemeleri ortak mürekkebi geri verir: dolguları açık/renkli,
@@ -1682,9 +1697,15 @@
        taşma olmaz; bir daha güncellenmesi gereken sabit yok.
        `--home-head-gap`: başlık ile kart panosu arası nefes payı — oransal (vh), sabit px değil.
        Sütun akışı olduğu için bu pay panonun (dolayısıyla kartların) boyundan kendiliğinden düşer. */
-    body[data-active-view="home"] main{min-height:100dvh;display:flex;flex-direction:column}#home.active{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;height:auto}#home{--rail-gap:0px;--rail-cards:2;--rail-unit:calc((100vw - var(--rail-gap) - 2 * var(--page-gutter) - (var(--rail-cards) - 1) * 10px)/var(--rail-cards));--strip-inset:20px;--home-head-gap:clamp(12px,2.8vh,26px);/* HIZLI SAHNE KARTININ BOYU — TEK KAYNAK. Not §6.2 tablette ~62px ister; 640px yükseklikte
+    body[data-active-view="home"] main{min-height:100dvh;display:flex;flex-direction:column}#home.active{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;height:auto}#home{--rail-gap:0px;--rail-cards:2;--rail-unit:calc((100vw - var(--rail-gap) - 2 * var(--page-gutter) - (var(--rail-cards) - 1) * 10px)/var(--rail-cards));--strip-inset:20px;/* DEMODAN SAPMA — BAŞLIK. Demonun üst şeridi 70px (tek kademe, geniş ekran); bizde sağ
+     hücre iki kademe (sağlık göstergeleri + 56px'lik eylem düğmeleri) ve 1024x640'ta 92px
+     ölçülüyor. 56px not §7'nin dokunma hedefi, altına inilmedi; demoya yaklaşan tek sayı
+     başlık-pano arası oldu: demo `margin-bottom:6px`, burada clamp'in alt ucu 6px
+     (1024x640'ta ~10px). Kazanılan 8px doğrudan panoya yazıldı. */
+     --home-head-gap:clamp(6px,1.6vh,16px);/* HIZLI SAHNE KARTININ BOYU — TEK KAYNAK. Not §6.2 tablette ~62px ister; 640px yükseklikte
      `9.7vh` tam 62px eder, 480px'lik ekranda taban 56px devreye girer. İkisi de 44px dokunma
-     hedefinin üstünde. Şeridin `min-height` bütçesi de bu değerden hesaplanır. */--scene-h:clamp(56px,9.7vh,62px)}#home .page-head{margin-bottom:var(--home-head-gap)}#home .widget-board{flex:1 1 auto;min-height:150px;max-height:660px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:10px}#home [data-widget="quick"]{position:fixed;z-index:9;left:var(--strip-inset);right:var(--strip-inset);bottom:calc(12px + env(safe-area-inset-bottom));grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden}#home .widget-rail{position:relative;z-index:1;grid-column:1/-1;grid-row:1;pointer-events:none;height:100%;display:grid;grid-template-columns:repeat(var(--rail-cards),var(--rail-unit));grid-template-rows:minmax(0,1fr);grid-auto-columns:var(--rail-unit);grid-auto-flow:column;gap:10px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scroll-snap-type:x mandatory;scrollbar-width:none}#home .widget-rail::-webkit-scrollbar{display:none}#home .widget-rail>*{pointer-events:auto;scroll-snap-align:start}/* RAY SAYFA SAYFA: her kart AYNI genişliktedir ve genişlik ekrandan türer, sabit px'ten değil.
+     hedefinin üstünde. Şeridin `min-height` bütçesi de bu değerden hesaplanır. */--scene-h:clamp(56px,9.7vh,62px)}#home .page-head{margin-bottom:var(--home-head-gap)}/* Panonun tabanı artık demonun oda kartı boyudur (154px): 1024x640 bütçesinde panoya 268px
+   kalıyor, yani tek sıra oda kartı tam boyunda sığıyor. */#home .widget-board{flex:1 1 auto;min-height:154px;max-height:660px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:10px}#home [data-widget="quick"]{position:fixed;z-index:9;left:var(--strip-inset);right:var(--strip-inset);bottom:calc(12px + env(safe-area-inset-bottom));grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden}#home .widget-rail{position:relative;z-index:1;grid-column:1/-1;grid-row:1;pointer-events:none;height:100%;display:grid;grid-template-columns:repeat(var(--rail-cards),var(--rail-unit));grid-template-rows:minmax(0,1fr);grid-auto-columns:var(--rail-unit);grid-auto-flow:column;gap:10px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scroll-snap-type:x mandatory;scrollbar-width:none}#home .widget-rail::-webkit-scrollbar{display:none}#home .widget-rail>*{pointer-events:auto;scroll-snap-align:start}/* RAY SAYFA SAYFA: her kart AYNI genişliktedir ve genişlik ekrandan türer, sabit px'ten değil.
    `--rail-cards` görünür alana kaç kart sığacağını söyler, `--rail-unit` de o alanı aralarındaki
    10px boşluklar düşüldükten sonra eşit böler. Görünür alan sabit sayı DEĞİL, gerçek ölçülerden
    türer: 100vw eksi sol rayın genişliği (`--rail-gap`, ray yalnız `min-width:900px`ten sonra
@@ -1753,8 +1774,9 @@
     .quick-scene-grid>.empty{grid-column:1/-1;display:flex;align-items:center;margin:0;padding:0 6px;border:0;background:transparent;color:var(--muted);font-size:13px}
     /* Kartın içinde YALNIZ işlev ikonu ve tek satırlık eylem başlığı var — açıklama paragrafı ana
        ekranda yasak (not §12). Uzun ad kırpılır; tam hâli `title` ile durur. */
-    .quick-card.quick-scene{width:auto;min-width:0;justify-content:flex-start;gap:9px;padding:5px clamp(9px,1.1vw,14px);border:1px solid var(--line);background:var(--surface);box-shadow:var(--card-shadow);touch-action:manipulation}
-    .quick-scene .quick-device-icon{flex:none}
+    .quick-card.quick-scene{width:auto;min-width:0;justify-content:flex-start;gap:10px;padding:9px clamp(10px,1.2vw,14px);border:1px solid var(--line);border-radius:var(--r-plate);background:var(--surface);box-shadow:var(--card-shadow);touch-action:manipulation}
+    .quick-scene .quick-device-icon{width:clamp(36px,6.6vh,42px);height:clamp(36px,6.6vh,42px);flex:none;border-radius:clamp(13px,2.4vh,15px);color:var(--forest-strong);background:var(--forest-soft)}
+    .quick-scene .quick-device-icon .device-type-svg{width:22px;height:22px}
     .quick-scene .device-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:15px;font-weight:650}
     /* Komut yoldayken kart kilitli: tek dokunuş tek komut (`state.pendingCommands`, 10-core.js). */
     .quick-scene[disabled]{opacity:.62;cursor:progress}
@@ -1786,10 +1808,10 @@
     .ov-switch-track{width:38px;height:22px;flex:none;display:block;position:relative;border-radius:999px;background:#c9d2cd;transition:background .16s ease}
     :root[data-theme="dark"] .ov-switch-track{background:#3c4a43}
     .ov-switch-knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.28);transition:left .16s ease}
-    .ov-switch[aria-checked="true"]{color:#18583d;border-color:#4b9a74;background:#e3f3eb}
+    .ov-switch[aria-checked="true"]{color:var(--forest-strong);border-color:var(--forest);background:var(--forest-soft)}
     .ov-switch[aria-checked="true"] .ov-switch-track{background:#4b9a74}
     .ov-switch[aria-checked="true"] .ov-switch-knob{left:19px}
-    :root[data-theme="dark"] .ov-switch[aria-checked="true"]{color:#a8e3c6;background:#1d392c}
+    :root[data-theme="dark"] .ov-switch[aria-checked="true"]{color:var(--forest-strong);background:var(--forest-soft)}
     .ov-switch[disabled]{opacity:.45;cursor:not-allowed}
     .ov-switch-note{max-width:190px;color:var(--muted);font-size:11px;font-weight:650;text-align:right}
     /* ODA KARTI — not §6.3. Sıra: ikon + ad · açık sayısı ya da "Her şey kapalı" · VARSA sensör
@@ -1816,10 +1838,10 @@
     .room-master-track{width:38px;height:22px;flex:none;display:block;position:relative;border-radius:999px;background:#c9d2cd;transition:background .16s ease}
     :root[data-theme="dark"] .room-master-track{background:#3c4a43}
     .room-master-knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.28);transition:left .16s ease}
-    .room-master.is-on{color:#18583d;border-color:#4b9a74;background:#e3f3eb}
+    .room-master.is-on{color:var(--forest-strong);border-color:var(--forest);background:var(--forest-soft)}
     .room-master.is-on .room-master-track{background:#4b9a74}
     .room-master.is-on .room-master-knob{left:19px}
-    :root[data-theme="dark"] .room-master.is-on{color:#a8e3c6;background:#1d392c}
+    :root[data-theme="dark"] .room-master.is-on{color:var(--forest-strong);background:var(--forest-soft)}
     .room-master[disabled]{opacity:.55;cursor:progress}
     .room-master:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     @media(prefers-reduced-motion:reduce){.room-master-track,.room-master-knob{transition:none}}
@@ -1878,8 +1900,13 @@
     .admin-attention-more{margin:10px 0 0;color:var(--muted);font-size:clamp(11px,1.1vw,12.5px)}
     .admin-attention-more[hidden]{display:none}
     .admin-empty{margin:0;color:var(--muted);font-size:clamp(12px,1.2vw,13.5px)}
-    .room-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,clamp(260px,31vw,380px)),1fr));align-items:start;gap:clamp(12px,1.5vw,16px)}
-    .room-card{min-width:0}
+    .room-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,clamp(230px,26.5vw,340px)),1fr));align-items:start;gap:clamp(12px,1.2vw,13px)}
+    /* DEMODAN SAPMA — ODA KARTI. Demo `repeat(3,minmax(0,1fr))` + `min-height:154px` yazıyor;
+       sabit sütun sayısı 1024'ün altında kartı 44px hedeflerinin altına ezerdi, o yüzden sütun
+       akışkan bırakıldı ve en dar sütun 1024'te üç sütun verecek şekilde seçildi
+       (`clamp(230px,26.5vw,340px)` -> 1024'te ~271px). Boy da `clamp()` + görüntü birimi:
+       640px yükseklikte 24vh = 153.6px, yani demonun 154px'i; kısa ekranda 132px'e iner. */
+    .room-card{min-width:0;min-height:clamp(132px,24vh,154px);padding:17px}
     .room-card .tile-eye{display:grid;right:6px}
     .room-card .tile-star{display:grid;right:56px}
     /* Cihaz seviyesi göster/gizle: göz döşemenin kardeşi (iç içe buton olamaz), düzenleme kipinde
@@ -2597,6 +2624,7 @@
       --glass-filter-chip:blur(calc(var(--theme-glass-blur) * .65)) saturate(var(--theme-glass-saturation));
       --glass-accent:var(--theme-accent);--glass-accent-soft:var(--theme-accent-soft);
       --forest:var(--theme-accent);--forest-soft:var(--theme-accent-soft);
+      --forest-strong:var(--theme-accent);--forest-ring:var(--theme-accent-soft);
       --home-control:var(--theme-glass-tile);--home-border:var(--theme-glass-edge);
       --home-float-shadow:var(--theme-glass-shadow);
       /* Kapalı ailesi de pakete bağlanır (gerekçe ve ölçüm aşağıda, `.off` kuralında). Buradaki
@@ -2771,7 +2799,7 @@
     :root[data-theme-package] .quick-modal{
       --ink:var(--on-dark-ink);--ink-soft:var(--on-dark-ink-soft);--muted:var(--on-dark-ink-soft);
       --line:var(--on-dark-line);--surface:var(--on-dark-inset);--surface-soft:var(--on-dark-inset);
-      --forest:var(--on-dark-accent);--forest-soft:var(--on-dark-accent-soft);--on-forest:var(--on-dark-accent-ink);
+      --forest:var(--on-dark-accent);--forest-strong:var(--on-dark-accent);--forest-soft:var(--on-dark-accent-soft);--on-forest:var(--on-dark-accent-ink);
       --danger:var(--on-dark-danger);--danger-soft:var(--on-dark-danger-soft);
       --glass-ink:var(--on-dark-ink);--glass-ink-soft:var(--on-dark-ink-soft);--glass-sub:var(--on-dark-ink-soft);
       --glass-line:var(--on-dark-line);--glass-inset:var(--on-dark-inset);
@@ -2916,13 +2944,13 @@
     .rail-brand .brand-mark{width:clamp(42px,4.6vh,52px);height:clamp(42px,4.6vh,52px);border-radius:var(--r-control);font:700 clamp(19px,2.4vh,25px)/1 Georgia,serif}
     .rail-brand:focus-visible{outline:3px solid var(--forest);outline-offset:2px}
     /* Ray düğmesi: ikon üstte, kısa etiket altta. Dokunma hedefi 56px'in altına inmez. */
-    .rail-button{width:100%;min-height:clamp(56px,8.6vh,68px);display:grid;place-items:center;align-content:center;gap:5px;padding:8px 4px;border:1px solid transparent;border-radius:var(--r-control);color:var(--muted);background:transparent;text-align:center}
-    .rail-icon{display:grid;place-items:center;width:26px;height:26px}
-    .rail-icon svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .rail-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(10px,1.05vw,12px);font-weight:750;letter-spacing:-.01em;line-height:1.1}
+    .rail-button{width:100%;min-height:clamp(56px,9.4vh,64px);display:grid;place-items:center;align-content:center;gap:8px;padding:8px 4px;border:1px solid transparent;border-radius:var(--r-control);color:var(--muted);background:transparent;text-align:center}
+    .rail-icon{display:grid;place-items:center;width:22px;height:22px}
+    .rail-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .rail-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(11px,1.1vw,12px);font-weight:750;letter-spacing:-.01em;line-height:1.1}
     .rail-button:hover{color:var(--ink);background:var(--surface-soft)}
     .rail-button:focus-visible{outline:3px solid var(--forest);outline-offset:-2px}
-    .side-rail .nav-button.active{border-color:var(--line);color:var(--forest);background:var(--surface-soft);box-shadow:var(--card-shadow);font-weight:800}
+    .side-rail .nav-button.active{border-color:var(--line);color:var(--forest-strong);background:var(--surface-strong);box-shadow:var(--card-shadow);font-weight:800}
     /* MOD ŞERİDİ — not §4.2: yönetici modunda sıcak renkli bilgilendirme + görünür "Ev moduna
        dön". Şeridin görünürlüğünü 20-auth.js yazar (`body.home-mode [data-admin-only]`), burada
        ikinci bir mod mekanizması yok. Yüzey ve mürekkep TEK eksende (`--warm` / `--warm-ink`,
@@ -2946,7 +2974,7 @@
     @media(min-width:900px){
       .shell{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);align-items:start}
       .side-rail{position:sticky;top:0;z-index:10;height:100vh;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2vh,20px);padding:clamp(12px,2.2vh,20px) clamp(6px,.7vw,12px) calc(clamp(12px,2.2vh,20px) + env(safe-area-inset-bottom,0px));border-right:1px solid var(--line);background:var(--surface)}
-      .rail-nav,.rail-bottom{width:100%;display:grid;gap:6px}
+      .rail-nav,.rail-bottom{width:100%;display:grid;gap:8px}
       .rail-bottom{margin-top:auto}
       /* Menü levhasını açan düğme artık rayın en altında (Profil). Sayfa başlıklarındaki ikizi
          düşer — not §12: aynı işlev için ikinci düğme yok. Başlık ızgarası iki sütuna iner. */
