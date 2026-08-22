@@ -13,7 +13,7 @@ import { AutomationBackupStore } from "./automation-backup.js";
 import { AutomationAutoOffStore, AutomationsStore } from "./automations.js";
 import { CelestialService } from "./celestial-service.js";
 import { AgentTokenStore } from "./agent-tokens.js";
-import { AuthStore, type AuthRole } from "./auth-store.js";
+import { AuthStore } from "./auth-store.js";
 import { loadConfig } from "./config.js";
 import {
   defaultCoordinatorPort,
@@ -364,7 +364,10 @@ const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
   secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true",
   agentTokens: agentTokenStore,
-  mcpAllowedOrigins: config.mcp.allowedOrigins
+  mcpAllowedOrigins: config.mcp.allowedOrigins,
+  // Yanlış yönetici PIN'i denemeleri hata ayıklama listesine düşsün: kaba kuvvet denemesi
+  // sunucu günlüğüne değil, kullanıcının gördüğü ekrana da yansımalı.
+  recordError: (entry) => recentErrors.record(entry)
 });
 /*
  * Önbellek tabanı: kendi politikasını koymayan her yanıt saklanamaz olsun. API gövdeleri cihaz
@@ -513,11 +516,13 @@ const panelAssetRoutes = [
   "/js/10-core.js",
   "/js/20-auth.js",
   "/js/30-device-view.js",
+  "/js/35-generator.js",
   "/js/40-home.js",
   "/js/45-clock-weather.js",
   "/js/50-widgets.js",
   "/js/60-pairing.js",
   "/js/70-settings.js",
+  "/js/72-admin-overview.js",
   "/js/80-zigbee-tools.js",
   "/js/82-theme-packages.js",
   "/js/84-celestial-view.js",
@@ -640,17 +645,17 @@ app.get("/api/locales", async (request, reply) => {
 
 app.get("/api/health", async () => ({ ...store.getHealth(), node: nodeStatus() }));
 app.get("/api/discovery", async () => ({ ...discoveryRecord, sentAt: Date.now() }));
-// Tip birliğinde `agent` rolü de var ama buraya hiç uğramaz: ajan yalnız `/mcp` üzerinden konuşur,
-// `/api/*` yolları oturum ister. Pratikte gelen rol admin ya da resident'tır.
-const visibleDevices = (role: AuthRole | undefined) => store.getDevices().map((device) => ({
+// Ajan bu yoldan hiç geçmez: yalnız `/mcp` üzerinden konuşur. Buraya gelen tek soru "istek
+// yönetici moduna yükseltilmiş mi" — ayar niteliğindeki kanallar yalnız o zaman görünür.
+const visibleDevices = (elevated: boolean) => store.getDevices().map((device) => ({
   ...device,
   // Görsel varlığı cihaz modelinden türetilemez: model adı geçerli olsa da upstream'de o görsel
   // olmayabilir (ör. `TS0601_u8ouaqsz`). Bilgiyi yalnız önbellek bilir, panele burada taşınır ki
   // görseli olmayan cihaz için `<img>` hiç kurulmasın — konsolda 404 birikmesin.
   image: { ...device.image, available: imageCache.availability(device.image.model) },
-  controls: role === "resident"
-    ? device.controls.filter((control) => control.adminOnly !== true)
-    : device.controls
+  controls: elevated
+    ? device.controls
+    : device.controls.filter((control) => control.adminOnly !== true)
 }));
 
 /**
@@ -662,7 +667,7 @@ const replyDeviceMissing = (reply: FastifyReply, id: string): FastifyReply =>
   reply.code(404).send(deviceMissingResponse(source.recentDeparture?.(id)));
 
 app.get("/api/devices", async (request) => ({
-  devices: visibleDevices(request.villaSession?.role)
+  devices: visibleDevices(request.villaElevated)
 }));
 app.get<{ Params: { id: string } }>("/api/devices/:id/note", async (request, reply) => {
   const id = request.params.id.toLowerCase();
@@ -882,7 +887,7 @@ app.post<{
       fromEndpoint === undefined ? undefined : Number(fromEndpoint),
       toEndpoint === undefined ? undefined : Number(toEndpoint)
     );
-    return { ok: true, devices: visibleDevices(request.villaSession?.role) };
+    return { ok: true, devices: visibleDevices(request.villaElevated) };
   } catch (error) {
     return reply.code(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -1072,7 +1077,7 @@ app.post("/api/pairing/stop", async (_request, reply) => {
 });
 app.get("/api/overview", async (request) => ({
   health: { ...store.getHealth(), node: nodeStatus() },
-  devices: visibleDevices(request.villaSession?.role),
+  devices: visibleDevices(request.villaElevated),
   groups: store.getGroups(),
   pairing: store.getPairing(),
   events: store.getEvents(20),
@@ -1669,8 +1674,8 @@ app.post<{
   }
   const control = device.controls.find((item) => item.property === request.body?.property);
   if (!control) return reply.code(400).send({ ok: false, error: "Bu denetim cihaz tarafından sunulmuyor." });
-  if (control.adminOnly && request.villaSession?.role !== "admin") {
-    return reply.code(403).send({ ok: false, error: "Bu cihaz ayarı için yönetici yetkisi gerekiyor." });
+  if (control.adminOnly && !request.villaElevated) {
+    return reply.code(403).send({ ok: false, error: "Bu cihaz ayarı için yönetici modu gerekiyor." });
   }
   // Değer dönüşümü/doğrulaması panelle otomasyonun paylaştığı tek fonksiyondadır; burada yalnız
   // hatanın HTTP karşılığı verilir. Panel aç/kapat değerini `boolean` yollar, otomasyon yollamaz.

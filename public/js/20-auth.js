@@ -1,135 +1,117 @@
-  function setAuthState(data){
+  /* MOD — tek kullanıcı, iki mod. Giriş ekranı YOK: panel açılır açılmaz ev modundadır.
+     Kurulum ekranları "yönetici modu" ister; o modun anahtarı tek bir PIN'dir (varsayılan 1234).
+     Buradaki bayrak yalnız SUNUCUNUN söylediğini yansıtır — gizlenen düğme bir yetki değildir,
+     yetkiyi her istekte sunucu yeniden sorar (`ELEVATION_REQUIRED`). */
+  function setModeState(data){
     state.auth={
-      configured:data.configured===true,
-      authenticated:data.authenticated===true,
-      user:data.user&&typeof data.user.username==="string"?data.user:null,
-      csrfToken:typeof data.csrfToken==="string"?data.csrfToken:null,
-      expiresAt:typeof data.expiresAt==="string"?data.expiresAt:null
+      elevated:data.elevated===true,
+      mustChangePin:data.mustChangePin===true,
+      secretKind:data.secretKind==="password"?"password":"pin",
+      csrfToken:typeof data.csrfToken==="string"?data.csrfToken:state.auth.csrfToken,
+      expiresAt:typeof data.expiresAt==="string"?data.expiresAt:state.auth.expiresAt,
+      elevationExpiresAt:typeof data.elevationExpiresAt==="string"?data.elevationExpiresAt:null
     };
     applyAuthUi();
   }
-  function setAuthFormError(id,message=""){
-    const error=$("#"+id);
+  function setModeFormError(message=""){
+    const error=$("#modePinError");
     error.textContent=message;
     error.hidden=!message;
   }
+  /* Yükseltme sunucuda hareketsizlikte düşer. Panel bunu kendi başına bilemez; bayrağı yerelde
+     düşürüp gerçeği bir sonraki sunucu yanıtından öğrenir. */
+  function dropElevatedFlag(){
+    if(!state.auth.elevated)return;
+    state.auth.elevated=false;
+    state.auth.elevationExpiresAt=null;
+    applyAuthUi();
+  }
   function applyAuthUi(){
-    const resident=state.auth.user?.role==="resident";
-    document.body.classList.toggle("resident-session",resident);
-    document.body.classList.toggle("auth-locked",!state.auth.authenticated);
-    $(".shell").inert=!state.auth.authenticated;
-    // Oturum bittiyse (düğmeyle çıkış ya da süre dolması) menü açık kalmasın: giriş kutusunun
-    // önünde duran, artık hiçbir şey yapmayan bir pencere olurdu. Kapalıysa bu çağrı boştur.
-    if(!state.auth.authenticated)closeAppMenu();
-    $("#authAccountName").textContent=state.auth.user?.username||"—";
-    $("#authRoleBadge").textContent=t(resident?"homeUser":"administrator");
-    // Menü levhasının kimlik satırı: kim girmiş, hangi rolle. Oturum yoksa satır boşalır ve
-    // kendi kuralıyla (`.app-menu-role:empty`) gizlenir.
-    $("#appMenuRole").textContent=state.auth.user?t("signedInAs",{role:t(resident?"homeUser":"administrator")}):"";
-    $$("[data-auth-logout]").forEach(button=>{button.setAttribute("aria-label",t("signOut"));button.title=t("signOut")});
-    if(resident&&["automations","connections","settings"].includes(document.body.dataset.activeView))activateView("home");
+    const elevated=state.auth.elevated===true;
+    document.body.classList.toggle("home-mode",!elevated);
+    // Yönetici ekranı açıkken mod düşerse kullanıcı boş bir sayfada kalmasın.
+    if(!elevated&&["adminOverview","automations","connections","settings"].includes(document.body.dataset.activeView))activateView("home");
+    $$("[data-mode-toggle]").forEach(button=>{
+      const label=t(elevated?"leaveAdminMode":"enterAdminMode");
+      button.setAttribute("aria-label",label);
+      button.title=label;
+      button.classList.toggle("active",elevated);
+      const text=button.querySelector("[data-mode-toggle-label]");
+      if(text)text.textContent=label;
+    });
+    // Menü levhasının kimlik satırı artık kişi değil, mod söyler.
+    $("#appMenuRole").textContent=t(elevated?"adminModeOn":"homeModeOn");
+    $("#modeStateBadge").textContent=t(elevated?"adminModeOn":"homeModeOn");
+    // KALICI UYARI ŞERİDİ: PIN hâlâ fabrika varsayılanı (1234). `data-admin-only` taşıdığı için
+    // ev modunda zaten görünmez; burada yalnız "varsayılan mı" sorusu kalır.
+    $("#defaultPinBanner").hidden=!state.auth.mustChangePin;
+    $("#modePinFieldHint").textContent=t(state.auth.secretKind==="password"?"adminSecretLegacyHint":"adminPinHint");
+    const input=$("#modePinInput");
+    input.inputMode=state.auth.secretKind==="password"?"text":"numeric";
+    input.maxLength=state.auth.secretKind==="password"?128:8;
   }
-  function openAuthGate(){
-    const setup=$("#authSetupDialog");
-    const login=$("#authLoginDialog");
-    renderAuthRuntimeContext();
-    if(!state.auth.configured){
-      login.hidden=true;
-      setAuthFormError("authSetupError");
-      setup.hidden=false;
-      // Metin alanına odaklanmıyoruz (klavye ekranın yarısını kapatıyordu); odak kutunun
-      // başlığında kalır, kullanıcı alana kendisi dokununca klavye açılır.
-      requestAnimationFrame(()=>focusModalHeading(setup));
-      return;
-    }
-    setup.hidden=true;
-    setLoginMode(state.loginMode);
-    setAuthFormError("authLoginError");
-    login.hidden=false;
-    requestAnimationFrame(()=>focusModalHeading(login));
+  async function loadModeState(){setModeState(await api("/api/auth/session"))}
+  function openModePin(){
+    if(state.auth.elevated)return;
+    setModeFormError();
+    $("#modePinInput").value="";
+    $("#modePinDialog").hidden=false;
+    requestAnimationFrame(()=>focusModalHeading($("#modePinDialog")));
   }
-  async function loadAuthSession(){setAuthState(await api("/api/auth/session"))}
-  function setLoginMode(mode){
-    state.loginMode=mode==="admin"?"admin":"resident";
-    $$("[data-login-mode]").forEach(button=>button.classList.toggle("active",button.dataset.loginMode===state.loginMode));
-    const admin=state.loginMode==="admin";
-    $("#loginUsernameField").hidden=!admin;
-    $("#authLoginSecretLabel").textContent=t(admin?"adminPassword":"residentPin");
-    const secret=$("#authLoginSecret");
-    secret.inputMode=admin?"text":"numeric";
-    if(admin)secret.removeAttribute("pattern");
-    else secret.setAttribute("pattern","[0-9]{6}");
-    secret.maxLength=admin?128:6;
-    secret.value="";
-    setAuthFormError("authLoginError");
+  function closeModePin(){
+    $("#modePinDialog").hidden=true;
+    $("#modePinInput").value="";
+    setModeFormError();
   }
-  async function submitAuthSetup(event){
+  async function submitModePin(event){
     event.preventDefault();
-    const button=$("#authSetupSubmit");
-    setAuthFormError("authSetupError");
+    const button=$("#modePinSubmit");
+    setModeFormError();
     button.disabled=true;
     try{
-      const data=await api("/api/auth/setup",{method:"POST",body:JSON.stringify({username:$("#authSetupUsername").value,password:$("#authSetupPassword").value,residentPin:$("#authSetupPin").value})});
-      setAuthState(data);
-      $("#authSetupPassword").value="";
-      $("#authSetupPin").value="";
-      $("#authSetupDialog").hidden=true;
-      await startAuthenticatedApplication();
-    }catch(error){setAuthFormError("authSetupError",error.message)}
+      const data=await api("/api/mode/elevate",{method:"POST",body:JSON.stringify({pin:$("#modePinInput").value})});
+      setModeState(data);
+      closeModePin();
+      showToast(t("adminModeOn"));
+      // Yönetici ekranlarının verisi ev modunda hiç okunmuyor; mod açılınca bir kez getirilir.
+      try{await loadSettings()}catch{}
+    }catch(error){setModeFormError(error.message)}
     finally{button.disabled=false}
   }
-  async function submitAuthLogin(event){
-    event.preventDefault();
-    const button=$("#authLoginSubmit");
-    setAuthFormError("authLoginError");
-    button.disabled=true;
-    try{
-      const data=await api("/api/auth/login",{method:"POST",body:JSON.stringify({mode:state.loginMode,username:state.loginMode==="admin"?$("#authLoginUsername").value:"",secret:$("#authLoginSecret").value})});
-      setAuthState(data);
-      $("#authLoginSecret").value="";
-      $("#authLoginDialog").hidden=true;
-      await startAuthenticatedApplication();
-    }catch(error){setAuthFormError("authLoginError",error.message)}
-    finally{button.disabled=false}
+  async function leaveAdminMode(){
+    try{setModeState(await api("/api/mode/leave",{method:"POST",body:"{}"}))}
+    catch{dropElevatedFlag()}
+    activateView("home");
+    showToast(t("homeModeOn"));
   }
-  async function signOut(){
-    try{await api("/api/auth/logout",{method:"POST",body:"{}"})}catch{}
-    setAuthState({configured:true,authenticated:false,user:null,csrfToken:null,expiresAt:null});
-    openAuthGate();
+  function toggleAdminMode(){
+    if(state.auth.elevated)leaveAdminMode();
+    else openModePin();
   }
-  async function updateResidentPin(event){
+  async function updateAdminPin(event){
     event.preventDefault();
-    const input=$("#residentPinInput");
+    const input=$("#adminPinInput");
+    const confirmation=$("#adminPinConfirm");
     const button=event.currentTarget.querySelector('button[type="submit"]');
-    button.disabled=true;
-    try{
-      await api("/api/auth/resident-pin",{method:"PUT",body:JSON.stringify({pin:input.value})});
-      input.value="";
-      showToast(t("pinChanged"));
-    }catch(error){showToast(error.message,true)}
-    finally{button.disabled=false}
-  }
-  async function updateAdminPassword(event){
-    event.preventDefault();
-    const next=$("#newAdminPassword");
-    const confirmation=$("#confirmAdminPassword");
-    const button=event.currentTarget.querySelector('button[type="submit"]');
-    setAuthFormError("adminPasswordError");
-    if(next.value!==confirmation.value){
-      setAuthFormError("adminPasswordError",t("adminPasswordMismatch"));
+    setAdminPinError();
+    if(input.value!==confirmation.value){
+      setAdminPinError(t("adminPinMismatch"));
       confirmation.focus();
       return;
     }
     button.disabled=true;
     try{
-      await api("/api/auth/admin-password",{method:"PUT",body:JSON.stringify({newPassword:next.value})});
-      next.value="";confirmation.value="";
-      showToast(t("adminPasswordChanged"));
-      setAuthState({configured:true,authenticated:false,user:null,csrfToken:null,expiresAt:null});
-      setLoginMode("admin");
-      openAuthGate();
-    }catch(error){setAuthFormError("adminPasswordError",error.message)}
+      const data=await api("/api/auth/admin-pin",{method:"PUT",body:JSON.stringify({pin:input.value})});
+      input.value="";confirmation.value="";
+      setModeState(data);
+      showToast(t("adminPinChanged"));
+    }catch(error){setAdminPinError(error.message)}
     finally{button.disabled=false}
+  }
+  function setAdminPinError(message=""){
+    const error=$("#adminPinError");
+    error.textContent=message;
+    error.hidden=!message;
   }
   async function loadInstallationOnboarding(){
     const localComplete=locallyCompletedOnboarding();

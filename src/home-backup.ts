@@ -23,6 +23,7 @@ import {
 import {
   emptyHomeVisibility,
   validateHomeVisibility,
+  type HiddenDeviceControl,
   type HomeVisibility
 } from "./home-visibility.js";
 
@@ -215,9 +216,16 @@ const mergeById = <T extends { id: string }>(
 
 const favoriteKey = (favorite: HomeFavorite): string => `${favorite.deviceId}|${favorite.controlId}`;
 
+/**
+ * Gizleme kaydının anahtarı KAPSAMI da içerir: aynı cihaz iki ayrı odanın kartında ayrı ayrı
+ * gizlenebilir, iki kayıt birbirini ezmemeli. Kapsamsız (eski) kayıt kendi başına bir anahtardır.
+ */
+const hiddenDeviceKey = (entry: HiddenDeviceControl): string =>
+  `${entry.scope ?? ""}|${entry.deviceId}|${entry.controlId}`;
+
 /** Özet sayımı için: gizlenen cihaz ve oda kayıtları tek anahtar uzayında toplanır. */
 const visibilityKeys = (visibility: HomeVisibility): string[] => [
-  ...visibility.hiddenDevices.map((entry) => `device:${entry.deviceId}|${entry.controlId}`),
+  ...visibility.hiddenDevices.map((entry) => `device:${hiddenDeviceKey(entry)}`),
   ...visibility.hiddenGroups.map((groupId) => `group:${groupId}`)
 ];
 
@@ -227,10 +235,10 @@ const mergeVisibility = (
   mode: HomeBackupMode
 ): HomeVisibility => {
   if (mode === "replace") return incoming;
-  const incomingDeviceKeys = new Set(incoming.hiddenDevices.map(favoriteKey));
+  const incomingDeviceKeys = new Set(incoming.hiddenDevices.map(hiddenDeviceKey));
   return {
     hiddenDevices: [
-      ...current.hiddenDevices.filter((entry) => !incomingDeviceKeys.has(favoriteKey(entry))),
+      ...current.hiddenDevices.filter((entry) => !incomingDeviceKeys.has(hiddenDeviceKey(entry))),
       ...incoming.hiddenDevices
     ],
     hiddenGroups: [

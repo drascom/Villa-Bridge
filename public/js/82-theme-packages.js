@@ -57,7 +57,7 @@
   let themeCacheWrittenAt=0;
   /* GÖLGE DAR VE YUMUŞAK — YARIÇAP KOMŞU BOŞLUĞUNDAN KÜÇÜK. Paket profilleri ilk turda geniş
      yazılmıştı (`0 18px 40px` / `0 10px 28px`); 40px bulanıklık kenardan ~20px dışarı taşar,
-     oysa ölçülen en dar gerçek boşluk 8px (dar yatayda `#home .quick-grid.grid-view{gap:8px}`),
+     oysa ölçülen en dar gerçek boşluk 8px (dar yatayda `#home .strip-row{gap:8px}`),
      tablette 10px. İki komşunun gölgesi aradaki boşlukta üst üste binip tek koyu bant kuruyordu —
      panelin kendi kümelerinde daha önce "tünel" diye düzeltilen hatanın aynısı, paket yolundan
      geri gelmişti. Yeni ifade iki katmanlı: `0 1px 2px` TEMAS gölgesi düğmeyi zemine bağlar,

@@ -25,18 +25,12 @@
     const namedZone=worldClockZones.find(zone=>zone.timeZone===localTimeZone&&zone.label!=="clockLocal");
     const localName=namedZone?locationName(namedZone):localTimeZone.split("/").pop().replace(/_/g," ");
     $("#hubZoneName").textContent=`${localName} · ${t("clockLocal")}`;
-    renderHubCities(now);
-    renderHubAlarm();
   }
-  // Hub'daki iki şehir: dünya saati penceresindeki listenin ilk iki kaydı, yerelle aynı saat
-  // dilimi atlanır (o zaten büyük saatte yazıyor). Şehir seçilmemişse düğüm boş kalır ve
-  // `.hub-cities:empty` onu tümüyle gizler — davet satırı ya da boşluk çıkmaz.
-  const hubClockCities=()=>worldClockZones.filter(zone=>zone.timeZone&&zone.timeZone!==localTimeZone).slice(0,2);
-  function renderHubCities(now){
-    const container=$("#hubCities");
-    if(!container)return;
-    container.innerHTML=hubClockCities().map(zone=>`<span class="hub-city"><em>${esc(locationName(zone))}</em><b>${esc(zoneTime(now,zone.timeZone))}</b></span>`).join("");
-  }
+  /* BAŞLIKTA YALNIZ SAAT, TARİH VE KONUM VAR (not §6.1). Dünya saatlerinin ve alarm özetinin
+     hub'daki satırları kalktı: ikisi de `#clockDialog`un içinde tam hâliyle duruyor (şehir
+     listesi + `#alarmStatus`) ve başlığın tek satırlık boyu ana ekranın dikey payını yemesin
+     diye orada kalıyorlar. Bu yüzden `renderHubCities`/`renderHubAlarm` de kalktı — çağrıları
+     boşa dönen ölü kod olurdu. */
   function tickWorldClock(){
     const now=new Date();
     const seconds=$("#hubSeconds");
@@ -570,12 +564,6 @@
     const day=key===alarmDayKey(today)?t("hubToday"):key===alarmDayKey(tomorrow)?t("hubTomorrow"):dateTimeFormatter({weekday:"long"}).format(date);
     return`${day} ${zoneTime(date)}`;
   }
-  function renderHubAlarm(){
-    const text=$("#hubAlarmText");
-    if(!text)return;
-    const next=nextAlarmDate();
-    text.textContent=next?alarmWhenText(next):t("alarmOff");
-  }
   // Gün adları biçimlendiriciden gelir: yeni bir dil eklemek için burada yapılacak iş yok.
   function alarmWeekdayOptions(){
     const week=new Date();
@@ -704,7 +692,6 @@
     alarmSetting.lastFired=alarmRingsOn(today)&&now.getTime()>=today.getTime()?alarmDayKey(today):"";
     persistAlarmSetting();
     renderAlarmSettings();
-    renderHubAlarm();
   }
   /* Denetim her saniyelik tikte YENİDEN hesaplanır. Uyuyan tablet, düzeltilen sistem saati ya da
      yaz saati geçişi zinciri kırmaz: kurulu bir zamanlayıcı yok, yalnız "şu an alarm anına ne
@@ -743,7 +730,6 @@
     startAlarmSound();
     alarmAutoStopTimer=setTimeout(stopAlarmRing,alarmAutoStopMs);
     alarmRingClockTimer=setInterval(renderAlarmRing,1000);
-    renderHubAlarm();
   }
   function stopAlarmRing(){
     if(alarmAutoStopTimer!==null){clearTimeout(alarmAutoStopTimer);alarmAutoStopTimer=null}
@@ -752,7 +738,6 @@
     alarmRingingSince=null;
     const dialog=$("#alarmDialog");
     if(dialog?.open)dialog.close();
-    renderHubAlarm();
     renderAlarmSettings();
   }
   /* SES — harici dosya YOK, ton Web Audio ile üretilir: paket şişmez, çevrimdışı çalışır.

@@ -43,8 +43,11 @@ async function main() {
   await verifyAstronomy(projectRoot);
   console.log("Astronomi dogrulamasi tamam.");
 
-  await assertHomeLayout(projectRoot);
-  console.log("1024x640 ana ekran akis denetimi tamam.");
+  const home = await assertHomeLayout(projectRoot);
+  console.log(
+    `1024x640 ana ekran akis denetimi tamam: baslik ${home.head}px, mod seridi ` +
+      `${home.strip.join("/")}px, panoya kalan ${home.board}px.`
+  );
 }
 
 main().catch((error) => {

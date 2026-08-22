@@ -74,57 +74,114 @@
   <div class="sky-moon-face"><div class="sky-moon-half"><i></i></div><div class="sky-moon-bulge"></div></div>
 </div>
 <div class="shell">
+  <!-- SOL SABİT RAY — tablette panelin TEK kalıcı gezinmesi (not §7: "solda ince, sabit
+       gezinme"). Satırlar gerçek görünümlere bağlanır; uydurma "Odalar"/"Rutinler" sayfası
+       AÇILMAZ çünkü panelde öyle bir görünüm yok ve prototipin sahte verisi üretime taşınmaz.
+       Yönetici satırları `data-admin-only` taşır: gizleme yalnız SUNUM: yetkiyi her istekte
+       sunucu yeniden sorar. Satırlar `.nav-button` sınıfını da taşır — tıklama bağı
+       (`99-bind.js`) ve `active` işareti (`activateView`) tek yerde kurulu kalsın diye; ikinci
+       bir gezinme mekanizması kurulmaz. En altta Profil: menü levhasını açan TEK düğme
+       (not §12: sağ üstte tekrar eden profil düğmesi yok). -->
+  <aside class="side-rail">
+    <button class="rail-brand" type="button" data-view-link="home" data-i18n-aria="navHome" aria-label="Home"><span class="brand-mark" aria-hidden="true">V</span></button>
+    <nav class="rail-nav" data-i18n-aria="menu" aria-label="Menu">
+      <button class="nav-button rail-button active" type="button" data-view="home"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg></span><span class="rail-label" data-i18n="navHome">Home</span></button>
+      <!-- ODALAR — ev modunun görünümü (not §4.1). Aşama 2'de bu satır yoktu çünkü ortada oda
+           görünümü YOKTU; artık oda kartları `35-generator.js`ten türüyor ve hepsi burada
+           listeleniyor. Ana ekran yalnız "Genel görünümde göster" işaretli odaları basar; işareti
+           kapatılan oda kaybolmaz, yeri bu görünümdür. Satır ötekilerle AYNI mekanizmayı kullanır
+           (`.nav-button` + `data-view`): ikinci bir gezinme kurulmuyor. -->
+      <button class="nav-button rail-button" type="button" data-view="rooms"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/></svg></span><span class="rail-label" data-i18n="navRooms">Rooms</span></button>
+      <button class="nav-button rail-button" type="button" data-view="devices"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h2"/></svg></span><span class="rail-label" data-i18n="navDevices">Devices</span></button>
+      <!-- RUTİNLER — ev modunun görünümü (not §4.1). Ev kullanıcısı burada rutini yalnız
+           ÇALIŞTIRIR (not §3); düzenleme yönetici modundaki Otomasyon ekranında kalır. Satır
+           `data-admin-only` TAŞIMAZ, çünkü çalıştırma yolu (`POST /api/automations/:id/run`)
+           sunucuda da ev moduna açıktır. -->
+      <button class="nav-button rail-button" type="button" data-view="routines"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span><span class="rail-label" data-i18n="navRoutines">Routines</span></button>
+      <!-- YÖNETİCİ GEZİNMESİ (not §4.2): Genel Bakış · Cihazlar · Otomasyonlar · Bağlantılar ·
+           Sistem. "Cihazlar" iki modda da aynı satırdır (yönetici için ikinci bir kopya
+           AÇILMAZ); geri kalan dördü `data-admin-only` taşır. Genel Bakış yönetici modunun ilk
+           ekranıdır ve o yüzden yönetici satırlarının BAŞINDA durur. "Sistem" bugünkü Ayarlar
+           görünümünün ta kendisidir — kimliği (`#settings`) ve iki sekmesi korunuyor, yalnız
+           adı yönetici gezinmesinin diline çevrildi. -->
+      <button class="nav-button rail-button" type="button" data-view="adminOverview" data-admin-only><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg></span><span class="rail-label" data-i18n="navOverview">Overview</span></button>
+      <button class="nav-button rail-button" type="button" data-view="automations" data-admin-only><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg></span><span class="rail-label" data-i18n="navAutomations">Automations</span></button>
+      <button class="nav-button rail-button" type="button" data-view="connections" data-admin-only><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 12a4 4 0 0 1 4-4h3a4 4 0 1 1 0 8h-2"/><path d="M16 12a4 4 0 0 1-4 4H9a4 4 0 1 1 0-8h2"/></svg></span><span class="rail-label" data-i18n="navConnections">Connections</span></button>
+      <button class="nav-button rail-button" type="button" data-view="settings" data-admin-only><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg></span><span class="rail-label" data-i18n="navSystem">System</span></button>
+    </nav>
+    <div class="rail-bottom">
+      <button class="rail-button rail-profile" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/></svg></span><span class="rail-label" data-i18n="profile">Profile</span></button>
+    </div>
+  </aside>
   <main>
     <div id="systemAlertBar" class="system-alert-bar" role="alert" hidden><span class="system-alert-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3v.1"/></svg></span><span id="systemAlertText"></span><span id="systemAlertCount" class="system-alert-count" hidden></span></div>
-    <div class="topbar">
-      <div class="theme-switch" role="group" aria-label="Appearance">
-        <button data-theme-mode="light" data-i18n="themeLight" aria-pressed="false">Light</button>
-        <button data-theme-mode="dark" data-i18n="themeDark" aria-pressed="false">Dark</button>
-        <button data-theme-mode="sun" data-i18n="themeSun" aria-pressed="false">By the sun</button>
-        <button data-theme-mode="system" data-i18n="themeSystem" aria-pressed="false">System</button>
+    <!-- MOD ŞERİDİ (not §4.2). Kullanıcı hangi modda olduğunu tahmin etmek zorunda kalmasın:
+         yönetici modu açıkken kabuğun en üstünde sıcak renkli, kapatılamaz bir bilgilendirme
+         şeridi ve GÖRÜNÜR bir "Ev moduna dön" durur. Şeridin tamamı `data-admin-only`, yani
+         ev modunda hiç çizilmez — durumu 20-auth.js'in `applyAuthUi`si yazar (`body.home-mode`),
+         burada ikinci bir mod mekanizması YOK.
+         Varsayılan PIN uyarısı da bu şeridin İÇİNDE: ayrı bir şerit değil, aynı şeridin ikinci
+         satırı. Kimliği (`#defaultPinBanner`) korunuyor çünkü görünürlüğünü hâlâ `applyAuthUi`
+         açıp kapatıyor (`state.auth.mustChangePin`). -->
+    <div id="adminModeStrip" class="admin-mode-strip" data-admin-only>
+      <div class="admin-mode-strip-row">
+        <span class="admin-mode-strip-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg></span>
+        <div class="admin-mode-strip-copy"><strong data-i18n="adminModeOn">Administrator mode</strong><span data-i18n="adminModeStripLead">Setup screens are open. Everyday controls are unaffected.</span></div>
+        <button id="leaveAdminModeButton" class="admin-mode-strip-action" type="button" data-i18n="backToHomeMode">Back to home mode</button>
       </div>
-      <div class="language-switch" role="group" aria-label="Language"><button data-language="en" class="active">EN</button><button data-language="tr">TR</button></div>
-      <div class="mobile-topbar-actions">
-        <button id="mobileTheme" class="mobile-utility" type="button" data-theme-toggle aria-label="Appearance"><span class="theme-mode-icon" aria-hidden="true"><svg class="sun-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon-icon" viewBox="0 0 24 24"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"/></svg></span></button>
-        <button id="mobileLanguage" class="mobile-utility" type="button" data-language-cycle aria-label="Language"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
-        <button class="mobile-utility session-utility" type="button" data-auth-logout aria-label="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4m4-4H9"/></svg></button>
-      </div>
+      <div id="defaultPinBanner" class="default-pin-banner" role="alert" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4m0 3h.01"/></svg><div><strong data-i18n="defaultPinWarningTitle">The administrator PIN is still 1234</strong><span data-i18n="defaultPinWarningLead">Anyone on this network can open the setup screens. Change it under Settings - Administrator mode.</span></div><button id="defaultPinBannerAction" class="quiet" type="button" data-view-link="settings" data-i18n="changePin">Change PIN</button></div>
     </div>
     <div id="pairingBanner" class="pairing-banner"><div><strong data-i18n="pairingTitle">Searching for new devices</strong><div id="pairingText" class="device-meta" data-i18n="pairingHint">Put the nearby device into pairing mode.</div></div><div class="pairing-banner-actions"><button id="showPairing" class="secondary" data-i18n="showPairing" hidden>Show</button><button id="stopPairing" class="quiet" data-i18n="stopSearch">Stop searching</button></div></div>
 
     <section id="home" class="view active">
-      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="home-heading"><h1 class="eyebrow" data-i18n="homeEyebrow">Home control</h1><div class="home-title-line"><div class="home-metrics"><div id="homeSummary" class="home-summary"></div><span id="serverConnectionMetric" class="server-connection-metric" hidden><span data-i18n="server">Server</span><span id="serverConnectionDot" class="server-connection-dot" aria-hidden="true"></span></span></div></div><p class="lead" data-i18n="homeLead">Control lights, sensors and connections from one place.</p></div><div class="home-actions"><button id="addWidget" class="secondary"><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7m-3.5-3.5h7"/></svg><span class="home-action-label" data-i18n="addWidget">＋ Add</span></button><button id="editDashboard" class="quiet"><svg id="editDashboardGlyph" class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg><span id="editDashboardLabel" class="home-action-label" data-i18n="editDashboard">✎ Edit</span></button><button id="homeAutomations" class="quiet" type="button" data-view-link="automations" data-admin-only><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg><span class="home-action-label" data-i18n="navAutomations">Automations</span></button></div></header>
-      <div id="widgetBoard" class="widget-board">
+      <!-- ANA EKRAN BAŞLIĞI — not §6.1: TEK satır, üç bölüm.
+           sol = bağlam yazısı + ekran başlığı · orta = birleşik saat/hava · sağ = evin sağlığı.
+           Saat/hava artık panonun bir KARTI değil, başlığın orta hücresi: ayrı kart yok, ikinci
+           satır yok, ana ekranın dikey boyunu tüketmiyor. Sağ hücrede evin sağlığı (üç gösterge +
+           sunucu bağlantısı) ve pano eylemleri birlikte durur; iki yan hücre de `1fr` olduğu için
+           orta hücre gerçekten ortalanır — içerik genişliği ortalamayı kaydırmaz. -->
+      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="home-heading"><p class="eyebrow" data-i18n="homeEyebrow">Home control</p><h1 class="home-title" data-i18n="navHome">Home</h1></div>
+        <!-- BİRLEŞİK SAAT/HAVA. Arkası şeffaf, ince bordür ve hafif iç ışık (`--glass-sheen`) —
+             kart değil. Aradaki dikey çizgi iki AYRI tıklanabilir bölgeyi anlatır: soldaki
+             `#clockDialog`u, sağdaki `#weatherDialog`u açar; iki pencere de olduğu gibi duruyor,
+             yalnız tetikleyicileri buraya taşındı. Dünya saatleri, alarm özeti ve hava ayrıntısı
+             başlıkta DEĞİL, o pencerelerin içinde — başlık iki satırdan uzamaz. -->
         <section id="homeHub" class="home-hub" aria-label="Time and weather">
           <button id="hubClockZone" class="hub-zone hub-zone-clock" type="button" aria-haspopup="dialog">
             <span id="hubTime" class="hub-time">--:--<span id="hubSeconds" class="hub-seconds"></span></span>
-            <span id="hubDate" class="hub-date"></span>
-            <span id="hubZoneName" class="hub-sub"></span>
-            <span id="hubCities" class="hub-cities"></span>
-            <span class="hub-alarm"><span aria-hidden="true">⏰</span><span id="hubAlarmText"></span></span>
-            <span class="hub-hint" data-i18n="hubClockHint">Tap for world clock and alarms</span>
+            <span class="hub-clock-meta"><span id="hubDate" class="hub-date"></span><span id="hubZoneName" class="hub-sub"></span></span>
           </button>
           <span class="hub-divider" aria-hidden="true"></span>
+          <!-- Hava bölgesi: büyük ikon solda, yazı sağda. Sahne görselini `applyWeatherScene`
+               (45-clock-weather.js) bölgenin BAŞINA ekler, bu yüzden yazılar tek bir sarmalın
+               (`.hub-weather-copy`) içinde durur — ikon eklendiğinde/kaldırıldığında sıra bozulmaz. -->
           <button id="hubWeatherZone" class="hub-zone hub-zone-weather" type="button" aria-haspopup="dialog">
-            <span id="hubWeatherLocation" class="hub-label"></span>
-            <span id="hubWeatherBody" class="hub-weather"></span>
-            <span class="hub-hint" data-i18n="hubWeatherHint">Tap for the detailed forecast</span>
+            <span class="hub-weather-copy"><span id="hubWeatherBody" class="hub-weather"></span><span id="hubWeatherLocation" class="hub-label"></span></span>
           </button>
-          <span class="hub-locked"><span aria-hidden="true">🔒</span><span data-i18n="hubLocked">This block always stays first</span></span>
         </section>
+        <div class="home-status"><div class="home-metrics"><div id="homeSummary" class="home-summary"></div><span id="serverConnectionMetric" class="server-connection-metric" hidden><span data-i18n="server">Server</span><span id="serverConnectionDot" class="server-connection-dot" aria-hidden="true"></span></span></div><div class="home-actions"><!-- PANO DÜZENLEME EV MODUNDAN ÇEKİLDİ. Ana ekran artık ELLE dizilen bir pano değil,
+             cihazlardan TÜRETİLEN bir sonuç: kart ekleme/çıkarma ve oda oluşturma Odalar
+             görünümüne taşındı, kart görünürlüğü de orada kalıcı bir anahtar oldu. İki düğme
+             KALDIRILMADI, yalnız `hidden`: `#editDashboard`/`#addWidget` kimlikleri, bağları
+             (`99-bind.js`) ve `setDashboardEditing` akışı yerinde duruyor — geri dönüş yolu
+             bir tur daha açık kalsın. -->
+          <button id="addWidget" class="secondary" hidden><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7m-3.5-3.5h7"/></svg><span class="home-action-label" data-i18n="addWidget">＋ Add</span></button><button id="editDashboard" class="quiet" hidden><svg id="editDashboardGlyph" class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg><span id="editDashboardLabel" class="home-action-label" data-i18n="editDashboard">✎ Edit</span></button><button id="homeAutomations" class="quiet" type="button" data-view-link="automations" data-admin-only><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg><span class="home-action-label" data-i18n="navAutomations">Automations</span></button></div></div>
+      </header>
+      <div id="widgetBoard" class="widget-board">
         <section class="dashboard-widget widget-wide quick-control-widget" data-widget="quick">
           <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
+          <!-- HIZLI SAHNELER (not §6.2). Şerit artık oda SEKMESİ değil, tek dokunuşluk RUTİN
+               çalıştırma alanı: dört sütun, kart boyu ~62px, içinde YALNIZ işlev ikonu ve kısa
+               eylem başlığı — açıklama paragrafı yok (not §12). Kartlar `35-generator.js`in
+               `genSceneCatalog`ından türer; ayrı bir sahne deposu YOKTUR, rutin = otomasyon.
+               Şeride dörtten fazlası sığmaz; tamamı sol raydaki Rutinler görünümündedir.
+               Kaydırma okları ve "yeni grup" düğmesi kalktı: sabit dört sütun kayacak bir şey
+               bırakmıyor, grup oluşturma panonun "＋ Ekle" penceresinde duruyor. -->
           <div class="strip-row">
-            <button id="quickScrollLeft" class="quick-scroll-hint scroll-hint-left" type="button" hidden aria-label="More tabs to the left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
-            <div id="homeTabs" class="device-grid quick-grid grid-view">
-              <button id="createHomeGroup" class="quick-card quick-card-add" type="button" data-i18n-aria="createDeviceGroup" aria-label="Create device group"><span class="quick-add-icon" aria-hidden="true"><svg class="device-type-svg" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
-              <div id="homeTabList" class="home-tab-list" role="tablist" data-i18n-aria="homeTabsLabel" aria-label="Overview and groups"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></div>
-            </div>
-            <button id="quickScrollRight" class="quick-scroll-hint scroll-hint-right" type="button" hidden aria-label="More tabs to the right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+            <div id="quickScenes" class="quick-scene-grid" role="group" data-i18n-aria="quickScenesLabel" aria-label="Quick scenes"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></div>
           </div>
         </section>
-        <section id="groupPanel" class="widget-card group-widget group-panel" role="tabpanel" tabindex="-1" hidden></section>
-        <div id="widgetRail" class="widget-rail" role="tabpanel" aria-labelledby="hometab-overview" tabindex="-1">
+        <div id="widgetRail" class="widget-rail" tabindex="-1">
           <article class="dashboard-widget widget-card" data-widget="summary" hidden>
             <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
             <h2 data-i18n="summaryWidget">Home status</h2><p data-i18n="summaryWidgetLead">Which devices are reachable, and what happened recently.</p>
@@ -156,6 +213,53 @@
       <section id="allDevices" class="device-grid devices-grid-view"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></section>
     </section>
 
+    <!-- ODALAR GÖRÜNÜMÜ — evin bütün oda kartları, süzgeçsiz (not §4.1). Kartlar ana ekrandakinin
+         AYNISIDIR: aynı `groupWidgetHtml` çağrısı, aynı döşemeler, aynı ana anahtar; ikinci bir
+         kart dili açılmadı. Fark tek: ana ekran yalnız "Genel görünümde göster" işaretli odaları
+         basar, burada hepsi durur ve o anahtar kartın üstünde KALICI olarak görünür — pano
+         düzenleme kipine girmeye gerek kalmadı, o yüzden ev modundan çekildi.
+         Kart yönetimi (oda oluştur / kart kataloğu) da buraya taşındı: ana ekranın başlığında
+         artık düzenleme düğmeleri yok. -->
+    <section id="rooms" class="view">
+      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navRooms">Rooms</h1></div><div class="rooms-head-actions"><button id="roomsAddCard" class="quiet page-action-tile" type="button" data-open-widget-catalog data-i18n-aria="addWidget" aria-label="Add card"><svg class="page-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7m-3.5-3.5h7"/></svg><span class="page-action-label" data-i18n="addWidget">＋ Add</span></button><button id="roomsCreate" class="primary page-action-tile" type="button" data-open-group-create data-i18n-aria="createGroupAction" aria-label="Create room"><svg class="page-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg><span class="page-action-label" data-i18n="createGroupAction">＋ Create</span></button></div></header>
+      <p class="routine-lead" data-i18n="roomsLead">Every room card, whether or not it shows on the home screen.</p>
+      <div id="roomCards" class="room-card-grid"></div>
+    </section>
+
+    <!-- RUTİNLER GÖRÜNÜMÜ — ev kullanıcısının rutin listesi (not §3, §6.2). Ana ekrandaki şerit
+         yalnız ilk dördünü gösterir; tamamı burada durur ve UZUN AÇIKLAMA da yalnız burada
+         yazılır. Ekranda tek eylem var: çalıştır. Düzenleme/silme/yeni kural yönetici modundaki
+         Otomasyon ekranında; oraya giden bağ da yalnız yönetici modunda görünür. -->
+    <section id="routines" class="view">
+      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navRoutines">Routines</h1></div><button id="routinesManage" class="secondary page-action-tile" type="button" data-view-link="automations" data-admin-only data-i18n-aria="navAutomations" aria-label="Automations"><svg class="page-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg><span class="page-action-label" data-i18n="navAutomations">Automations</span></button></header>
+      <p class="routine-lead" data-i18n="routinesLead">Tap a routine to run it now.</p>
+      <div id="routineList" class="routine-list"></div>
+    </section>
+
+    <!-- GENEL BAKIŞ — yönetici gezinmesinin ilk ekranı (not §4.2). Yönetici moduna geçen kişi
+         önce "evde durum ne?" sorar; cevap bugüne kadar Ayarlar, Bağlantılar ve Cihazlar
+         arasına dağılmıştı. Burada tek yerde duruyor: cihaz sayısı · çevrimiçi · otomasyon ·
+         düşük pil · servis sağlığı. Sayılar `35-generator.js`in saf modellerinden gelir
+         (`genHomeHealthModel`, `genSceneCatalog`) — ikinci bir sayım kuralı yazılmadı.
+         Ekran ANA EKRANIN DIŞINDA: 1024x640 bütçesi ana ekranın kendi akışına bakar.
+         Teknik terim burada serbesttir (not §11), çünkü bölümün tamamı `data-admin-only`. -->
+    <section id="adminOverview" class="view" data-admin-only>
+      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navOverview">Overview</h1></div></header>
+      <p class="routine-lead" data-i18n="adminOverviewLead">The state of the house in one place: devices, automations and the services behind them.</p>
+      <div id="adminOverviewStats" class="admin-stat-grid"></div>
+      <div class="admin-overview-columns">
+        <article class="setting-card admin-overview-card">
+          <div><h2 data-i18n="adminServicesTitle">Services</h2><p data-i18n="adminServicesLead">Zigbee, MQTT, Matter and Home Assistant. A service that has not been read yet says so — it is never counted as healthy.</p></div>
+          <ul id="adminServiceList" class="admin-service-list"></ul>
+        </article>
+        <article class="setting-card admin-overview-card">
+          <div><h2 data-i18n="adminAttentionTitle">Needs attention</h2><p data-i18n="adminAttentionLead">Every device reporting a problem, with the reason it reported. Tap a row to open the device.</p></div>
+          <div id="adminAttentionList" class="admin-attention-list"></div>
+          <p id="adminAttentionMore" class="admin-attention-more" hidden></p>
+        </article>
+      </div>
+    </section>
+
     <section id="automations" class="view" data-admin-only>
       <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navAutomations">Automations</h1></div><button id="newAutomation" class="primary page-action-tile" type="button" data-i18n-aria="newAutomation" aria-label="New automation"><svg class="page-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg><span class="page-action-label" data-i18n="newAutomation">New automation</span></button></header>
       <div id="automationAgentBar" class="automation-agent-bar" hidden><span class="automation-agent-bar-glyph" aria-hidden="true">🤖</span><p class="automation-agent-bar-note" data-i18n="automationAgentBarNote">An assistant changed these rules.</p><button id="revertAgentAutomations" class="secondary" type="button" data-i18n="automationAgentRevert">Undo assistant change</button></div>
@@ -184,11 +288,11 @@
     </section>
 
     <section id="settings" class="view" data-admin-only>
-      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navSettings">Settings</h1></div></header>
+      <header class="page-head"><button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="page-head-title"><h1 data-i18n="navSystem">System</h1></div></header>
       <!-- İKİ SEKME. Rol ayrımı DEĞİL: bölümün tamamı `data-admin-only`, iki sekmeyi de
            yalnız yönetici görür. Amaç kalabalığı azaltmak — sık dokunulan ayarlar bir
            sekmede, kurulumda bir kez dokunulanlar öbüründe. Seçim `localStorage`ta durur. -->
-      <div class="settings-tabs" role="tablist" data-i18n-aria="navSettings" aria-label="Settings">
+      <div class="settings-tabs" role="tablist" data-i18n-aria="navSystem" aria-label="System">
         <button id="settingsTabUsage" class="settings-tab" type="button" role="tab" aria-selected="true" aria-controls="settingsPanelUsage" data-settings-tab="usage" data-i18n="settingsTabUsage">Everyday</button>
         <button id="settingsTabSetup" class="settings-tab" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="settingsPanelSetup" data-settings-tab="setup" data-i18n="settingsTabSetup">Setup</button>
       </div>
@@ -232,10 +336,8 @@
         <div class="settings-server-notice" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="7" rx="2"/><path d="M8 6.5h.01M8 17.5h.01M12 6.5h5M12 17.5h5"/></svg><div><strong data-i18n="serverSettingsTitle">You are editing the active server</strong><p data-i18n="serverSettingsLead">Zigbee, MQTT and Matter changes are saved on the Villa Bridge server shown in this browser, not locally on this tablet or browser.</p></div><div class="settings-server-address"><span data-i18n="serverAddress">Server IP</span><code id="connectedServerAddress">—</code></div></div>
         <article class="setting-card onboarding-settings-card"><div><h2 data-i18n="guidesTitle">Setup wizard</h2><p data-i18n="guidesLead">Run the simple setup again to review the coordinator, MQTT and Matter addresses.</p></div><div class="onboarding-settings-actions"><button id="restartOnboarding" class="secondary" type="button" data-i18n="runSetupAgain">Run setup again</button></div></article>
         <article id="accountsCard" class="setting-card accounts-card">
-          <div><h2 data-i18n="accountsTitle">Accounts</h2><p data-i18n="accountsLead">Admin protects setup while the home account keeps daily controls simple.</p><div class="auth-account-meta"><strong id="authAccountName">—</strong><span id="authRoleBadge" class="auth-role-badge">Admin</span></div></div>
-          <form id="residentPinForm" class="auth-account-actions"><input id="residentPinInput" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" data-i18n-placeholder="newResidentPin" placeholder="New 6-digit home PIN" required><button class="secondary" type="submit" data-i18n="changePin">Change PIN</button></form>
-          <div class="accounts-admin"><strong data-i18n="adminPassword">Admin passphrase</strong><small data-i18n="changeAdminPasswordLead">Choose and confirm a new admin passphrase. You will sign in again afterward.</small></div>
-          <form id="adminPasswordForm" class="admin-password-form"><div class="admin-password-fields"><input id="newAdminPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" data-i18n-placeholder="newAdminPassword" placeholder="New admin passphrase" required><input id="confirmAdminPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" data-i18n-placeholder="confirmAdminPassword" placeholder="Confirm new passphrase" required></div><div id="adminPasswordError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button class="secondary" type="submit" data-i18n="changeAdminPassword">Change password</button></form>
+          <div><h2 data-i18n="adminModeTitle">Administrator mode</h2><p data-i18n="adminModeCardLead">One PIN unlocks the setup screens. Everyday controls never ask for it.</p><div class="auth-account-meta"><span id="modeStateBadge" class="auth-role-badge">Administrator mode</span></div></div>
+          <form id="adminPinForm" class="admin-password-form"><div class="admin-password-fields"><input id="adminPinInput" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="new-password" data-i18n-placeholder="newAdminPin" placeholder="New PIN (4-8 digits)" required><input id="adminPinConfirm" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="new-password" data-i18n-placeholder="confirmAdminPin" placeholder="Confirm new PIN" required></div><div id="adminPinError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button class="secondary" type="submit" data-i18n="changePin">Change PIN</button></form>
         </article>
         <!-- BAĞLANTI VE AĞ — koordinatör, MQTT ve Matter adresleri kurulum sihirbazında
              soruluyor; burada yalnız sihirbazın SORMADIĞI iki ayar kalır. Kanal değişikliği
@@ -383,16 +485,20 @@
   </main>
 </div>
 
-<div id="authSetupDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authSetupTitle" hidden><form id="authSetupForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><div><h2 id="authSetupTitle" data-i18n="secureHomeTitle">Protect your home controls</h2><p data-i18n="secureHomeLead">Create one admin login and a simpler PIN for household members.</p></div></div><div class="auth-fields"><div class="field"><label for="authSetupUsername" data-i18n="adminUsername">Admin username</label><input id="authSetupUsername" value="admin" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_-]{2,31}" autocomplete="username" required></div><div class="field"><label for="authSetupPassword" data-i18n="adminPassword">Admin passphrase</label><input id="authSetupPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required><small class="auth-help" data-i18n="adminPasswordHelp">Use at least 8 characters. A memorable passphrase works well.</small></div><div class="field"><label for="authSetupPin" data-i18n="residentPin">Home user PIN</label><input id="authSetupPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required><small class="auth-help" data-i18n="residentPinHelp">Choose six non-obvious digits for everyday household access.</small></div></div><div id="authSetupError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authSetupSubmit" class="primary auth-submit" type="submit" data-i18n="createSecureHome">Create secure home</button></form></div>
-<div id="authLoginDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="authLoginTitle" hidden><form id="authLoginForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><div><h2 id="authLoginTitle" data-i18n="welcomeBack">Welcome home</h2><p data-i18n="signInLead">Sign in as a home user or administrator.</p></div></div><div class="auth-mode-toggle" role="group"><button id="loginResidentMode" class="active" type="button" data-login-mode="resident" data-i18n="homeUser">Home user</button><button id="loginAdminMode" type="button" data-login-mode="admin" data-i18n="administrator">Administrator</button></div><div class="auth-fields"><div id="loginUsernameField" class="field" hidden><label for="authLoginUsername" data-i18n="adminUsername">Admin username</label><input id="authLoginUsername" autocomplete="username"></div><div class="field"><label id="authLoginSecretLabel" for="authLoginSecret" data-i18n="residentPin">Home user PIN</label><input id="authLoginSecret" type="password" inputmode="numeric" autocomplete="current-password" required></div></div><div id="authLoginError" class="auth-error" role="alert" aria-live="assertive" hidden></div><button id="authLoginSubmit" class="primary auth-submit" type="submit" data-i18n="signIn">Sign in</button></form></div>
+<!-- YONETICI MODU. Giris ekrani degil: panel zaten acik, bu diyalog yalnizca kurulum
+     ekranlarini acan modu ister. Yanlis PIN sunucuda hiz sinirina takilir. -->
+<div id="modePinDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="modePinTitle" hidden><form id="modePinForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><div><h2 id="modePinTitle" data-i18n="enterAdminMode">Enter administrator mode</h2><p data-i18n="adminModeLead">Setup screens stay locked until the administrator PIN is entered.</p></div></div><div class="auth-fields"><div class="field"><label for="modePinInput" data-i18n="adminPin">Administrator PIN</label><input id="modePinInput" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8" required><small id="modePinFieldHint" class="auth-help"></small></div></div><div id="modePinError" class="auth-error" role="alert" aria-live="assertive" hidden></div><div class="modal-actions"><button id="modePinCancel" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="modePinSubmit" class="primary" type="submit" data-i18n="unlock">Unlock</button></div></form></div>
 <dialog id="appMenuDialog" class="app-menu-dialog" aria-labelledby="appMenuTitle">
   <div class="modal app-menu-modal">
     <div class="app-menu-head"><div class="app-menu-who"><span class="brand-mark" aria-hidden="true">V</span><div class="app-menu-identity"><h2 id="appMenuTitle" data-i18n="menu">Menu</h2><span id="appMenuRole" class="app-menu-role"></span></div></div><button id="closeAppMenu" class="device-detail-close" type="button" data-i18n-aria="close" aria-label="Close">×</button></div>
     <nav class="app-menu-nav" data-i18n-aria="menu" aria-label="Menu">
       <button class="nav-button active" type="button" data-view="home"><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg></span><span class="app-menu-text"><b data-i18n="navHome">Home</b><span data-i18n="navHomeLead">Rooms, scenes and favourites</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button class="nav-button" type="button" data-view="rooms"><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/></svg></span><span class="app-menu-text"><b data-i18n="navRooms">Rooms</b><span data-i18n="navRoomsLead">Every room card in one place</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button class="nav-button" type="button" data-view="devices"><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h2"/></svg></span><span class="app-menu-text"><b data-i18n="navDevices">Devices</b><span data-i18n="navDevicesLead">Every paired device and its state</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button class="nav-button" type="button" data-view="routines"><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span><span class="app-menu-text"><b data-i18n="navRoutines">Routines</b><span data-i18n="navRoutinesLead">Run a routine with one tap</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button class="nav-button" type="button" data-view="adminOverview" data-admin-only><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg></span><span class="app-menu-text"><b data-i18n="navOverview">Overview</b><span data-i18n="navOverviewLead">Devices, automations and service health</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button class="nav-button" type="button" data-view="connections" data-admin-only><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 12a4 4 0 0 1 4-4h3a4 4 0 1 1 0 8h-2"/><path d="M16 12a4 4 0 0 1-4 4H9a4 4 0 1 1 0-8h2"/></svg></span><span class="app-menu-text"><b data-i18n="navConnections">Connections</b><span data-i18n="navConnectionsLead">Zigbee, Matter and Home Assistant</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button class="nav-button" type="button" data-view="settings" data-admin-only><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg></span><span class="app-menu-text"><b data-i18n="navSettings">Settings</b><span data-i18n="navSettingsLead">Network, users and backups</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button class="nav-button" type="button" data-view="settings" data-admin-only><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg></span><span class="app-menu-text"><b data-i18n="navSystem">System</b><span data-i18n="navSystemLead">Network, backups and setup tools</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
     </nav>
     <div class="app-menu-utilities">
       <div class="app-menu-utility app-menu-utility-stack"><span class="app-menu-utility-label" data-i18n="appearance">Appearance</span><div class="theme-switch" role="group" data-i18n-aria="appearance" aria-label="Appearance"><button type="button" data-theme-mode="light" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg><span data-i18n="themeLight">Light</span></button><button type="button" data-theme-mode="dark" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8.2 8.2 0 1 0 10.5 10.5Z"/></svg><span data-i18n="themeDark">Dark</span></button><button type="button" data-theme-mode="sun" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><span data-i18n="themeSun">By the sun</span></button><button type="button" data-theme-mode="system" aria-pressed="false"><svg class="app-menu-switch-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/></svg><span data-i18n="themeSystem">System</span></button></div></div>
@@ -424,7 +530,7 @@
     </div>
     <div class="app-menu-foot">
       <div class="connection"><span id="sideDot" class="status-dot"></span><span id="sideStatus" data-i18n="connecting">Connecting to home control</span></div>
-      <button class="secondary session-utility" type="button" data-auth-logout aria-label="Sign out"><svg class="app-menu-foot-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4m4-4H9"/></svg><span data-i18n="signOut">Sign out</span></button>
+      <button class="secondary session-utility mode-utility" type="button" data-mode-toggle aria-label="Administrator mode"><svg class="app-menu-foot-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg><span data-mode-toggle-label>Administrator mode</span></button>
     </div>
   </div>
 </dialog>
@@ -464,11 +570,13 @@
 <script src="/js/10-core.js"></script>
 <script src="/js/20-auth.js"></script>
 <script src="/js/30-device-view.js"></script>
+<script src="/js/35-generator.js"></script>
 <script src="/js/40-home.js"></script>
 <script src="/js/45-clock-weather.js"></script>
 <script src="/js/50-widgets.js"></script>
 <script src="/js/60-pairing.js"></script>
 <script src="/js/70-settings.js"></script>
+<script src="/js/72-admin-overview.js"></script>
 <script src="/js/80-zigbee-tools.js"></script>
 <script src="/js/82-theme-packages.js"></script>
 <script src="/js/84-celestial-view.js"></script>

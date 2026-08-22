@@ -477,11 +477,13 @@
   }
   const dashboardTourSteps=()=>[
     {target:"#homeSummary",fallback:"#home .home-heading",title:"tourStatusTitle",text:"tourStatusLead"},
-    {target:"#homeTabs",title:"tourQuickTitle",text:"tourQuickLead"},
+    {target:"#quickScenes",title:"tourQuickTitle",text:"tourQuickLead"},
     {target:"#addWidget",title:"tourAddTitle",text:"tourAddLead"},
     {target:"#editDashboard",title:"tourEditTitle",text:"tourEditLead"},
     {target:"#widgetRail",fallback:"#widgetBoard",title:"tourWidgetsTitle",text:"tourWidgetsLead"},
-    {target:'#home [data-app-menu]',fallback:"#home .home-actions",title:"tourMenuTitle",text:"tourMenuLead"}
+    /* Profil/menü adımı önce SOL RAYIN altındaki düğmeyi arar; ray çizilmediğinde (dar ekran)
+       `coachTarget` sıfır ölçüyü görüp başlıktaki menü düğmesine, o da yoksa eylem grubuna düşer. */
+    {target:".rail-profile",fallback:"#home [data-app-menu]",title:"tourMenuTitle",text:"tourMenuLead"}
   ];
   function coachTarget(step){
     const primary=$(step.target);
@@ -663,36 +665,6 @@
     $("#connectedServerAddress").textContent=address;
     $("#restartOnboarding").textContent=t(state.androidMonitor?"openServerSettings":"runSetupAgain");
     $(".onboarding-settings-card p").textContent=t(state.androidMonitor?"serverGuidesLead":"guidesLead");
-    renderAuthRuntimeContext();
-  }
-  function renderAuthRuntimeContext(){
-    const runtimeAvailable=bridgeSafe(()=>typeof window.VillaAndroid?.runtimeStatus==="function",false);
-    const ensureContext=(form,id,before)=>{
-      let context=$("#"+id);
-      if(context)return context;
-      context=document.createElement("div");
-      context.id=id;
-      context.className="auth-runtime-context";
-      form.insertBefore(context,before);
-      return context;
-    };
-    const login=ensureContext($("#authLoginForm"),"authLoginRuntimeContext",$(".auth-mode-toggle"));
-    const setup=ensureContext($("#authSetupForm"),"authSetupRuntimeContext",$("#authSetupForm .auth-fields"));
-    const address=connectedServerAddress();
-    login.hidden=!state.androidMonitor;
-    if(state.androidMonitor){
-      login.classList.remove("local");
-      login.innerHTML=`<span class="auth-runtime-dot" aria-hidden="true"></span><div><strong>${t("serverAccountTitle")}</strong><small>${t("serverAccountLead",{address})}</small></div><code>${esc(address)}</code>`;
-      setup.hidden=false;
-      setup.classList.remove("local");
-      setup.innerHTML=`<span class="auth-runtime-dot" aria-hidden="true"></span><div><strong>${t("serverFirstAdminTitle")}</strong><small>${t("serverFirstAdminLead",{address})}</small></div><code>${esc(address)}</code>`;
-      return;
-    }
-    setup.hidden=!runtimeAvailable;
-    setup.classList.toggle("local",runtimeAvailable);
-    if(runtimeAvailable){
-      setup.innerHTML=`<span class="auth-runtime-dot" aria-hidden="true"></span><div><strong>${t("localFirstAdminTitle")}</strong><small>${t("localFirstAdminLead")}</small></div>`;
-    }
   }
   /* DUVARDAKİ TABLETİN EKRANI VE AYAKTA KALMASI.
      Kullanıcının gördüğü her ayar burada — Android tarafında ayar ekranı yoktur, orası yalnız
@@ -896,8 +868,8 @@
       renderMenuBrightness();
     },60000);
   }
-  /* AÇILIŞI KESEMEZ. `initialize()` bu işlevi oturum açılmadan ÖNCE çağırıyor: burada fırlayan
-     bir hata `loadAuthSession()`e hiç gelinmemesi, yani hiç açılmayan bir panel demekti. Aynı
+  /* AÇILIŞI KESEMEZ. `initialize()` bu işlevi mod durumu okunmadan ÖNCE çağırıyor: burada
+     fırlayan bir hata `loadModeState()`e hiç gelinmemesi, yani hiç açılmayan bir panel demekti. Aynı
      işlev bağlama zincirinde de `bindScreensaver()`den önce duruyor. Bu yüzden gövde tümüyle
      korunuyor — konak yüzeyi eksik ya da bozuksa panel o yeteneksiz devam eder. */
   function configureAndroidActions(){

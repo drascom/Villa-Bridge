@@ -87,6 +87,11 @@
       siren:'<path d="M8 18v-7a4 4 0 0 1 8 0v7M5 21h14M4 10H2m20 0h-2M6 4 4.5 2.5M18 4l1.5-1.5M12 3V1"/>',
       sensor:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>',
       overview:'<path d="M4 11 12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/>',
+      /* Rutin ve tepkisel kural: aynı ikon ailesinden iki İŞLEV ikonu (not §5.4 — ikon markayı
+         değil yapılan işi anlatır). Zaman/güneş tetikleyen kural saattir, olay dinleyen kural
+         şimşek. Ayrım `genSceneCatalog`ın `kind` alanından gelir, ada bakan hiçbir kural yok. */
+      routine:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+      reactive:'<path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/>',
       group:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'
     };
     return`<svg class="device-type-svg" viewBox="0 0 24 24" aria-hidden="true">${icons[kind]||icons.sensor}</svg>`;
@@ -133,17 +138,32 @@
     const label=`${t("signal")} ${percent===null?"—":`${percent}%`}`;
     return`<span class="device-link-level${tone?` ${tone}`:""}" title="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16a10 10 0 0 1 14 0M8 19a6 6 0 0 1 8 0M11 22a2 2 0 0 1 2 0"/></svg><span>${percent===null?"—":`${percent}%`}</span></span>`;
   };
-  /* Gizlenenler listesi: kayıtta olmayan her şey görünür. Yıldız/favori değil — "oda kartında
-     göster/gizle". Anahtar cihaz kimliği + kontrol kimliği; kontrolü olmayan cihaz `@device`. */
-  const isTileHidden=(deviceId,controlId)=>state.hiddenTiles.has(tileVisibilityKey(deviceId,controlId));
-  /* Sunucudaki şekil: `{hiddenDevices:[{deviceId,controlId}],hiddenGroups:[groupId]}`. Panelde
-     cihaz gizlemesi tek dizeli anahtarla (`<IEEE>::<controlId>`) taşınır; çeviri burada. */
+  /* Gizlenenler listesi: kayıtta olmayan her şey görünür. Yıldız/favori değil — "bu kartta
+     göster/gizle". Karar artık KART BAŞINA verilir: aynı lamba salon kartında durup "Işıklar"
+     kartında gizlenebilir. Kapsam = kartın kimliği; kapsamsız (eski) kayıt her kartta geçerlidir. */
+  const isTileHidden=(scope,deviceId,controlId)=>
+    state.hiddenTiles.has(tileVisibilityKey(scope,deviceId,controlId))
+    ||state.hiddenTiles.has(legacyTileVisibilityKey(deviceId,controlId));
+  /* Kart bilmeyen yüzeyler (cihaz detayı, ışık kolonu) için: cihaz HERHANGİ bir kartta gizli mi?
+     Oradaki göz tek bir kartın değil, cihazın tamamının kararını verir. */
+  const isDeviceHiddenAnywhere=(deviceId,controlId)=>{
+    const wanted=controlId||groupDeviceControlId;
+    if(state.hiddenTiles.has(legacyTileVisibilityKey(deviceId,wanted)))return true;
+    for(const key of state.hiddenTiles){
+      const parsed=parseVisibilityKey(key);
+      if(parsed&&parsed.scope&&parsed.deviceId===deviceId&&parsed.controlId===wanted)return true;
+    }
+    return false;
+  };
+  /* Sunucudaki şekil: `{hiddenDevices:[{deviceId,controlId,scope?}],hiddenGroups:[groupId]}`.
+     Panelde kayıt tek dizeli anahtarla taşınır; çeviri burada. Kapsamsız anahtar `scope`
+     ALANINI HİÇ ÜRETMEZ — eski kayıt sunucuya olduğu gibi geri yazılır. */
   function visibilityPayload(){
     return{
-      hiddenDevices:[...state.hiddenTiles].map(key=>{
-        const index=key.lastIndexOf("::");
-        return index<0?null:{deviceId:key.slice(0,index),controlId:key.slice(index+2)};
-      }).filter(entry=>entry&&entry.deviceId&&entry.controlId),
+      hiddenDevices:[...state.hiddenTiles].map(parseVisibilityKey).filter(Boolean).map(entry=>
+        entry.scope
+          ?{deviceId:entry.deviceId,controlId:entry.controlId,scope:entry.scope}
+          :{deviceId:entry.deviceId,controlId:entry.controlId}),
       hiddenGroups:[...state.hiddenGroups]
     };
   }
@@ -159,7 +179,9 @@
     const groups=Array.isArray(visibility?.hiddenGroups)?visibility.hiddenGroups:[];
     state.hiddenTiles=new Set(devices
       .filter(entry=>entry&&typeof entry.deviceId==="string"&&typeof entry.controlId==="string")
-      .map(entry=>tileVisibilityKey(entry.deviceId,entry.controlId)));
+      .map(entry=>typeof entry.scope==="string"&&entry.scope
+        ?tileVisibilityKey(entry.scope,entry.deviceId,entry.controlId)
+        :legacyTileVisibilityKey(entry.deviceId,entry.controlId)));
     state.hiddenGroups=new Set(groups.filter(id=>typeof id==="string"&&id));
     cacheVisibility();
   }
@@ -172,11 +194,38 @@
       return true;
     }catch(error){showToast(t("visibilitySaveFailed",{error:error.message}),true);return false}
   }
-  function toggleTileVisibility(deviceId,controlId){
-    if(!deviceId)return;
-    const key=tileVisibilityKey(deviceId,controlId);
+  /* KART BAŞINA gizleme. Kapsam kartın kimliğidir; kapsamsız eski kayda denk gelinirse kayıt
+     burada GÖÇ EDER: silinmeden önce cihazın göründüğü HER kartın kapsamına yazılır, ancak
+     ondan sonra bu kartınki kaldırılır. Böylece "her yerde gizliydi" tercihi öteki kartlarda
+     aynen sürer — kimse tercihini kaybetmez. Göç kullanıcının o karta baktığı anda olur, yani
+     oda listesinin yüklü olduğu an: erken çalışıp boş listeye göç etmesi mümkün değil. */
+  function toggleTileVisibility(scope,deviceId,controlId){
+    if(!deviceId||!scope)return;
+    const key=tileVisibilityKey(scope,deviceId,controlId);
+    const legacy=legacyTileVisibilityKey(deviceId,controlId);
+    if(state.hiddenTiles.has(legacy)){
+      state.hiddenTiles.delete(legacy);
+      for(const other of tileVisibilityScopes(deviceId,controlId)){
+        state.hiddenTiles.add(tileVisibilityKey(other,deviceId,controlId));
+      }
+      state.hiddenTiles.add(key);
+    }
     if(state.hiddenTiles.has(key))state.hiddenTiles.delete(key);
     else state.hiddenTiles.add(key);
+    void saveHomeVisibility();
+    render();
+  }
+  /* Cihaz detayındaki göz TEK kartın değil, cihazın kararını verir: gizle = her kartta gizle
+     (kapsamsız kayıt), göster = kapsamlı/kapsamsız bütün gizleme kayıtlarını kaldır. */
+  function toggleDeviceVisibility(deviceId,controlId){
+    if(!deviceId)return;
+    const wanted=controlId||groupDeviceControlId;
+    const hidden=isDeviceHiddenAnywhere(deviceId,wanted);
+    for(const key of[...state.hiddenTiles]){
+      const parsed=parseVisibilityKey(key);
+      if(parsed&&parsed.deviceId===deviceId&&parsed.controlId===wanted)state.hiddenTiles.delete(key);
+    }
+    if(!hidden)state.hiddenTiles.add(legacyTileVisibilityKey(deviceId,wanted));
     void saveHomeVisibility();
     render();
   }
@@ -190,7 +239,7 @@
      durumda da AYNI kaynaktan, `visibilityLabel(hidden)`dan gelir; `aria-label` hiç değişmez. */
   const tipOrTitle=(text,options)=>`${options?.tip===true?"data-tip":"title"}="${esc(text)}"`;
   const visibilityButton=(device,control,options)=>{
-    const hidden=isTileHidden(device.id,control.id);
+    const hidden=isDeviceHiddenAnywhere(device.id,control.id);
     const label=`${visibilityLabel(hidden)}: ${control.name||device.name}`;
     return`<button class="visibility-toggle${hidden?" is-hidden":""}" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(control.id)}" aria-label="${esc(label)}" ${tipOrTitle(visibilityLabel(hidden),options)}>${visibilityIcon(hidden)}</button>`;
   };
@@ -547,7 +596,7 @@
      yoksa gizlenen sensör yalnız düzenleme kipinden geri getirilebilirdi. */
   const deviceVisibilityHtml=device=>{
     if(device.controls.some(isDashboardControl))return"";
-    const hidden=isTileHidden(device.id,null);
+    const hidden=isDeviceHiddenAnywhere(device.id,null);
     const label=visibilityLabel(hidden);
     return`<div class="device-rooms"><div class="device-rooms-head">${t("roomCardVisibility")}</div><div class="device-rooms-chips"><button class="room-membership${hidden?"":" active"}" type="button" role="switch" aria-checked="${hidden?"false":"true"}" data-visibility-device="${esc(device.id)}" data-visibility-control="${esc(groupDeviceControlId)}" aria-label="${esc(label)}" title="${esc(label)}">${visibilityIcon(hidden)}${esc(label)}</button></div></div>`;
   };
@@ -844,8 +893,8 @@
        Kart kabuğu ve başlık dili ölçüm kartıyla aynı (`.device-buttons` + `-head`), yeni görsel
        dil icat edilmedi. Başlık mevcut `deviceRoleTitle` anahtarından gelir. */
     /* Kartın kendisi `data-admin-only`: içindeki satırların HEPSİ zaten yöneticiye özel
-       (`body.resident-session [data-admin-only]{display:none}`), sarmalayıcı işaretlenmezse ev
-       sakinine başlığı olan boş bir kart kalırdı. */
+       (`body.home-mode [data-admin-only]{display:none}`), sarmalayıcı işaretlenmezse ev
+       modunda başlığı olan boş bir kart kalırdı. */
     const rolesHtml=`<div class="device-buttons device-detail-roles-card" data-admin-only><div class="device-buttons-head">${esc(t("deviceRoleTitle"))}</div><div class="controls device-detail-roles">${deviceRoleRowsHtml(device)}</div></div>`;
     // Sol kolonda artık YALNIZ resim kartı var; yüksekliği sağ kolondan gelir (bkz. panel.css).
     const mediaHtml=`<div class="device-detail-media">${photoHtml}</div>`;

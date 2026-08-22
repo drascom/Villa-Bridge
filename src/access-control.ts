@@ -1,12 +1,22 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AgentTokenStore, AgentTokenSummary } from "./agent-tokens.js";
-import type { AuthRole, AuthSession, AuthStore, CreatedAuthSession } from "./auth-store.js";
+import type { AuthSession, AuthStore, CreatedAuthSession } from "./auth-store.js";
 import { isAllowedMcpOrigin, mcpErrorBody, mcpErrorCodes, mcpRoutePath } from "./mcp.js";
 
 declare module "fastify" {
   interface FastifyRequest {
     villaSession: AuthSession | null;
+    /**
+     * Oturum **yönetici moduna yükseltilmiş** mi? Rolün yerini alan tek bayrak budur ve
+     * kaynağı sunucudur: istemci bunu isteyerek ya da isteyerek olmayarak belirleyemez.
+     */
+    villaElevated: boolean;
+    /**
+     * Bu istekte kurulan yeni oturum jetonu. Çerez aynı istek içinde geri okunamadığı için,
+     * ilk turda yükseltme ve CSRF denetimi jetona buradan ulaşır.
+     */
+    villaSessionToken?: string;
     /** `/mcp` isteğini doğrulayan ajan token'ı; başka hiçbir yolda dolmaz. */
     villaAgent: AgentTokenSummary | null;
   }
@@ -14,6 +24,13 @@ declare module "fastify" {
 
 const sessionCookieName = "villa_session";
 const stateChangingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Yükseltme hareketsizlikte düşer. "Hareket", **yükseltmeyi kullanan** istektir (yalnız
+ * yönetici yolları); panelin 8 saniyede bir attığı ev modu yoklaması sayacı tazelemez, yoksa
+ * açık duran bir tablette yönetici modu hiç kapanmazdı.
+ */
+const elevationIdleMs = 5 * 60 * 1000;
 
 const publicRoutes = new Set([
   "/api/health",
@@ -41,30 +58,36 @@ const residentRoutes = new Set([
   "GET /api/home-visibility",
   "PUT /api/home-visibility",
   "GET /api/automations",
+  // Rutini ÇALIŞTIRMAK ev kullanıcısının günlük işidir (ana ekranın hızlı sahne şeridi ve
+  // Rutinler görünümü tek dokunuşla bu ucu çağırır); DÜZENLEMEK değildir. Bu yüzden yalnız
+  // çalıştırma yolu listelenir: `PUT /api/automations` (kural yazma) listede YOKTUR ve yönetici
+  // modu ister. Açtığı yetki, ev sakininin panelden zaten elle yapabildiği cihaz komutlarının
+  // aynısıdır — kuralın kendi eylemleri çalışır, yeni bir eylem tanımlanamaz.
+  "POST /api/automations/:id/run",
   // Çalışma günlüğü, ev sakininin zaten gördüğü kural ve cihaz verisinden fazlasını açmaz;
   // "neden çalışmadı" sorusunu soran da odur. Yazma yolu yok, salt okunur.
   "GET /api/automation-runs",
   "GET /api/automations/:id/runs",
   // Konum okuması güneş kuralının saatini göstermek için gerekir; **yazma** listelenmez,
-  // dolayısıyla yönetici ister (evin koordinatı kurulum ayarıdır).
+  // dolayısıyla yönetici modu ister (evin koordinatı kurulum ayarıdır).
   "GET /api/settings/location",
   "GET /api/celestial",
   "GET /api/theme-packages",
   "GET /api/appearance",
   // Hava durumu ana ekranın parçası: okuması herkese açık. **Konum yazma** (`PUT
-  // /api/weather/location`) listede YOKTUR, yönetici ister — bir ekranda yapılan seçim evdeki
-  // bütün panelleri değiştirir. Şehir araması ev sakininin de açtığı pencerelerde (dünya saati)
-  // kullanıldığı için okumayla birlikte açılır; dışarıya çıkan tek taraf sunucudur.
+  // /api/weather/location`) listede YOKTUR, yönetici modu ister — bir ekranda yapılan seçim
+  // evdeki bütün panelleri değiştirir. Şehir araması ev modunda da açılan pencerelerde (dünya
+  // saati) kullanıldığı için okumayla birlikte açılır; dışarıya çıkan tek taraf sunucudur.
   "GET /api/weather",
   "GET /api/locations/search",
   // Dünya saati şehirleri de evin ayarıdır (duvardaki tablet); okuması ana ekranın parçası olduğu
-  // için ev sakinine açık. **Yazma** (`PUT /api/world-clock`) listede YOKTUR, yönetici ister —
+  // için ev modunda açık. **Yazma** (`PUT /api/world-clock`) listede YOKTUR, yönetici modu ister —
   // hava konumuyla aynı gerekçe: bir ekranda yapılan düzenleme bütün panelleri değiştirir.
   "GET /api/world-clock",
   "GET /api/device-image/:model",
   "GET /api/devices/:id/note",
   "PUT /api/devices/:id/note",
-  // Rol yalnız arayüzdeki sunumu değiştirir (lamba mı anahtar mı) — ev sakini de düzeltebilir.
+  // Rol yalnız arayüzdeki sunumu değiştirir (lamba mı anahtar mı) — ev modunda da düzeltilebilir.
   "GET /api/devices/:id/role",
   "PUT /api/devices/:id/role",
   "POST /api/devices/:id/command",
@@ -72,17 +95,13 @@ const residentRoutes = new Set([
   "POST /api/auth/logout"
 ]);
 
-// `POST /api/system/restart` ve `POST /api/system/coordinator-restart` de bilerek listelenmedi:
-// listelenmeyen her yol yönetici ister. İkisi de evin kumandasını saniyeler boyunca kesiyor
-// (biri servisi indiriyor, öbürü koordinatörün telsiz çipini resetliyor) — bu bir ev sakini
-// düğmesi değil, kurulum işidir. Buraya EKLEMEYİN.
-
-// `POST /api/settings/zigbee-adapter/test` bilerek YUKARIDAKİ TABLOLARIN HİÇBİRİNDE yok:
-// listelenmeyen her yol yönetici ister ve bu uç tam olarak onu istiyor. Ev sakinine açılsaydı,
-// evin panelinde oturan herkes sunucudan istediği adrese TCP bağlantısı denettirebilirdi —
-// yani uç, ağdaki servisleri tarayan bir araca dönerdi. Ucun kendi içinde bir de hız sınırı var
-// (tek eşzamanlı yoklama, çağrılar arası ≥3 sn); yetki tablosu ile o sınır aynı gerekçenin iki
-// yarısıdır. Yol koordinatöre tek bayt yazmaz, yalnız "adres yanıt veriyor mu" der.
+/**
+ * MOD KAPISI. Bu iki yol yetki tablolarının HİÇBİRİNDE yer almaz ve yer alamaz: listelenmeyen
+ * her yol yönetici modu ister, ama yükseltmeyi isteyen ucun kendisi yükseltme isteyemez —
+ * kimse moda giremezdi. Bu yüzden `/mcp` gibi tablo aramasından ÖNCE, kendi kuralıyla ele
+ * alınır: ev modundan çağrılabilir, ama `elevate` doğru PIN'i ister ve hız sınırına tabidir.
+ */
+const modeRoutes = new Set(["/api/mode", "/api/mode/elevate", "/api/mode/leave"]);
 
 const parseCookie = (header: string | undefined, name: string): string | undefined => {
   if (!header) return undefined;
@@ -106,6 +125,8 @@ const sessionCookie = (token: string, maxAgeSeconds: number, secure: boolean): s
 const expiredSessionCookie = (secure: boolean): string =>
   `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
 
+const delay = (ms: number): Promise<void> => new Promise((done) => { setTimeout(done, ms); });
+
 interface AttemptState {
   failures: number;
   lastFailureAt: number;
@@ -127,7 +148,8 @@ export class LoginThrottle {
     return Math.max(1, Math.ceil((state.blockedUntil - this.now()) / 1000));
   }
 
-  failure(key: string): void {
+  /** Başarısız denemeyi işler ve o anahtarın **toplam** başarısızlık sayısını döndürür. */
+  failure(key: string): number {
     const now = this.now();
     const previous = this.attempts.get(key);
     const failures = previous && now - previous.lastFailureAt < 15 * 60_000
@@ -141,6 +163,7 @@ export class LoginThrottle {
         ? now + Math.min(15 * 60_000, this.baseBlockMs * 2 ** penaltyLevel)
         : 0
     });
+    return failures;
   }
 
   success(key: string): void {
@@ -148,33 +171,74 @@ export class LoginThrottle {
   }
 }
 
+/**
+ * Yükseltmelerin tutulduğu yer: **bellek**, oturum çerezinin üstünde. Diske yazılmaz, çünkü
+ * her yönetici isteğinde sayacı tazelemek dosyayı döverdi; ayrıca servis yeniden başladığında
+ * yükseltmenin düşmesi doğru varsayılandır. İstemcide hiçbir karşılığı yoktur — panelin
+ * gösterdiği bayrak yalnız sunucunun söylediğidir.
+ */
+class ElevationRegistry {
+  private readonly entries = new Map<string, number>();
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  private static key(token: string): string {
+    return createHash("sha256").update(token, "utf8").digest("base64url");
+  }
+
+  private sweep(): void {
+    const now = this.now();
+    for (const [key, expiresAt] of this.entries) {
+      if (expiresAt <= now) this.entries.delete(key);
+    }
+  }
+
+  isElevated(token: string | undefined): boolean {
+    if (!token) return false;
+    this.sweep();
+    return (this.entries.get(ElevationRegistry.key(token)) ?? 0) > this.now();
+  }
+
+  /** Yükseltir ya da hareketsizlik sayacını sıfırdan başlatır. */
+  elevate(token: string): string {
+    this.sweep();
+    const expiresAt = this.now() + elevationIdleMs;
+    this.entries.set(ElevationRegistry.key(token), expiresAt);
+    return new Date(expiresAt).toISOString();
+  }
+
+  /** Yalnız zaten yükseltilmiş oturumun sayacını tazeler; yeni yükseltme AÇMAZ. */
+  touch(token: string | undefined): void {
+    if (token && this.isElevated(token)) this.elevate(token);
+  }
+
+  drop(token: string | undefined): void {
+    if (token) this.entries.delete(ElevationRegistry.key(token));
+  }
+
+  /** PIN değiştiğinde: eski PIN'le açılmış BÜTÜN yükseltmeler düşer. */
+  dropAll(): void {
+    this.entries.clear();
+  }
+
+  expiresAt(token: string | undefined): string | null {
+    if (!token) return null;
+    const value = this.entries.get(ElevationRegistry.key(token));
+    return value && value > this.now() ? new Date(value).toISOString() : null;
+  }
+}
+
 export interface AccessControlOptions {
   secureCookies?: boolean;
+  /** Yönetici PIN'i hız sınırı. Verilmezse 5 denemede kilit + katlanan bekleme kurulur. */
   throttle?: LoginThrottle;
   /** Ajan token deposu; verilmezse `/mcp` her istekte 401 döner ve yönetim uçları açılmaz. */
   agentTokens?: AgentTokenStore;
   /** `/mcp` için izinli `Origin` başlıkları; boşsa Origin gönderen istemci reddedilir. */
   mcpAllowedOrigins?: readonly string[];
+  /** Başarısız PIN denemeleri hata ayıklama listesine buradan düşer. */
+  recordError?: (entry: { operation: string; statusCode: number; message: string }) => void;
 }
-
-const sendSession = (
-  reply: FastifyReply,
-  session: CreatedAuthSession,
-  secureCookies: boolean
-) => reply
-  .header("Set-Cookie", sessionCookie(
-    session.token,
-    Math.max(1, Math.floor((Date.parse(session.expiresAt) - Date.now()) / 1000)),
-    secureCookies
-  ))
-  .send({
-    ok: true,
-    configured: true,
-    authenticated: true,
-    user: { username: session.username, role: session.role },
-    csrfToken: session.csrfToken,
-    expiresAt: session.expiresAt
-  });
 
 export const registerAccessControl = async (
   app: FastifyInstance,
@@ -182,17 +246,45 @@ export const registerAccessControl = async (
   options: AccessControlOptions = {}
 ): Promise<void> => {
   const secureCookies = options.secureCookies === true;
-  const throttle = options.throttle ?? new LoginThrottle();
+  // 5 yanlış PIN → 60 sn kilit, sonraki her yanlışta iki katı (en çok 15 dk). Dört haneli bir
+  // sırrın 10.000 ihtimalini bu hızla taramak günler sürer; kaba kuvvet pratikte kapanır.
+  const throttle = options.throttle ?? new LoginThrottle(Date.now, 5, 60_000);
+  const elevations = new ElevationRegistry();
   const agentTokens = options.agentTokens;
   const mcpAllowedOrigins = options.mcpAllowedOrigins ?? [];
-  let configured = await authStore.configured();
+  const recordError = options.recordError ?? (() => undefined);
   app.decorateRequest("villaSession", null);
+  app.decorateRequest("villaElevated", false);
+  app.decorateRequest("villaSessionToken", undefined);
   app.decorateRequest("villaAgent", null);
 
   const requestToken = (request: FastifyRequest): string | undefined =>
     parseCookie(request.headers.cookie, sessionCookieName);
-  const requestSession = (request: FastifyRequest): Promise<AuthSession | null> =>
-    authStore.getSession(requestToken(request));
+
+  /**
+   * Giriş ekranı yok: oturumu olmayan ziyaretçi kapıda kendi **ev oturumunu** alır. Oturum
+   * yalnız CSRF jetonunu ve yükseltmenin bağlanacağı kimliği taşır; hiçbir yetki içermez.
+   */
+  const ensureSession = async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<AuthSession> => {
+    const existing = await authStore.getSession(requestToken(request));
+    if (existing) return existing;
+    const created: CreatedAuthSession = await authStore.createSession();
+    reply.header("Set-Cookie", sessionCookie(
+      created.token,
+      Math.max(1, Math.floor((Date.parse(created.expiresAt) - Date.now()) / 1000)),
+      secureCookies
+    ));
+    // Aynı istek içinde çerez daha okunamaz; jetonu isteğe iliştiriyoruz ki yükseltme ve CSRF
+    // denetimi bu ilk turda da doğru oturuma baksın.
+    request.villaSessionToken = created.token;
+    return { csrfToken: created.csrfToken, expiresAt: created.expiresAt };
+  };
+
+  const effectiveToken = (request: FastifyRequest): string | undefined =>
+    request.villaSessionToken ?? requestToken(request);
 
   /**
    * `/mcp` kapısı. Aşağıdaki tablo yalnız `/api/` yollarını kapsadığı için bu uç kendi başına
@@ -236,23 +328,19 @@ export const registerAccessControl = async (
   app.addHook("onRequest", async (request, reply) => {
     const route = request.routeOptions.url ?? request.url.split("?")[0];
     if (route === mcpRoutePath) return authorizeMcpRequest(request, reply);
-    if (!route.startsWith("/api/") || publicRoutes.has(route)) return;
-    if (!configured) {
-      return reply.code(423).send({
-        ok: false,
-        code: "AUTH_SETUP_REQUIRED",
-        error: "Önce yönetici hesabını oluşturun."
-      });
+    if (!route.startsWith("/api/")) return;
+
+    if (publicRoutes.has(route)) {
+      // Açık yollara makineler de vuruyor (sağlık yoklaması, LAN keşfi): onlara oturum
+      // AÇMIYORUZ, yalnız varsa taşıyoruz. Oturumu `/api/auth/session` kendi elinde açar.
+      request.villaSession = await authStore.getSession(requestToken(request));
+      request.villaElevated = elevations.isElevated(requestToken(request));
+      return;
     }
-    const session = await requestSession(request);
-    if (!session) {
-      return reply.code(401).send({
-        ok: false,
-        code: "AUTHENTICATION_REQUIRED",
-        error: "Oturum açmanız gerekiyor."
-      });
-    }
+
+    const session = await ensureSession(request, reply);
     request.villaSession = session;
+    const token = effectiveToken(request);
     if (
       stateChangingMethods.has(request.method)
       && !constantTimeStringEqual(request.headers["x-villa-csrf"] as string | undefined, session.csrfToken)
@@ -263,47 +351,117 @@ export const registerAccessControl = async (
         error: "Güvenlik doğrulaması geçersiz."
       });
     }
-    const requiredRole: AuthRole = residentRoutes.has(`${request.method} ${route}`)
-      ? "resident"
-      : "admin";
-    if (requiredRole === "admin" && session.role !== "admin") {
+    request.villaElevated = elevations.isElevated(token);
+
+    // Mod uçları kendi kapılarını taşır (yukarıdaki `modeRoutes` yorumuna bakın).
+    if (modeRoutes.has(route)) return;
+    if (residentRoutes.has(`${request.method} ${route}`)) return;
+
+    // Listelenmeyen her yol yönetici modu ister. Rolün yerini alan denetim tam olarak budur:
+    // kontrol SUNUCUDA yapılır, istemcinin gizlediği düğmelerle hiçbir ilgisi yoktur.
+    if (!request.villaElevated) {
       return reply.code(403).send({
         ok: false,
-        code: "ADMIN_REQUIRED",
-        error: "Bu işlem için yönetici yetkisi gerekiyor."
+        code: "ELEVATION_REQUIRED",
+        error: "Bu işlem için yönetici modu gerekiyor."
       });
     }
+    // Yalnız yükseltmeyi KULLANAN istek hareketsizlik sayacını tazeler.
+    elevations.touch(token);
   });
 
-  app.get("/api/auth/session", async (request) => {
-    const session = configured ? await requestSession(request) : null;
+  const modeState = async (request: FastifyRequest) => {
+    const secret = await authStore.adminSecretState();
+    const token = effectiveToken(request);
+    return {
+      elevated: elevations.isElevated(token),
+      elevationExpiresAt: elevations.expiresAt(token),
+      elevationIdleMs,
+      secretKind: secret.secretKind,
+      mustChangePin: secret.mustChange
+    };
+  };
+
+  /**
+   * Panelin açılış ucu. Adı eski akıştan kalma (`publicRoutes` tablosuna dokunmuyoruz) ama
+   * artık "kim giriş yaptı" değil, "hangi moddayız" sorusunu yanıtlar ve ev oturumu çerezini
+   * bu istekle birlikte kurar.
+   */
+  app.get("/api/auth/session", async (request, reply) => {
+    const session = await ensureSession(request, reply);
     return {
       ok: true,
-      configured,
-      authenticated: session !== null,
-      user: session ? { username: session.username, role: session.role } : null,
-      csrfToken: session?.csrfToken ?? null,
-      expiresAt: session?.expiresAt ?? null
+      csrfToken: session.csrfToken,
+      expiresAt: session.expiresAt,
+      ...await modeState(request)
     };
   });
 
-  app.post<{
-    Body?: { username?: unknown; password?: unknown; residentPin?: unknown };
-  }>("/api/auth/setup", async (request, reply) => {
-    if (configured) {
-      return reply.code(409).send({ ok: false, error: "Yönetici hesabı zaten oluşturulmuş." });
+  app.get("/api/mode", async (request) => ({ ok: true, ...await modeState(request) }));
+
+  app.post<{ Body?: { pin?: unknown } }>("/api/mode/elevate", async (request, reply) => {
+    const key = `${request.ip}:mode`;
+    const retryAfter = throttle.retryAfterSeconds(key);
+    if (retryAfter > 0) {
+      recordError({
+        operation: "mode-elevate",
+        statusCode: 429,
+        message: `Kilitli istemci yeniden denedi (${request.ip}); ${retryAfter} sn kaldı.`
+      });
+      return reply
+        .header("Retry-After", String(retryAfter))
+        .code(429)
+        .send({
+          ok: false,
+          code: "MODE_LOCKED",
+          retryAfter,
+          error: "Çok fazla yanlış PIN girildi. Biraz sonra yeniden deneyin."
+        });
     }
-    if (typeof request.body?.username !== "string") {
-      return reply.code(400).send({ ok: false, error: "Yönetici kullanıcı adı geçersiz." });
+    if (!await authStore.verifyAdminSecret(request.body?.pin)) {
+      const failures = throttle.failure(key);
+      recordError({
+        operation: "mode-elevate",
+        statusCode: 401,
+        message: `Yanlış yönetici PIN'i (${request.ip}); art arda ${failures}. deneme.`
+      });
+      // ARTAN GECİKME: her yanlışta cevap gecikir. Kilit devreye girmeden önce bile taramayı
+      // yavaşlatır ve doğru/yanlış arasındaki zamanlama farkını bastırır.
+      await delay(Math.min(2000, 150 * 2 ** Math.min(failures, 4)));
+      return reply.code(401).send({
+        ok: false,
+        code: "INVALID_PIN",
+        error: "Yönetici PIN’i yanlış.",
+        retryAfter: throttle.retryAfterSeconds(key)
+      });
     }
+    throttle.success(key);
+    const token = effectiveToken(request);
+    if (!token) {
+      return reply.code(409).send({
+        ok: false,
+        code: "SESSION_REQUIRED",
+        error: "Oturum kurulamadı; sayfayı yenileyip yeniden deneyin."
+      });
+    }
+    elevations.elevate(token);
+    return { ok: true, ...await modeState(request) };
+  });
+
+  app.post("/api/mode/leave", async (request) => {
+    elevations.drop(effectiveToken(request));
+    return { ok: true, ...await modeState(request) };
+  });
+
+  /** Yönetici modundayken PIN'i değiştirir. Yol listelenmediği için zaten yükseltme ister. */
+  app.put<{ Body?: { pin?: unknown } }>("/api/auth/admin-pin", async (request, reply) => {
     try {
-      const session = await authStore.setup(
-        request.body.username,
-        request.body.password,
-        request.body.residentPin
-      );
-      configured = true;
-      return sendSession(reply, session, secureCookies);
+      await authStore.setAdminPin(request.body?.pin);
+      // Eski PIN'le açılmış başka bir ekran açık kalmasın; PIN'i değiştiren oturum devam eder.
+      elevations.dropAll();
+      const token = effectiveToken(request);
+      if (token) elevations.elevate(token);
+      return { ok: true, ...await modeState(request) };
     } catch (error) {
       return reply.code(400).send({
         ok: false,
@@ -312,77 +470,20 @@ export const registerAccessControl = async (
     }
   });
 
-  app.post<{
-    Body?: { mode?: unknown; username?: unknown; secret?: unknown };
-  }>("/api/auth/login", async (request, reply) => {
-    if (!configured) {
-      return reply.code(423).send({
-        ok: false,
-        code: "AUTH_SETUP_REQUIRED",
-        error: "Önce yönetici hesabını oluşturun."
-      });
-    }
-    const mode = request.body?.mode;
-    if (mode !== "admin" && mode !== "resident") {
-      return reply.code(400).send({ ok: false, error: "Hesap türü geçersiz." });
-    }
-    const username = typeof request.body?.username === "string" ? request.body.username : "";
-    const key = `${request.ip}:${mode}:${mode === "resident" ? "home" : username.toLowerCase()}`;
-    const retryAfter = throttle.retryAfterSeconds(key);
-    if (retryAfter > 0) {
-      return reply
-        .header("Retry-After", String(retryAfter))
-        .code(429)
-        .send({ ok: false, error: "Çok fazla deneme yapıldı. Biraz sonra yeniden deneyin." });
-    }
-    const session = await authStore.login(mode, username, request.body?.secret);
-    if (!session) {
-      throttle.failure(key);
-      return reply.code(401).send({ ok: false, error: "Kullanıcı adı, parola veya PIN yanlış." });
-    }
-    throttle.success(key);
-    return sendSession(reply, session, secureCookies);
-  });
-
+  /**
+   * Oturumu tamamen bırakır (çerez silinir, yükseltme düşer). Giriş ekranı olmadığı için
+   * pratikte "bu tarayıcıyı unut" anlamına gelir; panel bir sonraki istekte yeni ev oturumu alır.
+   */
   app.post("/api/auth/logout", async (request, reply) => {
-    await authStore.logout(requestToken(request));
+    const token = effectiveToken(request);
+    elevations.drop(token);
+    await authStore.dropSession(token);
     return reply
       .header("Set-Cookie", expiredSessionCookie(secureCookies))
       .send({ ok: true });
   });
 
-  app.put<{
-    Body?: { newPassword?: unknown };
-  }>("/api/auth/admin-password", async (request, reply) => {
-    try {
-      await authStore.updateAdminPassword(
-        request.villaSession?.username ?? "",
-        request.body?.newPassword
-      );
-      return reply
-        .header("Set-Cookie", expiredSessionCookie(secureCookies))
-        .send({ ok: true, reauthenticationRequired: true });
-    } catch (error) {
-      return reply.code(400).send({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
-
-  app.put<{ Body?: { pin?: unknown } }>("/api/auth/resident-pin", async (request, reply) => {
-    try {
-      await authStore.updateResidentPin(request.body?.pin);
-      return { ok: true };
-    } catch (error) {
-      return reply.code(400).send({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
-
-  // Ajan token yönetimi. Yetki tablolarında listelenmediği için yönetici ister; ham token
+  // Ajan token yönetimi. Yetki tablolarında listelenmediği için yönetici modu ister; ham token
   // yalnız üretim yanıtında bir kez döner, listede bir daha görünmez.
   if (agentTokens) {
     app.get("/api/agent-tokens", async (_request, reply) => {

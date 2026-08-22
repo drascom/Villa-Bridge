@@ -131,15 +131,16 @@
   $b("#onboardingBack").onclick=previousOnboardingStep;
   $b("#skipOnboarding").onclick=skipOnboarding;
   $b("#onboardingDialog").oncancel=event=>event.preventDefault();
-  $b("#authSetupForm").onsubmit=submitAuthSetup;
-  $b("#authLoginForm").onsubmit=submitAuthLogin;
-  $b("#authSetupForm").addEventListener("input",()=>setAuthFormError("authSetupError"));
-  $b("#authLoginForm").addEventListener("input",()=>setAuthFormError("authLoginError"));
-  $$("[data-login-mode]").forEach(button=>button.onclick=()=>setLoginMode(button.dataset.loginMode));
-  $$("[data-auth-logout]").forEach(button=>button.onclick=signOut);
-  $b("#residentPinForm").onsubmit=updateResidentPin;
-  $b("#adminPasswordForm").onsubmit=updateAdminPassword;
-  $b("#adminPasswordForm").addEventListener("input",()=>setAuthFormError("adminPasswordError"));
+  $b("#modePinForm").onsubmit=submitModePin;
+  $b("#modePinForm").addEventListener("input",()=>setModeFormError());
+  $b("#modePinCancel").onclick=closeModePin;
+  $$("[data-mode-toggle]").forEach(button=>button.onclick=toggleAdminMode);
+  /* Mod şeridindeki "Ev moduna dön" — `data-mode-toggle` DEĞİL, çünkü o kanca iki yönlü bir
+     anahtar (kapalıyken PIN sorar) ve etiketini `applyAuthUi` yazar. Şerit yalnız yönetici
+     modunda çizildiği için burada tek yön geçerli: doğrudan 20-auth.js'in `leaveAdminMode`i. */
+  $b("#leaveAdminModeButton").onclick=leaveAdminMode;
+  $b("#adminPinForm").onsubmit=updateAdminPin;
+  $b("#adminPinForm").addEventListener("input",()=>setAdminPinError());
   $b("#coachNext").onclick=nextCoachStep;
   $b("#coachBack").onclick=previousCoachStep;
   $b("#coachSkip").onclick=finishCoach;
@@ -186,7 +187,7 @@
   [["#menuBrightness","#menuBrightnessValue"],["#screenDimBrightness","#screenDimBrightnessValue"],["#screenNightBrightness","#screenNightBrightnessValue"]].forEach(([slider,output])=>{
     $b(slider).oninput=()=>{$(output).textContent=`${$(slider).value}%`};
   });
-  $b("#restartCoordinator").onclick=restartCoordinator;$b("#restartService").onclick=restartService;$b("#stopRuntime").onclick=stopAndroidRuntime;$b("#cancelRuntimeStop").onclick=()=>$("#runtimeStopDialog").close();$b("#confirmRuntimeStop").onclick=confirmAndroidRuntimeStop;$b("#addWidget").onclick=openWidgetCatalog;$b("#editDashboard").onclick=()=>setDashboardEditing(!state.dashboardEditing);$b("#dismissWidgetDialog").onclick=closeAddDialog;$b("#hubClockZone").onclick=openClockManager;$b("#hubWeatherZone").onclick=openWeatherDialog;$b("#closeClockDialog").onclick=()=>$("#clockDialog").close();$b("#changeWeatherLocation").onclick=()=>{$("#weatherDialog").close();openWeatherLocationManager()};$b("#closeWeatherLocationDialog").onclick=()=>$("#weatherLocationDialog").close();$b("#clockCitySearch").oninput=()=>scheduleLocationSearch("clock");$b("#weatherLocationSearch").oninput=()=>scheduleLocationSearch("weather");$b("#widgetScrollLeft").onclick=()=>scrollWidgetRail(-1);$b("#widgetScrollHint").onclick=scrollWidgetRailForward;$b("#quickScrollLeft").onclick=()=>scrollHomeTabs(-1);$b("#quickScrollRight").onclick=()=>scrollHomeTabs(1);$b("#widgetBoard").addEventListener("pointerdown",touchDashboardEditing,{passive:true});$b("#widgetRail").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$b("#homeTabs").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$b("#homeTabs").addEventListener("wheel",railWheelScroll,{passive:false});$b("#homeTabs").addEventListener("keydown",event=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;if(!event.target.closest("[data-home-tab]"))return;event.preventDefault();moveHomeTabFocus(event.key)});$$("[data-open-widget-catalog]").forEach(button=>button.onclick=openWidgetCatalog);$$("[data-add-tab]").forEach(button=>button.onclick=()=>setAddDialogTab(button.dataset.addTab));$b(".modal-tabs").addEventListener("keydown",event=>{const steps={ArrowRight:1,ArrowLeft:-1,ArrowDown:1,ArrowUp:-1};if(!(event.key in steps))return;event.preventDefault();focusAddDialogTab(steps[event.key])});$b("#widgetDialog").addEventListener("close",resetAddDialog);
+  $b("#restartCoordinator").onclick=restartCoordinator;$b("#restartService").onclick=restartService;$b("#stopRuntime").onclick=stopAndroidRuntime;$b("#cancelRuntimeStop").onclick=()=>$("#runtimeStopDialog").close();$b("#confirmRuntimeStop").onclick=confirmAndroidRuntimeStop;$b("#addWidget").onclick=openWidgetCatalog;$b("#editDashboard").onclick=()=>setDashboardEditing(!state.dashboardEditing);$b("#dismissWidgetDialog").onclick=closeAddDialog;$b("#hubClockZone").onclick=openClockManager;$b("#hubWeatherZone").onclick=openWeatherDialog;$b("#closeClockDialog").onclick=()=>$("#clockDialog").close();$b("#changeWeatherLocation").onclick=()=>{$("#weatherDialog").close();openWeatherLocationManager()};$b("#closeWeatherLocationDialog").onclick=()=>$("#weatherLocationDialog").close();$b("#clockCitySearch").oninput=()=>scheduleLocationSearch("clock");$b("#weatherLocationSearch").oninput=()=>scheduleLocationSearch("weather");$b("#widgetScrollLeft").onclick=()=>scrollWidgetRail(-1);$b("#widgetScrollHint").onclick=scrollWidgetRailForward;$b("#widgetBoard").addEventListener("pointerdown",touchDashboardEditing,{passive:true});$b("#widgetRail").addEventListener("scroll",()=>requestAnimationFrame(updateWidgetScrollHint),{passive:true});$$("[data-open-widget-catalog]").forEach(button=>button.onclick=openWidgetCatalog);$$("[data-add-tab]").forEach(button=>button.onclick=()=>setAddDialogTab(button.dataset.addTab));$b(".modal-tabs").addEventListener("keydown",event=>{const steps={ArrowRight:1,ArrowLeft:-1,ArrowDown:1,ArrowUp:-1};if(!(event.key in steps))return;event.preventDefault();focusAddDialogTab(steps[event.key])});$b("#widgetDialog").addEventListener("close",resetAddDialog);
   async function closeMatterDialog(){
     try{await api("/api/matter/commissioning",{method:"POST",body:JSON.stringify({open:false})})}catch{}
     $("#matterDialog").close();
@@ -254,21 +255,26 @@
      Dinleyici kalıcıdır — bağlam tarayıcı tarafından askıya alınırsa (uyku, sekme değişimi)
      bir sonraki dokunuş onu geri getirir. */
   ["pointerdown","keydown","touchstart"].forEach(type=>document.addEventListener(type,unlockAlarmAudio,{capture:true,passive:true}));
-  async function startAuthenticatedApplication(){
+  async function startApplication(){
     if(applicationStarted){
       const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),initializeThemeRuntime()];
-      if(state.auth.user?.role==="admin")reload.push(loadSettings());
+      if(state.auth.elevated)reload.push(loadSettings());
       await Promise.allSettled(reload);
+      renderHomeScenes();
+      renderRoutines();
       await migrateLocalGroups();
       await migrateWeatherLocation();
       await migrateWorldClockZones();
       return;
     }
     applicationStarted=true;
-    setupPullToRefresh();setupQuickMouseScrolling();configureAndroidActions();bindScreensaver();bindWidgetControls();applyWidgetLayout();
+    setupPullToRefresh();configureAndroidActions();bindScreensaver();bindWidgetControls();applyWidgetLayout();
     const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),loadInstallationOnboarding(),initializeThemeRuntime()];
-    if(state.auth.user?.role==="admin")startup.push(loadSettings());
+    if(state.auth.elevated)startup.push(loadSettings());
     await Promise.allSettled(startup);
+    // Sahne şeridi ve Rutinler listesi otomasyonlar okunduktan SONRA doğar: ilk kare boş kalmasın.
+    renderHomeScenes();
+    renderRoutines();
     await migrateLocalGroups();
     // Sunucuda konum yoksa cihazda kalmış eski seçim bir kez yukarı taşınır; hava okunduktan
     // SONRA çalışır, yoksa sunucunun kendi konumunu ezerdi.
@@ -279,14 +285,14 @@
        sihirbaz açılır — yarım kurulumu atlatan tek şey olmasın. */
     if(!onboardingComplete()||state.setupPending===true)openOnboarding();
     else requestAnimationFrame(maybeStartDashboardTour);
-    setInterval(()=>{if(!document.hidden&&state.auth.authenticated)refresh()},8000);
+    setInterval(()=>{if(!document.hidden)refresh()},8000);
     scheduleWorldClockTick();
     // Hava sunucudan okunuyor: sormak ucuz, kör 30 dakikalık bekleme kalktı.
     setInterval(()=>{if(!document.hidden)refreshWeatherIfNeeded()},300000);
     setInterval(()=>{if(state.pairing?.open)render()},1000);
     // Ekran yeniden görünür olduğunda hava HEMEN tazelenir — uykudan dönen tablet eski değeri
     // göstermesin.
-    document.addEventListener("visibilitychange",()=>{if(document.hidden||!state.auth.authenticated)return;refresh();loadWeather()});
+    document.addEventListener("visibilitychange",()=>{if(document.hidden)return;refresh();loadWeather()});
   }
   async function initialize(){
     // Arka plan ayarları temadan ÖNCE okunur: `applyTheme` güneş takibini kurabiliyor ve o da
@@ -305,9 +311,11 @@
        listesi zaten var (`$b`). */
     if(missingBindTargets.size)showToast(t("stalePageReload"),true);
     configureAndroidActions();
-    try{await loadAuthSession()}
-    catch(error){showToast(error.message,true);openAuthGate();return}
-    if(!state.auth.authenticated){openAuthGate();return}
-    await startAuthenticatedApplication();
+    /* Giris ekrani yok: mod durumu okunur (ayni istek ev oturumu cerezini de kurar) ve panel
+       dogrudan ev modunda acilir. Durum okunamasa bile panel acilir — kullanici kapida kalmaz,
+       yonetici ekranlarini zaten sunucu koruyor. */
+    try{await loadModeState()}
+    catch(error){showToast(error.message,true);applyAuthUi()}
+    await startApplication();
   }
   initialize();

@@ -40,10 +40,11 @@
   /* Hiçbir odaya atanmamış cihazlar için türetilen kart. Kayıtta durmaz; boşsa hiç çıkmaz. */
   const noRoomGroupId="auto:noroom";
   const noRoomGroupWidgetId=groupWidgetId(noRoomGroupId);
-  const overviewTabId="overview";
-  /* Sekme seçimi widget düzeninden ayrı bir kayıt: `villa-dashboard-widgets` ile karışmaz. */
-  const homeTabStorageKey="villa-home-tab";
-  const savedHomeTab=(()=>{try{const value=localStorage.getItem(homeTabStorageKey);return typeof value==="string"&&value?value:overviewTabId}catch{return overviewTabId}})();
+  /* Ana ekranın hızlı sahne şeridi kaç kart gösterir: not §6.2 tablette DÖRT sütun ister ve
+     kartın boyu sabittir, yani beşincisi zaten sığmaz. Kalanlar kaybolmaz — Rutinler görünümü
+     listenin tamamını gösterir. Şeridin seçili bir hâli YOKTUR (sekme değil, eylem), bu yüzden
+     `villa-home-tab` kaydı da kalktı: cihazda saklanacak bir tercih kalmadı. */
+  const homeSceneLimit=4;
   /* Ayarlar sayfasının iki sekmesi. ROL AYRIMI DEĞİL: bölümün tamamı yöneticiye ait, sekme
      yalnız kalabalığı ikiye böler. Tercih cihazda kalır. */
   const settingsTabStorageKey="villa-settings-tab";
@@ -96,7 +97,35 @@
      tercihleri (döşeme genişliği, kart sırası, seçili sekme) cihazda kalmaya devam eder. */
   const hiddenTilesStorageKey="villa-hidden-tiles";
   const visibilityCacheKey="villa-home-visibility-cache";
-  const tileVisibilityKey=(deviceId,controlId)=>`${deviceId}::${controlId||groupDeviceControlId}`;
+  /* GÖRÜNÜRLÜK KAPSAM ALIR — genişlik tercihiyle (`tileWidthKey`) aynı desen. Kapsam kartın
+     kimliğidir (`group:<oda>`, `favorites`); kapsamsız anahtar bir kartta gizleneni HER kartta
+     gizliyordu, artık öyle değil.
+
+     İKİ anahtar biçimi yan yana yaşar ve karışmaz: kapsamlı anahtar ÜÇ parçalıdır
+     (`kapsam::cihaz::kontrol`), eski kapsamsız anahtar İKİ (`cihaz::kontrol`). Ayrım tahminle
+     değil biçimle yapılır — ilk parça IEEE adresine benziyorsa kayıt eskidir (`legacyTileVisibilityKey`),
+     çünkü hiçbir kart kimliği `0x…` olamaz. Eski kayıt "her kartta gizli" demektir ve SİLİNMEZ;
+     kullanıcı o kartta göze ilk dokunduğunda kapsamlara açılır (bkz. `toggleTileVisibility`). */
+  const legacyVisibilityKeyPattern=/^0x[0-9a-f]{16}$/i;
+  const tileVisibilityKey=(scope,deviceId,controlId)=>`${scope}::${deviceId}::${controlId||groupDeviceControlId}`;
+  const legacyTileVisibilityKey=(deviceId,controlId)=>`${deviceId}::${controlId||groupDeviceControlId}`;
+  /* Anahtar → `{scope,deviceId,controlId}`. Kontrol kimliği `:` içerebilir ama `::` içeremez,
+     bu yüzden bölme SOLDAN yapılır ve kalan her şey kontrol kimliğidir. */
+  const parseVisibilityKey=key=>{
+    if(typeof key!=="string"||!key)return null;
+    const first=key.indexOf("::");
+    if(first<0)return null;
+    const head=key.slice(0,first);
+    const rest=key.slice(first+2);
+    if(legacyVisibilityKeyPattern.test(head)){
+      return rest?{scope:null,deviceId:head,controlId:rest}:null;
+    }
+    const second=rest.indexOf("::");
+    if(second<0)return null;
+    const deviceId=rest.slice(0,second);
+    const controlId=rest.slice(second+2);
+    return deviceId&&controlId?{scope:head,deviceId,controlId}:null;
+  };
   const savedVisibilityCache=(()=>{try{
     const value=JSON.parse(localStorage.getItem(visibilityCacheKey)||"null");
     if(!value||typeof value!=="object"||Array.isArray(value))return null;
@@ -124,7 +153,7 @@
     return Array.isArray(value)?value.filter(item=>typeof item==="string"&&item):[];
   }catch{return[]}})());
   const dashboardWidgetTypes={
-    quick:{title:"homeTabsWidget",lead:"homeTabsWidgetLead"},
+    quick:{title:"quickScenesWidget",lead:"quickScenesWidgetLead"},
     summary:{title:"summaryWidget",lead:"summaryWidgetLead"},
     favorites:{title:"favoritesWidget",lead:"favoritesWidgetLead"}
   };
@@ -150,6 +179,8 @@
     return value.filter(group=>group&&typeof group.id==="string"&&typeof group.name==="string").map(group=>({
       id:group.id,
       name:group.name.trim().slice(0,32),
+      // İkon İSTEĞE BAĞLI: yoksa alan hiç üretilmez, kart ikonunu cihazlarından türetir.
+      ...(typeof group.icon==="string"&&group.icon?{icon:group.icon}:{}),
       items:Array.isArray(group.items)?group.items.filter(item=>item&&typeof item.deviceId==="string"&&typeof item.controlId==="string").map(item=>({deviceId:item.deviceId,controlId:item.controlId})):[]
     }));
   }catch{return[]}})();
@@ -176,7 +207,7 @@
     }
   }catch{}
   const themeMedia=typeof window.matchMedia==="function"?window.matchMedia("(prefers-color-scheme: dark)"):null;
-  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,zigbeeCapabilities:null,mqttPasswordVisible:false,debugErrors:[],debugNetworkEvents:[],agentTokens:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,favorites:savedFavorites,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,deviceReturnWait:null,lightDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,automationRunDetail:null,automationAgentBackups:0,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,setupPending:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,quickControl:null,quickPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,homeTab:savedHomeTab,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,deviceSort:savedDeviceSort??{key:"name",direction:"asc"},attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{configured:false,authenticated:false,user:null,csrfToken:null,expiresAt:null},loginMode:"resident"};
+  const state={devices:[],zigbeeGroups:[],events:[],health:null,connectionError:null,pairing:null,pairingSession:null,pairingNetworkClose:null,overviewLoaded:false,overviewSignature:null,matter:null,settings:null,network:null,mqttAccess:null,zigbeeCapabilities:null,mqttPasswordVisible:false,debugErrors:[],debugNetworkEvents:[],agentTokens:[],hiddenTiles:savedHiddenTiles,hiddenGroups:savedHiddenGroups,favorites:savedFavorites,editing:null,imageEditing:null,noteEditing:null,optionsDevice:null,roleEditing:null,roomEditing:null,removing:null,departures:[],deviceLost:null,deviceReturnWait:null,lightDevice:null,groupEditing:null,groupDeleting:null,pendingGroupMigration:false,roomFilter:null,simpleLink:null,automations:[],automationWizard:null,automationContext:null,automationSun:null,homeLocation:null,homeLocationSource:null,automationRuns:{},automationRunsOpen:null,automationRunDetail:null,automationAgentBackups:0,onboardingStep:0,onboardingDraft:null,remoteOnboarding:false,setupPending:false,coach:null,detailDevice:null,detailFromPairing:false,detailTechnicalOpen:false,lightPanelMode:null,detailPointerDown:false,lightPointerDown:false,quickControl:null,quickPointerDown:false,screensaverOpen:false,pendingConfirm:null,pendingCommands:new Set(),commandErrors:new Map(),usage:savedUsage,deviceLayout:savedDeviceLayout==="list"?"list":"grid",deviceColumns:savedDeviceColumns??3,deviceSort:savedDeviceSort??{key:"name",direction:"asc"},attentionOpen:savedAttentionOpen,widgets:savedWidgets,removedWidgets:savedRemovedWidgets,groups:savedGroups,tileWidths:savedTileWidths,dashboardEditing:false,appMenuOpener:null,androidMonitor:false,language:savedLanguage||"en",themeMode:savedThemeMode,auth:{elevated:false,mustChangePin:false,secretKind:"pin",csrfToken:null,expiresAt:null,elevationExpiresAt:null}};
   let applicationStarted=false;
   /* `updatedAt` sunucunun veriyi çektiği an, `checkedAt` bu cihazın sunucuya en son sorduğu an.
      İkisi ayrıdır: veri on dakika önce çekilmiş olabilir ama biz onu saniyeler önce okumuş
@@ -261,6 +292,10 @@
   const t=(key,values={})=>(translations[state.language]?.[key]||translations.en?.[key]||key).replace(/\{(\w+)\}/g,(_,name)=>values[name]??"");
   const commandKey=(id,property)=>JSON.stringify([id,property]);
   const commandPending=(id,property)=>state.pendingCommands.has(commandKey(id,property));
+  /* Rutin çalıştırmak da bir KOMUTTUR ve aynı bekleyen-komut kaydını kullanır: tek dokunuş tek
+     istek. Cihaz komutları (kimlik, özellik) çiftiyle anahtarlanıyor; rutinin bir özelliği yok,
+     bu yüzden sabit bir ad taşır. Kimlik otomasyonun kimliğidir, dostane adı değil. */
+  const sceneCommandProperty="@run";
   const commandErrorMs=3000;
   const commandFailed=id=>state.commandErrors.has(id);
   const flagCommandError=id=>{
@@ -289,4 +324,6 @@
   };
   const ago=iso=>{if(!iso)return t("noData");const seconds=Math.max(0,Math.floor((Date.now()-new Date(iso))/1000));return seconds<8?t("justNow"):seconds<60?t("secondsAgo",{count:seconds}):seconds<3600?t("minutesAgo",{count:Math.floor(seconds/60)}):t("hoursAgo",{count:Math.floor(seconds/3600)})};
   const showToast=(message,error=false)=>{const toast=$("#toast");toast.textContent=message;toast.className=`toast show${error?" error":""}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className="toast",error?6000:3200)};
-  const api=async(url,options={})=>{const method=String(options.method||"GET").toUpperCase();const csrf=state.auth.csrfToken&&["POST","PUT","PATCH","DELETE"].includes(method)?{"x-villa-csrf":state.auth.csrfToken}:{};const response=await fetch(url,{cache:"no-store",...options,headers:{...(options.body===undefined?{}:{"content-type":"application/json"}),...csrf,...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(response.status===401&&!url.startsWith("/api/auth/")){state.auth={configured:true,authenticated:false,user:null,csrfToken:null,expiresAt:null};applyAuthUi();openAuthGate()}if(!response.ok){const failure=new Error(data.error||t("operationFailed"));failure.status=response.status;if(data.code)failure.code=data.code;throw failure}return data};
+  const api=async(url,options={})=>{const method=String(options.method||"GET").toUpperCase();const csrf=state.auth.csrfToken&&["POST","PUT","PATCH","DELETE"].includes(method)?{"x-villa-csrf":state.auth.csrfToken}:{};const response=await fetch(url,{cache:"no-store",...options,headers:{...(options.body===undefined?{}:{"content-type":"application/json"}),...csrf,...(options.headers||{})}});const data=await response.json().catch(()=>({}));/* Yükseltme sunucuda hareketsizlikte düştüyse ilk yönetici isteği bunu haber verir:
+     yerel bayrak düşer, gizli düğmeler geri kapanır. */
+  if(response.status===403&&data.code==="ELEVATION_REQUIRED")dropElevatedFlag();if(!response.ok){const failure=new Error(data.error||t("operationFailed"));failure.status=response.status;if(data.code)failure.code=data.code;throw failure}return data};

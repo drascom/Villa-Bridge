@@ -653,6 +653,8 @@
     renderAutomationAgentBar();
   }
   function renderAutomations(){
+    // Aynı veri iki ekranda: yönetici listesi ve ev kullanıcısının Rutinler görünümü.
+    renderRoutines();
     renderAutomationAgentBar();
     const container=$("#automationList");
     if(!container)return;
@@ -727,8 +729,9 @@
     renderAutomations();
     if(successKey)showToast(t(successKey));
   }
-  // ————— evin konumu. Okuma ev sakinine açık, yazma yönetici işi: sakinde alanlar salt-okunur.
-  const isResidentSession=()=>state.auth.user?.role==="resident";
+  // ————— evin konumu. Okuma ev modunda açık, yazma yönetici modu işi: ev modunda alanlar
+  // salt-okunur. Gizleme bir yetki değil, sunucu aynı kuralı her istekte yeniden uygular.
+  const isResidentSession=()=>state.auth.elevated!==true;
   async function loadHomeLocation(){
     const data=await api("/api/settings/location");
     state.homeLocation=data.location||null;
@@ -878,6 +881,58 @@
       await loadAutomations();
       renderAutomations();
     }catch(error){showToast(error.message,true)}
+  }
+  /* ————— EV MODUNDAN TEK DOKUNUŞ. Yukarıdaki `runAutomationNow` yönetici penceresinin yoludur:
+     kimliği `state.automationContext`ten okur ve pencereyi kapatır. Bu ince sarmalayıcı AYNI ucu
+     kimlikle çağırır, pencere gerektirmez; sunucuda `POST /api/automations/:id/run` zaten
+     `residentRoutes`ta olduğu için ev sakini rutini çalıştırabilir — ama düzenleyemez.
+
+     ÇİFT GÖNDERİM YOK: istek cihaz komutlarıyla AYNI kayda (`state.pendingCommands`,
+     `commandKey`) yazılır. İkinci dokunuş daha ağa çıkmadan döner, düğme de o sürede `disabled`
+     çizilir. Kayıt `finally` içinde düşer: hata hâlinde de düğme kilitli kalmaz. */
+  async function runSceneNow(id){
+    if(!id)return;
+    const key=commandKey(id,sceneCommandProperty);
+    if(state.pendingCommands.has(key))return;
+    state.pendingCommands.add(key);
+    renderHomeScenes();
+    renderRoutines();
+    try{
+      await api(`/api/automations/${encodeURIComponent(id)}/run`,{method:"POST"});
+      const scene=state.automations.find(item=>item.id===id);
+      showToast(t("sceneRan",{name:scene?.name||id}));
+      // Son çalışma izi sunucudan gelir. Tazeleme başarısız olursa sonuç gizlenmez: kural çalıştı.
+      await loadAutomations().catch(()=>{});
+    }catch(error){showToast(error.message,true)}
+    finally{
+      state.pendingCommands.delete(key);
+      renderHomeScenes();
+      renderRoutines();
+    }
+  }
+  /* ————— RUTİNLER GÖRÜNÜMÜ. Ev kullanıcısının listesi: ana ekranın şeridi ilk dördü gösterir,
+     burada TAMAMI durur. Uzun açıklama (not §6.2) yalnız bu ekranda yazılır ve UYDURULMAZ —
+     satırın altındaki cümle kuralın kendi sayılarından (tetikleyici cinsi, eylem sayısı, son
+     çalışma) kurulur. Tek eylem var: çalıştır. Kapalı kural da listede kalır, çünkü elle
+     çalıştırma motorun `enabled` bayrağına bakmaz; durumu satırda açıkça yazılır. */
+  function routineCardHtml(scene){
+    const busy=commandPending(scene.id,sceneCommandProperty);
+    const notes=[
+      t(scene.kind==="routine"?"routineKindScheduled":"routineKindReactive"),
+      t("routineActionCount",{count:scene.actionCount}),
+      scene.lastRunAt?t("routineLastRun",{when:ago(scene.lastRunAt)}):t("routineNeverRun")
+    ];
+    const runLabel=t(busy?"sceneRunning":"routineRun");
+    return`<article class="routine-card${scene.enabled?"":" is-off"}"><span class="routine-glyph" aria-hidden="true">${deviceIconSvg(sceneIconKind(scene))}</span><div class="routine-copy"><strong>${esc(scene.name)}</strong><span class="routine-note">${esc(notes.join(" · "))}</span>${scene.enabled?"":`<span class="routine-off-note">${esc(t("routineDisabledNote"))}</span>`}</div><button class="primary routine-run" type="button" data-run-scene="${esc(scene.id)}"${busy?' aria-busy="true" disabled':""}>${esc(runLabel)}</button></article>`;
+  }
+  function renderRoutines(){
+    const container=$("#routineList");
+    if(!container)return;
+    const scenes=genSceneCatalog(state.automations);
+    container.innerHTML=scenes.length
+      ?scenes.map(routineCardHtml).join("")
+      :`<div class="empty">${esc(t("routinesEmpty"))}</div>`;
+    $$("#routineList [data-run-scene]").forEach(button=>button.onclick=()=>runSceneNow(button.dataset.runScene));
   }
   async function deleteAutomation(){
     const automation=state.automations.find(item=>item.id===state.automationContext);

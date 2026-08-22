@@ -34,7 +34,16 @@
     // sözde öğesinde duruyor (üç katman, iki taşıyıcı). CSS bir üst öğeyi seçemediği için ana
     // ekran dışında güneşin de sönmesi ancak kökteki bu ikizle mümkün.
     document.documentElement.dataset.activeView=viewName;
+    /* Genel Bakış kendi verisini ekrana girerken tazeler: ayarlar, otomasyonlar ve Matter
+       durumu üç ayrı uçtan gelir, hiçbiri ana veri turunda (`/api/overview`) taşınmaz. */
+    if(viewName==="adminOverview")loadAdminOverview();
     if(viewName==="automations"){renderAutomations();loadAutomations().then(renderAutomations).catch(error=>showToast(error.message,true))}
+    /* Rutinler ev modunun görünümü: liste otomasyonların ta kendisidir, ayrı bir kaynak yok.
+       Ekrana girerken elde olan yazılır, sonra sunucudan tazelenir. */
+    if(viewName==="routines"){renderRoutines();loadAutomations().then(()=>{renderRoutines();renderHomeScenes()}).catch(error=>showToast(error.message,true))}
+    /* Odalar görünümü kendi verisini çekmez: kartlar `state`ten türer ve her `render()` turunda
+       zaten yeniden basılır. Girişte bir kez tazelenir ki görünüm açılırken bayat kalmasın. */
+    if(viewName==="rooms"){renderRoomCards();bindGroupControls()}
     // Saat önizlemesi yalnız arka plan sayfasında yaşar: sayfadan çıkan kullanıcı paneli donmuş
     // bir gökyüzüyle (ya da akan bir günle) bırakmasın diye çıkışta kendiliğinden kapanır.
     // TEK İSTİSNA `?sky=preview`: o adres bilerek bir gösteri kipidir, sayfalar arasında
@@ -924,12 +933,7 @@
     $("#widgetScrollLeft").title=t("moreWidgetsLeft");
     $("#widgetScrollHint").setAttribute("aria-label",t("moreWidgetsRight"));
     $("#widgetScrollHint").title=t("moreWidgetsRight");
-    $("#quickScrollLeft").setAttribute("aria-label",t("moreQuickControlsLeft"));
-    $("#quickScrollLeft").title=t("moreQuickControlsLeft");
-    $("#quickScrollRight").setAttribute("aria-label",t("moreQuickControlsRight"));
-    $("#quickScrollRight").title=t("moreQuickControlsRight");
     $("#screensaver").setAttribute("aria-label",t("screensaverTitle"));
-    setLoginMode(state.loginMode);
     applyAuthUi();
     $$("[data-i18n-placeholder]").forEach(element=>element.placeholder=t(element.dataset.i18nPlaceholder));
     $$("[data-i18n-aria]").forEach(element=>element.setAttribute("aria-label",t(element.dataset.i18nAria)));
@@ -950,7 +954,6 @@
     if($("#widgetDialog").open){updateAddDialogTitle();renderRoomSuggestions();updateGroupOrderControls();renderGroupDeviceChoices();renderWidgetCatalog()}
     if($("#clockDialog").open){renderClockDialogRows();renderLocationSearchResults("clock");renderAlarmSettings()}
     if($("#alarmDialog").open)renderAlarmRing();
-    renderHubAlarm();
     if($("#weatherDialog").open)renderWeatherDialog();
     if($("#weatherLocationDialog").open)renderLocationSearchResults("weather");
     if($("#homeLocationDialog").open){renderHomeLocationDialog();renderLocationSearchResults("home")}

@@ -8,11 +8,14 @@ import { readFile } from "node:fs/promises";
 import { writeJsonAtomic } from "./atomic-file.js";
 
 /**
- * `agent`, makine istemcisinin (kullanıcının kendi LLM istemcisi) rolüdür. Diğer ikisinin aksine
- * bir kullanıcı kaydı ya da çerez oturumu yoktur: kimliği `agent-tokens.json` içindeki Bearer
- * token taşır. Rol burada durur ki yetki tabloları ondan da isimle söz edebilsin.
+ * ROLLER KALKTI. Panel giriş ekranı olmadan **ev modunda** açılır; kurulum ekranları
+ * "yönetici modu" ister ve o modun tek anahtarı burada duran **tek sır**dır (varsayılan `1234`).
+ * Yükseltmenin kendisi bu dosyada tutulmaz — oturumun üstünde, `access-control.ts` içinde
+ * yaşar ve hareketsizlikte düşer. Burada yalnız "sır doğru mu" sorusunun cevabı vardır.
+ *
+ * `agent` (makine istemcisi) kimliği bu depoya hiç uğramaz: onun kimliğini `agent-tokens.json`
+ * içindeki Bearer token taşır ve yalnız `/mcp` yolunda geçerlidir.
  */
-export type AuthRole = "admin" | "resident" | "agent";
 
 interface ScryptParameters {
   N: number;
@@ -21,10 +24,9 @@ interface ScryptParameters {
   keyLength: number;
 }
 
-interface StoredUser {
-  username: string;
-  role: AuthRole;
-  secretKind: "password" | "pin";
+/** Yükseltme sırrı. `kind` yalnız panelin doğru klavyeyi açması için taşınır. */
+interface StoredSecret {
+  kind: "pin" | "password";
   salt: string;
   hash: string;
   scrypt: ScryptParameters;
@@ -33,26 +35,34 @@ interface StoredUser {
 interface StoredSession {
   tokenHash: string;
   csrfToken: string;
-  username: string;
-  role: AuthRole;
   expiresAt: string;
 }
 
 interface StoredAuthState {
-  version: 1;
-  users: StoredUser[];
+  version: 2;
+  admin: StoredSecret;
+  /**
+   * Sır hâlâ fabrika varsayılanı (`1234`) mı? Panel bunu görünce yönetici modunda kalıcı
+   * uyarı şeridi gösterir. Yeni PIN yazılırken değeri yeniden hesaplanır.
+   */
+  mustChange: boolean;
   sessions: StoredSession[];
 }
 
 export interface AuthSession {
-  username: string;
-  role: AuthRole;
   csrfToken: string;
   expiresAt: string;
 }
 
 export interface CreatedAuthSession extends AuthSession {
   token: string;
+}
+
+export interface AdminSecretState {
+  /** Panelin PIN alanını sayısal mı yoksa serbest metin mi açacağını söyler. */
+  secretKind: "pin" | "password";
+  /** `true` ise sır hâlâ `1234`. */
+  mustChange: boolean;
 }
 
 export interface AuthStoreOptions {
@@ -68,9 +78,12 @@ const defaultScrypt: ScryptParameters = {
   keyLength: 32
 };
 
-const emptyState = (): StoredAuthState => ({ version: 1, users: [], sessions: [] });
+/** Fabrika PIN'i. Kurulum ekranı olmadığı için ilk açılışta geçerli olan tek sır budur. */
+export const defaultAdminPin = "1234";
+
 const tokenHash = (token: string): string =>
   createHash("sha256").update(token, "utf8").digest("base64url");
+
 const deriveSecret = (
   secret: string,
   salt: Buffer,
@@ -87,55 +100,45 @@ const deriveSecret = (
   });
 });
 
-const normalizeUsername = (value: string): string => value.trim().toLowerCase();
-
-const validateUsername = (value: string): string => {
-  const username = normalizeUsername(value);
-  if (!/^[a-z][a-z0-9_-]{2,31}$/.test(username)) {
-    throw new Error("Kullanıcı adı 3–32 karakter olmalı ve harfle başlamalı.");
-  }
-  if (username === "home") throw new Error("Bu kullanıcı adı ev kullanıcısı için ayrılmıştır.");
-  return username;
-};
-
-const commonPins = new Set([
-  "000000", "111111", "123123", "123456", "654321", "121212", "112233"
-]);
-
-export const validateAdminPassword = (value: unknown): string => {
-  if (typeof value !== "string") {
-    throw new Error("Yönetici parolası 8–128 karakter olmalıdır.");
-  }
-  const normalized = value.normalize("NFC");
-  if (normalized.length < 8 || normalized.length > 128) {
-    throw new Error("Yönetici parolası 8–128 karakter olmalıdır.");
-  }
-  return normalized;
-};
-
-export const validateResidentPin = (value: unknown): string => {
-  if (typeof value !== "string" || !/^\d{6}$/.test(value) || commonPins.has(value)) {
-    throw new Error("Ev kullanıcısı PIN’i kolay tahmin edilemeyen 6 rakam olmalıdır.");
+/**
+ * Yönetici PIN'i: 4–8 rakam. Üst sınır bilerek dar — bu bir parola değil, duvardaki tablette
+ * parmakla girilen bir moddan-çıkış anahtarıdır; uzunluk yerine hız sınırı korur (bkz.
+ * `access-control.ts`). Alt sınır 4, çünkü varsayılanın kendisi dört hanedir.
+ */
+export const validateAdminPin = (value: unknown): string => {
+  if (typeof value !== "string" || !/^\d{4,8}$/.test(value)) {
+    throw new Error("Yönetici PIN’i 4–8 rakam olmalıdır.");
   }
   return value;
 };
 
-const validateStoredState = (value: unknown): StoredAuthState => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("Erişim kaydı geçersiz.");
-  }
-  const candidate = value as Partial<StoredAuthState>;
-  if (candidate.version !== 1 || !Array.isArray(candidate.users) || !Array.isArray(candidate.sessions)) {
-    throw new Error("Erişim kaydı sürümü geçersiz.");
-  }
-  return candidate as StoredAuthState;
+const isStoredSecret = (value: unknown): value is StoredSecret => {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<StoredSecret>;
+  return (candidate.kind === "pin" || candidate.kind === "password")
+    && typeof candidate.salt === "string"
+    && typeof candidate.hash === "string"
+    && typeof candidate.scrypt === "object"
+    && candidate.scrypt !== null
+    && typeof (candidate.scrypt as ScryptParameters).N === "number"
+    && typeof (candidate.scrypt as ScryptParameters).r === "number"
+    && typeof (candidate.scrypt as ScryptParameters).p === "number"
+    && typeof (candidate.scrypt as ScryptParameters).keyLength === "number";
 };
+
+const readSessions = (value: unknown): StoredSession[] => (Array.isArray(value) ? value : [])
+  .filter((entry): entry is StoredSession =>
+    typeof entry === "object" && entry !== null
+    && typeof (entry as StoredSession).tokenHash === "string"
+    && typeof (entry as StoredSession).csrfToken === "string"
+    && typeof (entry as StoredSession).expiresAt === "string");
 
 export class AuthStore {
   private readonly now: () => Date;
   private readonly sessionLifetimeMs: number;
   private readonly scryptParameters: ScryptParameters;
   private cachedState: StoredAuthState | null = null;
+  private loading: Promise<StoredAuthState> | null = null;
   private mutation: Promise<void> = Promise.resolve();
 
   constructor(private readonly path: string, options: AuthStoreOptions = {}) {
@@ -144,18 +147,93 @@ export class AuthStore {
     this.scryptParameters = { ...defaultScrypt, ...options.scrypt };
   }
 
+  /**
+   * GÖÇ — canlı sunucudaki `auth.json` gerçek kimlik taşıyor, bu yüzden hiçbir yol
+   * "erişilemez"e çıkmaz:
+   *
+   *  1. Dosya **yeni şekildeyse** (`version: 2`) olduğu gibi kullanılır.
+   *  2. Dosya **eski şekildeyse** (`version: 1`, `users[]` + rol ayrımı): eski YÖNETİCİ
+   *     kullanıcısının parola hash'i olduğu gibi yeni tek sırra taşınır (`kind: "password"`).
+   *     Kullanıcı güncellemeden sonra eskiden kullandığı yönetici parolasıyla mod
+   *     yükseltmeye devam eder — sessiz bir güvenlik düşüşü OLMAZ. Ev sakini PIN'i düşer,
+   *     çünkü artık ev modu sır istemiyor. Eski oturumlar da düşer: rol taşıyorlardı,
+   *     karşılıkları yok; panel bir sonraki istekte yeni ev oturumunu kendisi alır.
+   *  3. Dosya yoksa, bozuksa ya da tanınmayan bir şekildeyse: varsayılan `1234` +
+   *     `mustChange` ile açılır. Bu, panelin kendi kapısında kilitli kalmasını önleyen
+   *     son çaredir; panel bu durumda kalıcı uyarı şeridi gösterir.
+   */
+  private async migrate(raw: unknown): Promise<{ state: StoredAuthState; rewrite: boolean }> {
+    const candidate = (typeof raw === "object" && raw !== null && !Array.isArray(raw))
+      ? raw as Record<string, unknown>
+      : null;
+
+    if (candidate?.version === 2 && isStoredSecret(candidate.admin)) {
+      return {
+        state: {
+          version: 2,
+          admin: candidate.admin,
+          mustChange: candidate.mustChange === true,
+          sessions: readSessions(candidate.sessions)
+        },
+        rewrite: false
+      };
+    }
+
+    if (candidate?.version === 1 && Array.isArray(candidate.users)) {
+      const legacyAdmin = (candidate.users as Array<Record<string, unknown>>).find((user) =>
+        user?.role === "admin" && typeof user.salt === "string" && typeof user.hash === "string"
+      );
+      if (legacyAdmin && isStoredSecret({ ...legacyAdmin, kind: "password" })) {
+        return {
+          state: {
+            version: 2,
+            admin: {
+              kind: "password",
+              salt: legacyAdmin.salt as string,
+              hash: legacyAdmin.hash as string,
+              scrypt: legacyAdmin.scrypt as ScryptParameters
+            },
+            mustChange: false,
+            sessions: []
+          },
+          rewrite: true
+        };
+      }
+    }
+
+    return { state: await this.defaultState(), rewrite: true };
+  }
+
+  private async defaultState(): Promise<StoredAuthState> {
+    return {
+      version: 2,
+      admin: { kind: "pin", ...await this.hashSecret(defaultAdminPin) },
+      mustChange: true,
+      sessions: []
+    };
+  }
+
   private async load(): Promise<StoredAuthState> {
     if (this.cachedState) return this.cachedState;
-    try {
-      this.cachedState = validateStoredState(JSON.parse(await readFile(this.path, "utf8")));
-      return this.cachedState;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        this.cachedState = emptyState();
-        return this.cachedState;
+    if (this.loading) return this.loading;
+    this.loading = (async () => {
+      let raw: unknown = null;
+      try {
+        raw = JSON.parse(await readFile(this.path, "utf8"));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          console.warn(
+            `Erişim kaydı okunamadı (${this.path}); varsayılan yönetici PIN’i ile açılıyor.`,
+            error
+          );
+        }
       }
-      throw error;
-    }
+      const { state, rewrite } = await this.migrate(raw);
+      this.cachedState = state;
+      if (rewrite) await this.save(state);
+      return state;
+    })().finally(() => { this.loading = null; });
+    return this.loading;
   }
 
   private async save(state: StoredAuthState): Promise<void> {
@@ -175,7 +253,7 @@ export class AuthStore {
     scrypt: ScryptParameters;
   }> {
     const parameters = this.scryptParameters;
-    const derived = await deriveSecret(secret, salt, parameters);
+    const derived = await deriveSecret(secret.normalize("NFC"), salt, parameters);
     return {
       salt: salt.toString("base64url"),
       hash: derived.toString("base64url"),
@@ -183,93 +261,67 @@ export class AuthStore {
     };
   }
 
-  private async verifySecret(user: StoredUser, secret: string): Promise<boolean> {
-    const expected = Buffer.from(user.hash, "base64url");
+  private activeSessions(sessions: StoredSession[]): StoredSession[] {
+    const now = this.now().getTime();
+    return sessions.filter((session) => Date.parse(session.expiresAt) > now).slice(-40);
+  }
+
+  /** Panelin uyarı şeridi ve PIN alanının klavyesi için gereken iki bilgi. */
+  async adminSecretState(): Promise<AdminSecretState> {
+    const state = await this.load();
+    return { secretKind: state.admin.kind, mustChange: state.mustChange };
+  }
+
+  /** Yönetici sırrını doğrular. Hız sınırı çağıranın işidir (bkz. `access-control.ts`). */
+  async verifyAdminSecret(secretValue: unknown): Promise<boolean> {
+    if (typeof secretValue !== "string" || secretValue.length === 0 || secretValue.length > 128) {
+      return false;
+    }
+    const state = await this.load();
+    const expected = Buffer.from(state.admin.hash, "base64url");
     const actual = await deriveSecret(
-      secret.normalize("NFC"),
-      Buffer.from(user.salt, "base64url"),
-      user.scrypt
+      secretValue.normalize("NFC"),
+      Buffer.from(state.admin.salt, "base64url"),
+      state.admin.scrypt
     );
     return expected.length === actual.length && timingSafeEqual(expected, actual);
   }
 
-  private createSession(username: string, role: AuthRole): CreatedAuthSession {
-    const token = randomBytes(32).toString("base64url");
-    return {
-      token,
-      username,
-      role,
-      csrfToken: randomBytes(24).toString("base64url"),
-      expiresAt: new Date(this.now().getTime() + this.sessionLifetimeMs).toISOString()
-    };
-  }
-
-  private activeSessions(sessions: StoredSession[]): StoredSession[] {
-    const now = this.now().getTime();
-    return sessions.filter((session) => Date.parse(session.expiresAt) > now).slice(-20);
-  }
-
-  async configured(): Promise<boolean> {
-    return (await this.load()).users.some((user) => user.role === "admin");
-  }
-
-  async setup(usernameValue: string, passwordValue: unknown, pinValue: unknown): Promise<CreatedAuthSession> {
-    return this.exclusive(async () => {
+  async setAdminPin(pinValue: unknown): Promise<void> {
+    const pin = validateAdminPin(pinValue);
+    await this.exclusive(async () => {
       const state = await this.load();
-      if (state.users.some((user) => user.role === "admin")) {
-        throw new Error("Yönetici hesabı zaten oluşturulmuş.");
-      }
-      const username = validateUsername(usernameValue);
-      const password = validateAdminPassword(passwordValue);
-      const pin = validateResidentPin(pinValue);
-      const [adminSecret, residentSecret] = await Promise.all([
-        this.hashSecret(password),
-        this.hashSecret(pin)
-      ]);
-      const session = this.createSession(username, "admin");
       await this.save({
-        version: 1,
-        users: [
-          { username, role: "admin", secretKind: "password", ...adminSecret },
-          { username: "home", role: "resident", secretKind: "pin", ...residentSecret }
-        ],
-        sessions: [{
-          tokenHash: tokenHash(session.token),
-          csrfToken: session.csrfToken,
-          username: session.username,
-          role: session.role,
-          expiresAt: session.expiresAt
-        }]
+        ...state,
+        admin: { kind: "pin", ...await this.hashSecret(pin) },
+        // Uyarı şeridi "hâlâ varsayılan" sorusuna bakar: kullanıcı bilerek 1234 seçtiyse de
+        // şerit kalmalı, yoksa uyarı susturulabilir bir süse dönerdi.
+        mustChange: pin === defaultAdminPin,
+        sessions: this.activeSessions(state.sessions)
       });
-      return session;
     });
   }
 
-  async login(mode: AuthRole, usernameValue: string, secretValue: unknown): Promise<CreatedAuthSession | null> {
-    if (typeof secretValue !== "string" || secretValue.length > 128) return null;
-    const username = mode === "resident" ? "home" : normalizeUsername(usernameValue);
+  /** Giriş ekranı yok: her ziyaretçi kapıda kendi ev oturumunu alır. */
+  async createSession(): Promise<CreatedAuthSession> {
     return this.exclusive(async () => {
       const state = await this.load();
-      const user = state.users.find((candidate) =>
-        candidate.role === mode && candidate.username === username
-      );
-      if (!user) {
-        await this.hashSecret(secretValue.normalize("NFC"), Buffer.alloc(16));
-        return null;
-      }
-      if (!await this.verifySecret(user, secretValue)) return null;
-      const session = this.createSession(user.username, user.role);
-      state.sessions = [
-        ...this.activeSessions(state.sessions),
-        {
-          tokenHash: tokenHash(session.token),
-          csrfToken: session.csrfToken,
-          username: session.username,
-          role: session.role,
-          expiresAt: session.expiresAt
-        }
-      ];
-      await this.save(state);
+      const session: CreatedAuthSession = {
+        token: randomBytes(32).toString("base64url"),
+        csrfToken: randomBytes(24).toString("base64url"),
+        expiresAt: new Date(this.now().getTime() + this.sessionLifetimeMs).toISOString()
+      };
+      await this.save({
+        ...state,
+        sessions: [
+          ...this.activeSessions(state.sessions),
+          {
+            tokenHash: tokenHash(session.token),
+            csrfToken: session.csrfToken,
+            expiresAt: session.expiresAt
+          }
+        ]
+      });
       return session;
     });
   }
@@ -282,55 +334,21 @@ export class AuthStore {
       candidate.tokenHash.length === hash.length
       && timingSafeEqual(Buffer.from(candidate.tokenHash), Buffer.from(hash))
     );
-    return session ? {
-      username: session.username,
-      role: session.role,
-      csrfToken: session.csrfToken,
-      expiresAt: session.expiresAt
-    } : null;
+    return session
+      ? { csrfToken: session.csrfToken, expiresAt: session.expiresAt }
+      : null;
   }
 
-  async logout(token: string | undefined): Promise<void> {
+  async dropSession(token: string | undefined): Promise<void> {
     if (!token) return;
     await this.exclusive(async () => {
       const state = await this.load();
       const hash = tokenHash(token);
-      state.sessions = this.activeSessions(state.sessions).filter((session) => session.tokenHash !== hash);
-      await this.save(state);
-    });
-  }
-
-  async updateAdminPassword(
-    usernameValue: string,
-    newPasswordValue: unknown
-  ): Promise<void> {
-    const username = normalizeUsername(usernameValue);
-    const newPassword = validateAdminPassword(newPasswordValue);
-    await this.exclusive(async () => {
-      const state = await this.load();
-      const admin = state.users.find((user) =>
-        user.role === "admin" && user.username === username
-      );
-      if (!admin) throw new Error("Yönetici hesabı bulunamadı.");
-      if (await this.verifySecret(admin, newPassword)) {
-        throw new Error("Yeni yönetici parolası mevcut paroladan farklı olmalıdır.");
-      }
-      Object.assign(admin, await this.hashSecret(newPassword));
-      state.sessions = this.activeSessions(state.sessions).filter((session) => session.role !== "admin");
-      await this.save(state);
-    });
-  }
-
-  async updateResidentPin(pinValue: unknown): Promise<void> {
-    const pin = validateResidentPin(pinValue);
-    await this.exclusive(async () => {
-      const state = await this.load();
-      const secret = await this.hashSecret(pin);
-      const resident = state.users.find((user) => user.role === "resident");
-      if (!resident) throw new Error("Ev kullanıcısı bulunamadı.");
-      Object.assign(resident, secret);
-      state.sessions = this.activeSessions(state.sessions).filter((session) => session.role !== "resident");
-      await this.save(state);
+      await this.save({
+        ...state,
+        sessions: this.activeSessions(state.sessions)
+          .filter((session) => session.tokenHash !== hash)
+      });
     });
   }
 }

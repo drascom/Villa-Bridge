@@ -37,44 +37,26 @@
     $$("[data-edit-group]").forEach(button=>button.onclick=()=>openGroupEditor(button.dataset.editGroup));
   }
   /* İKİ SÜTUNLU ANA EKRANIN KOŞULU — panel.css'teki blokların BİREBİR aynısı olmak ZORUNDA.
-     Yerleşim şöyle kuruluyor: `#home .widget-board` iki sütun (`--hub-column` + kalanı), hub
-     birinci sütunda, ray ise `grid-column:1/-1` ile hub'ın ÜSTÜNDE duran tam genişlikte bir
-     katman. Hub sütununu görünür tutan tek şey rayın `padding-left`i; ray kaydırılır kaydırılmaz
-     kartlar hub'ın üstüne biner. O yüzden kaydırma başlayınca hub sönerek çekilir ve oklar belirir
-     — ikisini de bu koşul açıyor.
-     KOŞUL CSS'TEN AYRIŞIRSA yerleşim bozulmuş gibi görünür: burada eskiden yalnız
+     Saat/hava bloğu artık panonun içinde DEĞİL (başlığın orta hücresinde), bu yüzden onu
+     söndüren mantık kalktı: ray tam genişlikte tek katman, altında gizlenecek bir şey yok.
+     Koşuldan geriye TEK iş kaldı — kaydırma oklarının hangi kırılımda çalışacağı: pano yatay
+     kipte kayan bir raya dönüşüyor, dikeyde ise normal akış.
+     KOŞUL CSS'TEN AYRIŞIRSA oklar yanlış kırılımda çalışır: burada eskiden yalnız
      `max-height:900px` vardı, CSS'te ise ikinci bir kol daha var (`min-width:1000px`). Geniş ama
-     900px'ten UZUN ekranda (1280×1024, 1440×1000, 1512×982 …) CSS iki sütuna geçiyor, JS ise
-     "yatay değil" diyordu: oklar `enabled=false` ile zorla gizleniyor, hub hiç sönmüyordu.
-     Sonuç kullanıcının gördüğü tabloydu — kartlar en solda, saat/hava bloğu onların altında.
+     900px'ten UZUN ekranda (1280×1024, 1440×1000, 1512×982 …) CSS raya geçiyor, JS ise
+     "yatay değil" diyor ve oklar `enabled=false` ile zorla gizleniyordu.
      `scripts/check-home-layout.mjs` bu metnin CSS koşuluyla aynı kalmasını denetler. */
   const homeOverlayMediaQuery="(orientation: landscape) and (max-height: 900px), (orientation: landscape) and (min-width: 1000px)";
+  /* Ok düğmeleri artık YALNIZ kart rayına ait. Hızlı sahne şeridi sabit dört sütun: kayacak bir
+     şey yok, o yüzden kendi okları da kalktı. */
   function updateWidgetScrollHint(){
     const rail=$("#widgetRail");
-    const quick=$("#homeTabs");
-    if(!rail||!quick)return;
-    const landscape=window.matchMedia(homeOverlayMediaQuery).matches;
-    const update=(scroller,left,right,enabled)=>{
-      const hasBefore=scroller.scrollLeft>8;
-      const hasAfter=scroller.scrollWidth-scroller.clientWidth-scroller.scrollLeft>8;
-      left.hidden=!enabled||!hasBefore;
-      right.hidden=!enabled||!hasAfter;
-    };
-    const enabled=landscape&&!state.dashboardEditing;
-    update(rail,$("#widgetScrollLeft"),$("#widgetScrollHint"),enabled);
-    update(quick,$("#quickScrollLeft"),$("#quickScrollRight"),enabled&&!$('[data-widget="quick"]').hidden);
-    updateHubVisibility(landscape,rail);
-  }
-  // Kartlar saydam: rail sola kaydırıldığında altta kalan saat/hava bloğu görüntüyü bozuyordu.
-  // Birkaç piksellik kayma hub'ı kapatmasın diye eşik toleranslı; gizliyken tıklama ve odak da kapanır.
-  function updateHubVisibility(landscape,rail){
-    const hub=$("#homeHub");
-    if(!hub)return;
-    const hidden=Boolean(landscape&&rail&&rail.scrollLeft>24);
-    hub.classList.toggle("hub-hidden",hidden);
-    hub.toggleAttribute("inert",hidden);
-    if(hidden)hub.setAttribute("aria-hidden","true");
-    else hub.removeAttribute("aria-hidden");
+    if(!rail)return;
+    const enabled=window.matchMedia(homeOverlayMediaQuery).matches&&!state.dashboardEditing;
+    const hasBefore=rail.scrollLeft>8;
+    const hasAfter=rail.scrollWidth-rail.clientWidth-rail.scrollLeft>8;
+    $("#widgetScrollLeft").hidden=!enabled||!hasBefore;
+    $("#widgetScrollHint").hidden=!enabled||!hasAfter;
   }
   function scrollDashboardRow(scroller,direction,minimum,ratio){
     if(!scroller)return;
@@ -83,30 +65,6 @@
   }
   function scrollWidgetRail(direction){scrollDashboardRow($("#widgetRail"),direction,220,.72)}
   function scrollWidgetRailForward(){scrollWidgetRail(1)}
-  function scrollHomeTabs(direction){scrollDashboardRow($("#homeTabs"),direction,120,.55)}
-  /* Masaüstünde fare tekerleği dikey delta üretir; yatay şerit bundan kaydırılmaz. Dikey deltayı
-     yatay kaydırmaya çeviriyoruz — ama yalnız gerçekten çevirdiğimizde `preventDefault()`.
-     `deltaMode` piksel(0) dışında satır(1) ya da sayfa(2) olabilir, ikisini de piksele çeviriyoruz.
-     Yalnız alt sekme şeridine bağlı: genel görünüm rayında kartların kendi dikey kaydırması
-     tekerlekle çakışıyordu, orada sağ/sol ok düğmeleri birincil yol. */
-  function wheelPixelDelta(event,scroller){
-    if(event.deltaMode===1)return event.deltaY*16;
-    if(event.deltaMode===2)return event.deltaY*Math.max(1,scroller.clientWidth);
-    return event.deltaY;
-  }
-  const scrollRoomLeft=(node,delta)=>delta<0?node.scrollLeft:node.scrollWidth-node.clientWidth-node.scrollLeft;
-  function railWheelScroll(event){
-    const scroller=event.currentTarget;
-    if(!scroller)return;
-    // Trackpad'in yatay jesti ve tarayıcı yakınlaştırması kendi doğal yolunda kalsın.
-    if(event.ctrlKey||Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
-    const delta=wheelPixelDelta(event,scroller);
-    if(!delta)return;
-    // Şerit o yönde sonuna geldiyse olayı yutma; sayfa normal davransın.
-    if(scrollRoomLeft(scroller,delta)<=1)return;
-    scroller.scrollLeft+=delta;
-    event.preventDefault();
-  }
   const editDashboardGlyphs={
     edit:'<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
     done:'<path d="m4 12.5 5.5 5.5L20 7"/>'
@@ -119,12 +77,14 @@
     if(node.parentElement===parent&&node.nextElementSibling===reference)return;
     parent.insertBefore(node,reference);
   }
-  const scrollKeepers=()=>[$("#homeTabs"),$("#widgetRail")].filter(Boolean);
+  const scrollKeepers=()=>[$("#widgetRail")].filter(Boolean);
   /* Döşeme ızgaraları her turda yeniden yazıldığı için düğüm kimliği kaybolur: dikey konum
      grubun kendi kimliğiyle (panelde "panel") saklanır ve yeniden sorgulanarak geri verilir. */
   const gridScrollKey=grid=>grid.closest("[data-group-widget]")?.dataset.groupWidget
-    ||(grid.closest("#groupPanel")?"panel":null)
     ||grid.closest("[data-widget]")?.dataset.widget
+    /* Odalar görünümündeki kart ana ekranınkiyle aynı odayı gösterir ama ayrı bir düğümdür;
+       kendi anahtarını taşır, yoksa iki kartın kaydırması birbirine karışırdı. */
+    ||(grid.closest("[data-room-card]")?`rooms:${grid.closest("[data-room-card]").dataset.roomCard}`:null)
     ||null;
   function captureScrollPositions(){
     const grids=new Map();
@@ -150,6 +110,7 @@
     const scrollPositions=captureScrollPositions();
     reconcileWidgetLayout();
     renderGroupWidgets();
+    renderRoomCards();
     renderFavoritesWidget();
     const widgets=Object.fromEntries($$("[data-widget]").map(widget=>[widget.dataset.widget,widget]));
     Object.values(widgets).forEach(widget=>widget.hidden=true);
@@ -179,7 +140,7 @@
     board.classList.toggle("editing",state.dashboardEditing);
     // "Pano boş" satırı ekranda gerçekten kart olup olmamasına bakar; sıradaki kayda değil.
     $("#widgetEmpty").hidden=railWidgets().length>0;
-    applyHomeTab();
+    renderHomeScenes();
     const editDashboard=$("#editDashboard");
     const editDashboardText=t(state.dashboardEditing?"finishEditing":"editDashboard");
     $("#editDashboardGlyph").innerHTML=state.dashboardEditing?editDashboardGlyphs.done:editDashboardGlyphs.edit;
@@ -212,26 +173,6 @@
     refreshWeatherIfNeeded();
     restoreScrollPositions(scrollPositions);
     requestAnimationFrame(updateWidgetScrollHint);
-  }
-  /* Seçili sekme neyi gösteriyor: "Genel görünüm" yatay kart rayını, grup sekmesi tek kartı.
-     Yükseklik mekanizması (`#home.active` kalan alan) ikisinde de aynı — kartlar alt şeridin
-     üstünde biter, altına girmez. */
-  function applyHomeTab(){
-    const panel=$("#groupPanel");
-    const rail=$("#widgetRail");
-    if(state.homeTab!==overviewTabId&&!dashboardGroupById(state.homeTab)){state.homeTab=overviewTabId;saveHomeTab()}
-    renderHomeTabs();
-    const group=state.homeTab===overviewTabId?null:dashboardGroupById(state.homeTab);
-    rail.hidden=Boolean(group);
-    panel.hidden=!group;
-    /* Panel kabı hangi grubu gösterdiğini kimliğiyle duyurur: CSS (ör. "Işıklar" kartının sütun
-       sayısı) gruba göre kural yazabilsin diye. Kimlik değişmez; başlık metnine ya da friendly
-       name'e bağlanan bir kural çok dilli/çok evli kurulumda kırılırdı. */
-    if(!group){panel.innerHTML="";delete panel.dataset.groupPanel;return}
-    panel.dataset.groupPanel=group.id;
-    const entries=groupControlEntries(group);
-    panel.innerHTML=groupWidgetHtml(group,{variant:"panel"});
-    panel.setAttribute("aria-labelledby",`hometab-${group.id}`);
   }
   function addDashboardWidget(id){
     const known=Object.hasOwn(dashboardWidgetTypes,id)||dashboardGroups().some(group=>groupWidgetId(group.id)===id);
@@ -404,11 +345,18 @@
       event.stopPropagation();
       toggleTileWidth(button);
     });
-    /* Göz yalnız görünürlüğü değiştirir — cihazı açıp kapatmaz. */
+    /* Göz yalnız görünürlüğü değiştirir — cihazı açıp kapatmaz. Karar KART BAŞINA verilir:
+       kapsam düğmenin üstünde yazılıdır (`data-visibility-scope`), tahmin edilmez. */
     $$(".tile-eye").forEach(button=>button.onclick=event=>{
       event.preventDefault();
       event.stopPropagation();
-      toggleTileVisibility(button.dataset.visibilityDevice,button.dataset.visibilityControl);
+      toggleTileVisibility(button.dataset.visibilityScope,button.dataset.visibilityDevice,button.dataset.visibilityControl);
+    });
+    /* Odanın ana anahtarı: kart gövdesinden AYRI bir hedef, olayı da ayrıca durdurulur. */
+    $$("[data-room-master]").forEach(button=>button.onclick=event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      runRoomMaster(button.dataset.roomMaster);
     });
     /* Yıldız da yalnız favori kaydını değiştirir; gözle aynı gerekçeyle olay burada durdurulur. */
     $$(".tile-star").forEach(button=>button.onclick=event=>{
@@ -416,11 +364,11 @@
       event.stopPropagation();
       toggleFavorite(button.dataset.favoriteDevice,button.dataset.favoriteControl);
     });
-    /* "n cihaz gizli" satırı Cihazlar görünümüne götürür; oda gerçek bir grupsa oraya süzer. */
-    $$("[data-hidden-room]").forEach(button=>button.onclick=event=>{
+    /* Oda adı ve "n cihaz gizli" satırı AYNI yolu kullanır: Cihazlar görünümü, oda süzgeciyle. */
+    $$("[data-open-room]").forEach(button=>button.onclick=event=>{
       event.preventDefault();
       event.stopPropagation();
-      openHiddenDevices(button.dataset.hiddenRoom);
+      openHiddenDevices(button.dataset.openRoom);
     });
     $$("[data-overview-toggle]").forEach(button=>button.onclick=event=>{
       event.preventDefault();
@@ -549,7 +497,8 @@
     let groups;
     let createdId=null;
     if(editing.id){
-      groups=state.groups.map(group=>group.id===editing.id?{id:group.id,name,items}:group);
+      // `...group` ÖNCE: odanın ikonu (`icon`) gibi burada düzenlenmeyen alanlar korunur.
+      groups=state.groups.map(group=>group.id===editing.id?{...group,id:group.id,name,items}:group);
     }else{
       const id=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
       createdId=id;
