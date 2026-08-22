@@ -219,20 +219,6 @@
     }catch(error){showToast(error.message,true)}
     finally{button.disabled=false}
   }
-  async function scanTouchlink(){
-    const button=$("#scanTouchlink");
-    const results=$("#touchlinkResults");
-    button.disabled=true;
-    results.innerHTML=`<span class="device-meta">${t("searching")}</span>`;
-    try{
-      const data=await api("/api/zigbee/touchlink/scan",{method:"POST"});
-      results.innerHTML=data.devices?.length
-        ?data.devices.map(device=>`<span class="touchlink-device">⌁ ${esc(device.ieeeAddress)} · ${esc(device.channel)}<button class="danger-button" type="button" data-touchlink-reset="${esc(device.ieeeAddress)}" data-channel="${esc(device.channel)}">${t("reset")}</button></span>`).join("")
-        :`<span class="device-meta">${t("noNearbyDevices")}</span>`;
-      $$("[data-touchlink-reset]").forEach(reset=>reset.onclick=()=>resetTouchlink(reset.dataset.touchlinkReset,Number(reset.dataset.channel)));
-    }catch(error){results.innerHTML="";showToast(error.message,true)}
-    finally{button.disabled=false}
-  }
   const networkQualityPercent=value=>Math.round(Math.max(0,Math.min(255,Number(value)||0))/255*100);
   const networkQualityTone=quality=>quality>=55?"strong":quality>=25?"good":"weak";
   function networkGraphLabel(value){
@@ -325,23 +311,6 @@
       renderZigbeeGroups();
     }catch(error){showToast(error.message,true)}
   }
-  async function zigbeeGroupScene(id,action,sceneId=null){
-    const input=$$("[data-zgroup-scene]").find(item=>item.dataset.zgroupScene===id);
-    const nameInput=$$("[data-zgroup-scene-name]").find(item=>item.dataset.zgroupSceneName===id);
-    const selectedScene=sceneId??Number(input?.value||1);
-    const name=action==="store"?(nameInput?.value.trim()||`Scene ${selectedScene}`):undefined;
-    try{
-      const data=await api(`/api/groups/${encodeURIComponent(id)}/scene`,{method:"POST",body:JSON.stringify({sceneId:selectedScene,action,name})});
-      state.zigbeeGroups=data.groups||state.zigbeeGroups;
-      const group=state.zigbeeGroups.find(candidate=>candidate.id===id);
-      if(group&&action==="store"&&!group.scenes?.some(scene=>scene.id===selectedScene)){
-        group.scenes=[...(group.scenes||[]),{id:selectedScene,name}].sort((left,right)=>left.id-right.id);
-      }
-      if(group&&action==="remove")group.scenes=(group.scenes||[]).filter(scene=>scene.id!==selectedScene);
-      renderZigbeeGroups();
-      showToast(t(action==="store"?"sceneStored":action==="remove"?"sceneRemoved":"sceneRecalled"));
-    }catch(error){showToast(error.message,true)}
-  }
   async function deleteZigbeeGroup(id){
     if(!confirm(t("deleteZigbeeGroupConfirm")))return;
     try{
@@ -404,14 +373,6 @@
       state.devices=data.devices||state.devices;
       renderZigbeeGroups();
       showToast(t(bind?"bindingSaved":"bindingRemoved"));
-    }catch(error){showToast(error.message,true)}
-  }
-  async function resetTouchlink(ieeeAddress,channel){
-    if(!confirm(t("touchlinkResetConfirm")))return;
-    try{
-      await api("/api/zigbee/touchlink/reset",{method:"POST",body:JSON.stringify({ieeeAddress,channel,confirmation:"RESET"})});
-      showToast(t("touchlinkResetComplete"));
-      await scanTouchlink();
     }catch(error){showToast(error.message,true)}
   }
   /* TEK YEDEK — ayarlar, odalar ve Zigbee ağı tek bir dosyada (`/api/backup/full`, ZIP).
@@ -590,27 +551,60 @@
     };
     setTimeout(poll,5000);
   }
-  async function saveSettings(event){
-    event.preventDefault();
-    const settings={
-        zigbee:{adapterUrl:$("#zigbeeAdapterUrl").value.trim(),channel:Number($("#zigbeeChannel").value)},
-        mqtt:{url:$("#mqttUrl").value.trim(),baseTopic:$("#mqttBaseTopic").value.trim()},
-        matter:{wsUrl:$("#matterWsUrl").value.trim()},
-        homeAssistant:{discoveryEnabled:state.settings?.homeAssistant?.discoveryEnabled===true},
-        alerts:{lowBatteryThreshold:Number($("#lowBatteryThreshold").value)},
-        selfHealing:{enabled:$("#selfHealingEnabled").value!=="false",probeOffline:state.settings?.selfHealing?.probeOffline===true},
-        debug:{enabled:state.settings?.debug?.enabled!==false}
-      };
-    const withChannel=settingsWithChannelConfirmation(settings);
-    if(!withChannel)return;
-    const payload=settingsWithAdapterConfirmation(withChannel);
-    if(!payload||!confirm(t("restartConfirm")))return;
-    const button=$("#saveSettings");
+  /* AYAR KAYDETMENİN İKİ YOLU — hangi alanın değiştiğine göre ayrılır.
+     Koordinatör/MQTT/Matter adresleri artık YALNIZ kurulum sihirbazında soruluyor; buradaki
+     iki işlev sihirbazın sormadığı alanları kaydeder. Gövde her zaman tam ayar nesnesidir
+     (sunucu kısmi gövde kabul etmiyor), değişmeyen her alan kayıtlı değerinden okunur —
+     böylece bir sekmedeki kaydetme öbür sekmedeki dokunulmamış alanı sürüklemez. */
+  function settingsPayload(overrides){
+    const current=state.settings;
+    return{
+      zigbee:{adapterUrl:current.zigbee.adapterUrl,channel:current.zigbee.channel},
+      mqtt:{url:current.mqtt.url,baseTopic:current.mqtt.baseTopic},
+      matter:{wsUrl:current.matter.wsUrl},
+      homeAssistant:{discoveryEnabled:current.homeAssistant?.discoveryEnabled===true},
+      alerts:{lowBatteryThreshold:current.alerts?.lowBatteryThreshold??15},
+      selfHealing:{enabled:current.selfHealing?.enabled!==false,probeOffline:current.selfHealing?.probeOffline===true},
+      debug:{enabled:current.debug?.enabled!==false},
+      ...overrides
+    };
+  }
+  /* Kanal değişikliği telsizi yeniden kurar: onay + yeniden başlatma ister. Otomatik onarım
+     anahtarı sunucuda anında işler, onun için yeniden başlatma yoktur. */
+  async function saveNetworkSettings(){
+    if(!state.settings)return showToast(t("settingsUnavailable"),true);
+    const channel=Number($("#zigbeeChannel").value);
+    const restartNeeded=channel!==Number(state.settings.zigbee.channel);
+    const settings=settingsPayload({
+      zigbee:{adapterUrl:state.settings.zigbee.adapterUrl,channel},
+      selfHealing:{enabled:$("#selfHealingEnabled").value!=="false",probeOffline:state.settings?.selfHealing?.probeOffline===true}
+    });
+    const payload=settingsWithChannelConfirmation(settings);
+    if(!payload)return;
+    if(restartNeeded&&!confirm(t("restartConfirm")))return;
+    const button=$("#saveNetworkSettings");
     button.disabled=true;
     try{
-      await api("/api/settings",{method:"PUT",body:JSON.stringify(payload)});
+      const data=await api("/api/settings",{method:"PUT",body:JSON.stringify(payload)});
+      state.settings=data.settings||state.settings;
+      if(!restartNeeded){showToast(t("settingsStored"));button.disabled=false;return}
       showToast(t("settingsSaved"));
       await api("/api/settings/apply",{method:"POST",body:JSON.stringify({confirmation:"APPLY"})});
       waitForRestart();
     }catch(error){button.disabled=false;showToast(error.message,true)}
+  }
+  /* Düşük pil eşiği günlük bir ayardır: sunucu anında uygular, yeniden başlatma yoktur. */
+  async function saveBatteryThreshold(){
+    if(!state.settings)return showToast(t("settingsUnavailable"),true);
+    const input=$("#lowBatteryThreshold");
+    if(!input.reportValidity())return;
+    const button=$("#saveBatteryThreshold");
+    button.disabled=true;
+    try{
+      const data=await api("/api/settings",{method:"PUT",body:JSON.stringify(settingsPayload({alerts:{lowBatteryThreshold:Number(input.value)}}))});
+      state.settings=data.settings||state.settings;
+      showToast(t("settingsStored"));
+      render();
+    }catch(error){showToast(error.message,true)}
+    finally{button.disabled=false}
   }

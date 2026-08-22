@@ -404,14 +404,11 @@
         const device=state.devices.find(item=>item.id===id);
         return`<span class="touchlink-device">${esc(device?.name||id)}<button class="danger-button" type="button" data-zgroup-remove-member="${esc(group.id)}" data-device="${esc(id)}">×</button></span>`;
       }).join("");
-      const scenes=(group.scenes||[]).map(scene=>`<span class="zigbee-scene"><span>${esc(scene.name)} · ${scene.id}</span><button class="secondary" type="button" data-zgroup-existing-scene="recall" data-group="${esc(group.id)}" data-scene="${scene.id}" title="${t("recallScene")}">▶</button><button class="danger-button" type="button" data-zgroup-existing-scene="remove" data-group="${esc(group.id)}" data-scene="${scene.id}" title="${t("removeScene")}">×</button></span>`).join("");
-      return`<div class="zigbee-group-row"><div class="zigbee-group-row-head"><input value="${esc(group.name)}" maxlength="64" data-zgroup-name="${esc(group.id)}"><span class="zigbee-member-count">${t("groupMembers",{count:group.members})}</span><button class="secondary" type="button" data-zgroup-rename="${esc(group.id)}" title="${t("changeName")}">✓</button></div><div class="zigbee-group-actions"><select data-zgroup-device="${esc(group.id)}"><option value="">＋ ${t("device")}</option>${available.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("")}</select><button class="secondary" type="button" data-zgroup-add-member="${esc(group.id)}" title="${t("add")}">＋</button><input type="number" min="1" max="255" value="1" data-zgroup-scene="${esc(group.id)}" aria-label="${t("scene")}"><input type="text" maxlength="64" data-zgroup-scene-name="${esc(group.id)}" placeholder="${t("sceneName")}"><button class="secondary" type="button" data-zgroup-scene-action="store" data-group="${esc(group.id)}" title="${t("storeScene")}">●</button><button class="danger-button" type="button" data-zgroup-delete="${esc(group.id)}" title="${t("deleteGroup")}">×</button></div>${members?`<div class="zigbee-member-list">${members}</div>`:""}${scenes?`<div class="zigbee-scene-list">${scenes}</div>`:""}</div>`;
+      return`<div class="zigbee-group-row"><div class="zigbee-group-row-head"><input value="${esc(group.name)}" maxlength="64" data-zgroup-name="${esc(group.id)}"><span class="zigbee-member-count">${t("groupMembers",{count:group.members})}</span><button class="secondary" type="button" data-zgroup-rename="${esc(group.id)}" title="${t("changeName")}">✓</button></div><div class="zigbee-group-actions"><select data-zgroup-device="${esc(group.id)}"><option value="">＋ ${t("device")}</option>${available.map(device=>`<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("")}</select><button class="secondary" type="button" data-zgroup-add-member="${esc(group.id)}" title="${t("add")}">＋</button><button class="danger-button" type="button" data-zgroup-delete="${esc(group.id)}" title="${t("deleteGroup")}">×</button></div>${members?`<div class="zigbee-member-list">${members}</div>`:""}</div>`;
     }).join(""):`<div class="zigbee-group-empty"><span aria-hidden="true">＋</span><div><strong>${t("noZigbeeGroups")}</strong><p>${t("noZigbeeGroupsLead")}</p></div></div>`;
     $$("[data-zgroup-rename]").forEach(button=>button.onclick=()=>renameZigbeeGroup(button.dataset.zgroupRename));
     $$("[data-zgroup-add-member]").forEach(button=>button.onclick=()=>addZigbeeGroupMember(button.dataset.zgroupAddMember));
     $$("[data-zgroup-remove-member]").forEach(button=>button.onclick=()=>setZigbeeGroupMember(button.dataset.zgroupRemoveMember,button.dataset.device,false));
-    $$("[data-zgroup-scene-action]").forEach(button=>button.onclick=()=>zigbeeGroupScene(button.dataset.group,button.dataset.zgroupSceneAction));
-    $$("[data-zgroup-existing-scene]").forEach(button=>button.onclick=()=>zigbeeGroupScene(button.dataset.group,button.dataset.zgroupExistingScene,Number(button.dataset.scene)));
     $$("[data-zgroup-delete]").forEach(button=>button.onclick=()=>deleteZigbeeGroup(button.dataset.zgroupDelete));
     const source=$("#bindSource"),target=$("#bindTarget");
     const sourceValue=source.value,targetValue=target.value;
@@ -468,7 +465,6 @@
     lowBatteryFact.hidden=lowBatteryDevices===0;
     // Ayrı Zigbee geri yükleme düğmesi kalktı: tek yedek düğmesi her kipte durur, uygulanamayan
     // bölümü sunucu reddeder (`/api/backup/full/restore`).
-    applyZigbeeAdapterOwnership();
     renderPairingRouters();
     renderZigbeeGroups();
     renderHomeSummary();

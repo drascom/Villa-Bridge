@@ -44,6 +44,10 @@
   /* Sekme seçimi widget düzeninden ayrı bir kayıt: `villa-dashboard-widgets` ile karışmaz. */
   const homeTabStorageKey="villa-home-tab";
   const savedHomeTab=(()=>{try{const value=localStorage.getItem(homeTabStorageKey);return typeof value==="string"&&value?value:overviewTabId}catch{return overviewTabId}})();
+  /* Ayarlar sayfasının iki sekmesi. ROL AYRIMI DEĞİL: bölümün tamamı yöneticiye ait, sekme
+     yalnız kalabalığı ikiye böler. Tercih cihazda kalır. */
+  const settingsTabStorageKey="villa-settings-tab";
+  const savedSettingsTab=(()=>{try{const value=localStorage.getItem(settingsTabStorageKey);return value==="setup"?"setup":"usage"}catch{return "usage"}})();
   /* Kart içi cihaz butonunun genişlik kademesi. Anahtar ÜÇ parçalı: KART kimliği + cihaz kimliği
      (IEEE) + kontrol kimliği — dostane ad değişse de tercih kaybolmaz. Kart parçası şart: aynı
      kanal birden çok kartta görünür (Favoriler + odası + "Işıklar"), kart parçası olmadan

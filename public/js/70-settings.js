@@ -47,15 +47,88 @@
       if(button)button.disabled=false;
     }
   }
-  /* Shadow kipinde koordinatörün sahibi Zigbee2MQTT'dir: adres burada yalnız okunur. */
-  function applyZigbeeAdapterOwnership(){
-    const input=$("#zigbeeAdapterUrl");
-    if(!input)return;
-    const managed=state.health?.mode==="shadow";
-    input.readOnly=managed;
-    $("#testZigbeeAdapter").hidden=managed;
-    $("#zigbeeAdapterManaged").hidden=!managed;
-    $("#zigbeeAdapterHelp").textContent=t(state.zigbeeCapabilities?.serialSupported?"adapterUrlHelp":"adapterUrlHelpTcpOnly");
+  /* AYARLARIN İKİ SEKMESİ. Rol ayrımı DEĞİL — `#settings` bölümünün tamamı `data-admin-only`,
+     iki sekmeyi de yalnız yönetici görür. Sekme yalnız kalabalığı böler: günlük dokunulan
+     ayarlar bir yanda, kurulumda bir kez dokunulanlar öbür yanda. Seçim cihazda kalır. */
+  let settingsTab=savedSettingsTab;
+  function activateSettingsTab(tab){
+    settingsTab=tab==="setup"?"setup":"usage";
+    try{localStorage.setItem(settingsTabStorageKey,settingsTab)}catch{}
+    $$("[data-settings-tab]").forEach(button=>{
+      const selected=button.dataset.settingsTab===settingsTab;
+      button.setAttribute("aria-selected",String(selected));
+      button.tabIndex=selected?0:-1;
+    });
+    const usage=$("#settingsPanelUsage");
+    const setup=$("#settingsPanelSetup");
+    if(usage)usage.hidden=settingsTab!=="usage";
+    if(setup)setup.hidden=settingsTab!=="setup";
+  }
+  /* SİSTEM YENİDEN BAŞLATMA
+     Koordinatör düğmesi ancak sunucu "yapılabilir" derse etkinleşir: adres bir USB seri yolsa
+     ya da kurulum yarımsa uzaktan telsiz reseti diye bir şey yoktur. Karar istemcide TAHMİN
+     EDİLMEZ — `/api/settings` yanıtındaki `zigbee.coordinatorRestart` bayrağından okunur; adres
+     panele hiç gelmez. Servis düğmesi her zaman açıktır, çünkü ona her kipte basılabilir. */
+  function renderSystemRestart(){
+    const button=$("#restartCoordinator");
+    if(!button)return;
+    const capability=state.zigbeeCapabilities?.coordinatorRestart;
+    const supported=capability?.supported===true;
+    button.disabled=!supported;
+    const note=$("#coordinatorRestartUnavailable");
+    if(!note)return;
+    note.hidden=supported;
+    if(!supported)note.textContent=t(capability?.reason==="serial"?"coordinatorRestartSerial":"coordinatorRestartUnset");
+  }
+  function setSystemRestartStatus(message){
+    const node=$("#systemRestartStatus");
+    if(!node)return;
+    node.textContent=message||"";
+    node.hidden=!message;
+  }
+  async function restartCoordinator(){
+    if(!confirm(t("coordinatorRestartConfirm")))return;
+    const button=$("#restartCoordinator");
+    button.disabled=true;
+    setSystemRestartStatus(t("coordinatorRestartRunning"));
+    try{
+      const data=await api("/api/system/coordinator-restart",{method:"POST"});
+      const seconds=Number(data?.estimatedSeconds)>0?Math.ceil(Number(data.estimatedSeconds)):30;
+      setSystemRestartStatus(t("coordinatorRestartDone",{seconds}));
+      showToast(t("coordinatorRestartStarted"));
+    }catch(error){
+      setSystemRestartStatus("");
+      showToast(error.message,true);
+    }finally{renderSystemRestart()}
+  }
+  /* Geri sayım yalnız bilgi verir; paneli geri getiren şey `waitForRestart` yoklamasıdır
+     (önce çevrimdışı görülür, sonra sağlık ucu dönünce sayfa yeniden yüklenir). */
+  function startServiceRestartCountdown(seconds){
+    clearInterval(startServiceRestartCountdown.timer);
+    let left=Math.max(1,Math.ceil(seconds));
+    const tick=()=>{
+      setSystemRestartStatus(t("serviceRestartCountdown",{seconds:left}));
+      left-=1;
+      if(left<0)clearInterval(startServiceRestartCountdown.timer);
+    };
+    tick();
+    startServiceRestartCountdown.timer=setInterval(tick,1000);
+  }
+  async function restartService(){
+    if(!confirm(t("serviceRestartConfirm")))return;
+    const button=$("#restartService");
+    button.disabled=true;
+    try{
+      const data=await api("/api/system/restart",{method:"POST",body:JSON.stringify({confirmation:"RESTART"})});
+      const seconds=Number(data?.estimatedSeconds)>0?Number(data.estimatedSeconds):25;
+      showToast(t("serviceRestartStarted"));
+      startServiceRestartCountdown(seconds);
+      waitForRestart();
+    }catch(error){
+      button.disabled=false;
+      setSystemRestartStatus("");
+      showToast(error.message,true);
+    }
   }
   async function loadSettings(){
     try{
@@ -67,15 +140,10 @@
       /* Kurulum yarımsa sihirbaz zorunludur: sunucu koordinatöre hiç bağlanmamıştır. */
       state.setupPending=data.setupPending===true;
       renderConnectedServerAddress();
-      $("#zigbeeAdapterUrl").value=state.settings.zigbee.adapterUrl;
-      clearAdapterTestResult($("#zigbeeAdapterTestResult"));
-      applyZigbeeAdapterOwnership();
+      renderSystemRestart();
       $("#zigbeeChannel").value=String(state.settings.zigbee.channel);
       $("#lowBatteryThreshold").value=String(state.settings.alerts?.lowBatteryThreshold??15);
       $("#selfHealingEnabled").value=state.settings.selfHealing?.enabled===false?"false":"true";
-      $("#mqttUrl").value=state.settings.mqtt.url;
-      $("#mqttBaseTopic").value=state.settings.mqtt.baseTopic;
-      $("#matterWsUrl").value=state.settings.matter.wsUrl;
       renderHomeAssistant();
       renderDebugSettings();
       if(state.settings.debug?.enabled===true)await loadDebugErrors();
@@ -104,14 +172,18 @@
       input.value=themeHex(value);
     });
   }
+  /* Gökyüzü renk kutuları Ayarlar'dan kaldırıldı (o iş "Arka plan" ekranının). Kayıtlı solar
+     üstyazımlar YİNE DE olduğu gibi taşınır — burada gösterilmeyen bir değer, buradan yapılan
+     bir kaydetmeyle silinmemeli. */
   async function persistAppearancePalette(){
     const theme=activeThemePackage();
     if(!theme)return;
-    const item={light:{},dark:{},solar:{night:{},dawn:{},day:{},dusk:{}}};
+    const stored=themeRuntime.appearance?.overrides?.[theme.id]||{};
+    const item={light:{},dark:{},...(stored.solar?{solar:stored.solar}:{})};
     $$('[data-theme-override]').forEach(input=>{
       const parts=input.dataset.themeOverride.split(".");
-      if(parts[0]==="solar")item.solar[parts[1]][parts[2]]=input.value;
-      else item[parts[0]][parts[1]]=input.value;
+      if(parts[0]==="solar")return;
+      item[parts[0]][parts[1]]=input.value;
     });
     try{await saveThemeOverrides({[theme.id]:item});showToast(t("themeColorsSaved"));renderAppearanceSettings()}
     catch(error){showToast(error.message,true)}
@@ -255,7 +327,7 @@
     let body="";
     if(step===0)body=onboardingHero("welcome","setupWelcomeTitle","setupWelcomeLead",`<div class="onboarding-choices"><button class="onboarding-choice ${state.language==="en"?"selected":""}" type="button" data-onboarding-language="en">English<small>Continue in English</small></button><button class="onboarding-choice ${state.language==="tr"?"selected":""}" type="button" data-onboarding-language="tr">Türkçe<small>Türkçe devam et</small></button></div>`);
     if(step===1)body=onboardingHero("hub","setupHubTitle","setupHubLead",`<div class="onboarding-features"><div class="onboarding-feature"><strong>Zigbee</strong><span>${t("setupHubZigbee")}</span></div><div class="onboarding-feature"><strong>MQTT</strong><span>${t("setupHubMqtt")}</span></div><div class="onboarding-feature"><strong>Matter</strong><span>${t("setupHubMatter")}</span></div></div>`);
-    if(step===2)body=onboardingHero("zigbee","setupZigbeeTitle","setupZigbeeLead",`<div class="onboarding-fields"><div class="onboarding-field"><label for="onboardingZigbeeUrl">${t("adapterUrl")}</label><input id="onboardingZigbeeUrl" type="text" inputmode="url" autocomplete="off" spellcheck="false" value="${esc(draft.zigbeeAdapterUrl)}" placeholder="tcp://192.0.2.10:6638" required><div class="adapter-test-row"><button id="onboardingZigbeeTest" class="secondary" type="button">${t("adapterTest")}</button><span id="onboardingZigbeeTestResult" class="adapter-test-result" role="status"></span></div></div></div><p class="onboarding-help">${t(state.zigbeeCapabilities?.serialSupported?"adapterUrlHelp":"adapterUrlHelpTcpOnly")}</p><p class="onboarding-help">${t("adapterTestRequiredHelp")}</p>`);
+    if(step===2)body=onboardingHero("zigbee","setupZigbeeTitle","setupZigbeeLead",`<div class="onboarding-fields"><div class="onboarding-field"><label for="onboardingZigbeeUrl">${t("adapterUrl")}</label><input id="onboardingZigbeeUrl" type="text" inputmode="url" autocomplete="off" spellcheck="false" value="${esc(draft.zigbeeAdapterUrl)}" placeholder="tcp://192.0.2.10:6638" required><div class="adapter-test-row"><button id="onboardingZigbeeTest" class="secondary" type="button">${t("adapterTest")}</button><span id="onboardingZigbeeTestResult" class="adapter-test-result" role="status"></span></div></div></div><p class="onboarding-help">${t(state.zigbeeCapabilities?.serialSupported?"adapterUrlHelp":"adapterUrlHelpTcpOnly")}</p><p class="onboarding-help">${t("adapterTestRequiredHelp")}</p>${state.health?.mode==="shadow"?`<p class="onboarding-help">${t("adapterManagedByZ2m")}</p>`:""}`);
     if(step===3)body=onboardingHero("services","setupServicesTitle","setupServicesLead",`<div class="onboarding-fields"><div class="onboarding-field"><label for="onboardingMqttUrl">${t("mqttUrl")}</label><input id="onboardingMqttUrl" type="url" value="${esc(draft.mqttUrl)}" required></div><div class="onboarding-field"><label for="onboardingMqttTopic">${t("baseTopic")}</label><input id="onboardingMqttTopic" value="${esc(draft.mqttBaseTopic)}" required></div><div class="onboarding-field"><label for="onboardingMatterUrl">${t("matterUrl")}</label><input id="onboardingMatterUrl" type="url" value="${esc(draft.matterWsUrl)}" required></div></div><p class="onboarding-help">${t("setupRecommendedValues")}</p>`);
     if(step===4){
       const ip=state.network?.preferredAddress||state.network?.addresses?.[0]||t("ipUnavailable");
@@ -388,7 +460,8 @@
       state.remoteOnboarding=false;
       state.onboardingDraft=null;
       activateView("settings");
-      requestAnimationFrame(()=>$("#settingsForm").scrollIntoView({behavior:"smooth",block:"start"}));
+      activateSettingsTab("setup");
+      requestAnimationFrame(()=>$("#networkSettingsCard").scrollIntoView({behavior:"smooth",block:"start"}));
       return;
     }
     if(!captureOnboardingStep())return;
@@ -775,9 +848,11 @@
   }
   function renderTabletCare(){
     const card=$("#tabletCareCard");
+    const screenCard=$("#screenSleepCard");
     if(!card)return;
     const available=screenBridgeAvailable();
     card.hidden=!available;
+    if(screenCard)screenCard.hidden=!available;
     if(!available)return;
     const status=hostStatusSnapshot();
     const exempt=status?.batteryExempt===true;
@@ -787,7 +862,6 @@
     const systemWritable=status?.screen?.systemWritable===true;
     $("#systemBrightnessStatus").textContent=t(systemWritable?"screenBrightnessSystemOn":"screenBrightnessSystemOff");
     $("#systemBrightnessStatus").className=systemWritable?"tablet-care-badge online-text":"tablet-care-badge unknown-text";
-    $("#grantSystemBrightnessCard").hidden=systemWritable;
     const restarts=Number(status?.restarts||0);
     $("#watchdogSummary").textContent=status?.exhausted===true
       ?t("watchdogExhausted",{count:restarts})
@@ -804,7 +878,7 @@
     $("#screenNightEnd").value=screenPolicyPreferences.nightEnd;
     $("#screenNightBrightness").value=String(screenPolicyPreferences.nightBrightness);
     $("#screenNightBrightnessValue").textContent=`${screenPolicyPreferences.nightBrightness}%`;
-    $$("#tabletCareCard .tablet-night-fields .setting-field").forEach(field=>field.classList.toggle("disabled",!screenPolicyPreferences.nightEnabled));
+    $$("#screenSleepCard .tablet-night-fields .setting-field").forEach(field=>field.classList.toggle("disabled",!screenPolicyPreferences.nightEnabled));
     ["#screenNightStart","#screenNightEnd","#screenNightBrightness"].forEach(id=>{$(id).disabled=!screenPolicyPreferences.nightEnabled});
     $("#screenNightState").hidden=!screenNightActive();
   }
