@@ -18,8 +18,8 @@ sky animation) and `live` (the "by the sun" mode — phased sky gradient, sun an
 moon on a rotating arm, card ink derived from the time of day). `data-theme`
 stays on its own axis, and every surface is written through one glass token
 family (`--glass-*`), so never hard-code colors into individual rules.
-Deployment units and the Matterbridge alias hook are in `deploy/`; safe defaults
-are in `config/default.yaml`.
+Deployment units live with their host adapter (`apps/linux/systemd/`); safe
+defaults are in `config/default.yaml`.
 
 The brain is shared: `src/`, `public/` and `apps/runtime/`. `apps/android/` and
 `apps/linux/` carry host-specific launching, packaging and lifecycle code only.
