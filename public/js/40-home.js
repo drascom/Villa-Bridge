@@ -363,6 +363,8 @@
        sistem şeridinde, uyarılı ve zayıf sinyalli cihazlar Cihazlar görünümünde duruyor. */
     renderSystemAlertBar();
     const onlineDevices=devices.filter(device=>device.availability==="online").length;
+    const connectionDeviceCount=$("#connectionsZigbeeDevices");
+    if(connectionDeviceCount)connectionDeviceCount.textContent=String(devices.length);
     const offlineDevices=devices.filter(device=>device.availability==="offline").length;
     $("#onlineDeviceCount").textContent=String(onlineDevices);
     const offlineFact=$("#offlineDeviceCount");
@@ -674,7 +676,7 @@
     const on=targets.some(({control})=>dashboardControlAction(control)?.active===true);
     const busy=targets.some(({device,control})=>commandPending(device.id,control.property));
     const label=`${group.name} · ${t(on?"roomTurnAllOff":"roomTurnAllOn")}`;
-    return`<button class="room-master${on?" is-on":""}" type="button" role="switch" aria-checked="${on?"true":"false"}" data-room-master="${esc(group.id)}" aria-label="${esc(label)}" title="${esc(label)}"${busy?' aria-busy="true" disabled':""}><span class="room-master-track" aria-hidden="true"><span class="room-master-knob"></span></span><span class="room-master-text">${esc(t(on?"on":"off"))}</span></button>`;
+    return`<button class="room-master${on?" is-on":""}" type="button" role="switch" aria-checked="${on?"true":"false"}" data-room-master="${esc(group.id)}" aria-label="${esc(label)}" title="${esc(label)}"${busy?' aria-busy="true" disabled':""}><span class="room-master-track" aria-hidden="true"><span class="room-master-knob"></span></span><span class="room-master-text">${esc(t(on?"roomTurnAllOff":"roomTurnAllOn"))}</span></button>`;
   }
   /* Komut akışı YENİDEN YAZILMIYOR: her hedef için mevcut `command()` çağrılır, bekleyen komut
      ve hata bayrağı bugünkü yerinde (`commandPending`, `flagCommandError`) kalır. Kilit/perde

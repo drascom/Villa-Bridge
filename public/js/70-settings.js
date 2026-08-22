@@ -137,6 +137,10 @@
       state.network=data.network||null;
       state.mqttAccess=data.mqttAccess||null;
       state.zigbeeCapabilities=data.zigbee||null;
+      const connectionCoordinator=$("#connectionsZigbeeCoordinator");
+      if(connectionCoordinator)connectionCoordinator.textContent=state.settings.zigbee.adapterUrl;
+      const connectionChannel=$("#connectionsZigbeeChannel");
+      if(connectionChannel)connectionChannel.textContent=String(state.settings.zigbee.channel);
       /* Kurulum yarımsa sihirbaz zorunludur: sunucu koordinatöre hiç bağlanmamıştır. */
       state.setupPending=data.setupPending===true;
       renderConnectedServerAddress();

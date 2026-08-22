@@ -12,7 +12,7 @@
   /* Tema kipleri: sabit iki tema, işletim sisteminin tercihi ve "güneşe göre" (gündüz açık,
      gece koyu — eşik gün doğumu/batımı). Liste `<head>` içindeki ilk-kare tema betiğiyle ve
      `setThemeMode` ile birebir aynı kalmalı. */
-  const savedThemeMode=(()=>{try{const value=localStorage.getItem("villa-theme");return["light","dark","sun","system"].includes(value)?value:"system"}catch{return"system"}})();
+  const savedThemeMode=(()=>{try{const value=localStorage.getItem("villa-theme");return["light","dark","sun","system"].includes(value)?value:"sun"}catch{return"sun"}})();
   /* Hava durumu artık cihazda DEĞİL sunucuda durur (`/api/weather`): aynı evdeki tablet ve
      tarayıcı tek şehri, tek ölçümü gösterir. Buradaki eski kayıt yalnız bir kerelik göç
      kaynağıdır — sunucuda konum tanımlı değilse cihazdaki seçim bir kez yukarı taşınır ve yerel

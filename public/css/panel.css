@@ -3060,3 +3060,565 @@
     body[data-active-view="home"] #home .tile-width-toggle,
     body[data-active-view="home"] #home .tile-eye,
     body[data-active-view="home"] #home .tile-star{display:none}
+
+    /* ————— EXPERIMENT UYGULAMA KATMANI —————
+       Bu son katman yalnız sunumu değiştirir. Gerçek cihaz, oda, rutin, yetki ve bağlantı
+       işaretleri aynı DOM düğümlerinde kalır; ana ekranda ayrıntı yerine özet gösterilir. */
+    :root{
+      --rail-w:92px;
+      --experiment-plate:28px;
+      --experiment-card:22px;
+      --experiment-control:16px;
+      --experiment-gap:12px;
+      --experiment-glass:rgba(249,252,250,.72);
+      --experiment-glass-strong:rgba(253,254,253,.9);
+      --experiment-shadow:0 18px 44px rgba(24,45,37,.1);
+    }
+    :root[data-theme="dark"]{
+      --experiment-glass:rgba(22,32,33,.7);
+      --experiment-glass-strong:rgba(28,39,39,.88);
+      --experiment-shadow:0 20px 46px rgba(0,0,0,.3);
+    }
+    body.home-mode [data-admin-only]{display:none!important}
+    body:not(.home-mode) [data-resident-only]{display:none!important}
+    body:not(.home-mode) [data-view="adminOverview"]{order:1}
+    body:not(.home-mode) [data-view="devices"]{order:2}
+    body:not(.home-mode) [data-view="automations"]{order:3}
+    body:not(.home-mode) [data-view="connections"]{order:4}
+    body:not(.home-mode) [data-view="settings"]{order:5}
+
+    .view>.page-head,
+    .view>.toolbar,
+    .view>.settings-tabs,
+    .view>.connection-grid,
+    .view>.settings-grid,
+    .view>.automation-list,
+    .view>.device-grid,
+    .view>.room-cards{position:relative;z-index:1}
+    .widget-card,.setting-card,.connection-card,.automation-card,.device-card{
+      border-color:var(--line);
+      border-radius:var(--experiment-card);
+      background:var(--experiment-glass);
+      box-shadow:var(--experiment-shadow);
+      -webkit-backdrop-filter:blur(20px) saturate(1.08);
+      backdrop-filter:blur(20px) saturate(1.08);
+    }
+    .page-head-title h1{letter-spacing:-.035em}
+
+    /* Birleşik saat ve hava, başlığın içinde sınırları belli fakat zeminsiz tek parçadır. */
+    #home .home-hub{
+      height:58px;
+      max-height:58px;
+      min-height:58px;
+      padding:4px 8px;
+      border:1px solid var(--hub-border-line);
+      border-radius:19px;
+      background:transparent;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+    }
+    #home .hub-zone{min-height:48px;height:48px;padding:4px 12px;border-radius:14px}
+    #home .hub-zone:hover{background:var(--home-glass)}
+    #home .hub-zone-clock{display:flex;align-items:center;justify-content:center;gap:10px}
+    #home .hub-clock-meta{min-width:0;display:grid;gap:1px;text-align:left}
+    #home .hub-zone-weather{--weather-scene-size:44px;justify-content:center}
+    #home .hub-weather-scene{width:var(--weather-scene-size);height:var(--weather-scene-size)}
+    #home .hub-weather-scene img,#home .hub-weather-scene svg{width:100%;height:100%}
+
+    /* Bölüm başlıkları demodaki gibi yönlendiricidir: başlık, kısa yardım ve Tümü eylemi. */
+    #home .home-section-head{
+      min-height:44px;
+      align-items:center;
+      gap:18px;
+      padding:0 2px;
+    }
+    #home .home-section-head>div{min-width:0}
+    #home .home-section-head h2{
+      margin:0;
+      color:var(--ink);
+      font:750 clamp(19px,2.25vw,27px)/1.05 system-ui,sans-serif;
+      letter-spacing:-.035em;
+      text-transform:none;
+    }
+    #home .home-section-head p{
+      margin:4px 0 0;
+      overflow:hidden;
+      color:var(--muted);
+      font-size:12.5px;
+      line-height:1.25;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    #home .home-section-head>button{
+      min-width:64px;
+      min-height:40px;
+      flex:none;
+      padding:0 14px;
+      border:1px solid var(--home-border);
+      border-radius:999px;
+      color:var(--forest-strong);
+      background:var(--home-control);
+      box-shadow:var(--home-float-shadow);
+      font-size:13px;
+      font-weight:800;
+    }
+
+    /* Hızlı sahneler yalnız ikon + başlıktır; kartlar akışta kalır ve yüksekliği tüketmez. */
+    #home [data-widget="quick"]{
+      position:relative;
+      inset:auto;
+      z-index:1;
+      width:auto;
+      height:auto;
+      min-height:var(--scene-h);
+      margin:0;
+      padding:0;
+      overflow:visible;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
+      -webkit-backdrop-filter:none;
+      backdrop-filter:none;
+    }
+    #home .strip-row{height:var(--scene-h);gap:10px}
+    #home .quick-scene-grid{gap:10px}
+    #home .quick-scene{
+      min-width:0;
+      height:var(--scene-h);
+      min-height:var(--scene-h);
+      padding:8px 12px;
+      border:1px solid var(--home-border);
+      border-radius:18px;
+      background:var(--experiment-glass);
+      box-shadow:0 8px 24px rgba(24,45,37,.08);
+      -webkit-backdrop-filter:blur(18px) saturate(1.08);
+      backdrop-filter:blur(18px) saturate(1.08);
+    }
+    #home .quick-scene .quick-device-icon{width:42px;height:42px;border-radius:14px}
+    #home .quick-scene .device-name{font-size:14px;font-weight:750}
+
+    /* Ana ekran oda kartı bir kumanda panosu değil, anlaşılır bir oda özetidir. Ayrıntılı cihaz
+       döşemeleri Odalar/Cihazlar görünümünde aynı işlevleriyle kalmaya devam eder. */
+    #home .widget-rail{
+      height:auto;
+      min-height:0;
+      margin:0;
+      overflow:visible;
+      grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--room-col,260px)),1fr));
+      grid-auto-rows:var(--room-card-h);
+      gap:var(--experiment-gap);
+    }
+    #home .widget-rail .widget-card{
+      grid-column:auto;
+      height:154px;
+      min-height:154px;
+      padding:16px;
+      border-radius:var(--experiment-card);
+      background:var(--experiment-glass);
+      box-shadow:var(--experiment-shadow);
+      overflow:hidden;
+    }
+    #home .widget-rail .group-widget{
+      display:flex;
+      flex-direction:column;
+    }
+    #home .widget-rail .group-widget-head{height:100%;align-items:stretch;gap:10px}
+    #home .widget-rail .ov-title{
+      min-width:0;
+      flex:1 1 auto;
+      display:flex;
+      align-items:flex-start;
+      flex-direction:column;
+      padding:0;
+      text-align:left;
+    }
+    #home .widget-rail .ov-title-name{width:100%;font-size:16px;font-weight:800}
+    #home .widget-rail .room-card-icon{width:43px;height:43px;border-radius:15px}
+    #home .widget-rail .room-card-icon .device-type-svg{width:24px;height:24px}
+    #home .widget-rail .ov-go{margin-left:auto;font-size:25px;font-weight:500}
+    #home .widget-rail .group-summary{margin-top:auto;gap:6px}
+    #home .widget-rail .group-summary span{font-size:12.5px}
+    #home .widget-rail .room-sensors{margin-top:5px;font-size:12px}
+    #home .widget-rail .group-widget-actions{align-items:flex-end;justify-content:flex-end}
+    #home .widget-rail .room-master{
+      min-height:42px;
+      max-width:128px;
+      padding:0 13px;
+      border-radius:14px;
+      background:var(--home-control);
+      font-size:11.5px;
+      line-height:1.15;
+      white-space:normal;
+    }
+    #home .widget-rail .room-master-track,
+    #home .widget-rail .group-control-grid,
+    #home .widget-rail .group-empty,
+    #home .widget-rail .ov-hidden-note,
+    #home .widget-rail [data-edit-group]{display:none!important}
+    #home .widget-scroll-hint{display:none!important}
+
+    /* Günlük başlıkta yalnız evin sağlık bilgisi kalır; yönetim eylemleri kendi modundadır. */
+    #home .home-summary,#home #serverConnectionMetric,#home .home-actions{display:none!important}
+    #home .home-status{align-items:center;justify-items:end}
+    #home .home-metrics{justify-content:flex-end}
+    #home .home-metrics .home-health{margin-left:0}
+
+    @media(min-width:901px){
+      .shell{grid-template-columns:var(--rail-w) minmax(0,1fr)}
+      .side-rail{
+        position:fixed;
+        inset:0 auto 0 0;
+        width:var(--rail-w);
+        height:100dvh;
+        gap:12px;
+        padding:18px 10px calc(16px + env(safe-area-inset-bottom));
+        border-right:1px solid var(--line);
+        background:var(--experiment-glass);
+        box-shadow:10px 0 34px rgba(18,38,31,.05);
+        -webkit-backdrop-filter:blur(24px) saturate(1.1);
+        backdrop-filter:blur(24px) saturate(1.1);
+      }
+      .rail-nav,.rail-bottom{gap:7px}
+      .rail-button{min-height:60px;border-radius:16px;gap:6px;padding:7px 3px}
+      .rail-icon,.rail-icon svg{width:21px;height:21px}
+      .rail-label{font-size:11px}
+      .side-rail .nav-button.active{border-color:var(--line);background:var(--experiment-glass-strong);box-shadow:0 8px 20px rgba(18,38,31,.08)}
+      main{grid-column:2;width:100%;min-width:0;max-width:1500px;margin:0 auto;padding:20px 30px 52px;box-sizing:border-box}
+      #home .page-head{
+        min-height:70px;
+        grid-template-columns:minmax(0,1fr) clamp(360px,40vw,520px) minmax(0,1fr);
+        align-items:center;
+        gap:18px;
+        margin-bottom:6px;
+      }
+      #home .home-heading{grid-column:1;text-align:left}
+      #home .home-hub{grid-column:2}
+      #home .home-status{grid-column:3}
+      #home .widget-board{
+        min-height:0;
+        max-height:none;
+        grid-template-rows:auto auto auto auto;
+        row-gap:10px;
+        overflow:visible;
+      }
+      #home .home-section-head[data-home-section="scenes"]{display:flex;grid-row:1}
+      #home [data-widget="quick"]{grid-row:2}
+      #home .home-section-head[data-home-section="rooms"]{grid-row:3}
+      #home .widget-rail{grid-row:4}
+      body[data-active-view="home"] main{min-height:100dvh;padding-bottom:34px}
+      #home.active{height:auto;min-height:0}
+      .admin-mode-strip{margin-bottom:12px;border-radius:18px}
+    }
+
+    @media(min-width:901px) and (max-width:1180px){
+      #home .page-head{grid-template-columns:minmax(0,1fr) clamp(360px,40vw,440px) minmax(0,1fr);gap:13px}
+      #home .widget-rail{grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--room-col,260px)),1fr))}
+      #home .home-section-head h2{font-size:20px}
+    }
+
+    /* Telefonda aynı bilgi hiyerarşisi korunur; gezinme başlık düğmesi yerine sabit alt raydır. */
+    @media(max-width:620px){
+      :root{--rail-w:0px}
+      .shell{display:block;min-height:100dvh}
+      main{padding:14px 14px calc(92px + env(safe-area-inset-bottom))}
+      .side-rail{
+        position:fixed;
+        z-index:30;
+        inset:auto 10px calc(10px + env(safe-area-inset-bottom)) 10px;
+        width:auto;
+        height:70px;
+        display:flex;
+        align-items:center;
+        gap:4px;
+        padding:6px;
+        border:1px solid var(--line);
+        border-radius:23px;
+        background:var(--experiment-glass-strong);
+        box-shadow:0 16px 36px rgba(13,28,23,.22);
+        -webkit-backdrop-filter:blur(24px) saturate(1.12);
+        backdrop-filter:blur(24px) saturate(1.12);
+      }
+      .rail-brand{display:none}
+      .rail-nav{min-width:0;flex:1 1 auto;display:flex;align-items:center;gap:3px}
+      .rail-bottom{width:auto;flex:0 0 56px;margin:0;display:block}
+      .rail-button{min-width:0;min-height:56px;height:56px;flex:1 1 0;gap:4px;padding:5px 2px;border-radius:17px}
+      .rail-bottom .rail-button{width:56px}
+      .rail-icon,.rail-icon svg{width:20px;height:20px}
+      .rail-label{font-size:10px}
+      .page-head>.app-menu-button{display:none!important}
+      #home .page-head{
+        min-height:0;
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:8px 10px;
+        margin-bottom:10px;
+      }
+      #home .home-heading{grid-column:1;grid-row:1}
+      #home .home-status{grid-column:2;grid-row:1}
+      #home .home-hub{grid-column:1/-1;grid-row:2;width:100%;margin:0}
+      #home .home-hub{--hub-time-size:28px;--hub-line:11px;min-height:60px}
+      #home .hub-zone-weather{--weather-scene-size:42px}
+      #home .widget-board{
+        display:grid;
+        min-height:0;
+        max-height:none;
+        grid-template-rows:auto auto auto auto;
+        gap:10px;
+        overflow:visible;
+      }
+      #home .home-section-head[data-home-section="scenes"]{display:flex;grid-row:1}
+      #home [data-widget="quick"]{position:relative;inset:auto;grid-row:2;width:auto;height:auto;padding:0;overflow:visible}
+      #home .home-section-head[data-home-section="rooms"]{grid-row:3}
+      #home .widget-rail{grid-row:4}
+      #home .home-section-head{min-height:42px}
+      #home .home-section-head h2{font-size:19px}
+      #home .home-section-head p{max-width:230px;font-size:11px}
+      #home .home-section-head>button{min-width:58px;min-height:38px;padding:0 11px}
+      #home .quick-scene-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+      #home .strip-row,#home .quick-scene-grid{height:auto;min-height:0;overflow:visible}
+      #home [data-widget="quick"]{min-height:124px}
+      #home .quick-scene{height:58px;min-height:58px;padding:7px 9px;border-radius:16px}
+      #home .quick-scene .quick-device-icon{width:40px;height:40px}
+      #home .quick-scene .device-name{font-size:12px}
+      #home .widget-rail{grid-template-columns:1fr;grid-auto-rows:148px;gap:10px}
+      #home .widget-rail .widget-card{height:148px;min-height:148px;padding:15px}
+      #home .home-health{width:40px;min-width:40px;min-height:40px}
+      body[data-active-view="home"] main{min-height:100dvh;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+      body[data-active-view="home"] .toast{bottom:calc(94px + env(safe-area-inset-bottom))}
+      .admin-mode-strip-row{align-items:flex-start;flex-wrap:wrap}
+      .admin-mode-strip-action{width:100%;margin-left:0}
+      dialog#appMenuDialog{inset:auto 8px 8px!important;width:calc(100% - 16px)!important;max-width:none!important;height:min(82dvh,690px);margin:0!important;border-radius:26px}
+    }
+
+    /* ————— UYGULAMA ÇAPINDA DEMO EŞLEŞTİRMESİ —————
+       Experiment prototipinin sakin ilk bakışını bütün ana sayfalara taşır. İşlevsel formlar,
+       cihaz ayrıntıları ve yönetici araçları DOM'da kalır; bu katman yalnız liste/özet ritmini
+       ve büyük tablet yerleşimini düzenler. */
+    #home [data-group-widget="auto:lights"],
+    #rooms [data-room-card="auto:lights"]{display:none!important}
+
+    .view>.page-head{min-height:60px;margin-bottom:8px}
+    .view:not(#home)>.page-head{grid-template-columns:minmax(0,1fr) auto;gap:12px}
+    .view:not(#home)>.page-head>.app-menu-button{display:none}
+    .view:not(#home)>.page-head>.page-head-title{grid-column:1;text-align:left}
+    .view:not(#home)>.page-head>:last-child:not(.page-head-title):not(.app-menu-button){grid-column:2}
+    .page-head-title h1{
+      font-family:Georgia,"Times New Roman",serif;
+      font-size:clamp(30px,4vw,40px);
+      font-weight:700;
+      letter-spacing:-.045em;
+    }
+    .routine-lead{margin-top:0;margin-bottom:16px}
+
+    /* Odalar: gündelik kullanıcı önce oda durumunu görür; cihaz kumandası odaya dokununca açılır. */
+    #rooms .room-card-grid{
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;
+    }
+    #rooms .room-card{
+      grid-column:auto;
+      height:154px;
+      min-height:154px;
+      display:flex;
+      flex-direction:column;
+      padding:16px;
+      overflow:hidden;
+      border-radius:var(--experiment-card);
+      background:var(--experiment-glass);
+      box-shadow:var(--experiment-shadow);
+    }
+    #rooms .group-widget-head{height:100%;align-items:stretch;gap:10px}
+    #rooms .ov-title{
+      min-width:0;
+      flex:1 1 auto;
+      display:flex;
+      align-items:flex-start;
+      flex-direction:column;
+      padding:0;
+      text-align:left;
+    }
+    #rooms .ov-title-name{width:100%;font-size:16px;font-weight:800}
+    #rooms .room-card-icon{width:43px;height:43px;border-radius:15px}
+    #rooms .room-card-icon .device-type-svg{width:24px;height:24px}
+    #rooms .ov-go{margin-left:auto;font-size:25px;font-weight:500}
+    #rooms .group-summary{margin-top:auto;gap:6px}
+    #rooms .group-summary span{font-size:12.5px}
+    #rooms .room-sensors{margin-top:5px;font-size:12px}
+    #rooms .group-widget-actions{align-items:flex-end;justify-content:flex-end}
+    #rooms .room-master{
+      min-height:42px;
+      max-width:128px;
+      padding:0 13px;
+      border-radius:14px;
+      background:var(--home-control);
+      font-size:11.5px;
+      line-height:1.15;
+      white-space:normal;
+    }
+    #rooms .room-master-track,
+    #rooms .group-control-grid,
+    #rooms .group-empty,
+    #rooms .ov-hidden-note,
+    #rooms .ov-switch-wrap,
+    #rooms [data-edit-group]{display:none!important}
+
+    body[data-active-view="home"] #home .home-heading,
+    body[data-active-view="home"] #home .home-section-head h2{color:var(--glass-plate-ink);text-shadow:var(--glass-plate-shadow)}
+    body[data-active-view="home"] #home .home-section-head p{color:var(--glass-plate-sub);text-shadow:var(--glass-plate-shadow)}
+
+    /* Rutinler: demodaki iki sütunlu, tek dokunuşluk sakin kartlar. */
+    #routines .routine-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    #routines .routine-card{
+      min-height:142px;
+      padding:20px;
+      border:1px solid var(--line);
+      border-radius:var(--experiment-card);
+      background:var(--experiment-glass);
+      box-shadow:var(--experiment-shadow);
+      -webkit-backdrop-filter:blur(20px) saturate(1.08);
+      backdrop-filter:blur(20px) saturate(1.08);
+    }
+    #routines .routine-glyph{width:56px;height:56px;border-radius:17px}
+
+    /* Yönetici genel bakış: 1024 px tablette dört temel ölçü tek sırada okunur. */
+    body:not(.home-mode) .admin-mode-strip{
+      margin-bottom:10px;
+      padding:8px 14px;
+      border-radius:18px;
+      background:var(--experiment-glass);
+      box-shadow:var(--experiment-shadow);
+    }
+    body:not(.home-mode) .admin-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    body:not(.home-mode) .admin-stat{
+      min-height:100px;
+      border-radius:var(--experiment-card);
+      background:var(--experiment-glass);
+      box-shadow:var(--experiment-shadow);
+    }
+    body:not(.home-mode) .admin-overview-columns{grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr);gap:12px}
+    body:not(.home-mode) .admin-overview-card{border-radius:var(--experiment-card)}
+    body:not(.home-mode) .automation-card{border-radius:var(--experiment-card);background:var(--experiment-glass)}
+
+    /* Bağlantılar: teknik ayrıntı ikinci adımda; girişte üç platform yan yana özetlenir. */
+    #connections .connection-network-guide{display:none}
+    #connections .connection-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    #connections .connection-card{
+      min-width:0;
+      min-height:305px;
+      display:flex;
+      flex-direction:column;
+      padding:20px;
+      border-radius:var(--experiment-card);
+    }
+    #connections .connection-card-head{display:contents}
+    #connections .connection-brand{order:0;width:58px;height:58px}
+    #connections .connection-card h2{order:1;margin:14px 0 7px;font-size:21px}
+    #connections .connection-card>p{order:2;margin-bottom:12px;font-size:13px;line-height:1.42}
+    #connections .fabric-list{order:3;margin:8px 0 14px}
+    #connections .connection-action,
+    #connections .connection-card>button{order:4;width:100%;min-width:0;margin-top:auto}
+    .connection-summary-facts{order:3;display:grid;gap:7px;margin:8px 0 16px}
+    .connection-summary-facts>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .connection-summary-facts dt{color:var(--muted);font-size:12px}
+    .connection-summary-facts dd{margin:0;color:var(--ink);font-size:12px;font-weight:800;text-align:right}
+    .zigbee-summary-card .connection-brand svg{width:46px;height:46px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+    /* Sistem: demodaki kategori girişi üstte; mevcut tüm ayrıntılı ayarlar altta ve çalışır durumda. */
+    .system-hub-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+      margin-bottom:18px;
+    }
+    .system-hub-card{
+      min-width:0;
+      min-height:146px;
+      display:grid;
+      grid-template-columns:48px minmax(0,1fr);
+      grid-template-rows:minmax(0,1fr) auto;
+      column-gap:14px;
+      row-gap:10px;
+      padding:18px;
+      border:1px solid var(--line);
+      border-radius:var(--experiment-card);
+      color:var(--ink);
+      background:var(--experiment-glass);
+      box-shadow:var(--experiment-shadow);
+      text-align:left;
+      -webkit-backdrop-filter:blur(20px) saturate(1.08);
+      backdrop-filter:blur(20px) saturate(1.08);
+    }
+    .system-hub-card:hover,.system-hub-card:focus-visible{border-color:var(--forest);transform:translateY(-1px)}
+    .system-hub-glyph{
+      grid-column:1;
+      grid-row:1;
+      width:46px;
+      height:46px;
+      display:grid;
+      place-items:center;
+      border-radius:15px;
+      color:var(--forest);
+      background:var(--forest-soft);
+      font-size:23px;
+    }
+    .system-hub-card>span:nth-child(2){grid-column:2;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+    .system-hub-card strong{font-size:17px;font-weight:800}
+    .system-hub-card small{color:var(--muted);font-size:12.5px;line-height:1.4}
+    .system-hub-card b{grid-column:2;grid-row:2;color:var(--forest);font-size:12px;font-weight:800}
+    #settings>.settings-tabs{margin-top:6px}
+
+    /* Profil: tablet demosundaki sağdan açılan koyu, sakin çekmece. Ana gezinme zaten sol rayda. */
+    .app-menu-person{display:flex;align-items:center;gap:12px;padding:5px 2px 2px}
+    .app-menu-person .brand-mark{width:48px;height:48px;flex:none}
+    .app-menu-person-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+    .app-menu-person-copy strong{font-size:16px;font-weight:800}
+    .app-menu-person-copy span{color:var(--menu-sub);font-size:12px}
+    @media(min-width:621px){
+      dialog#appMenuDialog{
+        inset:16px 16px 16px auto!important;
+        width:min(370px,calc(100vw - 32px))!important;
+        max-width:370px!important;
+        height:calc(100dvh - 32px)!important;
+        max-height:calc(100dvh - 32px)!important;
+        margin:0!important;
+        border-radius:28px;
+      }
+      dialog#appMenuDialog>.app-menu-modal{
+        --menu-surface:rgba(15,31,28,.94);
+        --menu-brd:rgba(255,255,255,.18);
+        --menu-ink:#f2f7f4;
+        --menu-sub:rgba(234,245,239,.68);
+        --menu-line:rgba(255,255,255,.13);
+        --menu-inset:rgba(255,255,255,.06);
+        --menu-accent:#bce3c7;
+        --menu-accent-soft:rgba(188,227,199,.13);
+        --menu-accent-ink:#173226;
+        height:100%;
+        padding:20px;
+        border-radius:28px;
+        background:var(--menu-surface);
+      }
+      dialog#appMenuDialog>.app-menu-modal>.app-menu-nav{display:none}
+      dialog#appMenuDialog>.app-menu-modal>.app-menu-utilities{margin-top:4px}
+      dialog#appMenuDialog>.app-menu-modal>.app-menu-foot{margin-top:auto}
+    }
+
+    @media(max-width:900px){
+      #rooms .room-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      body:not(.home-mode) .admin-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      body:not(.home-mode) .admin-overview-columns{grid-template-columns:1fr}
+      #connections .connection-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:620px){
+      .view>.page-head{min-height:52px}
+      .page-head-title h1{font-size:30px}
+      #rooms .room-card-grid,#routines .routine-list,.system-hub-grid{grid-template-columns:1fr}
+      #rooms .room-card{height:148px;min-height:148px;padding:15px}
+      #routines .routine-card{min-height:124px;padding:16px}
+      #connections .connection-card{min-height:260px;padding:18px}
+      .system-hub-card{min-height:132px;padding:16px}
+      dialog#appMenuDialog{height:auto;max-height:min(82dvh,690px)}
+      dialog#appMenuDialog>.app-menu-modal{height:auto;max-height:min(82dvh,690px)}
+      dialog#appMenuDialog>.app-menu-modal>.app-menu-nav{display:none}
+      dialog#appMenuDialog>.app-menu-modal>.app-menu-utilities{margin-top:12px}
+    }

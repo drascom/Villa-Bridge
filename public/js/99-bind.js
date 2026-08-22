@@ -43,6 +43,10 @@
   $b("#deviceColumns").oninput=()=>applyDeviceColumns($("#deviceColumns").value);
   $b("#deviceColumns").onchange=()=>setDeviceColumns($("#deviceColumns").value);
   $$("[data-theme-mode]").forEach(button=>button.onclick=()=>setThemeMode(button.dataset.themeMode));
+  $$("[data-system-jump]").forEach(button=>button.onclick=()=>{
+    activateSettingsTab(button.dataset.systemTab||"usage");
+    requestAnimationFrame(()=>document.getElementById(button.dataset.systemJump)?.scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"start"}));
+  });
   $$("[data-theme-toggle]").forEach(button=>button.onclick=()=>setThemeMode(document.documentElement.dataset.theme==="dark"?"light":"dark"));
   $$("[data-language-cycle]").forEach(button=>button.onclick=cycleLanguage);
   /* ARKA PLAN AYARLARI. Kaydırıcılar `input` ile ANINDA boyar (canlı önizleme), kayıt

@@ -25,6 +25,11 @@
   }
   function activateView(viewName){
     closeAppMenu();
+    if(viewName==="devices"){
+      state.deviceLayout=state.auth.elevated===true?"list":"grid";
+      applyDeviceLayout();
+      requestAnimationFrame(()=>{filterDevices();bindCards()});
+    }
     if(viewName!=="home"&&state.dashboardEditing)setDashboardEditing(false);
     if(viewName!=="devices"&&!pullRefreshState.refreshing)resetPullRefresh();
     $$(".nav-button").forEach(item=>item.classList.toggle("active",item.dataset.view===viewName));
