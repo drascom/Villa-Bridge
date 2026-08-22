@@ -2017,7 +2017,7 @@ const coordinatorRestartSummary = (): { supported: boolean; reason: CoordinatorR
  * tetikler (`shutdown`: otomasyon günlüğü diske iner, kaynak ve HTTP kapanır) ve kapanışın
  * sonunda süreç sıfır koduyla biter. Standalone runtime içinde gömülü çalışırken de aynı
  * sinyal `apps/runtime/main.cjs`'in kendi kapanışını çalıştırır. Geri getiren şey systemd:
- * `deploy/villa-bridge.service` içinde `Restart=always` + `RestartSec=5`.
+ * `apps/linux/systemd/villa-bridge.service.in` şablonunda `Restart=always` + `RestartSec=5`.
  */
 app.post<{ Body?: { confirmation?: unknown } }>("/api/system/restart", async (request, reply) => {
   if (request.body?.confirmation !== "RESTART") {
