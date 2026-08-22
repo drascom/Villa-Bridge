@@ -905,7 +905,7 @@
     :root[data-theme="dark"] .screensaver{background:rgba(4,10,8,.88)}
     button,input{font:inherit}button{cursor:pointer}.icon{width:21px;height:21px;display:block}
     /* Gezinme şeridi kaldırıldı: her ekranın başlığındaki tek düğme `#appMenuDialog`i açar. */
-    .shell{min-height:100vh}
+    .shell{min-height:100dvh}
     .brand-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:var(--on-forest);background:var(--forest)}
     .nav-button{display:flex;align-items:center;gap:13px;min-height:52px;padding:12px 14px;border:0;border-radius:10px;color:var(--muted);background:transparent;text-align:left}.theme-mode-icon{display:grid;place-items:center}.theme-mode-icon svg{grid-area:1/1}:root[data-theme="light"] .theme-mode-icon .moon-icon,:root[data-theme="dark"] .theme-mode-icon .sun-icon{display:none}
     /* Tek menü düğmesi: her ekranın başlık eylem grubunda aynı görsel dille durur. */
@@ -1697,7 +1697,7 @@
        taşma olmaz; bir daha güncellenmesi gereken sabit yok.
        `--home-head-gap`: başlık ile kart panosu arası nefes payı — oransal (vh), sabit px değil.
        Sütun akışı olduğu için bu pay panonun (dolayısıyla kartların) boyundan kendiliğinden düşer. */
-    body[data-active-view="home"] main{min-height:100dvh;display:flex;flex-direction:column}#home.active{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;height:auto}#home{--rail-gap:0px;--rail-cards:2;--rail-unit:calc((100vw - var(--rail-gap) - 2 * var(--page-gutter) - (var(--rail-cards) - 1) * 10px)/var(--rail-cards));--strip-inset:20px;/* DEMODAN SAPMA — BAŞLIK. Demonun üst şeridi 70px (tek kademe, geniş ekran); bizde sağ
+    body[data-active-view="home"] main{min-height:100dvh;display:flex;flex-direction:column}#home.active{min-height:0;flex:1 1 auto;display:flex;flex-direction:column;height:auto}#home{--room-col:clamp(230px,26.5vw,340px);--room-card-h:clamp(132px,24vh,154px);--strip-inset:20px;/* DEMODAN SAPMA — BAŞLIK. Demonun üst şeridi 70px (tek kademe, geniş ekran); bizde sağ
      hücre iki kademe (sağlık göstergeleri + 56px'lik eylem düğmeleri) ve 1024x640'ta 92px
      ölçülüyor. 56px not §7'nin dokunma hedefi, altına inilmedi; demoya yaklaşan tek sayı
      başlık-pano arası oldu: demo `margin-bottom:6px`, burada clamp'in alt ucu 6px
@@ -1705,31 +1705,23 @@
      --home-head-gap:clamp(6px,1.6vh,16px);/* HIZLI SAHNE KARTININ BOYU — TEK KAYNAK. Not §6.2 tablette ~62px ister; 640px yükseklikte
      `9.7vh` tam 62px eder, 480px'lik ekranda taban 56px devreye girer. İkisi de 44px dokunma
      hedefinin üstünde. Şeridin `min-height` bütçesi de bu değerden hesaplanır. */--scene-h:clamp(56px,9.7vh,62px)}#home .page-head{margin-bottom:var(--home-head-gap)}/* Panonun tabanı artık demonun oda kartı boyudur (154px): 1024x640 bütçesinde panoya 268px
-   kalıyor, yani tek sıra oda kartı tam boyunda sığıyor. */#home .widget-board{flex:1 1 auto;min-height:154px;max-height:660px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:10px}#home [data-widget="quick"]{position:fixed;z-index:9;left:var(--strip-inset);right:var(--strip-inset);bottom:calc(12px + env(safe-area-inset-bottom));grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden}#home .widget-rail{position:relative;z-index:1;grid-column:1/-1;grid-row:1;pointer-events:none;height:100%;display:grid;grid-template-columns:repeat(var(--rail-cards),var(--rail-unit));grid-template-rows:minmax(0,1fr);grid-auto-columns:var(--rail-unit);grid-auto-flow:column;gap:10px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scroll-snap-type:x mandatory;scrollbar-width:none}#home .widget-rail::-webkit-scrollbar{display:none}#home .widget-rail>*{pointer-events:auto;scroll-snap-align:start}/* RAY SAYFA SAYFA: her kart AYNI genişliktedir ve genişlik ekrandan türer, sabit px'ten değil.
-   `--rail-cards` görünür alana kaç kart sığacağını söyler, `--rail-unit` de o alanı aralarındaki
-   10px boşluklar düşüldükten sonra eşit böler. Görünür alan sabit sayı DEĞİL, gerçek ölçülerden
-   türer: 100vw eksi sol rayın genişliği (`--rail-gap`, ray yalnız `min-width:900px`ten sonra
-   çizildiği için orada `--rail-w`, altında 0) eksi sayfa kenarları (2×`--page-gutter`, `main`den
-   miras). Böylece kenar boşluğu 20px'ten 18px'e indiğinde (dar ekran) hesap kendiliğinden
-   düzelir. Saat/hava artık başlıkta olduğu için panodan bir sütun düşmüyor: ray tam genişlikte.
-   Eski YARIM ADIMLI düzen kalktı: birim bir
-   kartın yarısıydı, görünür alana tam altı birim giriyordu ama grup kartı dört birim kaplıyordu —
-   ilk kart tamam, ikincisi dört biriminin ancak ikisini gösterip sağ kenarda YARIM kalıyordu.
-   Artık 1024px'te iki kart görünür alanı (1024 - ray - kenarlar) tam doldurur; 1280px'te aynı
-   iki kart daha geniş olur — oran her genişlikte kendiliğinden çıkar. Kaydırma kaybolmadı, yalnız hizalandı: fazla kart varsa ray yine
-   kayar, `scroll-snap-type:x mandatory` + her kartta `scroll-snap-align:start` sayesinde her
-   duruş bir kart kenarına oturur, yani hiçbir duruşta yarım kart kalmaz. */#home .widget-rail .widget-card{grid-row:1;grid-column:span 1;min-height:0;height:100%;overflow:hidden}#home .widget-rail .group-widget{grid-column:span 1;display:grid;grid-template-rows:auto minmax(0,1fr)}#home .widget-rail .group-control-grid{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:none}#home .widget-rail .group-control-grid::-webkit-scrollbar{display:none}/* Birleşik "Ev durumu" kartı da rayın tek kart genişliğini kullanır: ara genişlik (eski 3 birim)
-   kalktı, çünkü karışık genişlikler sayfa kenarlarını kaydırıp yarım kart doğuruyordu. */#home .widget-rail [data-widget="summary"]{grid-column:span 1}#home #widgetEmpty{grid-row:1;grid-column:1/-1}#home .strip-row,#home .quick-scene{height:var(--scene-h)}/* Liste kartın ALT bölümü: kalan boyu artık sabit bir pay değil, üstündeki erişilebilirlik
+   kalıyor, yani tek sıra oda kartı tam boyunda sığıyor. */#home .widget-board{flex:1 1 auto;min-height:154px;max-height:660px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr);gap:10px}#home [data-widget="quick"]{position:fixed;z-index:9;left:var(--strip-inset);right:var(--strip-inset);bottom:calc(12px + env(safe-area-inset-bottom));grid-column:auto;grid-row:auto;height:136px;min-width:0;overflow:hidden}#home .widget-rail{position:relative;z-index:1;grid-column:1/-1;grid-row:4;pointer-events:none;min-height:0;height:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--room-col)),1fr));grid-auto-rows:var(--room-card-h);align-content:start;gap:clamp(12px,1.2vw,13px);overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:none}#home .widget-rail::-webkit-scrollbar{display:none}#home .widget-rail>*{pointer-events:auto}/* ODA IZGARASI — demonun `.room-grid`i. Ray artık yatay sayfalanan bir şerit DEĞİL: kartlar
+   soldan sağa dizilir, sığmayan satır alta iner ve taşma DİKEY kaydırılır. Sütun sayısı sabit
+   değil, sütunun en dar hâli (`--room-col`) ekranla ölçülür — 1024'te üç sütun, 1280'de dört
+   çıkar; kart boyu da (`--room-card-h`) demonun 154px'ini 640px yükseklikte tam verir.
+   Eski `--rail-cards`/`--rail-unit`/`--rail-gap` üçlüsü ve `scroll-snap` KALKTI: sayfa sayfa
+   kayan tek satır, "ilk oda satırı kaydırmadan görünsün" kuralıyla çelişiyordu. Kaydırma okları
+   (`#widgetScrollLeft`/`#widgetScrollHint`) kodda duruyor ama yatay taşma olmadığı için
+   `updateWidgetScrollHint` onları hiç açmaz. */#home .widget-rail .widget-card{min-width:0;min-height:0;height:100%;padding:17px;overflow:hidden}#home .widget-rail .group-widget{min-width:0;display:grid;grid-template-rows:auto minmax(0,1fr)}#home .widget-rail .group-control-grid{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:none}#home .widget-rail .group-control-grid::-webkit-scrollbar{display:none}/* "Pano boş" satırı ızgaranın tüm genişliğini kaplar; kart değil, tek satırlık bir bilgi. */#home #widgetEmpty{grid-column:1/-1}#home .strip-row,#home .quick-scene{height:var(--scene-h)}/* Liste kartın ALT bölümü: kalan boyu artık sabit bir pay değil, üstündeki erişilebilirlik
    bölümünün gerçek boyu belirler. Kaç satır çizileceğini `widgetListCapacity` ölçer; buradaki
    `overflow:hidden` yalnız son çare kırpmadır — kart yine tek widget yüksekliğinde kalır. */#home .widget-list{min-height:0;margin-top:12px;gap:0;overflow:hidden}#home .group-summary{margin-top:7px}#home .home-summary{gap:14px;margin-top:0}#home .widget-value{margin-top:14px}#home .widget-scroll-hint{z-index:8;display:grid;place-items:center;padding:0;border:1px solid var(--forest);color:var(--on-forest);background:var(--forest);box-shadow:0 8px 18px rgba(24,77,59,.2)}#home .widget-scroll-hint{position:absolute;top:calc(50% - 24px);width:38px;height:48px;border-radius:15px}#home .widget-scroll-hint.scroll-hint-left{left:6px}#home .widget-scroll-hint.scroll-hint-right{right:6px}/* Şerit oklarının konumu ve yüzeyi bu dosyanın SONUNDAKİ şerit bloğunda: artık satırın bir
    sütunu değil, üstünde duran mutlak konumlu yuvarlak cam düğmeler ve kartlar altlarından
    kayıyor. Hızlı sahne şeridinin oku YOK (sabit dört sütun); burada kalan yalnız KART RAYININ
    ok iskeleti (ızgara, ikon, gizlenme). */
 #home .widget-scroll-hint[hidden]{display:none}#home .widget-scroll-hint svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.system-alert-bar{position:fixed;z-index:9;top:0;left:0;right:0;min-height:56px;margin:0;border-width:0 0 1px;border-radius:0;font-size:20px}.system-alert-icon,.system-alert-icon svg{width:28px;height:28px}.system-alert-count{font-size:16px}body.has-system-alert main{padding-top:70px}}
-    /* Dar yatay ekranda (800×480 gibi) iki kart 200px'e düşerdi — döşeme ızgarası tek sütuna iner,
-       kademeler anlamını yitirir. Orada sayfa TEK karttır: kart ~410px olur, bütün görünür,
-       diğer kartlar kaydırmayla gelir. */
-    @media(orientation:landscape) and (max-width:900px){#home{--rail-cards:1}}
+    /* DAR YATAY (900px altı, ray çizilmiyor): oda ızgarası zaten `auto-fill` ile kendini böler —
+       sütun en dar hâline (`--room-col`) inip tek sütuna düşer. Eskiden burada sayfa başına düşen
+       kart sayısı elle 1'e çekiliyordu; sayfalama kalktığı için o ayara gerek kalmadı. */
     /* KISA YATAY EKRAN (800×480 sınıfı) — kırpma sırası. Saat/hava bloğu artık başlıkta ve
        zaten en kısa hâlinde (üç küçük satır + ikon), bu yüzden burada ona dokunulmuyor: ölçüleri
        `vh` clamp'leriyle kendiliğinden iniyor. Kısılan yalnız kart içi tipografi — göstergeler,
@@ -1760,6 +1752,9 @@
        açıklama satırı bir üstteki blokta gizli — işlev kaybı yok, üç düğme de yerinde.
        Dikey telefon bu bloğa GİRMEZ (`orientation:landscape` koşulu), 1024×600 ve 1280×800 de
        girmez (`max-width:900px` koşulu). */
+    /* Dar yatayda şerit alt bardır (akıştan çıkar): pano iki satıra iner, boş kalan sabit
+       satırlar ızgarada boşluk bırakmasın. */
+    @media(orientation:landscape) and (max-width:900px){#home .widget-board{grid-template-rows:auto minmax(0,1fr)}#home .home-section-head[data-home-section="rooms"]{grid-row:1}#home .widget-rail{grid-row:2}}
     @media(orientation:landscape) and (max-width:900px){#home .page-head{--head-action-h:clamp(44px,11.5vh,56px);--head-action-w:var(--head-action-h);--head-action-gap:clamp(6px,1.4vw,12px);display:grid;grid-template-columns:var(--head-action-w) minmax(0,1fr) clamp(240px,34vw,320px) minmax(0,1fr);align-items:center;gap:var(--head-action-gap);margin-bottom:8px}#home .home-heading{min-width:0;text-align:left}#home .home-status{justify-items:end}#home .home-metrics{width:auto;justify-content:flex-end}#home .home-actions{flex-wrap:nowrap;justify-content:flex-end;margin-top:0}}
     /* HIZLI SAHNE ŞERİDİ — DÖRT SÜTUN, TEK SATIR (not §6.2).
        Şerit sekme çubuğu olmaktan çıktı: sahne bir DURUM değil bir EYLEMdir, seçili kalmaz. Onunla
@@ -2864,15 +2859,22 @@
     /* `data-moon-visible` KALKTI: onu yazan tek yer ikinci motordu (astronomi yoklaması) ve o
        motor kaldırıldı. Ayın görünürlüğü zaten tek yerden geliyor — `--moon-disc`, gündüz sıfır. */
 
-    /* ALT HIZLI ERİŞİM BARI — içerik üstüne `fixed` katman olarak binmez. Ana pano üç satırlı
-       akışın ikinci satırını kendisine ayırır; kart satırı ile arasında gerçek grid boşluğu vardır.
-       ŞERİDİN KENDİ ZEMİNİ YOK (aşağıdaki blokta kaldırılıyor): burada kalan yalnız GEOMETRİ —
-       tam genişliğe taşma, iç dolgu ve satır yüksekliği. */
+    /* HIZLI SAHNELER EN ÜSTTE — demonun `view-root` sırası: başlık · sahne başlığı + `.scene-grid`
+       · oda başlığı + `.room-grid`. Şerit ekrana `fixed`lenmiş bir ALT BAR değil, akışın ikinci
+       satırı: kullanıcı tablette önce dört sahneyi, hemen altında ilk oda satırını görüyor ve
+       ikisi için de kaydırmıyor. Dört satır sabit numaralarla yazılır (1 sahne başlığı, 2 şerit,
+       3 oda başlığı, 4 oda ızgarası) — DOM sırası ile CSS sırası tek yerde ve aynı.
+       ŞERİDİN KENDİ ZEMİNİ YOK (aşağıdaki blokta kaldırılıyor): burada kalan yalnız GEOMETRİ.
+       Tam genişliğe taşan eski negatif kenar payı da kalktı; şerit artık sayfanın alt kenarına
+       yapışmadığı için kenardan kenara uzanması bir anlam taşımıyor. */
     @media(orientation:landscape) and (min-width:901px) and (max-height:900px),(orientation:landscape) and (min-width:1000px){
       body[data-active-view="home"] main{padding-bottom:20px}
-      #home .widget-board{max-height:none;grid-template-rows:minmax(0,1fr) auto;row-gap:12px;overflow:visible}
-      #home [data-widget="quick"]{position:relative;z-index:4;left:auto;right:auto;bottom:auto;grid-column:1/-1;grid-row:2;height:auto;min-height:calc(9px + var(--scene-h) + 11px);margin:0 calc(-1 * var(--page-gutter)) calc(-1 * (20px + env(safe-area-inset-bottom)));padding:9px var(--page-gutter) calc(11px + env(safe-area-inset-bottom));overflow:hidden}
-      #home .widget-rail{grid-row:1}
+      #home .widget-board{max-height:none;grid-template-rows:auto auto auto minmax(0,1fr);row-gap:12px;overflow:visible}
+      #home .home-section-head{grid-column:1/-1}
+      #home .home-section-head[data-home-section="scenes"]{display:flex;grid-row:1}
+      #home [data-widget="quick"]{position:relative;z-index:4;left:auto;right:auto;bottom:auto;grid-column:1/-1;grid-row:2;height:auto;min-height:calc(9px + var(--scene-h) + 11px);margin:0;padding:9px 0 11px;overflow:hidden}
+      #home .home-section-head[data-home-section="rooms"]{grid-row:3}
+      #home .widget-rail{grid-row:4}
       #home .quick-control-widget .strip-row,#home .quick-scene{height:var(--scene-h)}
     }
 
@@ -2972,8 +2974,8 @@
     .admin-mode-strip>.default-pin-banner{margin:0;padding:10px 0 0;border-width:1px 0 0;border-radius:0;background:transparent}
     .admin-mode-strip>.default-pin-banner strong,.admin-mode-strip>.default-pin-banner span{color:var(--warm-ink)}
     @media(min-width:900px){
-      .shell{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);align-items:start}
-      .side-rail{position:sticky;top:0;z-index:10;height:100vh;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2vh,20px);padding:clamp(12px,2.2vh,20px) clamp(6px,.7vw,12px) calc(clamp(12px,2.2vh,20px) + env(safe-area-inset-bottom,0px));border-right:1px solid var(--line);background:var(--surface)}
+      .shell{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);align-items:start;min-height:100dvh}
+      .side-rail{position:sticky;top:0;z-index:10;height:100dvh;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2vh,20px);padding:clamp(12px,2.2vh,20px) clamp(6px,.7vw,12px) calc(clamp(12px,2.2vh,20px) + env(safe-area-inset-bottom,0px));border-right:1px solid var(--line);background:var(--surface)}
       .rail-nav,.rail-bottom{width:100%;display:grid;gap:8px}
       .rail-bottom{margin-top:auto}
       /* Menü levhasını açan düğme artık rayın en altında (Profil). Sayfa başlıklarındaki ikizi
@@ -2995,9 +2997,8 @@
       /* Ekrana SABİTLENEN şeritler rayın sağından başlar, yoksa rayın altında kalırlardı. */
       .system-alert-bar{left:var(--rail-w)}
       #home [data-widget="quick"]{left:calc(var(--rail-w) + var(--strip-inset,20px))}
-      /* Ray SAHNENİN GENİŞLİĞİNDEN düşer: kart birimi (`--rail-unit`) 100vw'den türüyor, ray da
-         o 100vw'nin bir parçası. Ray yalnız bu kırılımda çizildiği için pay da yalnız burada. */
-      #home{--rail-gap:var(--rail-w)}
+      /* Kart birimi artık 100vw'den türemiyor (oda ızgarası kendi kabına göre bölünür), bu
+         yüzden sol rayın genişliğini elde düşen bir pay da yok. */
       /* MOD ŞERİDİNİN PAYI ARTIK HESAPLANMIYOR — ÖLÇÜLÜYOR.
          Burada eskiden `--admin-strip-h` diye elde toplanmış bir sayı vardı (44px satır + iki
          yanda dolgu + kart aralığı) ve `--home-top`a ekleniyordu. Şerit TEK satırken tutuyordu;
@@ -3009,3 +3010,53 @@
          yerleşim motoru; panelde artık onu taklit eden bir sabit YOK.
          Ray altındaki sabit şeritler yine rayın sağından başlar. */
     }
+
+    /* ————— ANA EKRAN: BÖLÜM BAŞLIKLARI · SAĞLIK HAPI · EMEKLİ DÜZENLEME İKONLARI —————
+       Demonun ana ekranı üç bloktan oluşur: başlık, "Hızlı sahneler" bölümü, "Odalar" bölümü.
+       Aradaki iki `section-head` yalnız birer ad satırıdır — düğme taşımazlar, çünkü "hepsini
+       gör" yolu zaten sol raydaki Rutinler ve Odalar satırlarıdır (ikinci gezinme açılmıyor).
+       Boyları bilerek küçük: 1024x640 bütçesinde başlık + dört sahne + ilk oda satırının hepsi
+       kaydırmasız sığmalı, iki ad satırı bu payı yemeyecek kadar ince kalmalı. */
+    .home-section-head{min-width:0;min-height:clamp(20px,3.2vh,26px);display:flex;align-items:end;justify-content:space-between;gap:16px}
+    /* Şerit ekrana sabitlendiği dar kırılımlarda (alt bar) sahne başlığının altında hiçbir şey
+       kalmaz: iki bölüm başlığı üst üste görünürdü. Başlık yalnız şerit AKIŞTA iken çizilir. */
+    .home-section-head[data-home-section="scenes"]{display:none}
+    .home-section-head h2{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font:750 clamp(12px,1.9vh,14px)/1.2 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+
+    /* EVİN DURUMU ARTIK KART DEĞİL, BAŞLIKTAKİ HAP (demo `.home-health`).
+       Ana ekrandan kalkan uzun "Evin durumu" kartının taşıdığı tek cümle buraya indi: nokta +
+       kısa metin. Kartın kendisi silinmedi — `#widgetBoard` içinde `hidden` duruyor, katalog ve
+       locale anahtarları yerinde; yalnız ana ekranın ızgarasına girmiyor (bkz. 50-widgets.js
+       `retiredHomeWidgets`).
+       RENK: `color-mix()` YOK. Nokta ve halesi gündüz/gece için ayrı ayrı çözülmüş `rgba`.
+       Yüzey ana ekranın kendi kumanda dilini (`--home-control`/`--home-border`) kullanır, yani
+       hem sabit hem hareketli gökyüzünde okunur kalır; paralel bir palet açılmıyor. */
+    .home-metrics .home-health{margin-left:clamp(10px,1.4vw,16px)}
+    .home-health{min-height:42px;display:inline-flex;align-items:center;gap:8px;padding:0 14px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:var(--surface);font-size:13px;font-weight:700;white-space:nowrap}
+    body[data-active-view="home"] .home-health{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
+    .home-health .status-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#48a876;box-shadow:0 0 0 5px rgba(72,168,118,.12)}
+    .home-health.alert .status-dot{background:#b83a35;box-shadow:0 0 0 5px rgba(184,58,53,.14)}
+    :root[data-theme="dark"] .home-health .status-dot{background:#5fc191;box-shadow:0 0 0 5px rgba(95,193,145,.16)}
+    :root[data-theme="dark"] .home-health.alert .status-dot{background:#e08a84;box-shadow:0 0 0 5px rgba(224,138,132,.18)}
+    .home-health-text{min-width:0;overflow:hidden;text-overflow:ellipsis}
+    /* DAR BAŞLIKTA HAP YALNIZ NOKTADIR (demo `@media(max-width:1180px)`).
+       1024x640'ta başlığın sağ hücresine ~260px düşüyor; üç gösterge + yazılı hap oraya sığmaz ve
+       satır SARAR — sarma başlığı bir kademe uzatır, bütçe de o kademeyi saymaz. Yazı kaybolmuyor:
+       `renderHomeHealth` aynı cümleyi `title` ve `aria-label` olarak yazıyor, ekran okuyucu okur. */
+    @media(max-width:1180px){
+      .home-health{width:42px;min-width:42px;padding:0;justify-content:center}
+      .home-health .home-health-text{display:none}
+    }
+
+    /* PANO DÜZENLEME İKONLARI ANA EKRANDA BASILMAZ — ama KOD SİLİNMEDİ.
+       Kullanıcının cümlesi: "kalksın ama belki sonra kullanırız." `#addWidget`/`#editDashboard`
+       işaretlemede `hidden` duruyor; buradaki kural düzenleme KİPİNİN ana ekranda doğurduğu
+       ikincil ikonları da kapatır: kart taşıma/kaldırma kutusu, döşeme genişliği düğmesi ve
+       döşemenin üstündeki göz/yıldız. Hiçbiri DOM'dan ya da JS'ten kalkmadı — `setDashboardEditing`,
+       `toggleTileWidth`, `tileVisibilityHtml` ve `tileFavoriteHtml` aynen çalışıyor.
+       KAPSAM DAR: yalnız ana ekran (`#home`). Göz/yıldızın kalıcı yeri Odalar görünümüdür
+       (`.room-card .tile-eye` / `.tile-star`) ve oraya dokunulmuyor. */
+    body[data-active-view="home"] #home .widget-edit-controls,
+    body[data-active-view="home"] #home .tile-width-toggle,
+    body[data-active-view="home"] #home .tile-eye,
+    body[data-active-view="home"] #home .tile-star{display:none}

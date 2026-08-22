@@ -29,7 +29,12 @@
     return`<div class="widget-catalog-section" role="group" aria-labelledby="${headingId}"><h3 id="${headingId}" class="widget-catalog-heading">${esc(t(labelKey))}</h3>${entries.map(widgetCatalogItemHtml).join("")}</div>`;
   }
   function renderWidgetCatalog(){
-    const infoBoxes=Object.entries(dashboardWidgetTypes).map(([id,definition])=>({id,title:t(definition.title),lead:t(definition.lead),groupId:null}));
+    /* Katalog yalnız GERÇEKTEN eklenip kaldırılabilen kartları listeler: emekli "Evin durumu"
+       ile artık kendiliğinden basılan "Favoriler" kutusu ölü kumanda olurdu. Tanımları
+       (`dashboardWidgetTypes`) ve locale anahtarları yerinde duruyor. */
+    const infoBoxes=Object.entries(dashboardWidgetTypes)
+      .filter(([id])=>!retiredHomeWidgets.has(id)&&id!==favoritesWidgetId)
+      .map(([id,definition])=>({id,title:t(definition.title),lead:t(definition.lead),groupId:null}));
     const groupBoxes=dashboardGroups().map(group=>({id:groupWidgetId(group.id),title:group.name,lead:t("groupWidgetLead",{count:group.items.length}),groupId:group.locked?null:group.id}));
     $("#widgetCatalog").innerHTML=widgetCatalogSectionHtml("widgetCatalogInfoHeading","widgetCatalogInfoBoxes",infoBoxes)+widgetCatalogSectionHtml("widgetCatalogGroupsHeading","widgetCatalogYourGroups",groupBoxes);
     $$("[data-add-widget]").forEach(button=>button.onclick=()=>addDashboardWidget(button.dataset.addWidget));
@@ -92,12 +97,14 @@
       const key=gridScrollKey(grid);
       if(key&&grid.scrollTop)grids.set(key,grid.scrollTop);
     }
-    return{rows:scrollKeepers().map(node=>({node,left:node.scrollLeft})),grids};
+    /* Ray artık DİKEY kayıyor (oda ızgarası). Yalnız `scrollLeft` yedeklenseydi cihaz her durum
+       bildirdiğinde `render()` çalışıp ikinci oda satırı başa dönerdi; iki eksen de saklanır. */
+    return{rows:scrollKeepers().map(node=>({node,left:node.scrollLeft,top:node.scrollTop})),grids};
   }
   function restoreScrollPositions(positions){
-    for(const {node,left} of positions.rows){
-      if(!left||node.scrollLeft===left)continue;
-      node.scrollLeft=left;
+    for(const {node,left,top} of positions.rows){
+      if(left&&node.scrollLeft!==left)node.scrollLeft=left;
+      if(top&&node.scrollTop!==top)node.scrollTop=top;
     }
     for(const grid of $$(".group-control-grid")){
       const top=positions.grids.get(gridScrollKey(grid));
@@ -121,9 +128,19 @@
       widget.hidden=false;
       placeNode(board,widget,rail);
     }
+    /* FAVORİLER ODA IZGARASININ İLK KARTI. Yeri sıra listesinden gelmez — kullanıcı kararı:
+       "ilk kart Favoriler olabilir, diğerleri demodaki gibi". Kart oda kartıyla AYNI iskelettedir
+       (`group-widget`), o yüzden ayrı bir uzun favori kartı yapılmadı. Yıldızlı cihaz yoksa kart
+       hiç üretilmez: boş bir kart ilk hücreyi işgal etmesin. */
+    const favoritesWidget=widgets[favoritesWidgetId];
+    if(favoritesWidget&&favoriteEntries().length){
+      favoritesWidget.hidden=false;
+      placeNode(rail,favoritesWidget,rail.firstElementChild);
+    }
     /* Sıra `state.widgets`ten, oda kartının görünürlüğü sunucudaki kayıttan gelir: kapatılmış
-       kart sırasını korur ama basılmaz. */
-    for(const id of state.widgets.filter(id=>!fixedDashboardWidgets.has(id))){
+       kart sırasını korur ama basılmaz. Emekli bilgi kartları (`retiredHomeWidgets`) ve favori
+       kartı bu turda ATLANIR: ilki ana ekranda hiç basılmaz, ikincisi yukarıda basıldı. */
+    for(const id of state.widgets.filter(id=>!fixedDashboardWidgets.has(id)&&!retiredHomeWidgets.has(id)&&id!==favoritesWidgetId)){
       const widget=widgets[id];
       if(!widget)continue;
       if(!state.dashboardEditing&&groupWidgetHidden(id))continue;

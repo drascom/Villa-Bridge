@@ -377,6 +377,7 @@
     renderPairingRouters();
     renderZigbeeGroups();
     renderHomeSummary();
+    renderHomeHealth();
     /* Genel Bakış açıkken her veri turunda tazelenir; kapalıyken çizim boşa çalışmaz. */
     if(document.body.dataset.activeView==="adminOverview")renderAdminOverview();
     renderAutomations();
@@ -398,6 +399,21 @@
     if($("#quickControlDialog").open)renderQuickControl();
     if($("#lightDialog").open)renderLightDialog();
     if($("#deviceDetailDialog").open)renderDeviceDetail();
+  }
+  /* EVİN DURUMU — BAŞLIKTAKİ HAP. Ana ekrandan kalkan uzun "Evin durumu" kartının taşıdığı tek
+     cümle burada: nokta + kısa metin. Sayı `genHomeHealthModel`den gelir (35-generator.js), yani
+     Genel Bakış ekranıyla AYNI kaynaktan — panelde ikinci bir "evde sorun var mı" kuralı yok.
+     Kart silinmedi, yalnız ana ekranda basılmıyor (10-core.js `retiredHomeWidgets`). */
+  function renderHomeHealth(){
+    const pill=$("#homeHealth");
+    const text=$("#homeHealthText");
+    if(!pill||!text)return;
+    const model=genHomeHealthModel(state.devices);
+    const label=model.ok?t("homeHealthOk"):t("homeHealthAttention",{count:model.attention.length});
+    pill.classList.toggle("alert",!model.ok);
+    text.textContent=label;
+    pill.setAttribute("title",label);
+    pill.setAttribute("aria-label",label);
   }
   function renderHomeSummary(){
     const container=$("#homeSummary");

@@ -159,7 +159,10 @@
             <span class="hub-weather-copy"><span id="hubWeatherBody" class="hub-weather"></span><span id="hubWeatherLocation" class="hub-label"></span></span>
           </button>
         </section>
-        <div class="home-status"><div class="home-metrics"><div id="homeSummary" class="home-summary"></div><span id="serverConnectionMetric" class="server-connection-metric" hidden><span data-i18n="server">Server</span><span id="serverConnectionDot" class="server-connection-dot" aria-hidden="true"></span></span></div><div class="home-actions"><!-- PANO DÜZENLEME EV MODUNDAN ÇEKİLDİ. Ana ekran artık ELLE dizilen bir pano değil,
+        <div class="home-status"><div class="home-metrics"><div id="homeSummary" class="home-summary"></div><!-- EVİN DURUMU — uzun kart değil, tek hap (demo `.home-health`). Ana ekrandan kalkan
+             `[data-widget="summary"]` kartının cümlesi buraya indi: nokta + kısa metin.
+             Metni `renderHomeHealth` (40-home.js) `genHomeHealthModel`den yazar; ikinci bir
+             sayım kuralı yok. Kart silinmedi, aşağıda `hidden` duruyor. --><div id="homeHealth" class="home-health"><span class="status-dot" aria-hidden="true"></span><span id="homeHealthText" class="home-health-text"></span></div><span id="serverConnectionMetric" class="server-connection-metric" hidden><span data-i18n="server">Server</span><span id="serverConnectionDot" class="server-connection-dot" aria-hidden="true"></span></span></div><div class="home-actions"><!-- PANO DÜZENLEME EV MODUNDAN ÇEKİLDİ. Ana ekran artık ELLE dizilen bir pano değil,
              cihazlardan TÜRETİLEN bir sonuç: kart ekleme/çıkarma ve oda oluşturma Odalar
              görünümüne taşındı, kart görünürlüğü de orada kalıcı bir anahtar oldu. İki düğme
              KALDIRILMADI, yalnız `hidden`: `#editDashboard`/`#addWidget` kimlikleri, bağları
@@ -168,6 +171,11 @@
           <button id="addWidget" class="secondary" hidden><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7m-3.5-3.5h7"/></svg><span class="home-action-label" data-i18n="addWidget">＋ Add</span></button><button id="editDashboard" class="quiet" hidden><svg id="editDashboardGlyph" class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg><span id="editDashboardLabel" class="home-action-label" data-i18n="editDashboard">✎ Edit</span></button><button id="homeAutomations" class="quiet" type="button" data-view-link="automations" data-admin-only><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg><span class="home-action-label" data-i18n="navAutomations">Automations</span></button></div></div>
       </header>
       <div id="widgetBoard" class="widget-board">
+        <!-- ANA EKRANIN SIRASI (demo `view-root`): başlık · "Hızlı sahneler" · "Odalar".
+             Bölüm başlıkları yalnız birer ad satırı: düğme taşımazlar, çünkü "hepsini gör"
+             yolu sol raydaki Rutinler ve Odalar satırlarıdır. Sıra hem burada hem
+             `panel.css`teki dört sabit grid satırında (1·2·3·4) aynı yazılıdır. -->
+        <div class="home-section-head" data-home-section="scenes"><h2 data-i18n="quickScenesWidget">Quick scenes</h2></div>
         <section class="dashboard-widget widget-wide quick-control-widget" data-widget="quick">
           <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
           <!-- HIZLI SAHNELER (not §6.2). Şerit artık oda SEKMESİ değil, tek dokunuşluk RUTİN
@@ -181,7 +189,11 @@
             <div id="quickScenes" class="quick-scene-grid" role="group" data-i18n-aria="quickScenesLabel" aria-label="Quick scenes"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></div>
           </div>
         </section>
+        <div class="home-section-head" data-home-section="rooms"><h2 data-i18n="navRooms">Rooms</h2></div>
         <div id="widgetRail" class="widget-rail" tabindex="-1">
+          <!-- EMEKLİ: "Evin durumu" kartı ana ekranda BASILMAZ (özeti başlıktaki hapa döndü).
+               Kart, katalog girdisi ve `renderWidgetLists` akışı silinmedi — `retiredHomeWidgets`
+               (10-core.js) yalnız ızgaraya girmesini engelliyor. -->
           <article class="dashboard-widget widget-card" data-widget="summary" hidden>
             <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
             <h2 data-i18n="summaryWidget">Home status</h2><p data-i18n="summaryWidgetLead">Which devices are reachable, and what happened recently.</p>
@@ -191,7 +203,9 @@
           </article>
           <!-- Favoriler: iskeleti oda kartıyla aynı (başlık satırı + döşeme ızgarası), içini
                `renderFavoritesWidget` doldurur. `data-group-widget` YOKTUR — o işaret oda
-               kartlarına ait ve her turda silinip yeniden basılmalarını sağlıyor. -->
+               kartlarına ait ve her turda silinip yeniden basılmalarını sağlıyor.
+               YERİ SIRA LİSTESİNDEN GELMEZ: kart oda ızgarasının İLK hücresine sabitlenir ve
+               yalnız yıldızlanmış cihaz varsa basılır (50-widgets.js `applyWidgetLayout`). -->
           <article class="dashboard-widget widget-card group-widget favorites-widget" data-widget="favorites" hidden>
             <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
             <div class="group-widget-head"><div><h2 data-i18n="favoritesWidget">Favourites</h2><p data-i18n="favoritesWidgetLead">The devices you starred, in one place.</p></div></div>

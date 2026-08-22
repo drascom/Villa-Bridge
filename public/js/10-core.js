@@ -157,8 +157,16 @@
     summary:{title:"summaryWidget",lead:"summaryWidgetLead"},
     favorites:{title:"favoritesWidget",lead:"favoritesWidgetLead"}
   };
-  const defaultDashboardWidgets=["quick","summary"];
+  const defaultDashboardWidgets=["quick"];
   const fixedDashboardWidgets=new Set(["quick"]);
+  /* ANA EKRANDA BASILMAYAN BİLGİ KARTLARI — kod EMEKLİ, SİLİK DEĞİL.
+     "Evin durumu" uzun kartıydı ve dört sahneyi ekranın altına itiyordu; özeti artık başlıktaki
+     sağlık hapı (`#homeHealth`) taşıyor. Kartın işaretlemesi, katalog tanımı, locale anahtarları
+     ve `renderWidgetLists` akışı yerinde duruyor — burada yalnız ana ekranın ızgarasına girmesi
+     engelleniyor, geri dönüş yolu tek satırlık.
+     "Favoriler" de sıra listesinden çıktı ama emekli DEĞİL: oda ızgarasının İLK hücresine
+     sabitlendi ve `applyWidgetLayout` onu ayrıca basıyor (yalnız yıldızlı cihaz varsa). */
+  const retiredHomeWidgets=new Set(["summary"]);
   /* "Ev durumu", "Cihaz erişilebilirliği" ve "Ev hareketleri" tek kartta birleşti: katalogda tek
      giriş, tek ekle/kaldır. Kayıtlı düzenlerde üç eski kimlik de bulunabilir; `availability` ve
      `activity` artık `summary`ye eşlenir. Kural — eski kimliklerden en az biri düzende açıksa

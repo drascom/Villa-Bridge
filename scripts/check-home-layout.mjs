@@ -6,15 +6,21 @@ import path from "node:path";
    Denetimin amaci bir tane: TABLETIN GERCEK CSS ALANINDA (1024x640) ana ekranin tasmamasi.
    Yerlesim degisti, amac degismedi — bu dosya yeni yerlesimi ayni titizlikle dogrular.
 
-   YENI YERLESIM (not §6.1 + §7):
+   YENI YERLESIM — DEMONUN SIRASI (not §6.1 + §7):
      1) Baslik UC BOLUM: sol = baglam + ekran basligi, orta = birlesik saat/hava, sag = evin
-        sagligi (+ pano eylemleri). Saat/hava artik panonun bir KARTI degil, basligin ORTA
-        hucresi: ayri kart yok, ikinci satir yok, hub sutunu yok.
-     2) Panonun tek sutunu var; ray ve grup paneli tam genislikte. Eski 340px'lik `--hub-column`
-        ve rayin ona bagli `padding-left` payi kalkti, hub'i sonduren `hub-hidden` mantigi da.
-     3) Ana ekranin boyu SAYIYLA DEGIL AKISLA bulunur: `main` sutun akisi, `#home` esneyen
+        sagligi. Saat/hava artik panonun bir KARTI degil, basligin ORTA hucresi. Evin durumu da
+        artik uzun bir kart degil, sag hucredeki HAP (`#homeHealth`): kart ana ekrandan kalkti
+        (emekli, ama silinmedi — bkz. 12r).
+     2) Pano DORT satir, demonun `view-root` sirasi: "Hizli sahneler" basligi · dort sutunlu
+        sahne seridi · "Odalar" basligi · oda izgarasi. Sahneler EN USTTE: eski alt bar
+        (`position:fixed`) kalkti, cunku uzun kartlar sahneleri ekranin altina itiyordu.
+     3) Oda izgarasi DIKEY: yatay sayfalama (`--rail-cards`/`--rail-unit`/`scroll-snap`) kalkti,
+        satirlar alta iner. Kural: ILK ODA SATIRI kaydirmadan gorunur.
+     4) Ana ekranin boyu SAYIYLA DEGIL AKISLA bulunur: `main` sutun akisi, `#home` esneyen
         eleman. Ustteki seritler (sistem uyarisi, mod seridi, PIN uyarisi) kendi GERCEK boylarini
         alir; panelde onlari taklit eden sabit (`--home-top`, `--admin-strip-h`) YOKTUR.
+     5) Sol ray TAM BOY (`100dvh`), Profil `margin-top:auto` ile en altta.
+     6) Pano duzenleme ikonlari ana ekranda BASILMAZ ama koddan silinmez (12e + 12f-2).
 
    ESKI DENETIMIN DEVRALINAN DERSI: metin karsilastirmasi tek basina yetmiyor. Burada iki katman
    var — (a) yapinin kendisi (hangi kural hangi medya blogunda, ne diyor), (b) SAYISAL BUTCE:
@@ -481,8 +487,13 @@ export async function assertHomeLayout(projectRoot) {
     px(requireValue(rules, ".eyebrow", "font-size", railViewport, "Baglam yazisi")) * TEXT_LINE_RATIO +
     px(splitTopLevel(requireValue(rules, ".home-title", "font", railViewport, "Ekran basligi").split("/")[0]).pop()) *
       TEXT_LINE_RATIO;
+  /* Sag hucre iki kademe: (gosterge cipleri VE saglik hapi ayni satirda) + eylem dugmeleri.
+     Hap satiri kendi basina buyutmesin diye satirin boyu ikisinin BUYUGU. */
   const statusHeight =
-    px(requireValue(rules, ".summary-chip", "min-height", railViewport, "Ev sagligi gostergesi")) +
+    Math.max(
+      px(requireValue(rules, ".summary-chip", "min-height", railViewport, "Ev sagligi gostergesi")),
+      px(requireValue(rules, ".home-health", "min-height", railViewport, "Ev sagligi hapi"))
+    ) +
     px(requireValue(rules, ".home-status", "gap", railViewport, "Ev sagligi hucresi")) +
     actionHeight;
   const hubPadding = boxSides(requireValue(rules, ".home-hub", "padding", railViewport, "Saat/hava blogu"));
@@ -498,13 +509,20 @@ export async function assertHomeLayout(projectRoot) {
   const headHeight = Math.max(headingHeight, statusHeight, hubHeight);
   const headGap = px(vars["--home-head-gap"]);
 
-  const boardMin = px(requireValue(rules, "#home .widget-board", "min-height", railViewport, "Kart panosu"));
   const boardRowGap = px(requireValue(rules, "#home .widget-board", "row-gap", railViewport, "Kart panosu"));
   const quickHeight = px(
     requireValue(rules, '#home [data-widget="quick"]', "min-height", railViewport, "Hizli erisim seridi")
   );
+  /* Pano DORT satir: bolum basligi · sahne seridi · bolum basligi · oda izgarasi. Ucu de gercek
+     boyuyla toplanir; hicbiri elde sayilmis sabit degil. */
+  const sectionHead = px(requireValue(rules, ".home-section-head", "min-height", railViewport, "Bolum basligi"));
+  /* "Ilk oda satiri kaydirmadan gorunmeli" kurali BURADA olculur: panonun `min-height` bildirimi
+     bir taban, gercek kisit ise oda kartinin KENDI boyu. Kart boyu buyurse butce de buyur. */
+  const roomRow = px(requireValue(rules, "#home", "--room-card-h", railViewport, "Oda karti boyu"));
+  const boardMin = roomRow;
 
-  const fixed = mainPadTop + headHeight + headGap + boardRowGap + quickHeight + mainPadBottom;
+  const fixed =
+    mainPadTop + headHeight + headGap + 3 * boardRowGap + 2 * sectionHead + quickHeight + mainPadBottom;
   const states = [
     { label: "mod seridi yok (ev modu)", strip: 0 },
     { label: "mod seridi tek satir", strip: stripOneLine },
@@ -515,20 +533,52 @@ export async function assertHomeLayout(projectRoot) {
     assert(
       total <= VIEWPORT.height,
       `1024x640 tasiyor — ${state.label}: gereken ${Math.round(total)}px, ekran ${VIEWPORT.height}px. ` +
-        `(baslik ${Math.round(headHeight)}px, serit ${Math.round(state.strip)}px, pano en az ${Math.round(boardMin)}px)`
+        `(baslik ${Math.round(headHeight)}px, serit ${Math.round(state.strip)}px, sahne seridi ${Math.round(quickHeight)}px, ` +
+        `bolum basliklari 2x${Math.round(sectionHead)}px, ilk oda satiri ${Math.round(roomRow)}px)`
     );
   }
 
-  /* 9) HIZLI ERISIM SERIDI AKISTA: sabit katman olsaydi butce yalan olurdu (serit icerigin
-     ustune biner, tasma goze gorunur ama hesaba girmez). */
+  /* 9) ANA EKRANIN SIRASI: baslik · "Hizli sahneler" · "Odalar" (demo `view-root`).
+     Iki sart birden aranir, cunku biri digerini kurtarmaz:
+       (a) SERIT AKISTA. Ekrana `fixed`lenmis bir alt bar olsaydi butce yalan olurdu — serit
+           icerigin ustune biner, tasma goze gorunur ama hesaba hic girmez.
+       (b) SAHNELER ODA KARTLARINDAN ONCE. Bu, kullanicinin tablette gordugu asil sikayetti:
+           uzun kartlar dort sahneyi ekranin altina itiyordu. Sira hem DOM'da hem CSS'in sabit
+           satir numaralarinda denetlenir; ikisi ayrisirsa ekran DOM'a degil CSS'e uyar. */
   const quickPosition = declaredValue(rules, '#home [data-widget="quick"]', "position", railViewport);
   assert.equal(quickPosition, "relative", "Hizli erisim seridi 1024x640'ta akista degil.");
-  assert.equal(
-    declaredValue(rules, '#home [data-widget="quick"]', "grid-row", railViewport),
-    "2",
-    "Hizli erisim seridi panonun ikinci satirinda degil."
-  );
+  const homeRows = [
+    ['#home .home-section-head[data-home-section="scenes"]', "1", "sahne bolumunun basligi"],
+    ['#home [data-widget="quick"]', "2", "hizli sahne seridi"],
+    ['#home .home-section-head[data-home-section="rooms"]', "3", "oda bolumunun basligi"],
+    ["#home .widget-rail", "4", "oda izgarasi"]
+  ];
+  for (const [selector, row, label] of homeRows) {
+    assert.equal(
+      declaredValue(rules, selector, "grid-row", railViewport),
+      row,
+      `Ana ekranin ${label} panonun ${row}. satirinda degil: sira demoyla ayni olmali.`
+    );
+  }
   assert(html.includes('data-widget="quick"'), "Hizli erisim widget'i panel isaretlemesinde bulunamadi.");
+  /* DOM sirasi da ayni: sahne serdi oda izgarasindan ONCE yazilmali (klavye ve ekran okuyucu
+     grid satir numarasini degil, DOM'u izler). */
+  const scenesHeadAt = board.indexOf('data-home-section="scenes"');
+  const quickAt = board.indexOf('data-widget="quick"');
+  const roomsHeadAt = board.indexOf('data-home-section="rooms"');
+  const railAt = board.indexOf('id="widgetRail"');
+  assert(scenesHeadAt >= 0, 'Sahne bolumunun basligi yok: `data-home-section="scenes"`.');
+  assert(roomsHeadAt >= 0, 'Oda bolumunun basligi yok: `data-home-section="rooms"`.');
+  assert(scenesHeadAt < quickAt, "Sahne basligi seritten sonra geliyor.");
+  assert(quickAt < roomsHeadAt, "Hizli sahne seridi oda bolumunun ICINDE ya da altinda.");
+  assert(roomsHeadAt < railAt, "Oda basligi oda izgarasindan sonra geliyor.");
+  /* Bolum baslıklari birer AD SATIRIDIR: icinde dugme olsaydi ya ikinci bir gezinme mekanizmasi
+     acilirdi ya da 44px dokunma hedefi butceyi tasirirdi. */
+  for (const marker of ["scenes", "rooms"]) {
+    const at = board.indexOf(`data-home-section="${marker}"`);
+    const head = board.slice(at, board.indexOf("</div>", at));
+    assert(!head.includes("<button"), `Bolum basligi dugme tasiyor (${marker}): ikinci bir gezinme yolu acilmis.`);
+  }
 
   /* 10) RAY TAM GENISLIK VE KART BIRIMI RAYIN GENISLIGINI DUSUYOR.
      Eski birim hub sutununu dusuyordu; sol sabit ray geldiginde o pay yanlis ada bagli kaldi. */
@@ -541,10 +591,40 @@ export async function assertHomeLayout(projectRoot) {
       );
     }
   }
-  const railUnit = vars["--rail-unit"];
-  assert(railUnit && railUnit.includes("--rail-gap"), "Kart birimi (--rail-unit) sol rayin genisligini dusmuyor.");
-  const railGap = declaredValue(rules, "#home", "--rail-gap", railViewport);
-  assert.equal(squeeze(railGap || ""), "var(--rail-w)", "1024px'te ray payi rayin gercek genisligine bagli degil.");
+  /* 10a) ODA IZGARASI: YATAY SAYFALAMA DEGIL, DIKEY IZGARA.
+     Eski ray tek satirda sayfa sayfa kayiyordu; "ilk oda satiri kaydirmadan gorunmeli" kurali
+     ancak satirlarin ALTA inmesiyle anlam kazanir. Sutun sayisi sabit olamaz: 1024'te uc,
+     1280'de dort cikmali, 800'de kart 44px hedeflerinin altina ezilmemeli. */
+  const railColumns = squeeze(
+    requireValue(rules, "#home .widget-rail", "grid-template-columns", railViewport, "Oda izgarasi")
+  );
+  assert(
+    railColumns.includes("minmax(") && /clamp\(|vw|%/.test(railColumns),
+    `Ana ekranin oda izgarasi sabit sutun: ${railColumns}`
+  );
+  assert.equal(
+    squeeze(declaredValue(rules, "#home .widget-rail", "grid-auto-rows", railViewport) || ""),
+    "var(--room-card-h)",
+    "Oda satiri boyunu tek kaynaktan (--room-card-h) almiyor: butce ile ekran ayrisir."
+  );
+  assert.equal(
+    declaredValue(rules, "#home .widget-rail", "overflow-y", railViewport),
+    "auto",
+    "Oda izgarasi dikey kaymiyor: ikinci satir ulasilamaz kalir."
+  );
+  assert.equal(
+    declaredValue(rules, "#home .widget-rail", "overflow-x", railViewport),
+    "hidden",
+    "Oda izgarasi hala yatay kaydiriliyor: sayfa sayfa ray geri gelmis."
+  );
+  for (const [name, label] of [
+    ["--rail-unit", "kart birimi"],
+    ["--rail-cards", "sayfadaki kart sayisi"],
+    ["--rail-gap", "ray payi"]
+  ]) {
+    assert(!flat.includes(name), `Kaldirilan yatay sayfalama degiskeni geri gelmis: ${name} (${label}).`);
+  }
+  assert(!flat.includes("scroll-snap-type:xmandatory"), "Yatay sayfalama (scroll-snap) geri gelmis.");
   assert(
     !flat.includes(".group-panel") && !flat.includes("#groupPanel"),
     "Kaldirilan grup paneli (.group-panel) hala CSS'te: ray tam genisligin tek katmani olmali."
@@ -716,6 +796,141 @@ export async function assertHomeLayout(projectRoot) {
       `\`${selector}\` gorunmuyor: cihaz gorunurlugu ulasilamaz hale gelmis.`
     );
   }
+
+  /* 12f-2) DUZENLEME IKONLARI ANA EKRANDA BASILMAZ — ama KOD SILINMEDI.
+     Kullanicinin karari: "kalksin ama belki sonra kullaniriz." Iki sart birlikte denetlenir,
+     cunku tek basina her biri yanlis yone kayar: yalnizca "gorunmesin" deseydik biri dosyayi
+     silerek de gecerdi; yalnizca "kod dursun" deseydik ikonlar ana ekranda kalirdi. */
+  const homeSuppressed = [
+    ".widget-edit-controls",
+    ".tile-width-toggle",
+    ".tile-eye",
+    ".tile-star"
+  ];
+  for (const selector of homeSuppressed) {
+    assert.equal(
+      declaredValue(rules, `body[data-active-view="home"] #home ${selector}`, "display", railViewport),
+      "none",
+      `\`${selector}\` ana ekranda hala basiliyor: pano duzenleme ikonlari ev modundan cekildi.`
+    );
+  }
+  for (const [needle, label, file] of [
+    ["setDashboardEditing", "pano duzenleme kipi", widgets],
+    ["data-widget-move", "kart tasima dugmeleri", html],
+    ["data-widget-remove", "kart kaldirma dugmesi", html],
+    ["tile-width-toggle", "doseme genisligi dugmesi", homeJs],
+    ["tileVisibilityHtml", "doseme gozu", homeJs],
+    ["tileFavoriteHtml", "doseme yildizi", homeJs]
+  ]) {
+    assert(file.includes(needle), `Emekli edilen ozellik KODDAN SILINMIS: ${label} (${needle}).`);
+  }
+
+  /* 12q) SOL RAY TAM BOY. Kullanicinin ilk sikayeti: ray ekranin altina kadar inmiyordu.
+     Uc sart birlikte: kabuk en az bir ekran boyu, ray o boyun tamami, Profil en altta.
+     Olcu `dvh` — tablet adres cubugu `vh`de yanlis sonuc veriyor. */
+  assert.equal(
+    declaredValue(rules, ".side-rail", "height", { width: 1024, height: 640 }),
+    "100dvh",
+    "Sol ray tam boy degil: `height:100dvh` bekleniyor."
+  );
+  for (const selector of [".shell"]) {
+    const shellHeights = rulesFor(rules, selector, railViewport)
+      .flatMap((rule) => declarations(rule.body))
+      .filter((entry) => entry.name === "min-height")
+      .map((entry) => squeeze(entry.value));
+    assert(shellHeights.length > 0, "Kabugun (.shell) en az bir ekran boyu bildirimi yok.");
+    assert(
+      shellHeights.every((value) => value === "100dvh"),
+      `Kabuk hala \`vh\` ile olculuyor: ${shellHeights.join(" / ")}`
+    );
+  }
+  assert.equal(
+    declaredValue(rules, ".rail-bottom", "margin-top", railViewport),
+    "auto",
+    "Profil rayin en altina yapismiyor (`margin-top:auto` yok)."
+  );
+
+  /* 12r) "EVIN DURUMU" UZUN KARTI ANA EKRANDAN KALKTI, OZETI BASLIKTAKI HAPA DONDU.
+     Kart emekli ama SILIK DEGIL: isaretlemesi, katalog tanimi ve locale anahtarlari yerinde. */
+  assert(
+    /const\s+retiredHomeWidgets\s*=\s*new Set\(\[([^\]]*)\]\)/.test(coreJs),
+    "10-core.js icinde `retiredHomeWidgets` tanimi yok: emekli kart yine ana ekrana girer."
+  );
+  assert(
+    coreJs.match(/const\s+retiredHomeWidgets\s*=\s*new Set\(\[([^\]]*)\]\)/)[1].includes('"summary"'),
+    "\"Evin durumu\" karti hala ana ekranin izgarasina giriyor."
+  );
+  assert(
+    widgets.includes("retiredHomeWidgets.has(id)"),
+    "50-widgets.js emekli kart listesini kullanmiyor: kart yine basilir."
+  );
+  assert(
+    /defaultDashboardWidgets\s*=\s*\["quick"\]/.test(coreJs),
+    "Varsayilan pano duzeni hala uzun bilgi karti aciyor."
+  );
+  assert(
+    html.includes('data-widget="summary"') && html.includes('data-i18n="summaryWidget"'),
+    "Emekli edilen \"Evin durumu\" karti isaretlemeden SILINMIS (kod silinmeyecekti)."
+  );
+  assert(
+    html.includes('id="homeHealth"') && html.includes('class="status-dot"'),
+    "Baslikta evin sagligi hapi (#homeHealth + .status-dot) yok."
+  );
+  const healthAt = head.indexOf('id="homeHealth"');
+  assert(healthAt >= 0, "Saglik hapi ana ekran basliginda degil.");
+  assert(
+    head.indexOf('class="home-status"') < healthAt,
+    "Saglik hapi basligin sag bolumunun (home-status) disinda."
+  );
+  assert(
+    homeJs.includes("genHomeHealthModel(") && /function\s+renderHomeHealth\s*\(/.test(homeJs),
+    "Hapin metni tek kaynaktan (genHomeHealthModel) yazilmiyor: ikinci bir saglik kurali acilmis."
+  );
+  const healthPill = evaluateLength(
+    requireValue(rules, ".home-health", "min-height", railViewport, "Ev sagligi hapi"),
+    { viewport: railViewport, vars: {} }
+  );
+  assert(healthPill >= 42, `Ev sagligi hapi ${Math.round(healthPill)}px: demo 42px istiyor.`);
+  /* 1024x640'ta basligin sag hucresine ~260px dusuyor: uc gosterge + YAZILI hap oraya sigmaz ve
+     satir sarar — sarma basligi bir kademe uzatir, butce de o kademeyi saymaz. Bu genislikte hap
+     yalniz NOKTA olmali; cumle `title`/`aria-label`da durur (bkz. renderHomeHealth). */
+  assert.equal(
+    declaredValue(rules, ".home-health", "width", railViewport),
+    "42px",
+    "1024x640'ta saglik hapi hala yazili: baslik sarar, butce yalan soyler."
+  );
+  assert.equal(
+    declaredValue(rules, ".home-health .home-health-text", "display", railViewport),
+    "none",
+    "Dar baslikta hapin yazisi hala ciziliyor."
+  );
+  assert(
+    /aria-label/.test(homeJs.slice(homeJs.indexOf("function renderHomeHealth"), homeJs.indexOf("function renderHomeSummary"))),
+    "Hapin cumlesi ekran okuyucuya verilmiyor: yazi gizlenince bilgi tamamen kayboldu."
+  );
+  assert(
+    !flat.includes("color-mix("),
+    "Panelde `color-mix()` var: eski Android WebView'da cozulmez."
+  );
+
+  /* 12s) FAVORILER ODA IZGARASININ ILK KARTI — ayri/uzun bir favori karti DEGIL.
+     Kart yalniz yildizli cihaz varsa basilir; sira listesinden yeri gelmez. */
+  assert(
+    widgets.includes("placeNode(rail,favoritesWidget,rail.firstElementChild)"),
+    "Favoriler karti oda izgarasinin ILK hucresine sabitlenmemis."
+  );
+  assert(
+    /if\(favoritesWidget&&favoriteEntries\(\)\.length\)/.test(widgets),
+    "Favori yokken de favori karti basiliyor: bos kart ilk hucreyi isgal eder."
+  );
+  assert(
+    html.includes("favorites-widget") && html.includes('data-widget="favorites"'),
+    "Favoriler kartinin iskeleti isaretlemeden kalkmis."
+  );
+  assert(
+    /class="dashboard-widget widget-card group-widget favorites-widget"/.test(html),
+    "Favoriler karti oda kartiyla ayni iskeleti (`group-widget`) kullanmiyor."
+  );
 
   /* 12g) ODANIN ANA ANAHTARI AYRI VE DOKUNULABILIR (not §6.3 + §7). Kart govdesi odaya girer,
      anahtar ayri hedeftir; ikisi de 44px'in altina inemez. Hap bicimli anahtarlar kare ikon
