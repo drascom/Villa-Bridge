@@ -1802,7 +1802,13 @@ app.get("/api/settings", async (_request, reply) => {
        */
       setupPending: config.setupPending,
       // Konak yeteneği: seri koordinatör yolu yalnız sunucu/Pi kurulumunda girilebilir.
-      zigbee: { serialSupported: settingsStore.serialSupported, defaultPort: defaultCoordinatorPort },
+      // `coordinatorRestart` de bir yetenektir: panel "telsiz çipini resetle" düğmesini
+      // istemcide tahmin etmez, adresin ağ köprüsü mü USB çubuk mu olduğuna sunucu karar verir.
+      zigbee: {
+        serialSupported: settingsStore.serialSupported,
+        defaultPort: defaultCoordinatorPort,
+        coordinatorRestart: coordinatorRestartSummary()
+      },
       network: getNetworkInfo(),
       // Doğrudan modda kütüphaneye eklenen harici cihaz tanımları; hangi dosyanın yüklendiği
       // (ve hangisinin patladığı) tek bakışta görülsün diye ayarlarla birlikte dönülür.
@@ -1953,6 +1959,129 @@ app.post<{ Body?: { confirmation?: string } }>("/api/settings/apply", async (req
   const timer = setTimeout(() => process.kill(process.pid, "SIGTERM"), 750);
   timer.unref();
   return { ok: true, restarting: true };
+});
+
+/**
+ * SİSTEM UÇLARI — panelden servisi ve koordinatörün telsiz çipini yeniden başlatma.
+ *
+ * Yetki: iki yol da `access-control.ts` tablolarının HİÇBİRİNDE yok, dolayısıyla yönetici ister.
+ * Bilerek böyle: ikisi de evin kumandasını saniyeler boyunca kesiyor, ev sakini düğmesi değil.
+ */
+
+/** Servis inip kalkana kadar geçen tahmini süre; panel bunun üstünden geri sayar. */
+const serviceRestartEstimateSeconds = 25;
+/** Telsiz çipi resetlenip ağ toparlanana kadar geçen tahmini süre. */
+const coordinatorRestartEstimateSeconds = 30;
+
+type CoordinatorRestartReason = "ok" | "not-configured" | "serial" | "invalid-address";
+
+interface CoordinatorRestartCapability {
+  supported: boolean;
+  reason: CoordinatorRestartReason;
+  /** Yalnız `tcp://` adreste dolu olur; panele gösterilmez, isteği kurmak için kullanılır. */
+  host: string | null;
+}
+
+/**
+ * KOORDİNATÖR ADRESİ KODA GÖMÜLMEZ. Ürün çok evli: her evin köprüsü başka adreste durur.
+ * Tek doğru kaynak, Zigbee2MQTT `configuration.yaml`'daki `serial.port` değerinden türeyen
+ * `config.zigbee.serial.path`; host da oradan çıkarılır. Adres bir USB seri yolsa "uzaktan
+ * telsiz reseti" diye bir şey yoktur — yetenek `supported:false` döner, panel düğmeyi kapatır.
+ */
+const coordinatorRestartCapability = (): CoordinatorRestartCapability => {
+  const configuredPath = config.zigbee?.serial.path;
+  if (config.mode !== "direct" || config.setupPending || !configuredPath) {
+    return { supported: false, reason: "not-configured", host: null };
+  }
+  let address;
+  try {
+    address = parseCoordinatorAddress(configuredPath);
+  } catch {
+    return { supported: false, reason: "invalid-address", host: null };
+  }
+  if (address.kind !== "tcp" || !address.host) {
+    return { supported: false, reason: "serial", host: null };
+  }
+  return { supported: true, reason: "ok", host: address.host };
+};
+
+/** Panele giden özet: adres burada da AÇILMAZ, yalnız "yapılabilir mi" ve gerekçesi gider. */
+const coordinatorRestartSummary = (): { supported: boolean; reason: CoordinatorRestartReason } => {
+  const capability = coordinatorRestartCapability();
+  return { supported: capability.supported, reason: capability.reason };
+};
+
+/**
+ * Servisi yeniden başlat. Yanıt ÖNCE gider (202), süreç sonra iner: panel gövdedeki tahmini
+ * süreyle geri sayabilsin. `process.exit(0)` doğrudan çağrılmaz — SIGTERM düzgün kapanışı
+ * tetikler (`shutdown`: otomasyon günlüğü diske iner, kaynak ve HTTP kapanır) ve kapanışın
+ * sonunda süreç sıfır koduyla biter. Standalone runtime içinde gömülü çalışırken de aynı
+ * sinyal `apps/runtime/main.cjs`'in kendi kapanışını çalıştırır. Geri getiren şey systemd:
+ * `deploy/villa-bridge.service` içinde `Restart=always` + `RestartSec=5`.
+ */
+app.post<{ Body?: { confirmation?: unknown } }>("/api/system/restart", async (request, reply) => {
+  if (request.body?.confirmation !== "RESTART") {
+    return reply.code(400).send({ ok: false, error: "Yeniden başlatma onayı geçersiz." });
+  }
+  console.log("Panelden servis yeniden başlatma istendi.");
+  const timer = setTimeout(() => process.kill(process.pid, "SIGTERM"), 750);
+  timer.unref();
+  return reply.code(202).send({
+    ok: true,
+    restarting: true,
+    estimatedSeconds: serviceRestartEstimateSeconds
+  });
+});
+
+/**
+ * Koordinatörün TELSİZ ÇİPİNİ yeniden başlat (SLZB ve benzeri ağ köprüleri: `action=4&cmd=1`,
+ * yani ZB_RST). Çip kilitlenip her komut `BUFFER_FULL` ile düştüğünde tek çıkış yolu budur.
+ *
+ * BİLEREK YALNIZ `cmd=1`. `cmd=9` (fabrika ayarlarına dönüş) ve `cmd=2` (bootloader) bu koda
+ * ASLA girmemeli: ikisi de ağ anahtarını ve eşleşmiş cihaz listesini geri dönüşsüz siler,
+ * yani evdeki bütün cihazların yeniden eşleştirilmesi gerekir. `cmd=3` (ESP32 reboot) de
+ * yoktur — sorunu çözen çip reseti, kartın kendisinin yeniden başlaması değil.
+ *
+ * Köprüye yalnız bu tek GET gider; koordinatörün seri/TCP oturumuna dokunulmaz.
+ */
+app.post("/api/system/coordinator-restart", async (_request, reply) => {
+  const capability = coordinatorRestartCapability();
+  if (!capability.supported || !capability.host) {
+    const serial = capability.reason === "serial";
+    return reply.code(serial ? 409 : 503).send({
+      ok: false,
+      reason: capability.reason,
+      error: serial
+        ? "Koordinatör USB seri yolla bağlı; telsiz çipi uzaktan yeniden başlatılamaz."
+        : "Koordinatör adresi tanımlı değil; telsiz çipi yeniden başlatılamaz."
+    });
+  }
+  const target = new URL("/api2", `http://${capability.host}`);
+  target.searchParams.set("action", "4");
+  target.searchParams.set("cmd", "1");
+  try {
+    const response = await fetch(target, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) {
+      recentErrors.record({
+        operation: "coordinator-restart",
+        statusCode: response.status,
+        message: `Koordinatör köprüsü ${response.status} yanıtı verdi.`
+      });
+      return reply.code(502).send({
+        ok: false,
+        error: `Koordinatör köprüsü ${response.status} yanıtı verdi.`
+      });
+    }
+    console.log("Koordinatörün telsiz çipi panelden yeniden başlatıldı.");
+    return { ok: true, estimatedSeconds: coordinatorRestartEstimateSeconds };
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    const message = timedOut
+      ? "Koordinatör köprüsüne 5 saniyede ulaşılamadı."
+      : `Koordinatör köprüsüne ulaşılamadı: ${error instanceof Error ? error.message : String(error)}`;
+    recentErrors.record({ operation: "coordinator-restart", statusCode: 504, message });
+    return reply.code(504).send({ ok: false, error: message });
+  }
 });
 
 app.post<{ Body?: { open?: boolean } }>("/api/matter/commissioning", async (request, reply) => {

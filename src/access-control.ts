@@ -72,6 +72,11 @@ const residentRoutes = new Set([
   "POST /api/auth/logout"
 ]);
 
+// `POST /api/system/restart` ve `POST /api/system/coordinator-restart` de bilerek listelenmedi:
+// listelenmeyen her yol yönetici ister. İkisi de evin kumandasını saniyeler boyunca kesiyor
+// (biri servisi indiriyor, öbürü koordinatörün telsiz çipini resetliyor) — bu bir ev sakini
+// düğmesi değil, kurulum işidir. Buraya EKLEMEYİN.
+
 // `POST /api/settings/zigbee-adapter/test` bilerek YUKARIDAKİ TABLOLARIN HİÇBİRİNDE yok:
 // listelenmeyen her yol yönetici ister ve bu uç tam olarak onu istiyor. Ev sakinine açılsaydı,
 // evin panelinde oturan herkes sunucudan istediği adrese TCP bağlantısı denettirebilirdi —
