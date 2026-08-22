@@ -10,7 +10,10 @@ User=villa-bridge
 Group=villa-bridge
 WorkingDirectory=/opt/villa-bridge
 Environment=VILLA_BRIDGE_NODE_ROLE=server
-ExecStart=/usr/local/bin/node /opt/villa-bridge/apps/runtime/main.cjs --platform=linux --core-host=0.0.0.0 --core-entrypoint=/opt/villa-bridge/dist/index.js --mqtt-host=0.0.0.0 --data-dir=/var/lib/villa-bridge
+# Node yolu sabitlenmiyor: iki kurulum yolu var - install-node.sh /usr/local/bin/node
+# sembolik bagini olusturur, Debian paketi ise /usr/bin/node kurar. systemd PATH'i
+# (/usr/local/bin:/usr/bin:/bin) her ikisini de cozer.
+ExecStart=/usr/bin/env node /opt/villa-bridge/apps/runtime/main.cjs --platform=linux --core-host=0.0.0.0 --core-entrypoint=/opt/villa-bridge/dist/index.js --mqtt-host=0.0.0.0 --data-dir=/var/lib/villa-bridge
 Restart=always
 RestartSec=5
 TimeoutStopSec=45
