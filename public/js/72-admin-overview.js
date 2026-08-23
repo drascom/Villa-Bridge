@@ -60,8 +60,8 @@
     ];
   }
 
-  /* Sayı döşemeleri. `genHomeHealthModel` cihaz tarafının tek doğrusu, `genSceneCatalog`
-     otomasyon tarafının; ikisi de saf. */
+  /* Sayı döşemeleri. Hızlı sahne kataloğu artık yalnız `manual:true` kayıtları içerir; yönetici
+     özeti ise elle ve otomatik çalışan bütün kuralları saymalıdır. */
   function adminOverviewStats(health,catalog){
     return[
       {key:"adminStatDevices",value:String(health.deviceCount),note:health.unknown?t("adminStatUnknownNote",{count:health.unknown}):"",tone:"plain"},
@@ -75,7 +75,7 @@
     const statBox=$("#adminOverviewStats");
     if(!statBox)return;
     const health=genHomeHealthModel();
-    const catalog=genSceneCatalog();
+    const catalog=Array.isArray(state.automations)?state.automations:[];
     statBox.innerHTML=adminOverviewStats(health,catalog).map(stat=>`
       <article class="admin-stat" data-tone="${stat.tone}">
         <span class="admin-stat-label">${esc(t(stat.key))}</span>

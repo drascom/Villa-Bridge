@@ -45,6 +45,12 @@
      listenin tamamını gösterir. Şeridin seçili bir hâli YOKTUR (sekme değil, eylem), bu yüzden
      `villa-home-tab` kaydı da kalktı: cihazda saklanacak bir tercih kalmadı. */
   const homeSceneLimit=4;
+  /* Kurulumla gelen dört örnek sahne hızlı şeridin sabit sırasıdır. Kimlik ad değildir; dil
+     değişse de aynı gerçek otomasyonlar bulunur. Kullanıcının öbür elle çalıştırılan kuralları
+     Rutinler ekranında kalır. */
+  const quickSceneExampleIds=[
+    "quick-leave-home","quick-night","quick-guests","quick-all-lights-off"
+  ];
   /* Ayarlar sayfasının iki sekmesi. ROL AYRIMI DEĞİL: bölümün tamamı yöneticiye ait, sekme
      yalnız kalabalığı ikiye böler. Tercih cihazda kalır. */
   const settingsTabStorageKey="villa-settings-tab";

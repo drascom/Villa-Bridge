@@ -1,14 +1,18 @@
-  /* HIZLI SAHNELER (not §6.2). Şerit oda sekmesi değil, tek dokunuşluk rutin çalıştırma alanı.
-     Liste ELLE KURULMAZ: `35-generator.js`in `genSceneCatalog`ı otomasyonları olduğu gibi verir —
-     rutin ayrı bir altyapı değildir, ayrı bir depo da açılmaz.
+  /* HIZLI SAHNELER (not §6.2). Şerit oda sekmesi değil, tek dokunuşluk sahne çalıştırma alanı.
+     Liste ELLE KURULMAZ: `35-generator.js`in `genSceneCatalog`ı aynı otomasyon deposundaki
+     `manual:true` kayıtları verir; zaman/sensör kuralları burada görünmez.
 
      Süzgeç TEK: kapalı kural ana ekranın şeridine çıkmaz. Elle çalıştırma motor tarafında
      `enabled` bayrağına bakmaz, ama ev sakininin ana ekranında kapattığı bir kuralın düğmesi
      durursa "kapalı mı açık mı" sorusu doğar; kapalı kurallar Rutinler görünümünde, kendi
      durumlarıyla birlikte kalır. Şerit ilk dördü gösterir (not §6.2: dört sütun), gerisi yine
      Rutinler görünümünde. */
-  const sceneIconKind=scene=>scene?.kind==="routine"?"routine":"reactive";
-  const homeSceneItems=()=>genSceneCatalog(state.automations).filter(scene=>scene.enabled).slice(0,homeSceneLimit);
+  const sceneIconKind=scene=>scene?.kind==="manual"?"manual":scene?.kind==="routine"?"routine":"reactive";
+  const homeSceneItems=()=>genSceneCatalog(state.automations).filter(scene=>scene.enabled).sort((left,right)=>{
+    const leftIndex=quickSceneExampleIds.indexOf(left.id);
+    const rightIndex=quickSceneExampleIds.indexOf(right.id);
+    return(leftIndex<0?quickSceneExampleIds.length:leftIndex)-(rightIndex<0?quickSceneExampleIds.length:rightIndex);
+  }).slice(0,homeSceneLimit);
   /* Kartta YALNIZ ikon ve kısa eylem başlığı var: açıklama paragrafı ana ekranda yasak (not §12).
      Tam ad `title` ile taşınır, çünkü uzun Türkçe adlar tek satırda kırpılabilir. */
   function homeSceneHtml(scene){

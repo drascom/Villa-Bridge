@@ -427,7 +427,11 @@ const automationSchema = {
     id: { type: "string", description: "Assigned by the server on create; never write it yourself." },
     name: { type: "string", description: "1..64 characters, shown to the user." },
     enabled: { type: "boolean" },
-    triggers: { type: "array", minItems: 1, maxItems: 8, items: automationTriggerSchema },
+    manual: {
+      type: "boolean",
+      description: "True for a user-run scene. Manual scenes must have an empty triggers array."
+    },
+    triggers: { type: "array", maxItems: 8, items: automationTriggerSchema },
     conditions: { type: "array", maxItems: 4, items: automationConditionSchema },
     conditionMode: {
       type: "string",
@@ -464,6 +468,7 @@ const listAutomationsOutputSchema = {
           id: { type: "string", description: "Pass this to `get_automation`, `write_automation` and `control_automation`." },
           name: { type: "string" },
           enabled: { type: "boolean" },
+          manual: { type: "boolean" },
           triggers: { type: "array", items: { type: "string" }, description: "Readable summary, one line per trigger." },
           conditions: { type: "array", items: { type: "string" } },
           actions: { type: "array", items: { type: "string" } },
@@ -475,7 +480,7 @@ const listAutomationsOutputSchema = {
           },
           agent: automationAgentSchema
         },
-        required: ["id", "name", "enabled", "triggers", "conditions", "actions", "lastRun", "agent"],
+        required: ["id", "name", "enabled", "manual", "triggers", "conditions", "actions", "lastRun", "agent"],
         additionalProperties: false
       }
     }
@@ -504,7 +509,11 @@ const writeAutomationInputSchema = {
       properties: {
         name: { type: "string" },
         enabled: { type: "boolean" },
-        triggers: { type: "array", minItems: 1, maxItems: 8, items: automationTriggerSchema },
+        manual: {
+          type: "boolean",
+          description: "True for a user-run scene. Manual scenes must have an empty triggers array."
+        },
+        triggers: { type: "array", maxItems: 8, items: automationTriggerSchema },
         conditions: { type: "array", maxItems: 4, items: automationConditionSchema },
         conditionMode: { type: "string", enum: ["all", "any"] },
         actions: { type: "array", minItems: 1, maxItems: 8, items: automationActionSchema }
@@ -956,6 +965,7 @@ const automationView = (automation: Automation): JsonObject => ({
   id: automation.id,
   name: automation.name,
   enabled: automation.enabled,
+  ...(automation.manual === true ? { manual: true } : {}),
   triggers: automation.triggers as unknown as JsonObject[],
   conditions: automation.conditions as unknown as JsonObject[],
   ...(automation.conditionMode === undefined ? {} : { conditionMode: automation.conditionMode }),
@@ -991,6 +1001,7 @@ const listAutomations = (
       id: automation.id,
       name: automation.name,
       enabled: automation.enabled,
+      manual: automation.manual === true,
       triggers: automation.triggers.map((trigger) => triggerText(trigger, label)),
       conditions: automation.conditions.map((condition) => conditionText(condition, label)),
       actions: automation.actions.map((action) => actionText(action, label)),

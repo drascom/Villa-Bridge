@@ -606,13 +606,16 @@
   const AUTOMATION_GEAR_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>';
   const automationCardHtml=automation=>{
     const trigger=automation.triggers?.[0];
+    const manual=automation.manual===true;
     const actions=(automation.actions||[]).filter(Boolean);
     const action=actions.find(item=>item.type==="device")||actions[0];
-    if(!trigger||!action)return"";
+    if((!trigger&&!manual)||!action)return"";
     // Eşleme kuralı tek satırda iki yönü birden anlatır; kart özeti sihirbazdaki cümleyle tutarlıdır.
     const map=automationMapView(automation);
     const first=map?map.targets[0]:null;
-    const line=map
+    const line=manual
+      ?t("automationManualCardLine",{action:automationActionName(action)})
+      :map
       ?(map.kind==="sun"
         ?automationSunMapCardLine(automationActionName(first.target),first.onMode,first.offMode)
         :automationMapCardLine(automationTriggerDeviceName(map.trigger),automationActionName(first.target),first.onMode,first.offMode))
@@ -728,6 +731,63 @@
     state.automations=Array.isArray(data.automations)?data.automations:automations;
     renderAutomations();
     if(successKey)showToast(t(successKey));
+  }
+  /* İlk dört hızlı sahne gerçek otomasyon kaydıdır; örnek düğme ya da ayrı bir sahne deposu
+     değildir. Yalnız yönetici oturumunda, yalnız eksik kimlikler eklenir. Eylemler cihazın
+     sunduğu ve "ışık" diye sınıflandırdığı güvenli kanallardan türetilir; kilit/siren gibi
+     korumalı cihazlar bu listeye hiçbir koşulda girmez. */
+  const quickSceneExamples=[
+    {id:quickSceneExampleIds[0],name:"quickSceneLeaveHome",mode:"off"},
+    {id:quickSceneExampleIds[1],name:"quickSceneNight",mode:"night"},
+    {id:quickSceneExampleIds[2],name:"quickSceneGuests",mode:"guest"},
+    {id:quickSceneExampleIds[3],name:"quickSceneAllLightsOff",mode:"off"}
+  ];
+  const quickSceneLightControls=()=>state.devices.flatMap(device=>{
+    if(isProtectedDevice(device))return[];
+    return automationControls(device)
+      .filter(control=>control.category==="light"||device.category==="light")
+      .map(control=>({device,control}));
+  });
+  const quickSceneLevelControls=lights=>lights.flatMap(({device,control})=>
+    automationValueControls(device,control.id)
+      .filter(candidate=>candidate.kind==="level")
+      .map(candidate=>({device,control:candidate})));
+  const quickSceneAction=(device,control,value)=>({
+    type:"device",deviceId:device.id,property:control.property,controlId:control.id,value
+  });
+  const quickSceneActions=(mode,lights,levels)=>{
+    if(mode==="night"&&levels.length)return levels.slice(0,automationMaxActions)
+      .map(({device,control})=>quickSceneAction(device,control,automationValueRaw(control,20)));
+    if(mode==="guest"&&levels.length)return levels.slice(0,automationMaxActions)
+      .map(({device,control})=>quickSceneAction(device,control,automationValueRaw(control,70)));
+    const on=mode==="guest";
+    return lights.slice(0,automationMaxActions)
+      .map(({device,control})=>quickSceneAction(device,control,automationControlValue(control,on)));
+  };
+  async function ensureQuickSceneExamples(){
+    if(state.auth.elevated!==true)return;
+    const lights=quickSceneLightControls();
+    if(!lights.length)return;
+    const levels=quickSceneLevelControls(lights);
+    try{
+      const data=await api("/api/automations");
+      const automations=Array.isArray(data.automations)?data.automations:[];
+      const ids=new Set(automations.map(item=>item?.id));
+      const additions=quickSceneExamples.filter(example=>!ids.has(example.id)).map(example=>({
+        id:example.id,
+        name:t(example.name),
+        enabled:true,
+        manual:true,
+        triggers:[],
+        conditions:[],
+        actions:quickSceneActions(example.mode,lights,levels)
+      })).filter(entry=>entry.actions.length>0).slice(0,Math.max(0,64-automations.length));
+      if(!additions.length)return;
+      await persistAutomations([...automations,...additions],null);
+      renderHomeScenes();
+      renderRoutines();
+      showToast(t("quickSceneExamplesAdded",{count:additions.length}));
+    }catch(error){showToast(error.message,true)}
   }
   // ————— evin konumu. Okuma ev modunda açık, yazma yönetici modu işi: ev modunda alanlar
   // salt-okunur. Gizleme bir yetki değil, sunucu aynı kuralı her istekte yeniden uygular.
@@ -918,7 +978,7 @@
   function routineCardHtml(scene){
     const busy=commandPending(scene.id,sceneCommandProperty);
     const notes=[
-      t(scene.kind==="routine"?"routineKindScheduled":"routineKindReactive"),
+      t(scene.kind==="manual"?"routineKindManual":scene.kind==="routine"?"routineKindScheduled":"routineKindReactive"),
       t("routineActionCount",{count:scene.actionCount}),
       scene.lastRunAt?t("routineLastRun",{when:ago(scene.lastRunAt)}):t("routineNeverRun")
     ];
@@ -975,6 +1035,7 @@
     automationDraftToCopy();
   }
   const automationTriggerChoices=[
+    {kind:"manual",glyph:"▶",label:"automationTriggerManual",ready:true},
     {kind:"time",glyph:"🕐",label:"automationTriggerTime",ready:true},
     {kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:true},
     {kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:true},
@@ -1030,7 +1091,9 @@
     const part=automationSunPart(wizard,event);
     return{type:"sun",event,offsetMinutes:part.offset,days:[...part.days].sort((left,right)=>left-right)};
   };
-  const automationWizardTrigger=wizard=>wizard.triggerKind==="button"
+  const automationWizardTrigger=wizard=>wizard.triggerKind==="manual"
+    ?null
+    :wizard.triggerKind==="button"
     ?{type:"deviceAction",deviceId:wizard.triggerDeviceId,action:wizard.triggerAction}
     :wizard.triggerKind==="sun"
     ?automationSunTriggerFor(wizard,"sunset")
@@ -1044,7 +1107,9 @@
       ...(wizard.triggerEquals===null||wizard.triggerEquals===undefined?{}:{equals:wizard.triggerEquals})})
     :{type:"time",at:automationTimeText(wizard),days:[...wizard.days].sort((left,right)=>left-right)};
   // Kaydedilecek tetikleyici listesi: güneşin iki olaylı yolunda iki satır, öbür yollarda tek.
-  const automationWizardTriggers=wizard=>automationSunBoth(wizard)
+  const automationWizardTriggers=wizard=>wizard.triggerKind==="manual"
+    ?[]
+    :automationSunBoth(wizard)
     ?[automationSunTriggerFor(wizard,"sunset"),automationSunTriggerFor(wizard,"sunrise")]
     :[automationWizardTrigger(wizard)];
   // Motor eylem başına sınırlıdır (`maxAutomationActions` = 8). Eşleme yolunda bir hedef iki eylem
@@ -1089,7 +1154,9 @@
     if(kind==="scene")return automationGroupName(target.groupId);
     return automationActionName(automationTargetRef(target));
   };
-  const automationDefaultName=(trigger,target)=>(trigger.type==="time"
+  const automationDefaultName=(trigger,target)=>(!trigger
+    ?t("automationDefaultNameManual",{device:automationTargetName(target)})
+    :trigger.type==="time"
     ?t("automationDefaultName",{device:automationTargetName(target),time:trigger.at})
     :trigger.type==="sun"
     ?t("automationDefaultName",{device:automationTargetName(target),time:t(trigger.event==="sunrise"?"automationSunriseWord":"automationSunsetWord")})
@@ -1107,7 +1174,9 @@
       ?automationSunMapSentence(name,onMode,offMode)
       :automationMapSentence(automationTriggerLabelName(wizard),name,onMode,offMode);
   };
-  const automationWizardSentence=wizard=>automationMappingMode(wizard)
+  const automationWizardSentence=wizard=>wizard.triggerKind==="manual"
+    ?t("automationManualSentence",{device:automationTargetName(automationFirstTarget(wizard))})
+    :automationMappingMode(wizard)
     ?automationWizardMapSentence(wizard)
     :automationSentence(automationWizardTrigger(wizard),automationTargetRef(automationFirstTarget(wizard)));
   // Eşleme formundan kaydedilecek eylemler: her yön için uygun `when` taşıyan bir eylem.
@@ -1220,7 +1289,7 @@
       stage:existing?"name":"path",
       id:existing?.id||null,
       enabled:existing?existing.enabled!==false:true,
-      triggerKind:automationTriggerKind(trigger),
+      triggerKind:existing?.manual===true?"manual":automationTriggerKind(trigger),
       hour:timed?Number(trigger.at.slice(0,2)):19,
       minute:timed?Number(trigger.at.slice(3,5)):0,
       days:timed?[...(trigger.days||automationWeekDays)]
@@ -2267,6 +2336,7 @@
     automationMappingMode(wizard)?automationTriggerChannelName(wizard):""
   );
   const automationTriggerLine=wizard=>{
+    if(wizard.triggerKind==="manual")return t("automationLineManual");
     if(wizard.triggerKind==="time"){
       const time=automationStrong(automationTimeText(wizard));
       return automationEveryDay(wizard.days)
@@ -2349,7 +2419,9 @@
     return choice?choice.glyph:"›";
   };
   // Tamamlanmış tetikleyiciye tıklayınca hangi soru yeniden açılır: alt öğe sorusu varsa o, yoksa cihaz.
-  const automationTriggerEditStage=wizard=>wizard.triggerKind==="time"
+  const automationTriggerEditStage=wizard=>wizard.triggerKind==="manual"
+    ?"kind"
+    :wizard.triggerKind==="time"
     ?"time"
     :wizard.triggerKind==="sun"
     ?"sun"
@@ -2797,7 +2869,7 @@
     if(leaving)leaving.classList.add("automation-leaving");
     automationAdvanceTimer=setTimeout(apply,190);
   }
-  const automationTriggerReady=wizard=>wizard.triggerKind==="time"||wizard.triggerKind==="sun"?true
+  const automationTriggerReady=wizard=>wizard.triggerKind==="manual"||wizard.triggerKind==="time"||wizard.triggerKind==="sun"?true
     :wizard.triggerKind==="button"?Boolean(wizard.triggerDeviceId&&wizard.triggerAction)
     :automationDeviceKinds.includes(wizard.triggerKind)?Boolean(wizard.triggerDeviceId&&wizard.triggerProperty):false;
   const automationDraftMapReady=wizard=>Boolean(wizard.draftTargetId&&wizard.draftProperty)
@@ -2810,7 +2882,7 @@
   // Tetikleyici tamamlanınca sıradaki soru beklemedir: "tetiklendi → bekle → yap" bu sırayla sorulur.
   const automationAfterTrigger=wizard=>wizard.targets.length?automationAfterTargets(wizard):"wait";
   const automationNextStage=wizard=>{
-    if(wizard.stage==="kind")return wizard.triggerKind==="time"?"time":wizard.triggerKind==="sun"?"sun":"trigDevice";
+    if(wizard.stage==="kind")return wizard.triggerKind==="manual"?automationAfterTrigger(wizard):wizard.triggerKind==="time"?"time":wizard.triggerKind==="sun"?"sun":"trigDevice";
     if(wizard.stage==="time"||wizard.stage==="sun"||wizard.stage==="trigEvent"||wizard.stage==="trigThreshold")return automationAfterTrigger(wizard);
     if(wizard.stage==="trigDevice")return wizard.triggerNumeric?"trigThreshold":"trigEvent";
     // Bekleme adımı atlanabilir: hedef yoksa eylem sorusuna, varsa (düzenlemede) sonrasına geçer.
@@ -2986,7 +3058,7 @@
       wizard.triggerKind=kind;
       wizard.triggerQuery="";
       wizard.triggerTab="all";
-      wizard.stage=kind==="time"?"time":kind==="sun"?"sun":"trigDevice";
+      wizard.stage=kind==="manual"?automationAfterTrigger(wizard):kind==="time"?"time":kind==="sun"?"sun":"trigDevice";
     });
   }
   function automationClearTriggerDevice(wizard){
@@ -2998,7 +3070,7 @@
   }
   // §8.2 — tetikleyici değişince onun kendi kanalını çalıştıran hedef düşer; döngü hiç kurulmaz.
   function automationPruneTargets(wizard){
-    if(wizard.triggerKind==="time")return;
+    if(wizard.triggerKind==="manual"||wizard.triggerKind==="time")return;
     if(wizard.triggerKind==="button"){
       wizard.targets=wizard.targets.filter(target=>target.deviceId!==wizard.triggerDeviceId);
       return;
@@ -3886,9 +3958,9 @@
     const trigger=triggers[0];
     // §8.2 — yalnız tetikleyen kanalın kendisi engellenir; buton yolunda kanal yok, cihaz engellenir.
     const deviceActions=actions.filter(action=>action.type==="device");
-    const loops=trigger.type==="deviceState"
+    const loops=trigger?.type==="deviceState"
       ?deviceActions.some(action=>automationChannelKey(action.deviceId,action.property)===automationChannelKey(trigger.deviceId,trigger.property))
-      :trigger.type==="deviceAction"&&deviceActions.some(action=>action.deviceId===trigger.deviceId);
+      :trigger?.type==="deviceAction"&&deviceActions.some(action=>action.deviceId===trigger.deviceId);
     if(loops){showToast(t("automationLoopWarning"),true);return}
     const buttons=automationNextButtons();
     buttons.forEach(button=>{button.disabled=true});
@@ -3896,6 +3968,7 @@
       id:wizard.id||automationNewId(),
       name:automationWizardName(wizard),
       enabled:wizard.enabled!==false,
+      ...(wizard.triggerKind==="manual"?{manual:true}:{}),
       triggers,
       conditions:wizard.conditions.map(condition=>({...condition})),
       actions,

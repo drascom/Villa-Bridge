@@ -3255,6 +3255,18 @@
     #home .widget-rail .group-empty,
     #home .widget-rail .ov-hidden-note,
     #home .widget-rail [data-edit-group]{display:none!important}
+    /* Favoriler oda özeti değildir: yıldızlanan gerçek eylemleri doğrudan ana ekranda gösterir.
+       Genel oda kartları kompakt kalırken yalnız bu kartın eylem ızgarası geri açılır. */
+    #home .widget-rail .favorites-widget{display:grid;grid-template-rows:auto minmax(0,1fr)}
+    #home .widget-rail .favorites-widget .group-widget-head{height:auto}
+    #home .widget-rail .favorites-widget .group-control-grid{
+      display:grid!important;
+      min-height:0;
+      margin-top:10px;
+      overflow-y:auto;
+      scrollbar-width:none;
+    }
+    #home .widget-rail .favorites-widget .group-control-grid::-webkit-scrollbar{display:none}
     #home .widget-scroll-hint{display:none!important}
 
     /* Günlük başlıkta yalnız evin sağlık bilgisi kalır; yönetim eylemleri kendi modundadır. */
@@ -3456,11 +3468,23 @@
       white-space:normal;
     }
     #rooms .room-master-track,
-    #rooms .group-control-grid,
     #rooms .group-empty,
-    #rooms .ov-hidden-note,
     #rooms .ov-switch-wrap,
     #rooms [data-edit-group]{display:none!important}
+    /* Odalar ekranı kartın ayrıntı yüzüdür. Burada eylemler ve kart-başına göz/yıldız
+       tercihleri görünür; ana ekranın 154 px'lik özet kartları değişmeden kalır. */
+    #rooms .room-card{height:auto;min-height:232px}
+    #rooms .group-widget-head{height:auto}
+    #rooms .group-control-grid{
+      display:grid!important;
+      min-height:78px;
+      max-height:210px;
+      margin-top:12px;
+      overflow-y:auto;
+      scrollbar-width:none;
+    }
+    #rooms .group-control-grid::-webkit-scrollbar{display:none}
+    #rooms .ov-hidden-note{display:block;margin-top:8px}
 
     body[data-active-view="home"] #home .home-heading,
     body[data-active-view="home"] #home .home-section-head h2{color:var(--glass-plate-ink);text-shadow:var(--glass-plate-shadow)}
@@ -3613,7 +3637,7 @@
       .view>.page-head{min-height:52px}
       .page-head-title h1{font-size:30px}
       #rooms .room-card-grid,#routines .routine-list,.system-hub-grid{grid-template-columns:1fr}
-      #rooms .room-card{height:148px;min-height:148px;padding:15px}
+      #rooms .room-card{height:auto;min-height:232px;padding:15px}
       #routines .routine-card{min-height:124px;padding:16px}
       #connections .connection-card{min-height:260px;padding:18px}
       .system-hub-card{min-height:132px;padding:16px}

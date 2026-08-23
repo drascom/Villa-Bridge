@@ -182,23 +182,18 @@
     return genCardModelForGroup({id:genUngroupedCardId,name:null,nameKey:"noRoomGroup",items,locked:true},list);
   };
 
-  /* Sahne kataloğu. Rutin ayrı bir altyapı DEĞİL: her otomasyon `POST /api/automations/:id/run` ile
-     elle çalıştırılabilir, motor bunu yaparken `enabled` bayrağına bakmaz. Bu yüzden liste süzülmez;
-     `enabled` bilgisi olduğu gibi taşınır, kararı gösterim katmanı verir.
-
-     `kind` yalnız tetikleyicinin CİNSİNİ söyler: tüm tetikleyicileri zaman/güneş olan kural bir
-     rutindir, olay dinleyen kural tepkiseldir. İkisi de elle tetiklenebilir. */
-  const genScheduleTriggerTypes=new Set(["time","sun"]);
+  /* Sahne kataloğu ayrı bir depo değildir; yalnız `manual:true` olan gerçek otomasyonların
+     kullanıcı yüzüdür. Zaman, güneş, sensör ve düğme tetikleyicili kurallar Otomasyonlar
+     ekranında kalır ve hızlı sahnelere sızmaz. */
   const genSceneCatalog=automations=>{
     const list=Array.isArray(automations)?automations:state.automations;
-    return(Array.isArray(list)?list:[]).filter(entry=>entry&&typeof entry.id==="string").map(entry=>{
+    return(Array.isArray(list)?list:[]).filter(entry=>entry?.manual===true&&typeof entry.id==="string").map(entry=>{
       const triggers=Array.isArray(entry.triggers)?entry.triggers:[];
-      const scheduled=triggers.length>0&&triggers.every(trigger=>genScheduleTriggerTypes.has(trigger?.type));
       return{
         id:entry.id,
         name:typeof entry.name==="string"&&entry.name?entry.name:entry.id,
         enabled:entry.enabled!==false,
-        kind:scheduled?"routine":"reactive",
+        kind:"manual",
         triggerCount:triggers.length,
         actionCount:Array.isArray(entry.actions)?entry.actions.length:0,
         runPath:`/api/automations/${encodeURIComponent(entry.id)}/run`,

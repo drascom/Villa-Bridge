@@ -92,6 +92,7 @@
          şimşek. Ayrım `genSceneCatalog`ın `kind` alanından gelir, ada bakan hiçbir kural yok. */
       routine:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
       reactive:'<path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/>',
+      manual:'<circle cx="12" cy="12" r="8.5"/><path d="m10 8 6 4-6 4V8Z"/>',
       group:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'
     };
     return`<svg class="device-type-svg" viewBox="0 0 24 24" aria-hidden="true">${icons[kind]||icons.sensor}</svg>`;
@@ -199,8 +200,11 @@
      ondan sonra bu kartınki kaldırılır. Böylece "her yerde gizliydi" tercihi öteki kartlarda
      aynen sürer — kimse tercihini kaybetmez. Göç kullanıcının o karta baktığı anda olur, yani
      oda listesinin yüklü olduğu an: erken çalışıp boş listeye göç etmesi mümkün değil. */
-  function toggleTileVisibility(scope,deviceId,controlId){
+  let visibilityMutation=0;
+  async function toggleTileVisibility(scope,deviceId,controlId){
     if(!deviceId||!scope)return;
+    const previous=new Set(state.hiddenTiles);
+    const mutation=++visibilityMutation;
     const key=tileVisibilityKey(scope,deviceId,controlId);
     const legacy=legacyTileVisibilityKey(deviceId,controlId);
     if(state.hiddenTiles.has(legacy)){
@@ -212,13 +216,18 @@
     }
     if(state.hiddenTiles.has(key))state.hiddenTiles.delete(key);
     else state.hiddenTiles.add(key);
-    void saveHomeVisibility();
+    render();
+    if(await saveHomeVisibility()||mutation!==visibilityMutation)return;
+    state.hiddenTiles=previous;
+    cacheVisibility();
     render();
   }
   /* Cihaz detayındaki göz TEK kartın değil, cihazın kararını verir: gizle = her kartta gizle
      (kapsamsız kayıt), göster = kapsamlı/kapsamsız bütün gizleme kayıtlarını kaldır. */
-  function toggleDeviceVisibility(deviceId,controlId){
+  async function toggleDeviceVisibility(deviceId,controlId){
     if(!deviceId)return;
+    const previous=new Set(state.hiddenTiles);
+    const mutation=++visibilityMutation;
     const wanted=controlId||groupDeviceControlId;
     const hidden=isDeviceHiddenAnywhere(deviceId,wanted);
     for(const key of[...state.hiddenTiles]){
@@ -226,7 +235,10 @@
       if(parsed&&parsed.deviceId===deviceId&&parsed.controlId===wanted)state.hiddenTiles.delete(key);
     }
     if(!hidden)state.hiddenTiles.add(legacyTileVisibilityKey(deviceId,wanted));
-    void saveHomeVisibility();
+    render();
+    if(await saveHomeVisibility()||mutation!==visibilityMutation)return;
+    state.hiddenTiles=previous;
+    cacheVisibility();
     render();
   }
   const visibilityIcon=hidden=>hidden
@@ -273,15 +285,21 @@
   }
   /* Sunucu 64 kaydı aşan listeyi reddediyor: kullanıcı sessiz bir hatayla değil, açık bir uyarıyla
      karşılaşsın ve yıldız işaretlenmemiş kalsın. */
-  function toggleFavorite(deviceId,controlId){
+  let favoritesMutation=0;
+  async function toggleFavorite(deviceId,controlId){
     if(!deviceId||!controlId||controlId===groupDeviceControlId)return;
+    const previous=new Set(state.favorites);
+    const mutation=++favoritesMutation;
     const key=favoriteKey(deviceId,controlId);
     if(state.favorites.has(key))state.favorites.delete(key);
     else{
       if(state.favorites.size>=maxHomeFavorites){showToast(t("favoritesFull",{count:maxHomeFavorites}),true);return}
       state.favorites.add(key);
     }
-    void saveHomeFavorites();
+    render();
+    if(await saveHomeFavorites()||mutation!==favoritesMutation)return;
+    state.favorites=previous;
+    cacheFavorites();
     render();
   }
   /* Favori kartının içeriği: kayıttaki SIRAYLA çözülür. Silinen cihaz ya da kalkmış kanal kaydı

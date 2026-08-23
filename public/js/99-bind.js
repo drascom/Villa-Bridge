@@ -264,6 +264,7 @@
       const reload=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),initializeThemeRuntime()];
       if(state.auth.elevated)reload.push(loadSettings());
       await Promise.allSettled(reload);
+      await ensureQuickSceneExamples();
       renderHomeScenes();
       renderRoutines();
       await migrateLocalGroups();
@@ -276,6 +277,7 @@
     const startup=[refresh(),loadHomeGroups(),loadHomeVisibility(),loadHomeFavorites(),loadAutomations(),loadHomeLocation(),loadWeather(),loadWorldClockZones(),loadInstallationOnboarding(),initializeThemeRuntime()];
     if(state.auth.elevated)startup.push(loadSettings());
     await Promise.allSettled(startup);
+    await ensureQuickSceneExamples();
     // Sahne şeridi ve Rutinler listesi otomasyonlar okunduktan SONRA doğar: ilk kare boş kalmasın.
     renderHomeScenes();
     renderRoutines();

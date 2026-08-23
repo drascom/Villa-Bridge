@@ -1013,12 +1013,13 @@ export async function assertHomeLayout(projectRoot) {
   }
 
   /* 12j) GENEL BAKIS BES SEYI DE GOSTERIR VE SAYIYI KENDI UYDURMAZ: cihaz sayisi, cevrimici,
-     otomasyon, dusuk pil, servis sagligi. Cihaz tarafinin tek dogrusu `genHomeHealthModel`,
-     otomasyon tarafinin `genSceneCatalog` (35-generator.js) — ikinci bir sayim kurali yazilamaz. */
+     otomasyon, dusuk pil, servis sagligi. Cihaz tarafinin tek dogrusu `genHomeHealthModel`;
+     otomasyon sayisi `state.automations`in tamamidir. `genSceneCatalog` yalniz elle calisan hizli
+     sahneleri suzdugu icin burada kullanilirsa otomatik kurallar eksik sayilir. */
   const overviewJs = await readFile(path.join(projectRoot, "public", "js", "72-admin-overview.js"), "utf8");
   for (const [needle, label] of [
     ["genHomeHealthModel(", "cihaz sagligi modeli"],
-    ["genSceneCatalog(", "otomasyon katalogu"],
+    ["state.automations", "tum otomasyon kayitlari"],
     ["adminStatDevices", "cihaz sayisi"],
     ["adminStatOnline", "cevrimici"],
     ["adminStatAutomations", "otomasyon"],

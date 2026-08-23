@@ -310,6 +310,11 @@ export interface Automation {
   id: string;
   name: string;
   enabled: boolean;
+  /**
+   * Kullanıcının panelden çalıştırdığı sahne. `true` olduğunda tetikleyici listesi boş olur;
+   * motor bu kaydı zaman/cihaz olaylarında indekslemez, yalnız `run(id)` yolu çalıştırır.
+   */
+  manual?: boolean;
   triggers: AutomationTrigger[];
   conditions: AutomationCondition[];
   /**
@@ -500,8 +505,12 @@ const validateDays = (value: unknown, label: string): number[] => {
   return days;
 };
 
-const validateTriggers = (value: unknown): AutomationTrigger[] => {
-  if (!Array.isArray(value) || value.length === 0 || value.length > maxAutomationTriggers) {
+const validateTriggers = (value: unknown, allowEmpty = false): AutomationTrigger[] => {
+  if (
+    !Array.isArray(value)
+    || (!allowEmpty && value.length === 0)
+    || value.length > maxAutomationTriggers
+  ) {
     throw new Error("Otomasyon tetikleyicileri geçersiz.");
   }
   return value.map((entry) => {
@@ -994,7 +1003,14 @@ export const validateAutomations = (
     // `lastRunAt`/`lastRunOk` gelirse **sessizce düşer**: çalışma durumu tanımın parçası değildir
     // (eski dosyalar ve eski paneller alanı gönderdiği için reddetmek değil, yok saymak doğru).
     const agent = validateAgentStamp(candidate.agent);
-    const triggers = validateTriggers(candidate.triggers);
+    if (candidate.manual !== undefined && typeof candidate.manual !== "boolean") {
+      throw new Error("Otomasyon elle çalıştırma bilgisi geçersiz.");
+    }
+    const manual = candidate.manual === true;
+    const triggers = validateTriggers(candidate.triggers, manual);
+    if (manual && triggers.length > 0) {
+      throw new Error("Elle çalıştırılan otomasyonda otomatik tetikleyici olamaz.");
+    }
     const actions = validateActions(candidate.actions, lookup, groupLookup);
     // Yalnız beklemeden oluşan bir kural hiçbir şey yapmaz; kullanıcı hatasıdır.
     if (actions.every((action) => action.type === "delay")) {
@@ -1076,6 +1092,7 @@ export const validateAutomations = (
       conditions,
       actions
     };
+    if (manual) automation.manual = true;
     // Yalnız "any" korunur; varsayılan alan hiç görünmez (yukarıdaki gerekçe).
     if (conditionMode) automation.conditionMode = conditionMode;
     // Damga da aynı kuraldadır: yoksa yazılmaz, eski dosyalar birebir aynı kalır.
@@ -1107,7 +1124,7 @@ export const removeDeviceFromAutomations = (
         !isAutomationDeviceAction(action) || action.deviceId !== normalizedId)
     }))
     .filter((automation) =>
-      automation.triggers.length > 0
+      (automation.manual === true || automation.triggers.length > 0)
       && automation.actions.some((action) => action.type !== "delay"));
 };
 
