@@ -16,6 +16,8 @@
   // `[data-app-menu]` kancası hepsini birden bağlıyor; ana ekrana dönüş menüdeki Home satırında.)
   $$("[data-view-link]").forEach(button=>button.onclick=()=>activateView(button.dataset.viewLink));
   $b("#closeAppMenu").onclick=closeAppMenu;
+  $b("#closeRoomDetail").onclick=closeRoomDetail;
+  $b("#roomDetailDialog").addEventListener("close",()=>{state.roomDetail=null});
   $b("#appMenuDialog").addEventListener("close",()=>{
     $$("[data-app-menu]").forEach(item=>item.setAttribute("aria-expanded","false"));
     const opener=state.appMenuOpener;
@@ -198,6 +200,7 @@
   }
   $b("#repairDialog").addEventListener("cancel",event=>event.preventDefault());
   bindBackdropClose("#widgetDialog",".add-modal",closeAddDialog);
+  bindBackdropClose("#roomDetailDialog",".room-detail-modal",closeRoomDetail);
   bindBackdropClose("#deviceDetailDialog",".device-detail-modal",closeDeviceDetail);
   bindBackdropClose("#lightDialog",".light-modal",()=>$("#lightDialog").close());
   /* Hızlı kumanda penceresi: kapatma çarpısı, `Esc` ve odak tuzağı `<dialog>`ın kendisinden gelir;

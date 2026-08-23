@@ -138,6 +138,7 @@
     "noRoomGroup": "No room",
     "noRoomCardHint": "These devices have no room · pick one in Devices",
     "showInOverview": "Show in overview",
+    "roomControls": "Room controls",
     "showInOverviewEmpty": "It stays out of the overview until a device is added.",
     "hiddenDevicesNote": "{count} hidden",
     "hiddenDevicesNoteLabel": "{count} devices hidden · open them from Devices",

@@ -405,6 +405,7 @@
     if($("#quickControlDialog").open)renderQuickControl();
     if($("#lightDialog").open)renderLightDialog();
     if($("#deviceDetailDialog").open)renderDeviceDetail();
+    if($("#roomDetailDialog").open)renderRoomDetail();
   }
   /* EVİN DURUMU — BAŞLIKTAKİ HAP. Ana ekrandan kalkan uzun "Evin durumu" kartının taşıdığı tek
      cümle burada: nokta + kısa metin. Sayı `genHomeHealthModel`den gelir (35-generator.js), yani
@@ -623,13 +624,12 @@
   function groupControlEntries(group){
     return cardEntriesFromModel(cardModelForGroup(group));
   }
-  /* Genel görünümde gerçekten kart basılacak mı? Hiç cihazı olmayan grup gibi, tüm cihazları
-     gizlenmiş grup da boş bir kart bırakmaz. Düzenleme kipinde ölçüt gevşer: göz düğmelerine
-     ulaşılabilsin diye kart görünür kalır (`applyWidgetLayout` aynı emniyeti kuruyor). */
+  /* Yeni yalın oda kartı cihaz döşemesi taşımadığı için, içindeki bütün döşemeler gizlense de
+     oda adı ana ekrandan kaybolmaz. Kartın kendisini kaldıran tek karar oda gözüdür; burada
+     yalnız gerçekten hiç öğesi olmayan türetilmiş grupları eleriz. */
   function groupHasVisibleEntries(group){
     const entries=groupControlEntries(group);
-    if(!entries.length)return false;
-    return state.dashboardEditing===true||overviewGroupEntries(entries,groupWidgetId(group.id)).entries.length>0;
+    return entries.length>0;
   }
   function groupDeviceVisualState(device){
     if(device.availability==="offline")return"offline";
@@ -798,6 +798,15 @@
     const label=`${group.name} · ${t("showInOverview")}`;
     return`<span class="ov-switch-wrap"><button class="ov-switch" type="button" role="switch" aria-checked="${active?"true":"false"}"${empty?" disabled aria-disabled=\"true\"":""} data-overview-toggle="${esc(group.id)}" aria-label="${esc(empty?`${label} — ${t("showInOverviewEmpty")}`:label)}"><span class="ov-switch-track" aria-hidden="true"><span class="ov-switch-knob"></span></span><span class="ov-switch-text">${esc(t("showInOverview"))}</span></button>${empty?`<small class="ov-switch-note">${esc(t("showInOverviewEmpty"))}</small>`:""}</span>`;
   }
+  /* Odalar ekranındaki göz, mevcut `hiddenGroups` kaydının kompakt karşılığıdır. Yeni bir
+     görünürlük kuralı üretmez: açık göz ana ekranda kartı gösterir, kapalı göz yalnız ana
+     ekrandan kaldırır; oda Odalar ekranında erişilebilir kalır. */
+  function roomOverviewEyeHtml(group,entries){
+    const active=groupInOverview(group);
+    const empty=entries.length===0;
+    const label=`${group.name} · ${t("showInOverview")}`;
+    return`<button class="room-overview-eye" type="button" role="switch" aria-checked="${active?"true":"false"}"${empty?' disabled aria-disabled="true"':""} data-overview-toggle="${esc(group.id)}" aria-label="${esc(empty?`${label} — ${t("showInOverviewEmpty")}`:label)}" title="${esc(label)}">${visibilityIcon(!active)}</button>`;
+  }
   /* Tek döşemenin HTML'i. Oda kartı, grup sekmesi ve Favoriler kartı aynı çağrıyı kullanır:
      ikinci bir döşeme dili açılmasın, hızlı kumanda/genişlik/göz/yıldız her yerde aynı davransın.
      `scope` = döşemeyi basan KARTIN kimliği; yalnız genişlik tercihini kapsar (bkz. `tileWidthKey`).
@@ -840,58 +849,59 @@
          KAYITLI tercihler de uygulanmaya devam ediyor — geri dönüş yolu açık kalsın. */
       return`<div class="group-control-slot has-eye${widthClass}${hiddenTile?" is-hidden-tile":""}" data-tile-key="${esc(widthKey)}" data-tile-legacy-key="${esc(widthLegacyKey)}" data-tile-width="${esc(widthMode)}">${tile}${tileVisibilityHtml(device,control,name,scope)}${tileFavoriteHtml(device,control,name)}</div>`;
   }
-  /* ODA KARTI — not §6.3 sırası: (1) oda ikonu + adı, (2) açık cihaz sayısı ya da "Her şey
-     kapalı", (3) VARSA sensör özeti, (4) odanın tek ana aç/kapat eylemi.
+  /* ODA KARTI artık bir özet/kumanda panosu değil, odaya açılan yalın bir kapıdır: ikon + ad.
+     Cihazlar, sensörler, oda anahtarı ve cihaz düzeyi yıldız/gözler sağ panelde çizilir. Böylece
+     hem ana ekranda hem Odalar görünümünde oda kartı aynı, kolay taranan tek görevi taşır.
 
-     Kartın gövdesi odaya GİRER (`data-open-room`), ana anahtar AYRI bir dokunma hedefidir
-     (`data-room-master`) — ikisi karışmasın diye anahtar başlığın dışında, kendi hücresinde durur.
-
-     `options.surface`: "home" ana ekranın rayındaki kart, "rooms" ise Odalar görünümündeki kart.
-     İki yüzey AYNI kartı çizer; fark yalnız kabuk — ana ekranda kart sıraya girer ve pano
-     düzeniyle gizlenebilir, Odalar görünümünde hepsi listelenir ve "Genel görünümde göster"
-     anahtarı orada kalıcı olarak durur (düzenleme kipine gerek kalmadı). */
+     Odalar yüzeyindeki ayrı göz mevcut `hiddenGroups` kaydını yönetir. Kartın kendisine
+     dokunmak görünürlüğü değiştirmez; sağ paneli açar. */
   function groupWidgetHtml(group,options){
     const surface=options?.surface==="rooms"?"rooms":"home";
     const model=cardModelForGroup(group);
     const entries=cardEntriesFromModel(model);
-    /* Genişlik ve görünürlük kapsamı KART kimliğidir ve o da grubun kalıcı kimliğinden gelir
-       (`group:<id>`) — sıra/indeks değil: kart taşınsa, silinip geri eklense de tercih yerinde
-       kalır. Ana ekran kartı ile Odalar görünümündeki kart bilerek aynı kapsamı paylaşır. */
     const scope=groupWidgetId(group.id);
-    const picked=overviewGroupEntries(entries,scope);
-    const shown=state.dashboardEditing?entries:picked.entries;
-    const controls=shown.map(({device,control})=>groupTileSlotHtml(device,control,scope)).join("");
-    /* Gizlenen cihaz sessizce kaybolmaz: kartın altında sayısıyla duyurulur ve satır Cihazlar
-       görünümüne (mümkünse o odayı süzerek) götürür. Gizli yoksa satır hiç basılmaz. */
-    const hiddenNote=!state.dashboardEditing&&picked.hidden
-      ?`<button class="ov-hidden-note" type="button" data-open-room="${esc(group.id)}" aria-label="${esc(t("hiddenDevicesNoteLabel",{count:picked.hidden}))}" title="${esc(t("hiddenDevicesNoteLabel",{count:picked.hidden}))}">${esc(t("hiddenDevicesNote",{count:picked.hidden}))}</button>`
-      :"";
-    const roomNote=!state.dashboardEditing&&group.id===noRoomGroupId
-      ?`<button class="ov-hidden-note" type="button" data-open-room="">${esc(t("noRoomCardHint"))}</button>`
-      :"";
-    const note=`${hiddenNote}${roomNote}`;
-    const editButton=group.locked?"":`<button type="button" data-edit-group="${esc(group.id)}" aria-label="${t("editGroup")}">${groupEditIcon()}</button>`;
-    const body=`${controls?`<div class="group-control-grid">${controls}</div>`:note?"":`<div class="group-empty">${t("groupNoControls")}</div>`}${note}`;
-    /* Oda adı Cihazlar görünümüne o odayı süzerek götürür; yol kartın altındaki "n cihaz gizli"
-       satırının yoluyla AYNI (`data-open-room`, `openHiddenDevices`). İkinci bir gezinme
-       mekanizması kurulmuyor. İkon jeneratörden gelir: oda kendi ikonunu seçmediyse (`icon`
-       alanı yok) döşemelerinin çoğunluğundan türer. */
-    const title=`<button class="ov-title" type="button" data-open-room="${esc(group.id)}" aria-label="${esc(t("openRoomDevices",{name:group.name}))}"><span class="ov-title-name"><span class="room-card-icon" aria-hidden="true">${deviceIconSvg(model.icon||"group")}</span>${esc(group.name)}<span class="ov-go" aria-hidden="true">›</span></span>${groupSummaryHtml(model)}${groupSensorsHtml(model)}</button>`;
-    const actions=`${surface==="rooms"||state.dashboardEditing?overviewSwitchHtml(group,entries):""}${roomMasterHtml(group,entries)}${editButton}`;
+    const open=`<button class="room-card-open" type="button" data-open-room="${esc(group.id)}" aria-label="${esc(t("openRoomDevices",{name:group.name}))}"><span class="room-card-icon" aria-hidden="true">${deviceIconSvg(model.icon||"group")}</span><span class="room-card-name">${esc(group.name)}</span><span class="ov-go" aria-hidden="true">›</span></button>`;
     if(surface==="rooms"){
       return`<article class="widget-card group-widget room-card${groupInOverview(group)?"":" is-off"}" data-room-card="${esc(group.id)}">
-      <div class="group-widget-head">${title}<div class="group-widget-actions">${actions}</div></div>
-      ${body}
+      ${open}${roomOverviewEyeHtml(group,entries)}
     </article>`;
     }
     return`<article class="dashboard-widget widget-card group-widget${groupInOverview(group)?"":" is-off"}" data-widget="${esc(scope)}" data-group-widget="${esc(group.id)}" hidden>
       <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
-      <div class="group-widget-head">${title}<div class="group-widget-actions">${actions}</div></div>
-      ${body}
+      ${open}
     </article>`;
   }
-  /* Cihazı olmayan ya da tüm cihazları gizlenmiş grup ana ekranda hiç kart basmaz (anahtarı açık
-     olsa bile); cihazları Cihazlar görünümünde, oda süzgeciyle bulunur.
+  /* Oda ayrıntısı bir sağ paneldir ama içindeki bütün eylemler mevcut oda döşemeleridir. Bu
+     yüzden favori/göz, hızlı kumanda ve doğrudan aç-kapat bağları `bindGroupControls` üzerinden
+     aynı şekilde çalışır; burada yalnız hangi odaya ait döşemelerin basılacağı seçilir. */
+  function renderRoomDetail(){
+    const dialog=$("#roomDetailDialog");
+    if(!dialog?.open||!state.roomDetail)return;
+    const group=dashboardGroups().find(candidate=>candidate.id===state.roomDetail);
+    if(!group){dialog.close();return}
+    const model=cardModelForGroup(group);
+    const entries=cardEntriesFromModel(model);
+    const scope=groupWidgetId(group.id);
+    $("#roomDetailTitle").textContent=group.name;
+    $("#roomDetailIcon").innerHTML=deviceIconSvg(model.icon||"group");
+    const controls=entries.map(({device,control})=>groupTileSlotHtml(device,control,scope)).join("");
+    $("#roomDetailBody").innerHTML=`<div class="room-detail-summary">${groupSummaryHtml(model)}${groupSensorsHtml(model)}${roomMasterHtml(group,entries)}</div>${controls?`<div class="group-control-grid room-detail-grid">${controls}</div>`:`<div class="group-empty">${esc(t("groupNoControls"))}</div>`}`;
+    bindGroupControls();
+  }
+  function openRoomDetail(groupId){
+    const group=dashboardGroups().find(candidate=>candidate.id===groupId);
+    if(!group)return;
+    state.roomDetail=group.id;
+    const dialog=$("#roomDetailDialog");
+    if(!dialog.open)dialog.showModal();
+    renderRoomDetail();
+  }
+  function closeRoomDetail(){
+    const dialog=$("#roomDetailDialog");
+    if(dialog?.open)dialog.close();
+  }
+  /* Cihazı olmayan grup ana ekranda kart basmaz. Döşemelerin tümü gizlense bile oda kapısı
+     kalır; oda kartını kaldıran tek karar Odalar görünümündeki oda gözüdür.
      Silme RAYLA SINIRLI: Odalar görünümündeki kartlar (`data-room-card`) ayrı basılır. */
   function renderGroupWidgets(){
     $$("#widgetRail [data-group-widget]").forEach(widget=>widget.remove());

@@ -3646,3 +3646,164 @@
       dialog#appMenuDialog>.app-menu-modal>.app-menu-nav{display:none}
       dialog#appMenuDialog>.app-menu-modal>.app-menu-utilities{margin-top:12px}
     }
+
+    /* ————— KOMPAKT ODA AKIŞI —————
+       Bölüm başlığı içeriğin hemen üstünde kalır; oda kartı yalnız oda adını taşır. Cihazlar
+       kartın boyunu uzatmak yerine sağdan açılan oda paneline taşınır. */
+    #home .widget-board{row-gap:6px}
+    #home .home-section-head{min-height:0;padding:0 2px}
+    #home .home-section-head p{margin-top:2px}
+    #home .widget-rail{
+      --room-card-h:82px;
+      grid-auto-rows:var(--room-card-h);
+      align-items:start;
+    }
+    #home .widget-rail .group-widget:not(.favorites-widget):not([hidden]){
+      height:82px;
+      min-height:82px;
+      display:block;
+      padding:10px;
+    }
+    .room-card-open{
+      width:100%;
+      min-width:0;
+      min-height:60px;
+      height:100%;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:8px 10px;
+      border:0;
+      border-radius:15px;
+      color:var(--ink);
+      background:transparent;
+      font:inherit;
+      text-align:left;
+      touch-action:manipulation;
+    }
+    .room-card-open:hover{background:var(--surface-soft)}
+    .room-card-open:focus-visible{outline:3px solid var(--forest-soft);outline-offset:1px}
+    .room-card-name{
+      min-width:0;
+      flex:1 1 auto;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:16px;
+      font-weight:800;
+    }
+    .room-card-open .ov-go{flex:none;margin:0;color:var(--muted);font-size:25px;line-height:1}
+    body[data-active-view="home"] #home .room-card-open{color:var(--glass-plate-ink)}
+    body[data-active-view="home"] #home .room-card-open:hover{background:var(--home-control)}
+
+    /* Favoriler içerikle birlikte 1 → 2 → tam satır büyür. Izgaranın sabit oda yüksekliği
+       kalktığı için çok sayıda favori de kırpılmadan yeni satıra geçebilir. */
+    #home .widget-rail .favorites-widget{
+      height:100%;
+      min-height:0;
+      grid-row:span var(--favorite-row-span,2);
+      padding:14px;
+      overflow:visible;
+    }
+    #home .widget-rail .favorites-widget[hidden]{display:none!important}
+    #home .widget-rail .favorites-widget[data-favorite-size="2"]{grid-column:span 2}
+    #home .widget-rail .favorites-widget[data-favorite-size="full"]{grid-column:1/-1}
+    #home .widget-rail .favorites-widget .group-widget-head h2{font-size:18px}
+    #home .widget-rail .favorites-widget .group-widget-head p{
+      margin-top:2px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    #home .widget-rail .favorites-widget .group-control-grid{
+      margin-top:8px;
+      overflow:visible;
+    }
+
+    /* Odalar listesinde göz yalnız ana ekran görünürlüğünü değiştirir; kartın kalan bütün alanı
+       sağ paneli açar. */
+    #rooms .room-card-grid{gap:10px}
+    #rooms .room-card{
+      position:relative;
+      height:84px;
+      min-height:84px;
+      display:block;
+      padding:10px 64px 10px 10px;
+      overflow:hidden;
+    }
+    #rooms .room-card.is-off{opacity:.72}
+    #rooms .room-card .room-card-open{min-height:62px}
+    .room-overview-eye{
+      position:absolute;
+      top:50%;
+      right:12px;
+      width:44px;
+      height:44px;
+      display:grid;
+      place-items:center;
+      padding:0;
+      border:1px solid var(--line);
+      border-radius:999px;
+      color:var(--forest);
+      background:var(--surface-soft);
+      transform:translateY(-50%);
+      touch-action:manipulation;
+    }
+    .room-overview-eye svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+    .room-overview-eye[aria-checked="false"]{color:var(--muted);background:transparent}
+    .room-overview-eye:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
+
+    /* Sağdan açılan oda kartı: tam ekran bir sayfa değil, yatay tablette bağlamı koruyan yan
+       panel. Telefon daralınca okunabilirlik için ekranın tamamını kullanır. */
+    dialog.room-detail-dialog{
+      inset:0 0 0 auto;
+      width:min(470px,calc(100vw - 96px));
+      max-width:min(470px,calc(100vw - 96px));
+      height:100dvh;
+      max-height:100dvh;
+      margin:0;
+      border-radius:28px 0 0 28px;
+      background:var(--surface);
+      overflow:hidden;
+    }
+    dialog.room-detail-dialog[open]{animation:room-detail-in .24s ease-out both}
+    dialog.room-detail-dialog::backdrop{background:rgba(12,26,20,.38);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+    @keyframes room-detail-in{from{opacity:.55;transform:translateX(42px)}to{opacity:1;transform:translateX(0)}}
+    .room-detail-modal{
+      width:100%;
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+      overflow:hidden;
+      background:var(--experiment-glass-strong);
+      -webkit-backdrop-filter:blur(26px) saturate(1.1);
+      backdrop-filter:blur(26px) saturate(1.1);
+    }
+    .room-detail-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .room-detail-title{min-width:0;display:flex;align-items:center;gap:12px}
+    .room-detail-title>div{min-width:0}
+    .room-detail-title .eyebrow{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+    .room-detail-title h2{margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:750 26px/1.1 system-ui,sans-serif}
+    .room-detail-body{flex:1 1 auto;min-height:0;margin-top:16px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+    .room-detail-summary{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft)}
+    .room-detail-summary .group-summary{margin:0;flex:1 1 150px}
+    .room-detail-summary .room-sensors{margin:0}
+    .room-detail-summary .room-master{min-height:44px;margin-left:auto}
+    .room-detail-grid{--group-tile-min:210px;margin-top:12px;padding-bottom:4px}
+    .room-detail-grid .group-control-slot{min-height:126px}
+    .room-detail-grid .group-control-slot>.group-control-tile{min-height:126px;padding-top:54px}
+    .room-detail-grid .tile-eye{right:6px;display:grid}
+    .room-detail-grid .tile-star{right:56px;display:grid}
+
+    @media(max-width:620px){
+      #home .widget-board{row-gap:7px}
+      #home .home-section-head{min-height:0}
+      #home .widget-rail{--room-card-h:78px;grid-auto-rows:var(--room-card-h)}
+      #home .widget-rail .group-widget:not(.favorites-widget):not([hidden]){height:78px;min-height:78px}
+      #home .widget-rail .favorites-widget{grid-column:1/-1!important;grid-row:span var(--favorite-row-span-mobile,2)}
+      #rooms .room-card{height:80px;min-height:80px;padding:8px 62px 8px 8px}
+      dialog.room-detail-dialog{inset:0 auto 0 0;width:100%;max-width:100%;border-radius:0}
+      .room-detail-modal{padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+    }
+    @media(prefers-reduced-motion:reduce){dialog.room-detail-dialog[open]{animation:none}}

@@ -8,6 +8,13 @@
     const grid=$("#favoriteTiles");
     if(!grid)return;
     const entries=favoriteEntries();
+    const widget=grid.closest(".favorites-widget");
+    if(widget){
+      widget.dataset.favoriteSize=entries.length>=3?"full":String(Math.max(1,entries.length));
+      widget.style.setProperty("--favorite-row-span",String(Math.max(2,Math.ceil(entries.length/4)+1)));
+      /* Telefonda varsayılan "orta" döşeme tek satır kaplar; başlık için bir satır daha eklenir. */
+      widget.style.setProperty("--favorite-row-span-mobile",String(Math.max(2,entries.length+1)));
+    }
     grid.innerHTML=entries.length
       ?entries.map(({device,control})=>groupTileSlotHtml(device,control,favoritesWidgetId)).join("")
       :`<div class="group-empty">${esc(t("favoritesEmpty"))}</div>`;
@@ -381,11 +388,11 @@
       event.stopPropagation();
       toggleFavorite(button.dataset.favoriteDevice,button.dataset.favoriteControl);
     });
-    /* Oda adı ve "n cihaz gizli" satırı AYNI yolu kullanır: Cihazlar görünümü, oda süzgeciyle. */
+    /* Oda kartı cihazları sayfadan çıkmadan gösteren sağ paneli açar. */
     $$("[data-open-room]").forEach(button=>button.onclick=event=>{
       event.preventDefault();
       event.stopPropagation();
-      openHiddenDevices(button.dataset.openRoom);
+      openRoomDetail(button.dataset.openRoom);
     });
     $$("[data-overview-toggle]").forEach(button=>button.onclick=event=>{
       event.preventDefault();

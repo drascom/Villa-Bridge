@@ -138,6 +138,7 @@
     "noRoomGroup": "Odasız",
     "noRoomCardHint": "Bu cihazların odası yok · Cihazlar bölümünden oda seçin",
     "showInOverview": "Genel görünümde göster",
+    "roomControls": "Oda denetimi",
     "showInOverviewEmpty": "Cihaz eklenene kadar Genel görünümde çıkmaz.",
     "hiddenDevicesNote": "{count} gizli",
     "hiddenDevicesNoteLabel": "{count} cihaz gizli · Cihazlar bölümünden açabilirsiniz",

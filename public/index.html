@@ -510,6 +510,15 @@
 <!-- YONETICI MODU. Giris ekrani degil: panel zaten acik, bu diyalog yalnizca kurulum
      ekranlarini acan modu ister. Yanlis PIN sunucuda hiz sinirina takilir. -->
 <div id="modePinDialog" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="modePinTitle" hidden><form id="modePinForm" class="modal auth-modal"><div class="auth-hero"><div class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><div><h2 id="modePinTitle" data-i18n="enterAdminMode">Enter administrator mode</h2><p data-i18n="adminModeLead">Setup screens stay locked until the administrator PIN is entered.</p></div></div><div class="auth-fields"><div class="field"><label for="modePinInput" data-i18n="adminPin">Administrator PIN</label><input id="modePinInput" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8" required><small id="modePinFieldHint" class="auth-help"></small></div></div><div id="modePinError" class="auth-error" role="alert" aria-live="assertive" hidden></div><div class="modal-actions"><button id="modePinCancel" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="modePinSubmit" class="primary" type="submit" data-i18n="unlock">Unlock</button></div></form></div>
+<dialog id="roomDetailDialog" class="room-detail-dialog" aria-labelledby="roomDetailTitle">
+  <div class="modal room-detail-modal">
+    <div class="room-detail-head">
+      <div class="room-detail-title"><span id="roomDetailIcon" class="room-card-icon" aria-hidden="true"></span><div><div class="eyebrow" data-i18n="roomControls">Room controls</div><h2 id="roomDetailTitle">Room</h2></div></div>
+      <button id="closeRoomDetail" class="device-detail-close" type="button" data-i18n-aria="close" aria-label="Close">×</button>
+    </div>
+    <div id="roomDetailBody" class="room-detail-body"></div>
+  </div>
+</dialog>
 <dialog id="appMenuDialog" class="app-menu-dialog" aria-labelledby="appMenuTitle">
   <div class="modal app-menu-modal">
     <div class="app-menu-head"><div class="app-menu-who"><span class="brand-mark" aria-hidden="true">V</span><div class="app-menu-identity"><h2 id="appMenuTitle" data-i18n="menu">Menu</h2><span id="appMenuRole" class="app-menu-role"></span></div></div><button id="closeAppMenu" class="device-detail-close" type="button" data-i18n-aria="close" aria-label="Close">×</button></div>
