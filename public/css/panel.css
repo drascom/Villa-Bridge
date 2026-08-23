@@ -3297,7 +3297,7 @@
       main{grid-column:2;width:100%;min-width:0;max-width:1500px;margin:0 auto;padding:20px 30px 52px;box-sizing:border-box}
       #home .page-head{
         min-height:70px;
-        grid-template-columns:minmax(0,1fr) clamp(500px,52vw,620px) minmax(0,1fr);
+        grid-template-columns:minmax(0,1fr) clamp(500px,54vw,620px) minmax(0,1fr);
         align-items:center;
         gap:18px;
         margin-bottom:6px;
@@ -3362,7 +3362,7 @@
     }
 
     @media(min-width:901px) and (max-width:1180px){
-      #home .page-head{grid-template-columns:minmax(0,1fr) clamp(480px,52vw,560px) minmax(0,1fr);gap:13px}
+      #home .page-head{grid-template-columns:minmax(0,1fr) clamp(480px,54vw,560px) minmax(0,1fr);gap:13px}
       #home .room-widget-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--room-col,260px)),1fr))}
       #home .home-section-head h2{font-size:20px}
     }
