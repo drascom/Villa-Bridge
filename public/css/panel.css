@@ -3597,6 +3597,19 @@
     .app-menu-person-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
     .app-menu-person-copy strong{font-size:16px;font-weight:800}
     .app-menu-person-copy span{color:var(--menu-sub);font-size:12px}
+    /* Profil çekmecesi de seçili görünüm paketini izler. Önceki sabit koyu yeşil değerler,
+       açık ve güneşe göre temalarda menüyü uygulamanın geri kalanından koparıyordu. */
+    dialog#appMenuDialog>.app-menu-modal{
+      --menu-surface:var(--experiment-glass-strong);
+      --menu-brd:var(--line);
+      --menu-ink:var(--ink);
+      --menu-sub:var(--muted);
+      --menu-line:var(--line);
+      --menu-inset:var(--surface-soft);
+      --menu-accent:var(--forest);
+      --menu-accent-soft:var(--forest-soft);
+      --menu-accent-ink:var(--on-forest);
+    }
     @media(min-width:621px){
       dialog#appMenuDialog{
         inset:16px 16px 16px auto!important;
@@ -3608,15 +3621,6 @@
         border-radius:28px;
       }
       dialog#appMenuDialog>.app-menu-modal{
-        --menu-surface:rgba(15,31,28,.94);
-        --menu-brd:rgba(255,255,255,.18);
-        --menu-ink:#f2f7f4;
-        --menu-sub:rgba(234,245,239,.68);
-        --menu-line:rgba(255,255,255,.13);
-        --menu-inset:rgba(255,255,255,.06);
-        --menu-accent:#bce3c7;
-        --menu-accent-soft:rgba(188,227,199,.13);
-        --menu-accent-ink:#173226;
         height:100%;
         padding:20px;
         border-radius:28px;
@@ -3717,7 +3721,46 @@
     }
     #home .widget-rail .favorites-widget .group-control-grid{
       margin-top:8px;
+      grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));
       overflow:visible;
+    }
+    /* Favorilerde kayıtlı kart-genişliği kademeleri kullanılmaz. Bu kartın kendisi öğe sayısına
+       göre büyüyor; döşemelerin ayrıca küçük/orta/tam olması aynı satırda farklı boylar üretip
+       çerçevenin dışına taşıyordu. Her favori burada eşit, yatay ve 76px'lik tek dokunma satırıdır;
+       oda panelindeki genişlik tercihleri ise aynen korunur. */
+    #home .widget-rail .favorites-widget .group-control-slot,
+    #home .widget-rail .favorites-widget .group-control-slot.is-medium,
+    #home .widget-rail .favorites-widget .group-control-slot.is-full{
+      min-height:0;
+      grid-column:auto!important;
+    }
+    #home .widget-rail .favorites-widget .group-control-slot>.group-control-tile,
+    #home .widget-rail .favorites-widget .group-control-slot:not(.is-medium):not(.is-full)>.group-control-tile{
+      height:76px;
+      min-height:76px;
+      flex-direction:row;
+      align-items:center;
+      gap:12px;
+      padding:8px 7px;
+      text-align:left;
+    }
+    #home .widget-rail .favorites-widget .group-control-slot>.group-control-tile>.tile-body,
+    #home .widget-rail .favorites-widget .group-control-slot:not(.is-medium):not(.is-full)>.group-control-tile>.tile-body{
+      width:auto;
+      justify-content:flex-start;
+      text-align:left;
+    }
+    #home .widget-rail .favorites-widget .group-control-slot>.group-control-tile strong,
+    #home .widget-rail .favorites-widget .group-control-slot:not(.is-medium):not(.is-full)>.group-control-tile strong{
+      display:block;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:14px;
+      line-height:1.22;
+    }
+    #home .widget-rail .favorites-widget .group-control-slot>.group-control-tile .group-control-copy small{
+      display:block;
     }
 
     /* Odalar listesinde göz yalnız ana ekran görünürlüğünü değiştirir; kartın kalan bütün alanı
@@ -3757,8 +3800,8 @@
        panel. Telefon daralınca okunabilirlik için ekranın tamamını kullanır. */
     dialog.room-detail-dialog{
       inset:0 0 0 auto;
-      width:min(470px,calc(100vw - 96px));
-      max-width:min(470px,calc(100vw - 96px));
+      width:60vw;
+      max-width:60vw;
       height:100dvh;
       max-height:100dvh;
       margin:0;
@@ -3774,18 +3817,35 @@
       height:100%;
       display:flex;
       flex-direction:column;
-      padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+      padding:0;
       overflow:hidden;
       background:var(--experiment-glass-strong);
       -webkit-backdrop-filter:blur(26px) saturate(1.1);
       backdrop-filter:blur(26px) saturate(1.1);
     }
-    .room-detail-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:14px}
-    .room-detail-title{min-width:0;display:flex;align-items:center;gap:12px}
+    .room-detail-head{
+      width:100%;
+      flex:none;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      padding:20px 12px 14px 20px;
+    }
+    .room-detail-title{min-width:0;flex:1 1 auto;display:flex;align-items:center;gap:12px}
+    .room-detail-head .device-detail-close{flex:none;margin-left:auto}
     .room-detail-title>div{min-width:0}
     .room-detail-title .eyebrow{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
     .room-detail-title h2{margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:750 26px/1.1 system-ui,sans-serif}
-    .room-detail-body{flex:1 1 auto;min-height:0;margin-top:16px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+    .room-detail-body{
+      flex:1 1 auto;
+      min-height:0;
+      margin-top:0;
+      padding:2px 20px calc(22px + env(safe-area-inset-bottom));
+      overflow:auto;
+      overscroll-behavior:contain;
+      scrollbar-width:thin;
+    }
     .room-detail-summary{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--surface-soft)}
     .room-detail-summary .group-summary{margin:0;flex:1 1 150px}
     .room-detail-summary .room-sensors{margin:0}
@@ -3804,6 +3864,7 @@
       #home .widget-rail .favorites-widget{grid-column:1/-1!important;grid-row:span var(--favorite-row-span-mobile,2)}
       #rooms .room-card{height:80px;min-height:80px;padding:8px 62px 8px 8px}
       dialog.room-detail-dialog{inset:0 auto 0 0;width:100%;max-width:100%;border-radius:0}
-      .room-detail-modal{padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+      .room-detail-head{padding:16px 8px 12px 16px}
+      .room-detail-body{padding:2px 16px calc(18px + env(safe-area-inset-bottom))}
     }
     @media(prefers-reduced-motion:reduce){dialog.room-detail-dialog[open]{animation:none}}

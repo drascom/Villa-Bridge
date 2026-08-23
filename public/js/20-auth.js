@@ -53,12 +53,25 @@
     input.maxLength=state.auth.secretKind==="password"?128:8;
   }
   async function loadModeState(){setModeState(await api("/api/auth/session"))}
-  function openModePin(){
-    if(state.auth.elevated)return;
+  function revealModePin(){
     setModeFormError();
     $("#modePinInput").value="";
     $("#modePinDialog").hidden=false;
     requestAnimationFrame(()=>focusModalHeading($("#modePinDialog")));
+  }
+  function openModePin(){
+    if(state.auth.elevated)return;
+    const menu=$("#appMenuDialog");
+    /* PIN katmanı normal DOM'da, menü ise tarayıcının "top layer"ında bir <dialog>. Z-index
+       bu sınırı aşamaz: PIN'i menü açıkken göstermek onu menünün arkasında bırakıyordu.
+       Önce menünün gerçek `close` olayını bekleriz; 99-bind'in açan düğmeye odak dönüşü
+       tamamlandıktan sonra PIN katmanı açılır ve başlık odağı devralır. */
+    if(menu?.open){
+      menu.addEventListener("close",revealModePin,{once:true});
+      closeAppMenu();
+      return;
+    }
+    revealModePin();
   }
   function closeModePin(){
     $("#modePinDialog").hidden=true;
