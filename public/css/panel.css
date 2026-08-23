@@ -2790,7 +2790,6 @@
          yazıları `--theme-ink`, yani ikisi de AYNI fazdan; alt satırları `color:inherit`
          (`.group-control-copy small`), `--muted`e hiç bakmıyorlar. `1ee9117`'de kapalı döşeme
          için yapılanın karşılığı burada zaten kuruluydu. */
-    :root[data-theme-package][data-sky="live"] dialog.app-menu-dialog>.app-menu-modal,
     :root[data-theme-package] .quick-modal{
       --ink:var(--on-dark-ink);--ink-soft:var(--on-dark-ink-soft);--muted:var(--on-dark-ink-soft);
       --line:var(--on-dark-line);--surface:var(--on-dark-inset);--surface-soft:var(--on-dark-inset);
@@ -3298,7 +3297,7 @@
       main{grid-column:2;width:100%;min-width:0;max-width:1500px;margin:0 auto;padding:20px 30px 52px;box-sizing:border-box}
       #home .page-head{
         min-height:70px;
-        grid-template-columns:minmax(0,1fr) clamp(360px,40vw,520px) minmax(0,1fr);
+        grid-template-columns:minmax(0,1fr) clamp(500px,52vw,620px) minmax(0,1fr);
         align-items:center;
         gap:18px;
         margin-bottom:6px;
@@ -3306,25 +3305,65 @@
       #home .home-heading{grid-column:1;text-align:left}
       #home .home-hub{grid-column:2}
       #home .home-status{grid-column:3}
+      #home .hub-zone{padding:4px 10px}
+      #home .hub-zone-clock{flex:1.06 1 0;justify-content:flex-start}
+      #home .hub-zone-weather{flex:.94 1 0;justify-content:flex-start}
+      #home .hub-clock-meta{flex:1 1 auto}
+      /* Hava tarafı saat tarafının tipografik ikizidir: büyük değer solda, açıklama ve konum
+         sağda iki satır. Böylece tarih ile hava aynı ritimde ve kırpılmadan okunur. */
+      #home .hub-weather-copy{
+        min-width:0;
+        flex:1 1 auto;
+        display:grid;
+        grid-template-columns:auto minmax(0,1fr);
+        grid-template-rows:auto auto;
+        align-items:center;
+        column-gap:10px;
+      }
+      #home .hub-weather,#home .hub-now{display:contents}
+      #home .hub-w-temp{grid-column:1;grid-row:1/3;align-self:center}
+      body[data-active-view="home"] #home .hub-zone-weather .hub-w-cond{
+        grid-column:2;
+        grid-row:1;
+        overflow:hidden;
+        color:var(--ink);
+        font-weight:650;
+        line-height:1.15;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      #home .hub-zone-weather .hub-label{
+        grid-column:2;
+        grid-row:2;
+        overflow:hidden;
+        color:var(--muted);
+        font-size:var(--hub-line);
+        font-weight:500;
+        letter-spacing:0;
+        line-height:1.15;
+        text-overflow:ellipsis;
+        text-transform:none;
+        white-space:nowrap;
+      }
       #home .widget-board{
         min-height:0;
         max-height:none;
-        grid-template-rows:auto auto auto auto;
+        grid-template-rows:auto auto auto;
         row-gap:10px;
+        align-content:start;
         overflow:visible;
       }
       #home .home-section-head[data-home-section="scenes"]{display:flex;grid-row:1}
       #home [data-widget="quick"]{grid-row:2}
-      #home .home-section-head[data-home-section="rooms"]{grid-row:3}
-      #home .widget-rail{grid-row:4}
+      #home .widget-rail{grid-row:3}
       body[data-active-view="home"] main{min-height:100dvh;padding-bottom:34px}
       #home.active{height:auto;min-height:0}
       .admin-mode-strip{margin-bottom:12px;border-radius:18px}
     }
 
     @media(min-width:901px) and (max-width:1180px){
-      #home .page-head{grid-template-columns:minmax(0,1fr) clamp(360px,40vw,440px) minmax(0,1fr);gap:13px}
-      #home .widget-rail{grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--room-col,260px)),1fr))}
+      #home .page-head{grid-template-columns:minmax(0,1fr) clamp(480px,52vw,560px) minmax(0,1fr);gap:13px}
+      #home .room-widget-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--room-col,260px)),1fr))}
       #home .home-section-head h2{font-size:20px}
     }
 
@@ -3374,14 +3413,14 @@
         display:grid;
         min-height:0;
         max-height:none;
-        grid-template-rows:auto auto auto auto;
+        grid-template-rows:auto auto auto;
         gap:10px;
+        align-content:start;
         overflow:visible;
       }
       #home .home-section-head[data-home-section="scenes"]{display:flex;grid-row:1}
       #home [data-widget="quick"]{position:relative;inset:auto;grid-row:2;width:auto;height:auto;padding:0;overflow:visible}
-      #home .home-section-head[data-home-section="rooms"]{grid-row:3}
-      #home .widget-rail{grid-row:4}
+      #home .widget-rail{grid-row:3}
       #home .home-section-head{min-height:42px}
       #home .home-section-head h2{font-size:19px}
       #home .home-section-head p{max-width:230px;font-size:11px}
@@ -3610,6 +3649,18 @@
       --menu-accent-soft:var(--forest-soft);
       --menu-accent-ink:var(--on-forest);
     }
+    /* Canlı gökyüzünde menü yüzeyi de açık tema kartıdır. Menü metni bu durumda koyu tema
+       sabitlerinden değil, gökyüzüyle birlikte hesaplanan tema mürekkebinden gelir. */
+    :root[data-theme-package][data-sky="live"] dialog#appMenuDialog>.app-menu-modal{
+      --menu-surface:var(--theme-glass-card);
+      --menu-brd:var(--theme-glass-edge);
+      --menu-ink:var(--theme-ink);
+      --menu-sub:var(--theme-ink-soft);
+      --menu-line:var(--theme-ink-line);
+      --menu-inset:var(--theme-ink-inset);
+      --menu-accent:var(--theme-accent);
+      --menu-accent-soft:var(--theme-accent-soft);
+    }
     @media(min-width:621px){
       dialog#appMenuDialog{
         inset:16px 16px 16px auto!important;
@@ -3654,13 +3705,29 @@
     /* ————— KOMPAKT ODA AKIŞI —————
        Bölüm başlığı içeriğin hemen üstünde kalır; oda kartı yalnız oda adını taşır. Cihazlar
        kartın boyunu uzatmak yerine sağdan açılan oda paneline taşınır. */
-    #home .widget-board{row-gap:6px}
+    #home .widget-board{row-gap:6px;align-content:start}
     #home .home-section-head{min-height:0;padding:0 2px}
     #home .home-section-head p{margin-top:2px}
     #home .widget-rail{
       --room-card-h:82px;
+      display:block;
+      height:auto;
+      min-height:0;
+      overflow:visible;
+      pointer-events:auto;
+    }
+    #home .widget-rail>.home-section-head{
+      margin:8px 0 4px;
+    }
+    #home .room-widget-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--room-col)),1fr));
       grid-auto-rows:var(--room-card-h);
       align-items:start;
+      align-content:start;
+      gap:clamp(10px,1.2vw,13px);
+      margin-top:4px;
+      overflow:visible;
     }
     #home .widget-rail .group-widget:not(.favorites-widget):not([hidden]){
       height:82px;
@@ -3703,15 +3770,13 @@
     /* Favoriler içerikle birlikte 1 → 2 → tam satır büyür. Izgaranın sabit oda yüksekliği
        kalktığı için çok sayıda favori de kırpılmadan yeni satıra geçebilir. */
     #home .widget-rail .favorites-widget{
-      height:100%;
+      width:100%;
+      height:auto;
       min-height:0;
-      grid-row:span var(--favorite-row-span,2);
       padding:14px;
       overflow:visible;
     }
     #home .widget-rail .favorites-widget[hidden]{display:none!important}
-    #home .widget-rail .favorites-widget[data-favorite-size="2"]{grid-column:span 2}
-    #home .widget-rail .favorites-widget[data-favorite-size="full"]{grid-column:1/-1}
     #home .widget-rail .favorites-widget .group-widget-head h2{font-size:18px}
     #home .widget-rail .favorites-widget .group-widget-head p{
       margin-top:2px;
@@ -3800,8 +3865,8 @@
        panel. Telefon daralınca okunabilirlik için ekranın tamamını kullanır. */
     dialog.room-detail-dialog{
       inset:0 0 0 auto;
-      width:60vw;
-      max-width:60vw;
+      width:60vw!important;
+      max-width:60vw!important;
       height:100dvh;
       max-height:100dvh;
       margin:0;
@@ -3812,9 +3877,11 @@
     dialog.room-detail-dialog[open]{animation:room-detail-in .24s ease-out both}
     dialog.room-detail-dialog::backdrop{background:rgba(12,26,20,.38);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
     @keyframes room-detail-in{from{opacity:.55;transform:translateX(42px)}to{opacity:1;transform:translateX(0)}}
-    .room-detail-modal{
+    dialog.room-detail-dialog>.room-detail-modal{
       width:100%;
       height:100%;
+      max-width:none;
+      max-height:100%;
       display:flex;
       flex-direction:column;
       padding:0;
@@ -3822,6 +3889,14 @@
       background:var(--experiment-glass-strong);
       -webkit-backdrop-filter:blur(26px) saturate(1.1);
       backdrop-filter:blur(26px) saturate(1.1);
+    }
+    /* Genel dokunmatik-dialog kuralları içeriği 920px'e sıkıştırıp modalın kendisine ikinci bir
+       kaydırma veriyordu. Oda çekmecesinde tek kaydırma alanı `.room-detail-body`dir. */
+    dialog.room-detail-dialog>.room-detail-modal>*{
+      width:100%;
+      max-width:none;
+      margin-left:0;
+      margin-right:0;
     }
     .room-detail-head{
       width:100%;
@@ -3850,21 +3925,37 @@
     .room-detail-summary .group-summary{margin:0;flex:1 1 150px}
     .room-detail-summary .room-sensors{margin:0}
     .room-detail-summary .room-master{min-height:44px;margin-left:auto}
-    .room-detail-grid{--group-tile-min:210px;margin-top:12px;padding-bottom:4px}
-    .room-detail-grid .group-control-slot{min-height:126px}
-    .room-detail-grid .group-control-slot>.group-control-tile{min-height:126px;padding-top:54px}
+    .room-detail-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+      margin-top:12px;
+      padding-bottom:4px;
+    }
+    .room-detail-grid .group-control-slot,
+    .room-detail-grid .group-control-slot.is-medium,
+    .room-detail-grid .group-control-slot.is-full{
+      min-width:0;
+      min-height:112px;
+      grid-column:auto!important;
+    }
+    .room-detail-grid .group-control-slot:last-child:nth-child(odd){grid-column:1/-1!important}
+    .room-detail-grid .group-control-slot>.group-control-tile{width:100%;min-height:112px;padding-top:50px}
     .room-detail-grid .tile-eye{right:6px;display:grid}
     .room-detail-grid .tile-star{right:56px;display:grid}
 
     @media(max-width:620px){
       #home .widget-board{row-gap:7px}
       #home .home-section-head{min-height:0}
-      #home .widget-rail{--room-card-h:78px;grid-auto-rows:var(--room-card-h)}
+      #home .widget-rail{--room-card-h:78px}
+      #home .room-widget-grid{grid-template-columns:1fr;grid-auto-rows:var(--room-card-h)}
       #home .widget-rail .group-widget:not(.favorites-widget):not([hidden]){height:78px;min-height:78px}
-      #home .widget-rail .favorites-widget{grid-column:1/-1!important;grid-row:span var(--favorite-row-span-mobile,2)}
+      #home .widget-rail .favorites-widget{width:100%;height:auto}
       #rooms .room-card{height:80px;min-height:80px;padding:8px 62px 8px 8px}
-      dialog.room-detail-dialog{inset:0 auto 0 0;width:100%;max-width:100%;border-radius:0}
+      dialog.room-detail-dialog{inset:0 auto 0 0;width:100%!important;max-width:100%!important;border-radius:0}
       .room-detail-head{padding:16px 8px 12px 16px}
       .room-detail-body{padding:2px 16px calc(18px + env(safe-area-inset-bottom))}
+      .room-detail-grid{grid-template-columns:1fr}
+      .room-detail-grid .group-control-slot:last-child:nth-child(odd){grid-column:auto!important}
     }
     @media(prefers-reduced-motion:reduce){dialog.room-detail-dialog[open]{animation:none}}

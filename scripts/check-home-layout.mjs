@@ -400,7 +400,9 @@ export async function assertHomeLayout(projectRoot) {
     /clamp\(/.test(tracks[1]) && /vw/.test(tracks[1]),
     "Orta hucre sabit px: `clamp()` + goruntu birimi olmali."
   );
-  assert(middle >= 280 && middle <= 460, `Orta hucre 1024px'te ${Math.round(middle)}px: saat/hava alani icin uygun degil.`);
+  /* Tarih ile hava aciklamasi iki esit bilgi grubu olarak eksiksiz okunabilsin. 1024px tablette
+     eski 440px ust siniri iki tarafta da uc nokta uretiyordu; orta hucre bilincli olarak genis. */
+  assert(middle >= 480 && middle <= 560, `Orta hucre 1024px'te ${Math.round(middle)}px: saat/hava alani icin uygun degil.`);
   assert.equal(declaredValue(rules, "#home .home-heading", "grid-column", railViewport), "1", "Sol bolum birinci hucrede degil.");
   assert.equal(declaredValue(rules, "#home .home-hub", "grid-column", railViewport), "2", "Saat/hava blogu orta hucrede degil.");
   assert.equal(declaredValue(rules, "#home .home-status", "grid-column", railViewport), "3", "Ev sagligi ucuncu hucrede degil.");
@@ -513,8 +515,8 @@ export async function assertHomeLayout(projectRoot) {
   const quickHeight = px(
     requireValue(rules, '#home [data-widget="quick"]', "min-height", railViewport, "Hizli erisim seridi")
   );
-  /* Pano DORT satir: bolum basligi · sahne seridi · bolum basligi · oda izgarasi. Ucu de gercek
-     boyuyla toplanir; hicbiri elde sayilmis sabit degil. */
+  /* Dış pano UC satir: sahne basligi · sahne seridi · icerik rayi. Favoriler ile onun altindaki
+     Odalar basligi ve oda izgarasi bu rayin icinde normal belge akisinda devam eder. */
   const sectionHead = px(requireValue(rules, ".home-section-head", "min-height", railViewport, "Bolum basligi"));
   /* "Ilk oda satiri kaydirmadan gorunmeli" kurali BURADA olculur: panonun `min-height` bildirimi
      bir taban, gercek kisit ise oda kartinin KENDI boyu. Kart boyu buyurse butce de buyur. */
@@ -538,7 +540,7 @@ export async function assertHomeLayout(projectRoot) {
     );
   }
 
-  /* 9) ANA EKRANIN SIRASI: baslik · "Hizli sahneler" · "Odalar" (demo `view-root`).
+  /* 9) ANA EKRANIN SIRASI: baslik · "Hizli sahneler" · Favoriler · "Odalar".
      Iki sart birden aranir, cunku biri digerini kurtarmaz:
        (a) SERIT AKISTA. Ekrana `fixed`lenmis bir alt bar olsaydi butce yalan olurdu — serit
            icerigin ustune biner, tasma goze gorunur ama hesaba hic girmez.
@@ -550,8 +552,7 @@ export async function assertHomeLayout(projectRoot) {
   const homeRows = [
     ['#home .home-section-head[data-home-section="scenes"]', "1", "sahne bolumunun basligi"],
     ['#home [data-widget="quick"]', "2", "hizli sahne seridi"],
-    ['#home .home-section-head[data-home-section="rooms"]', "3", "oda bolumunun basligi"],
-    ["#home .widget-rail", "4", "oda izgarasi"]
+    ["#home .widget-rail", "3", "favoriler ve oda izgarasi"]
   ];
   for (const [selector, row, label] of homeRows) {
     assert.equal(
@@ -565,13 +566,17 @@ export async function assertHomeLayout(projectRoot) {
      grid satir numarasini degil, DOM'u izler). */
   const scenesHeadAt = board.indexOf('data-home-section="scenes"');
   const quickAt = board.indexOf('data-widget="quick"');
-  const roomsHeadAt = board.indexOf('data-home-section="rooms"');
   const railAt = board.indexOf('id="widgetRail"');
+  const favoritesAt = board.indexOf('data-widget="favorites"');
+  const roomsHeadAt = board.indexOf('data-home-section="rooms"');
+  const roomGridAt = board.indexOf('id="roomWidgetGrid"');
   assert(scenesHeadAt >= 0, 'Sahne bolumunun basligi yok: `data-home-section="scenes"`.');
   assert(roomsHeadAt >= 0, 'Oda bolumunun basligi yok: `data-home-section="rooms"`.');
   assert(scenesHeadAt < quickAt, "Sahne basligi seritten sonra geliyor.");
-  assert(quickAt < roomsHeadAt, "Hizli sahne seridi oda bolumunun ICINDE ya da altinda.");
-  assert(roomsHeadAt < railAt, "Oda basligi oda izgarasindan sonra geliyor.");
+  assert(quickAt < railAt, "Hizli sahne seridi ana icerik rayinin ICINDE ya da altinda.");
+  assert(railAt < favoritesAt, "Favoriler karti ana icerik rayinin disinda.");
+  assert(favoritesAt < roomsHeadAt, "Odalar basligi Favoriler kartinin ustunde: istenen sira bozuk.");
+  assert(roomsHeadAt < roomGridAt, "Odalar basligi oda izgarasindan sonra geliyor.");
   /* Bolum baslıklari birer AD SATIRIDIR: icinde dugme olsaydi ya ikinci bir gezinme mekanizmasi
      acilirdi ya da 44px dokunma hedefi butceyi tasirirdi. */
   for (const marker of ["scenes", "rooms"]) {
@@ -596,26 +601,21 @@ export async function assertHomeLayout(projectRoot) {
      ancak satirlarin ALTA inmesiyle anlam kazanir. Sutun sayisi sabit olamaz: 1024'te uc,
      1280'de dort cikmali, 800'de kart 44px hedeflerinin altina ezilmemeli. */
   const railColumns = squeeze(
-    requireValue(rules, "#home .widget-rail", "grid-template-columns", railViewport, "Oda izgarasi")
+    requireValue(rules, "#home .room-widget-grid", "grid-template-columns", railViewport, "Oda izgarasi")
   );
   assert(
     railColumns.includes("minmax(") && /clamp\(|vw|%/.test(railColumns),
     `Ana ekranin oda izgarasi sabit sutun: ${railColumns}`
   );
   assert.equal(
-    squeeze(declaredValue(rules, "#home .widget-rail", "grid-auto-rows", railViewport) || ""),
+    squeeze(declaredValue(rules, "#home .room-widget-grid", "grid-auto-rows", railViewport) || ""),
     "var(--room-card-h)",
     "Oda satiri boyunu tek kaynaktan (--room-card-h) almiyor: butce ile ekran ayrisir."
   );
   assert.equal(
-    declaredValue(rules, "#home .widget-rail", "overflow-y", railViewport),
-    "auto",
-    "Oda izgarasi dikey kaymiyor: ikinci satir ulasilamaz kalir."
-  );
-  assert.equal(
-    declaredValue(rules, "#home .widget-rail", "overflow-x", railViewport),
-    "hidden",
-    "Oda izgarasi hala yatay kaydiriliyor: sayfa sayfa ray geri gelmis."
+    declaredValue(rules, "#home .room-widget-grid", "overflow", railViewport),
+    "visible",
+    "Oda izgarasi kendi icinde kayiyor: ana sayfanin tek kaydirma akisi bozulmus."
   );
   for (const [name, label] of [
     ["--rail-unit", "kart birimi"],

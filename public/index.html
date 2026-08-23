@@ -188,7 +188,6 @@
             <div id="quickScenes" class="quick-scene-grid" role="group" data-i18n-aria="quickScenesLabel" aria-label="Quick scenes"><div class="empty" data-i18n="devicesPreparing">Preparing devices…</div></div>
           </div>
         </section>
-        <div class="home-section-head" data-home-section="rooms"><div><h2 data-i18n="navRooms">Rooms</h2><p data-i18n="homeRoomsLead">Choose a room first, then what you want to do.</p></div></div>
         <div id="widgetRail" class="widget-rail" tabindex="-1">
           <!-- EMEKLİ: "Evin durumu" kartı ana ekranda BASILMAZ (özeti başlıktaki hapa döndü).
                Kart, katalog girdisi ve `renderWidgetLists` akışı silinmedi — `retiredHomeWidgets`
@@ -210,7 +209,13 @@
             <div class="group-widget-head"><div><h2 data-i18n="favoritesWidget">Favourites</h2><p data-i18n="favoritesWidgetLead">The devices you starred, in one place.</p></div></div>
             <div id="favoriteTiles" class="group-control-grid"></div>
           </article>
-          <div id="widgetEmpty" class="widget-empty" hidden><span data-i18n="widgetEmpty">Your dashboard is empty.</span> <button class="secondary" data-open-widget-catalog data-i18n="addWidget">＋ Add</button> <button class="quiet" data-open-group-create data-i18n="createGroupAction">＋ Create</button></div>
+          <!-- Favoriler kendi kartıdır; Odalar başlığı ondan SONRA gelir ve yalnız altındaki oda
+               ızgarasını adlandırır. Böylece başlık, Favoriler kartının üstünde yanlış bağlama
+               düşmez. Oda kartlarının çalışma düğümleri `#roomWidgetGrid` içinde kalır. -->
+          <div class="home-section-head" data-home-section="rooms"><div><h2 data-i18n="navRooms">Rooms</h2><p data-i18n="homeRoomsLead">Choose a room first, then what you want to do.</p></div></div>
+          <div id="roomWidgetGrid" class="room-widget-grid">
+            <div id="widgetEmpty" class="widget-empty" hidden><span data-i18n="widgetEmpty">Your dashboard is empty.</span> <button class="secondary" data-open-widget-catalog data-i18n="addWidget">＋ Add</button> <button class="quiet" data-open-group-create data-i18n="createGroupAction">＋ Create</button></div>
+          </div>
         </div>
         <button id="widgetScrollLeft" class="widget-scroll-hint scroll-hint-left" type="button" hidden aria-label="More widgets to the left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
         <button id="widgetScrollHint" class="widget-scroll-hint scroll-hint-right" type="button" hidden aria-label="More widgets to the right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>

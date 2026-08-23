@@ -121,6 +121,7 @@
   function applyWidgetLayout(){
     const board=$("#widgetBoard");
     const rail=$("#widgetRail");
+    const roomGrid=$("#roomWidgetGrid")||rail;
     const scrollPositions=captureScrollPositions();
     reconcileWidgetLayout();
     renderGroupWidgets();
@@ -152,14 +153,14 @@
       if(!widget)continue;
       if(!state.dashboardEditing&&groupWidgetHidden(id))continue;
       widget.hidden=false;
-      placeNode(rail,widget,$("#widgetEmpty"));
+      placeNode(roomGrid,widget,$("#widgetEmpty"));
     }
     /* Emniyet ağı: düzenleme kipinde, düzen kaydında hiç yeri olmayan bir grup kartı da
        görünür kalsın — anahtarı kapatan kullanıcı onu geri açacak yeri bulabilmeli. */
     if(state.dashboardEditing)for(const widget of $$("#widgetRail [data-group-widget]")){
       if(state.widgets.includes(widget.dataset.widget))continue;
       widget.hidden=false;
-      placeNode(rail,widget,$("#widgetEmpty"));
+      placeNode(roomGrid,widget,$("#widgetEmpty"));
     }
     board.classList.toggle("editing",state.dashboardEditing);
     // "Pano boş" satırı ekranda gerçekten kart olup olmamasına bakar; sıradaki kayda değil.
