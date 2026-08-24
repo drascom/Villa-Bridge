@@ -1,20 +1,10 @@
-  /* Favoriler kartı: içi oda kartıyla AYNI döşemelerden oluşur (`groupTileSlotHtml`), yalnız
-     kaynağı oda üyeliği değil yıldız kaydı. Kart iskeleti `index.html` içinde durur (grup kartıyla
-     aynı `group-widget` yapısı: başlık satırı + ızgara), böylece yükseklik/kaydırma davranışı da
-     bedava gelir — kart tek widget yüksekliğinde kalır, taşan döşemeler ızgarada kaydırılır.
-     Boşken ızgaranın yerini tek satırlık bir açıklama alır: kullanıcı yıldızı nerede bulacağını
-     okur. Silinen cihaz ya da kalkmış kanal `favoriteEntries` içinde zaten düşmüştür. */
+  /* Favoriler bölümü: Hızlı Sahneler/Odalar gibi dış kart taşımaz; yıldız kayıtlarından türeyen
+     gerçek eylem döşemelerini başlığın hemen altında gösterir. Silinen cihaz ya da kalkmış kanal
+     `favoriteEntries` içinde zaten düşmüştür. */
   function renderFavoritesWidget(){
     const grid=$("#favoriteTiles");
     if(!grid)return;
     const entries=favoriteEntries();
-    const widget=grid.closest(".favorites-widget");
-    if(widget){
-      widget.dataset.favoriteSize=entries.length>=3?"full":String(Math.max(1,entries.length));
-      widget.style.setProperty("--favorite-row-span",String(Math.max(2,Math.ceil(entries.length/4)+1)));
-      /* Telefonda varsayılan "orta" döşeme tek satır kaplar; başlık için bir satır daha eklenir. */
-      widget.style.setProperty("--favorite-row-span-mobile",String(Math.max(2,entries.length+1)));
-    }
     grid.innerHTML=entries.length
       ?entries.map(({device,control})=>groupTileSlotHtml(device,control,favoritesWidgetId)).join("")
       :`<div class="group-empty">${esc(t("favoritesEmpty"))}</div>`;

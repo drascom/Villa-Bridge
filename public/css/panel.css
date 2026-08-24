@@ -3257,7 +3257,6 @@
     /* Favoriler oda özeti değildir: yıldızlanan gerçek eylemleri doğrudan ana ekranda gösterir.
        Genel oda kartları kompakt kalırken yalnız bu kartın eylem ızgarası geri açılır. */
     #home .widget-rail .favorites-widget{display:grid;grid-template-rows:auto minmax(0,1fr)}
-    #home .widget-rail .favorites-widget .group-widget-head{height:auto}
     #home .widget-rail .favorites-widget .group-control-grid{
       display:grid!important;
       min-height:0;
@@ -3767,25 +3766,25 @@
     body[data-active-view="home"] #home .room-card-open{color:var(--glass-plate-ink)}
     body[data-active-view="home"] #home .room-card-open:hover{background:var(--home-control)}
 
-    /* Favoriler içerikle birlikte 1 → 2 → tam satır büyür. Izgaranın sabit oda yüksekliği
-       kalktığı için çok sayıda favori de kırpılmadan yeni satıra geçebilir. */
+    /* Favoriler Hızlı Sahneler ve Odalar gibi kart olmayan bir bölümdür. Dış çerçeve, dolgu ve
+       gölge yoktur; yalnız başlık satırı ile gerçek cihaz döşemeleri görünür. */
     #home .widget-rail .favorites-widget{
       width:100%;
       height:auto;
       min-height:0;
-      padding:14px;
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
       overflow:visible;
+      -webkit-backdrop-filter:none;
+      backdrop-filter:none;
     }
     #home .widget-rail .favorites-widget[hidden]{display:none!important}
-    #home .widget-rail .favorites-widget .group-widget-head h2{font-size:18px}
-    #home .widget-rail .favorites-widget .group-widget-head p{
-      margin-top:2px;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
+    #home .widget-rail .favorites-widget>.home-section-head{margin:0 0 4px}
     #home .widget-rail .favorites-widget .group-control-grid{
-      margin-top:8px;
+      margin-top:0;
       grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));
       overflow:visible;
     }

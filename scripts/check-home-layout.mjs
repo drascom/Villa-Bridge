@@ -913,23 +913,28 @@ export async function assertHomeLayout(projectRoot) {
     "Panelde `color-mix()` var: eski Android WebView'da cozulmez."
   );
 
-  /* 12s) FAVORILER ODA IZGARASININ ILK KARTI — ayri/uzun bir favori karti DEGIL.
-     Kart yalniz yildizli cihaz varsa basilir; sira listesinden yeri gelmez. */
+  /* 12s) FAVORILER ODA IZGARASINDAN ONCEKI BOLUM — dis kart DEGIL.
+     Bolum yalniz yildizli cihaz varsa basilir; sira listesinden yeri gelmez. */
   assert(
     widgets.includes("placeNode(rail,favoritesWidget,rail.firstElementChild)"),
-    "Favoriler karti oda izgarasinin ILK hucresine sabitlenmemis."
+    "Favoriler bolumu oda izgarasindan once sabitlenmemis."
   );
   assert(
     /if\(favoritesWidget&&favoriteEntries\(\)\.length\)/.test(widgets),
-    "Favori yokken de favori karti basiliyor: bos kart ilk hucreyi isgal eder."
+    "Favori yokken de Favoriler bolumu basiliyor."
   );
   assert(
     html.includes("favorites-widget") && html.includes('data-widget="favorites"'),
-    "Favoriler kartinin iskeleti isaretlemeden kalkmis."
+    "Favoriler bolumunun iskeleti isaretlemeden kalkmis."
   );
   assert(
-    /class="dashboard-widget widget-card group-widget favorites-widget"/.test(html),
-    "Favoriler karti oda kartiyla ayni iskeleti (`group-widget`) kullanmiyor."
+    /class="dashboard-widget favorites-widget"/.test(html) &&
+      /class="home-section-head" data-home-section="favorites"/.test(html),
+    "Favoriler dis kart olmadan ortak bolum basligini kullanmiyor."
+  );
+  assert(
+    !/class="[^"]*widget-card[^"]*favorites-widget|class="[^"]*favorites-widget[^"]*widget-card/.test(html),
+    "Favoriler bolumu hala dis kart (`widget-card`) tasiyor."
   );
 
   /* 12g) ODANIN ANA ANAHTARI AYRI VE DOKUNULABILIR (not §6.3 + §7). Kart govdesi odaya girer,

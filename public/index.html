@@ -170,10 +170,9 @@
           <button id="addWidget" class="secondary" hidden><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7m-3.5-3.5h7"/></svg><span class="home-action-label" data-i18n="addWidget">＋ Add</span></button><button id="editDashboard" class="quiet" hidden><svg id="editDashboardGlyph" class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg><span id="editDashboardLabel" class="home-action-label" data-i18n="editDashboard">✎ Edit</span></button><button id="homeAutomations" class="quiet" type="button" data-view-link="automations" data-admin-only><svg class="home-action-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg><span class="home-action-label" data-i18n="navAutomations">Automations</span></button></div></div>
       </header>
       <div id="widgetBoard" class="widget-board">
-        <!-- ANA EKRANIN SIRASI (demo `view-root`): başlık · "Hızlı sahneler" · "Odalar".
+        <!-- ANA EKRANIN SIRASI: başlık · "Hızlı sahneler" · "Favoriler" · "Odalar".
              Bölüm başlıkları yalnız birer ad satırı: düğme taşımazlar, çünkü "hepsini gör"
-             yolu sol raydaki Rutinler ve Odalar satırlarıdır. Sıra hem burada hem
-             `panel.css`teki dört sabit grid satırında (1·2·3·4) aynı yazılıdır. -->
+             yolu sol raydaki Rutinler ve Odalar satırlarıdır. -->
         <div class="home-section-head" data-home-section="scenes"><div><h2 data-i18n="quickScenesWidget">Quick scenes</h2><p data-i18n="homeQuickScenesLead">Change the mood of the home with one touch.</p></div></div>
         <section class="dashboard-widget widget-wide quick-control-widget" data-widget="quick">
           <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
@@ -199,18 +198,16 @@
             <div class="widget-section-divider" role="presentation"></div>
             <h3 class="widget-subhead" data-i18n="activityWidget">Home activity</h3><div id="activityEvents" class="widget-list"></div>
           </article>
-          <!-- Favoriler: iskeleti oda kartıyla aynı (başlık satırı + döşeme ızgarası), içini
-               `renderFavoritesWidget` doldurur. `data-group-widget` YOKTUR — o işaret oda
-               kartlarına ait ve her turda silinip yeniden basılmalarını sağlıyor.
-               YERİ SIRA LİSTESİNDEN GELMEZ: kart oda ızgarasının İLK hücresine sabitlenir ve
-               yalnız yıldızlanmış cihaz varsa basılır (50-widgets.js `applyWidgetLayout`). -->
-          <article class="dashboard-widget widget-card group-widget favorites-widget" data-widget="favorites" hidden>
+          <!-- Favoriler bir dış kart değildir: Hızlı Sahneler ve Odalar gibi bölüm başlığı ile
+               altında doğrudan eylem döşemelerinden oluşur. İçini `renderFavoritesWidget`
+               doldurur; yalnız yıldızlanmış cihaz varsa basılır. -->
+          <article class="dashboard-widget favorites-widget" data-widget="favorites" hidden>
             <div class="widget-edit-controls"><button data-widget-move="left">←</button><button data-widget-move="right">→</button><button data-widget-remove>×</button></div>
-            <div class="group-widget-head"><div><h2 data-i18n="favoritesWidget">Favourites</h2><p data-i18n="favoritesWidgetLead">The devices you starred, in one place.</p></div></div>
+            <div class="home-section-head" data-home-section="favorites"><div><h2 data-i18n="favoritesWidget">Favourites</h2><p data-i18n="favoritesWidgetLead">The devices you starred, in one place.</p></div></div>
             <div id="favoriteTiles" class="group-control-grid"></div>
           </article>
-          <!-- Favoriler kendi kartıdır; Odalar başlığı ondan SONRA gelir ve yalnız altındaki oda
-               ızgarasını adlandırır. Böylece başlık, Favoriler kartının üstünde yanlış bağlama
+          <!-- Odalar başlığı Favoriler bölümünden SONRA gelir ve yalnız altındaki oda
+               ızgarasını adlandırır. Böylece başlık, Favoriler bölümünün üstünde yanlış bağlama
                düşmez. Oda kartlarının çalışma düğümleri `#roomWidgetGrid` içinde kalır. -->
           <div class="home-section-head" data-home-section="rooms"><div><h2 data-i18n="navRooms">Rooms</h2><p data-i18n="homeRoomsLead">Choose a room first, then what you want to do.</p></div></div>
           <div id="roomWidgetGrid" class="room-widget-grid">
