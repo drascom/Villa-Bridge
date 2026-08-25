@@ -3961,7 +3961,7 @@
     .compact-title-row>:is(h1,h2,h3,strong){min-width:0;margin:0!important;order:0}
     .compact-title-row>.compact-help{order:1}
     .compact-help{position:relative;flex:none;display:grid;place-items:center}
-    .compact-help-button{position:relative;width:32px;height:32px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--forest);background:var(--surface-soft);font:italic 800 16px/1 Georgia,serif;touch-action:manipulation}
+    .compact-help-button{position:relative;width:32px;height:32px;min-width:32px!important;min-height:32px!important;max-width:32px;max-height:32px;flex:0 0 32px;aspect-ratio:1;display:grid;place-items:center;padding:0!important;box-sizing:border-box;border:1px solid var(--line);border-radius:50%;color:var(--forest);background:var(--surface-soft);font:italic 800 16px/1 Georgia,serif;touch-action:manipulation}
     .compact-help-button::after{content:"";position:absolute;inset:-6px;border-radius:50%}
     .compact-help-button:hover,.compact-help-button:focus-visible,.compact-help-button[aria-expanded="true"]{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
     .compact-help-button:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
