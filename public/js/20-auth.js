@@ -50,17 +50,15 @@
     // Yönetici ekranı açıkken mod düşerse kullanıcı boş bir sayfada kalmasın.
     if(!elevated&&["adminOverview","automations","connections","settings"].includes(document.body.dataset.activeView))activateView("home");
     $$("[data-mode-toggle]").forEach(button=>{
-      const label=t(elevated?"leaveAdminMode":"enterAdminMode");
+      const label=t(elevated?"backToHomeMode":"enterAdminMode");
       button.setAttribute("aria-label",label);
       button.title=label;
       button.classList.toggle("active",elevated);
       const text=button.querySelector("[data-mode-toggle-label]");
       if(text)text.textContent=label;
     });
-    // Menü levhasının kimlik satırı artık kişi değil, mod söyler.
+    // Menü başlığındaki kısa alt satır yalnız etkin modu söyler.
     $("#appMenuRole").textContent=t(elevated?"adminModeOn":"homeModeOn");
-    const personRole=$("#appMenuPersonRole");
-    if(personRole)personRole.textContent=t(elevated?"adminModeOn":"homeProfileResident");
     $("#modeStateBadge").textContent=t(elevated?"adminModeOn":"homeModeOn");
     // KALICI UYARI ŞERİDİ: PIN hâlâ fabrika varsayılanı (1234). `data-admin-only` taşıdığı için
     // ev modunda zaten görünmez; burada yalnız "varsayılan mı" sorusu kalır.
@@ -123,6 +121,23 @@
   function toggleAdminMode(){
     if(state.auth.elevated)leaveAdminMode();
     else openModePin();
+  }
+  function openAdminPinSettings(){
+    const revealPinSettings=()=>{
+      activateView("settings");
+      activateSettingsTab("usage");
+      requestAnimationFrame(()=>{
+        $("#accountsCard").scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"start"});
+        $("#adminPinInput").focus({preventScroll:true});
+      });
+    };
+    const menu=$("#appMenuDialog");
+    if(menu?.open){
+      menu.addEventListener("close",revealPinSettings,{once:true});
+      closeAppMenu();
+      return;
+    }
+    revealPinSettings();
   }
   async function updateAdminPin(event){
     event.preventDefault();

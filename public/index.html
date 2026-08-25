@@ -524,7 +524,6 @@
 <dialog id="appMenuDialog" class="app-menu-dialog" aria-labelledby="appMenuTitle">
   <div class="modal app-menu-modal">
     <div class="app-menu-head"><div class="app-menu-who"><span class="brand-mark" aria-hidden="true">V</span><div class="app-menu-identity"><h2 id="appMenuTitle" data-i18n="menu">Menu</h2><span id="appMenuRole" class="app-menu-role"></span></div></div><button id="closeAppMenu" class="device-detail-close" type="button" data-i18n-aria="close" aria-label="Close">×</button></div>
-    <div class="app-menu-person"><span class="app-menu-avatar" aria-hidden="true">VB</span><span><strong data-i18n="homeProfileTitle">Villa Bridge home</strong><small id="appMenuPersonRole" data-i18n="homeProfileResident">Home user</small></span></div>
     <nav class="app-menu-nav" data-i18n-aria="menu" aria-label="Menu">
       <button class="nav-button active" type="button" data-view="home" data-resident-only><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg></span><span class="app-menu-text"><b data-i18n="navHome">Home</b><span data-i18n="navHomeLead">Rooms, scenes and favourites</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button class="nav-button" type="button" data-view="rooms" data-resident-only><span class="app-menu-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/></svg></span><span class="app-menu-text"><b data-i18n="navRooms">Rooms</b><span data-i18n="navRoomsLead">Every room card in one place</span></span><svg class="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
@@ -564,6 +563,7 @@
     </div>
     <div class="app-menu-foot">
       <div class="connection"><span id="sideDot" class="status-dot"></span><span id="sideStatus" data-i18n="connecting">Connecting to home control</span></div>
+      <button id="menuChangePin" class="secondary session-utility pin-utility" type="button" data-admin-only data-i18n-aria="changePin" aria-label="Change PIN"><svg class="app-menu-foot-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 3 3m-6 0 3 3"/></svg><span data-i18n="changePin">Change PIN</span></button>
       <button class="secondary session-utility mode-utility" type="button" data-mode-toggle aria-label="Administrator mode"><svg class="app-menu-foot-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg><span data-mode-toggle-label>Administrator mode</span></button>
     </div>
   </div>

@@ -145,6 +145,7 @@
      anahtar (kapalıyken PIN sorar) ve etiketini `applyAuthUi` yazar. Şerit yalnız yönetici
      modunda çizildiği için burada tek yön geçerli: doğrudan 20-auth.js'in `leaveAdminMode`i. */
   $b("#leaveAdminModeButton").onclick=leaveAdminMode;
+  $b("#menuChangePin").onclick=openAdminPinSettings;
   $b("#adminPinForm").onsubmit=updateAdminPin;
   $b("#adminPinForm").addEventListener("input",()=>setAdminPinError());
   $b("#coachNext").onclick=nextCoachStep;
