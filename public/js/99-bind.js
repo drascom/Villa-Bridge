@@ -18,6 +18,8 @@
   $b("#closeAppMenu").onclick=closeAppMenu;
   $b("#closeRoomDetail").onclick=closeRoomDetail;
   $b("#roomDetailDialog").addEventListener("close",()=>{state.roomDetail=null});
+  $b("#closeSystemDetail").onclick=closeSystemDetail;
+  $b("#systemDetailDialog").addEventListener("close",restoreSystemDetail);
   $b("#appMenuDialog").addEventListener("close",()=>{
     $$("[data-app-menu]").forEach(item=>item.setAttribute("aria-expanded","false"));
     const opener=state.appMenuOpener;
@@ -45,10 +47,7 @@
   $b("#deviceColumns").oninput=()=>applyDeviceColumns($("#deviceColumns").value);
   $b("#deviceColumns").onchange=()=>setDeviceColumns($("#deviceColumns").value);
   $$("[data-theme-mode]").forEach(button=>button.onclick=()=>setThemeMode(button.dataset.themeMode));
-  $$("[data-system-jump]").forEach(button=>button.onclick=()=>{
-    activateSettingsTab(button.dataset.systemTab||"usage");
-    requestAnimationFrame(()=>document.getElementById(button.dataset.systemJump)?.scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"start"}));
-  });
+  $$("[data-system-jump]").forEach(button=>button.onclick=()=>openSystemDetail(button));
   $$("[data-theme-toggle]").forEach(button=>button.onclick=()=>setThemeMode(document.documentElement.dataset.theme==="dark"?"light":"dark"));
   $$("[data-language-cycle]").forEach(button=>button.onclick=cycleLanguage);
   /* ARKA PLAN AYARLARI. Kaydırıcılar `input` ile ANINDA boyar (canlı önizleme), kayıt
@@ -206,6 +205,7 @@
   $b("#repairDialog").addEventListener("cancel",event=>event.preventDefault());
   bindBackdropClose("#widgetDialog",".add-modal",closeAddDialog);
   bindBackdropClose("#roomDetailDialog",".room-detail-modal",closeRoomDetail);
+  bindBackdropClose("#systemDetailDialog",".system-detail-modal",closeSystemDetail);
   bindBackdropClose("#deviceDetailDialog",".device-detail-modal",closeDeviceDetail);
   bindBackdropClose("#lightDialog",".light-modal",()=>$("#lightDialog").close());
   /* Hızlı kumanda penceresi: kapatma çarpısı, `Esc` ve odak tuzağı `<dialog>`ın kendisinden gelir;

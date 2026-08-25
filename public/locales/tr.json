@@ -1409,6 +1409,7 @@
     "systemBackupAction": "Yedekleri göster ›",
     "systemMaintenanceAction": "Bakım araçları ›",
     "systemAdvancedAction": "Araçları aç ›",
+    "systemDetailUnavailable": "Bu kontroller yalnız Villa Bridge'in kurulu olduğu duvar tabletinde kullanılabilir.",
     "homeProfileTitle": "Villa Bridge evi",
     "homeProfileResident": "Ev kullanıcısı",
     "quickScenesEmpty": "Çalıştırılacak hızlı sahne yok.",

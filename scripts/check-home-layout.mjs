@@ -1071,10 +1071,19 @@ export async function assertHomeLayout(projectRoot) {
   const stripTag = html.slice(html.lastIndexOf("<div", stripAt), html.indexOf(">", stripAt));
   assert(stripTag.includes("data-admin-only"), "Mod seridi ev modunda da ciziliyor.");
 
-  /* 12m) "SISTEM" BUGUNKU AYARLAR EKRANIDIR: kimligi (#settings) ve IKI SEKMESI korunur.
-     Sekmeler kaybolursa kalabalik tek sayfaya doner ve `activateSettingsTab` ilk turda patlar. */
+  /* 12m) SISTEM OZET + SAG CEKMECE DESENIDIR. Eski iki panel form dugumlerinin park yeridir;
+     kaybolurlarsa mevcut ayar baglantilari patlar. Kullanici ise alti ozet kartindan birine
+     dokunur ve her hedef TEK, gercek bir DOM kimligine cozulur. */
   for (const id of ["settingsTabUsage", "settingsTabSetup", "settingsPanelUsage", "settingsPanelSetup"]) {
-    assert(html.includes(`id="${id}"`), `Ayarlar'in korunmasi gereken sekme parcasi kaybolmus: #${id}.`);
+    assert(html.includes(`id="${id}"`), `Ayarlar'in korunmasi gereken park parcasi kaybolmus: #${id}.`);
+  }
+  assert(html.includes('id="systemDetailDialog"'), "Sistem ayrinti cekmecesi kaybolmus.");
+  const systemTargetGroups = [...html.matchAll(/data-system-targets="([^"]+)"/g)];
+  assert.equal(systemTargetGroups.length, 6, "Sistem merkezindeki alti ozet kartinin hedef grubu eksik.");
+  const systemTargets = systemTargetGroups.flatMap(([, value]) => value.split(",").map((id) => id.trim()).filter(Boolean));
+  assert.equal(new Set(systemTargets).size, systemTargets.length, "Bir ayar karti iki sistem cekmecesine birden baglanmis.");
+  for (const id of systemTargets) {
+    assert(new RegExp(`id=["']${id}["']`).test(html), `Sistem cekmecesi olmayan hedefe gidiyor: #${id}.`);
   }
 
   /* 12n) RISKLI ISLEMLER ONAYSIZ CALISMAZ. Belirtecler sunucunun sozlesmesidir; biri dususe

@@ -64,6 +64,49 @@
     if(usage)usage.hidden=settingsTab!=="usage";
     if(setup)setup.hidden=settingsTab!=="setup";
   }
+  /* SİSTEM AYRINTI ÇEKMECESİ. Ana Sistem görünümü yalnız anlaşılır özet kartlarını taşır.
+     Mevcut form düğümleri kopyalanmaz: ilgili kartlar sağ çekmeceye taşınır, kapanışta tam
+     yerlerine geri konur. Böylece bağlı olay dinleyicileri ve form kimlikleri değişmeden kalır. */
+  let systemDetailEntries=[];
+  function restoreSystemDetail(){
+    for(const entry of [...systemDetailEntries].reverse()){
+      if(entry.next?.parentNode===entry.parent)entry.parent.insertBefore(entry.node,entry.next);
+      else entry.parent.appendChild(entry.node);
+    }
+    systemDetailEntries=[];
+    const body=$("#systemDetailBody");
+    if(body)body.replaceChildren();
+  }
+  function closeSystemDetail(){
+    const dialog=$("#systemDetailDialog");
+    if(dialog?.open)dialog.close();
+  }
+  function systemDetailButton(targetId){
+    return $$('[data-system-jump]').find(button=>button.dataset.systemJump===targetId)||null;
+  }
+  function openSystemDetail(button,{focusId=""}={}){
+    if(!button)return;
+    const dialog=$("#systemDetailDialog");
+    const body=$("#systemDetailBody");
+    if(!dialog||!body||dialog.open)return;
+    const ids=(button.dataset.systemTargets||button.dataset.systemJump||"").split(",").map(id=>id.trim()).filter(Boolean);
+    const nodes=ids.map(id=>document.getElementById(id)).filter(Boolean);
+    if(!nodes.length)return;
+    body.replaceChildren();
+    systemDetailEntries=nodes.map(node=>({node,parent:node.parentNode,next:node.nextSibling}));
+    for(const node of nodes)body.appendChild(node);
+    $("#systemDetailIcon").textContent=button.querySelector(".system-hub-glyph")?.textContent?.trim()||"•";
+    $("#systemDetailTitle").textContent=button.querySelector("strong")?.textContent?.trim()||t("navSystem");
+    $("#systemDetailLead").textContent=button.querySelector("small")?.textContent?.trim()||"";
+    if(!nodes.some(node=>!node.hidden)){
+      const empty=document.createElement("p");
+      empty.className="system-detail-empty";
+      empty.textContent=t("systemDetailUnavailable");
+      body.appendChild(empty);
+    }
+    dialog.showModal();
+    if(focusId)requestAnimationFrame(()=>document.getElementById(focusId)?.focus({preventScroll:true}));
+  }
   /* SİSTEM YENİDEN BAŞLATMA
      Koordinatör düğmesi ancak sunucu "yapılabilir" derse etkinleşir: adres bir USB seri yolsa
      ya da kurulum yarımsa uzaktan telsiz reseti diye bir şey yoktur. Karar istemcide TAHMİN

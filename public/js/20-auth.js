@@ -49,6 +49,7 @@
     document.body.classList.toggle("home-mode",!elevated);
     // Yönetici ekranı açıkken mod düşerse kullanıcı boş bir sayfada kalmasın.
     if(!elevated&&["adminOverview","automations","connections","settings"].includes(document.body.dataset.activeView))activateView("home");
+    if(!elevated&&$("#systemDetailDialog")?.open)$("#systemDetailDialog").close();
     $$("[data-mode-toggle]").forEach(button=>{
       const label=t(elevated?"backToHomeMode":"enterAdminMode");
       button.setAttribute("aria-label",label);
@@ -125,11 +126,7 @@
   function openAdminPinSettings(){
     const revealPinSettings=()=>{
       activateView("settings");
-      activateSettingsTab("usage");
-      requestAnimationFrame(()=>{
-        $("#accountsCard").scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"start"});
-        $("#adminPinInput").focus({preventScroll:true});
-      });
+      requestAnimationFrame(()=>openSystemDetail(systemDetailButton("accountsCard"),{focusId:"adminPinInput"}));
     };
     const menu=$("#appMenuDialog");
     if(menu?.open){

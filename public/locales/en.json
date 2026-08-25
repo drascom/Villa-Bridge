@@ -1409,6 +1409,7 @@
     "systemBackupAction": "View backups ›",
     "systemMaintenanceAction": "Maintenance tools ›",
     "systemAdvancedAction": "Open tools ›",
+    "systemDetailUnavailable": "These controls are available only on the wall tablet where Villa Bridge is installed.",
     "homeProfileTitle": "Villa Bridge home",
     "homeProfileResident": "Home user",
     "quickScenesEmpty": "No quick scenes to run yet.",
