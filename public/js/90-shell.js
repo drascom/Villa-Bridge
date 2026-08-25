@@ -920,9 +920,107 @@
     // kapanmıyoruz — orada peş peşe deneme yapılıyor.
     closeAppMenu();
   }
+  /* AZ METİN DESENİ. Açıklamalar silinmez ve kopyalanmaz: çevrilen gerçek düğüm, başlığın
+     yanındaki bilgi düğmesinin açtığı tek bir balona taşınır. Böylece dil değişimi aynı düğümü
+     günceller; uyarı, durum ve ölçüm metinleri ise bu dönüşümün dışında görünür kalır. */
+  let compactHelpSequence=0;
+  let compactHelpBound=false;
+  function closeCompactHelp(except=null){
+    $$(".compact-help").forEach(help=>{
+      if(help===except)return;
+      const button=help.querySelector(".compact-help-button");
+      const popover=help.querySelector(".compact-help-popover");
+      if(button)button.setAttribute("aria-expanded","false");
+      if(popover)popover.hidden=true;
+    });
+  }
+  function bindCompactHelp(){
+    if(compactHelpBound)return;
+    compactHelpBound=true;
+    document.addEventListener("pointerdown",event=>{if(!event.target.closest?.(".compact-help"))closeCompactHelp()},{capture:true,passive:true});
+    document.addEventListener("keydown",event=>{
+      if(event.key!=="Escape"||!$(".compact-help-button[aria-expanded='true']"))return;
+      event.preventDefault();
+      event.stopPropagation();
+      const open=$(".compact-help-button[aria-expanded='true']");
+      closeCompactHelp();
+      open?.focus();
+    },true);
+  }
+  function attachCompactHelp(anchor,nodes){
+    const descriptions=(nodes||[]).filter(node=>node?.isConnected&&!node.closest(".compact-help-popover"));
+    if(!anchor||anchor.dataset.compactHelp==="true"||!descriptions.length)return;
+    anchor.dataset.compactHelp="true";
+    const row=document.createElement("div");
+    row.className="compact-title-row";
+    anchor.before(row);
+    row.appendChild(anchor);
+    const help=document.createElement("div");
+    help.className="compact-help";
+    const id=`compactHelp${++compactHelpSequence}`;
+    const button=document.createElement("button");
+    button.className="compact-help-button";
+    button.type="button";
+    button.textContent="i";
+    button.dataset.i18nAria="showInformation";
+    button.setAttribute("aria-label",t("showInformation"));
+    button.setAttribute("aria-controls",id);
+    button.setAttribute("aria-expanded","false");
+    const popover=document.createElement("div");
+    popover.id=id;
+    popover.className="compact-help-popover";
+    popover.setAttribute("role","tooltip");
+    popover.hidden=true;
+    descriptions.forEach(node=>popover.appendChild(node));
+    help.append(button,popover);
+    row.appendChild(help);
+    button.addEventListener("click",event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      const opening=popover.hidden;
+      closeCompactHelp(opening?help:null);
+      popover.hidden=!opening;
+      button.setAttribute("aria-expanded",String(opening));
+    });
+  }
+  function decorateCompactHelp(){
+    bindCompactHelp();
+    $$(".setting-card").forEach(card=>{
+      const title=card.querySelector("h2");
+      const lead=title?.nextElementSibling;
+      if(lead?.matches("p[data-i18n]:not(.backup-warning):not(.danger-copy)"))attachCompactHelp(title,[lead]);
+    });
+    $$(".connection-card").forEach(card=>{
+      const title=card.querySelector("h2");
+      const lead=title?.nextElementSibling;
+      if(lead?.matches("p[data-i18n]"))attachCompactHelp(title,[lead]);
+    });
+    const attentionTitle=$(".device-attention-copy h2");
+    if(attentionTitle)attachCompactHelp(attentionTitle,[attentionTitle.nextElementSibling]);
+    const serverTitle=$("#settingsServerNotice strong");
+    if(serverTitle)attachCompactHelp(serverTitle,[serverTitle.nextElementSibling]);
+    $$(".system-restart-row").forEach(row=>attachCompactHelp(row.querySelector("strong"),[...row.querySelectorAll("small[data-i18n]")]));
+    $$(".tablet-care-row").forEach(row=>attachCompactHelp(row.querySelector("strong"),[...row.querySelectorAll("small[data-i18n]")]));
+    $$(".zigbee-panel-head").forEach(head=>attachCompactHelp(head.querySelector("strong"),[head.querySelector("p[data-i18n]")]));
+    $$(".page-head-title").forEach(head=>attachCompactHelp(head.querySelector("h1"),[...head.querySelectorAll(":scope>p[data-i18n]")]));
+    $$(".sky-block").forEach(block=>attachCompactHelp(block.querySelector("h2"),[...block.querySelectorAll(":scope>.sky-block-note[data-i18n]")]));
+    const networkGuide=$("#tabletIpGuide");
+    if(networkGuide)attachCompactHelp(networkGuide.querySelector("h3"),[...networkGuide.querySelectorAll(":scope>p,:scope>ol")]);
+    for(const [titleSelector,leadSelector] of [
+      ["#systemDetailTitle","#systemDetailLead"],
+      ["#automationTitle","#automationLead"],
+      ["#simpleLinkTitle","#simpleLinkLead"],
+      ["#clockDialogTitle","#clockDialogTitle + p"],
+      ["#modePinTitle","#modePinTitle + p"],
+      ["#nameDialogTitle","#nameDialogLead"],
+      ["#weatherLocationDialog h2","#weatherLocationDialog .modal > p[data-i18n]"],
+      ["#homeLocationDialog h2","#homeLocationDialog .modal > p[data-i18n]"]
+    ])attachCompactHelp($(titleSelector),[$(leadSelector)]);
+  }
   function applyLanguage(){
     document.documentElement.lang=state.language;
     $$("[data-i18n]").forEach(element=>element.textContent=t(element.dataset.i18n));
+    decorateCompactHelp();
     $("#addWidget").setAttribute("aria-label",t("addWidget"));
     $("#addWidget").title=t("addWidget");
     $("#devicesAddDevice").setAttribute("aria-label",t("addDevice"));

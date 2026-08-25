@@ -3691,8 +3691,8 @@
       #rooms .room-card-grid,#routines .routine-list,.system-hub-grid{grid-template-columns:1fr}
       #rooms .room-card{height:auto;min-height:232px;padding:15px}
       #routines .routine-card{min-height:124px;padding:16px}
-      #connections .connection-card{min-height:260px;padding:18px}
-      .system-hub-card{min-height:132px;padding:16px}
+      #connections .connection-card{min-height:220px;padding:18px}
+      .system-hub-card{min-height:96px;padding:16px}
       dialog#appMenuDialog{height:auto;max-height:min(82dvh,690px)}
       dialog#appMenuDialog>.app-menu-modal{height:auto;max-height:min(82dvh,690px)}
       dialog#appMenuDialog>.app-menu-modal>.app-menu-nav{display:none}
@@ -3954,6 +3954,32 @@
     .system-detail-body .setting-toggle{display:flex;align-items:center;gap:10px;min-height:44px}
     .system-detail-empty{margin:16px 0;padding:20px;border:1px dashed var(--line);border-radius:16px;color:var(--muted);background:var(--surface-soft);line-height:1.5}
 
+    /* AZ METİN SİSTEMİ. Başlık ve kontrol her zaman görünür; açıklama yalnız dairesel italik
+       `i` düğmesiyle çağrılır. Balon viewport'a sabittir, dar karttan veya yan panelden kesilmez.
+       Uyarı ve dinamik durumlar bu sınıfa taşınmadığı için görünür kalır. */
+    .compact-title-row{min-width:0;display:flex;align-items:center;gap:5px;margin:0 0 7px}
+    .compact-title-row>:is(h1,h2,h3,strong){min-width:0;margin:0!important}
+    .compact-help{position:relative;flex:none;display:grid;place-items:center}
+    .compact-help-button{position:relative;width:32px;height:32px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--forest);background:var(--surface-soft);font:italic 800 16px/1 Georgia,serif;touch-action:manipulation}
+    .compact-help-button::after{content:"";position:absolute;inset:-6px;border-radius:50%}
+    .compact-help-button:hover,.compact-help-button:focus-visible,.compact-help-button[aria-expanded="true"]{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
+    .compact-help-button:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
+    .compact-help-popover{position:fixed;z-index:1200;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));width:min(420px,calc(100vw - 32px));max-height:min(46dvh,360px);padding:14px 16px;border:1px solid var(--line);border-radius:16px;color:var(--ink);background:var(--surface-strong);box-shadow:0 16px 44px rgba(12,26,20,.28);font:500 13px/1.5 system-ui,sans-serif;text-align:left;overflow:auto;transform:translateX(-50%);-webkit-backdrop-filter:blur(24px) saturate(1.08);backdrop-filter:blur(24px) saturate(1.08)}
+    .compact-help-popover[hidden]{display:none}
+    .compact-help-popover :is(p,ol,ul,small){min-height:0!important;margin:0!important;color:inherit!important;font:inherit!important}
+    .compact-help-popover :is(ol,ul){padding-left:20px!important}
+    .compact-help-popover :is(p,ol,ul)+:is(p,ol,ul,small){margin-top:9px!important}
+    .connection-card>.compact-title-row{order:1;margin:14px 0 7px}
+    .settings-server-notice .compact-title-row,.system-detail-title>.compact-title-row{margin-bottom:0}
+
+    /* Kendini açıklayan ana bölümlerde ikinci satır gerekmez. Kartın ikonu, rengi ve başlığı
+       gezinme için yeterlidir; dinamik durum ve değer metinlerine dokunulmaz. */
+    #home .home-section-head p,.view>.routine-lead,.app-menu-text>span,.system-hub-card small,.system-hub-card b,.admin-mode-strip-copy>span{display:none!important}
+    #home .home-section-head{min-height:32px}
+    .system-hub-card{min-height:104px;grid-template-rows:1fr;align-items:center}
+    .system-hub-card>span:nth-child(2){grid-row:1;align-self:center;gap:0}
+    #connections .connection-card{min-height:230px}
+
     /* Alt sayfa standardı: cihaz ayrıntısı ve otomasyon düzenleyicisi de tablette sağdaki
        %60 çekmecede açılır. Telefon, oda panelindeki gibi tam ekran kalır. */
     @media(min-width:621px){
@@ -3966,6 +3992,8 @@
     }
 
     @media(max-width:620px){
+      #connections .connection-card{min-height:220px}
+      .system-hub-card{min-height:96px}
       #home .widget-board{row-gap:7px}
       #home .home-section-head{min-height:0}
       #home .widget-rail{--room-card-h:78px}
