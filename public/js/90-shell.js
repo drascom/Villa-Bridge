@@ -978,13 +978,19 @@
     row.appendChild(help);
     /* `backdrop-filter` kartları fixed elemanlar için yeni bir koordinat sistemi kurar.
        Balon kartta kalırsa ekran yerine karta ortalanır ve kesilir; body portalı onu gerçek
-       viewport'a bağlar. Açıklama düğümleri yine kendileridir, yalnız üst katmana taşınırlar. */
+       viewport'a bağlar. Açıklama düğümleri yine kendileridir, yalnız üst katmana taşınırlar.
+       Düğme sonradan bir dialog'a taşınırsa balon açılışta dialog'un top-layer katmanına geçer. */
     document.body.appendChild(popover);
     button.addEventListener("click",event=>{
       event.preventDefault();
       event.stopPropagation();
       const opening=popover.hidden;
       closeCompactHelp(opening?help:null);
+      if(opening){
+        const openDialog=button.closest("dialog[open]");
+        const portal=openDialog||document.body;
+        if(popover.parentElement!==portal)portal.appendChild(popover);
+      }
       popover.hidden=!opening;
       button.setAttribute("aria-expanded",String(opening));
     });
