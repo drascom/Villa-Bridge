@@ -18,6 +18,24 @@
     error.textContent=message;
     error.hidden=!message;
   }
+  /* Bir yönetici yazması, PIN penceresi açık değilken yetki süresinin dolduğunu öğrenebilir.
+     İstek sahibi bu Promise'i bekler; PIN doğruysa işlemini taslağı kaybetmeden sürdürür,
+     kullanıcı Vazgeç derse `false` alır. Normal menüden giriş bu bekleyiciyi oluşturmaz. */
+  let pendingModeElevation=null;
+  function settleModeElevation(granted){
+    const pending=pendingModeElevation;
+    pendingModeElevation=null;
+    if(pending)pending.resolve(granted===true);
+  }
+  function requestAdminElevation(){
+    if(state.auth.elevated===true)return Promise.resolve(true);
+    if(pendingModeElevation)return pendingModeElevation.promise;
+    let resolve;
+    const promise=new Promise(done=>{resolve=done});
+    pendingModeElevation={promise,resolve};
+    openModePin();
+    return promise;
+  }
   /* Yükseltme sunucuda hareketsizlikte düşer. Panel bunu kendi başına bilemez; bayrağı yerelde
      düşürüp gerçeği bir sonraki sunucu yanıtından öğrenir. */
   function dropElevatedFlag(){
@@ -73,10 +91,11 @@
     }
     revealModePin();
   }
-  function closeModePin(){
+  function closeModePin(granted=false){
     $("#modePinDialog").hidden=true;
     $("#modePinInput").value="";
     setModeFormError();
+    settleModeElevation(granted);
   }
   async function submitModePin(event){
     event.preventDefault();
@@ -86,11 +105,12 @@
     try{
       const data=await api("/api/mode/elevate",{method:"POST",body:JSON.stringify({pin:$("#modePinInput").value})});
       setModeState(data);
-      closeModePin();
+      const resumesBlockedAction=pendingModeElevation!==null;
+      closeModePin(true);
       showToast(t("adminModeOn"));
-      activateView("adminOverview");
+      if(!resumesBlockedAction)activateView("adminOverview");
       // Yönetici ekranlarının verisi ev modunda hiç okunmuyor; mod açılınca bir kez getirilir.
-      try{await loadSettings()}catch{}
+      if(!resumesBlockedAction)try{await loadSettings()}catch{}
     }catch(error){setModeFormError(error.message)}
     finally{button.disabled=false}
   }

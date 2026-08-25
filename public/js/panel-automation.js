@@ -710,6 +710,9 @@
   // İleri/Kaydet iki yerde durur (üstte ve altta) ama tek davranıştır; Geri yalnız altta kalır.
   // Tek birincil eylem: alttaki düğme. Üstteki kopya kaldırıldı, hangisinin asıl olduğu sorusu bitti.
   const automationNextButtons=()=>[$("#automationNext")].filter(Boolean);
+  // PIN yeniden istenirken native dialog geçici kapanır. `close` dinleyicisi bu tek bayrakla
+  // taslağı silmez; kullanıcı PIN'i girince aynı sihirbaz kaldığı yerden yeniden açılır.
+  let automationWizardReauthorizing=false;
   // Son basış ipucu yoklama turuyla tazelenir; yalnız düğme seçim adımında, metin alanı yok.
   function refreshAutomationHint(){
     const wizard=state.automationWizard;
@@ -726,8 +729,24 @@
     // Ajan yedeği sayısı: "geri al" yolunun görünür olup olmayacağını tek başına belirler.
     state.automationAgentBackups=Number(data.agentBackups)||0;
   }
-  async function persistAutomations(automations,successKey){
-    const data=await api("/api/automations",{method:"PUT",body:JSON.stringify({automations})});
+  async function persistAutomations(automations,successKey,reauthorize={}){
+    const returnView=document.body.dataset.activeView||"automations";
+    let data;
+    try{
+      data=await api("/api/automations",{method:"PUT",body:JSON.stringify({automations})});
+    }catch(error){
+      if(error?.code!=="ELEVATION_REQUIRED"||reauthorize.retry===false)throw error;
+      if(typeof reauthorize.before==="function")reauthorize.before();
+      const granted=await requestAdminElevation();
+      if(!granted){
+        const canceled=new Error("Administrator mode was cancelled.");
+        canceled.code="ELEVATION_CANCELED";
+        throw canceled;
+      }
+      activateView(returnView);
+      if(typeof reauthorize.after==="function")reauthorize.after();
+      return persistAutomations(automations,successKey,{...reauthorize,retry:false});
+    }
     state.automations=Array.isArray(data.automations)?data.automations:automations;
     renderAutomations();
     if(successKey)showToast(t(successKey));
@@ -921,7 +940,7 @@
   async function toggleAutomationEnabled(id){
     const next=state.automations.map(item=>item.id===id?{...item,enabled:item.enabled===false}:item);
     try{await persistAutomations(next)}
-    catch(error){showToast(error.message,true)}
+    catch(error){if(error?.code!=="ELEVATION_CANCELED")showToast(error.message,true)}
   }
   function openAutomationActions(id){
     const automation=state.automations.find(item=>item.id===id);
@@ -999,7 +1018,7 @@
     $("#automationActionDialog").close();
     if(!automation||!confirm(t("automationDeleteConfirm",{name:automation.name})))return;
     try{await persistAutomations(state.automations.filter(item=>item.id!==automation.id),"automationDeleted")}
-    catch(error){showToast(error.message,true)}
+    catch(error){if(error?.code!=="ELEVATION_CANCELED")showToast(error.message,true)}
   }
   /* ————— çoğaltma. Kopya sunucuya HEMEN yazılmaz: paneldeki "yeni otomasyon" da yalnız Kaydet'e
      basılınca kalıcı olur, çoğaltma da aynı akışa girer. Kullanıcı adı ve cihazları değiştirip
@@ -3983,7 +4002,24 @@
       const index=automations.findIndex(item=>item.id===entry.id);
       if(index>=0)automations[index]={...entry,lastRunAt:automations[index].lastRunAt,lastRunOk:automations[index].lastRunOk};
       else automations.push(entry);
-      await persistAutomations(automations,"automationSaved");
+      await persistAutomations(automations,"automationSaved",{
+        /* PIN katmanı normal DOM'dadır, otomasyon penceresi ise tarayıcının top layer'ındadır.
+           PIN görünür olsun diye pencereyi geçici kapatırız; close dinleyicisi bayrak sayesinde
+           taslağı korur. PIN kabul edilince aynı taslak yeniden açılır ve kayıt otomatik sürer. */
+        before:()=>{
+          automationWizardReauthorizing=true;
+          const dialog=$("#automationDialog");
+          if(dialog?.open)dialog.close();
+        },
+        after:()=>{
+          const dialog=$("#automationDialog");
+          if(dialog&&!dialog.open)dialog.showModal();
+          renderAutomationWizard();
+        }
+      });
       $("#automationDialog").close();
-    }catch(error){buttons.forEach(button=>{button.disabled=false});showToast(automationErrorText(error),true)}
+    }catch(error){
+      buttons.forEach(button=>{button.disabled=false});
+      if(error?.code!=="ELEVATION_CANCELED")showToast(automationErrorText(error),true);
+    }
   }

@@ -139,7 +139,7 @@
   $b("#onboardingDialog").oncancel=event=>event.preventDefault();
   $b("#modePinForm").onsubmit=submitModePin;
   $b("#modePinForm").addEventListener("input",()=>setModeFormError());
-  $b("#modePinCancel").onclick=closeModePin;
+  $b("#modePinCancel").onclick=()=>closeModePin();
   $$("[data-mode-toggle]").forEach(button=>button.onclick=toggleAdminMode);
   /* Mod şeridindeki "Ev moduna dön" — `data-mode-toggle` DEĞİL, çünkü o kanca iki yönlü bir
      anahtar (kapalıyken PIN sorar) ve etiketini `applyAuthUi` yazar. Şerit yalnız yönetici
@@ -177,7 +177,11 @@
   $b("#automationBack").onclick=stepBackAutomation;
   $b("#automationNext").onclick=nextAutomationStep;
   $b("#closeAutomationWizard").onclick=closeAutomationWizard;
-  $b("#automationDialog").addEventListener("close",()=>{cancelAutomationAdvance();state.automationWizard=null});
+  $b("#automationDialog").addEventListener("close",()=>{
+    cancelAutomationAdvance();
+    if(automationWizardReauthorizing){automationWizardReauthorizing=false;return}
+    state.automationWizard=null;
+  });
   bindBackdropClose("#automationDialog",".automation-modal",closeAutomationWizard);
   $b("#closeAutomationActions").onclick=()=>$("#automationActionDialog").close();
   $b("#runAutomationNow").onclick=runAutomationNow;

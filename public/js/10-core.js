@@ -338,6 +338,30 @@
   };
   const ago=iso=>{if(!iso)return t("noData");const seconds=Math.max(0,Math.floor((Date.now()-new Date(iso))/1000));return seconds<8?t("justNow"):seconds<60?t("secondsAgo",{count:seconds}):seconds<3600?t("minutesAgo",{count:Math.floor(seconds/60)}):t("hoursAgo",{count:Math.floor(seconds/3600)})};
   const showToast=(message,error=false)=>{const toast=$("#toast");toast.textContent=message;toast.className=`toast show${error?" error":""}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className="toast",error?6000:3200)};
-  const api=async(url,options={})=>{const method=String(options.method||"GET").toUpperCase();const csrf=state.auth.csrfToken&&["POST","PUT","PATCH","DELETE"].includes(method)?{"x-villa-csrf":state.auth.csrfToken}:{};const response=await fetch(url,{cache:"no-store",...options,headers:{...(options.body===undefined?{}:{"content-type":"application/json"}),...csrf,...(options.headers||{})}});const data=await response.json().catch(()=>({}));/* Yükseltme sunucuda hareketsizlikte düştüyse ilk yönetici isteği bunu haber verir:
-     yerel bayrak düşer, gizli düğmeler geri kapanır. */
-  if(response.status===403&&data.code==="ELEVATION_REQUIRED")dropElevatedFlag();if(!response.ok){const failure=new Error(data.error||t("operationFailed"));failure.status=response.status;if(data.code)failure.code=data.code;throw failure}return data};
+  const api=async(url,options={},retrySecurity=true)=>{
+    const method=String(options.method||"GET").toUpperCase();
+    const csrf=state.auth.csrfToken&&["POST","PUT","PATCH","DELETE"].includes(method)
+      ?{"x-villa-csrf":state.auth.csrfToken}:{};
+    const response=await fetch(url,{cache:"no-store",...options,headers:{
+      ...(options.body===undefined?{}:{"content-type":"application/json"}),...csrf,...(options.headers||{})
+    }});
+    const data=await response.json().catch(()=>({}));
+    /* Tablet günlerce açık kalabilir. Oturum çerezi yenilendiğinde bellekteki eski CSRF anahtarı
+       ilk yazmayı 403'e düşürür; reddedilen istek hiçbir işlem yapmadığı için yeni oturum
+       durumunu alıp aynı isteği BİR KEZ yeniden göndermek güvenlidir. */
+    if(response.status===403&&data.code==="INVALID_CSRF_TOKEN"&&retrySecurity){
+      const sessionResponse=await fetch("/api/auth/session",{cache:"no-store"});
+      const session=await sessionResponse.json().catch(()=>({}));
+      if(sessionResponse.ok){setModeState(session);return api(url,options,false)}
+    }
+    /* Yükseltme sunucuda hareketsizlikte düştüyse ilk yönetici isteği bunu haber verir:
+       yerel bayrak düşer, gizli düğmeler geri kapanır. */
+    if(response.status===403&&data.code==="ELEVATION_REQUIRED")dropElevatedFlag();
+    if(!response.ok){
+      const failure=new Error(data.error||t("operationFailed"));
+      failure.status=response.status;
+      if(data.code)failure.code=data.code;
+      throw failure;
+    }
+    return data;
+  };
