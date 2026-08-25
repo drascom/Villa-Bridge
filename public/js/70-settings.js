@@ -709,9 +709,14 @@
   }
   function renderConnectedServerAddress(){
     const address=connectedServerAddress();
-    $("#connectedServerAddress").textContent=address;
-    $("#restartOnboarding").textContent=t(state.androidMonitor?"openServerSettings":"runSetupAgain");
-    $(".onboarding-settings-card p").textContent=t(state.androidMonitor?"serverGuidesLead":"guidesLead");
+    const addressOutput=$("#connectedServerAddress");
+    const restartButton=$("#restartOnboarding");
+    /* Açıklama `compact-help` tarafından body katmanına taşınabilir. Kartın içindeki konuma
+       değil kalıcı kimliğine bağlanmak, dil veya görünüm yenilenirken düğümü kaybetmez. */
+    const guideLead=$("#setupWizardLead")||$('[data-i18n="guidesLead"]');
+    if(addressOutput)addressOutput.textContent=address;
+    if(restartButton)restartButton.textContent=t(state.androidMonitor?"openServerSettings":"runSetupAgain");
+    if(guideLead)guideLead.textContent=t(state.androidMonitor?"serverGuidesLead":"guidesLead");
   }
   /* DUVARDAKİ TABLETİN EKRANI VE AYAKTA KALMASI.
      Kullanıcının gördüğü her ayar burada — Android tarafında ayar ekranı yoktur, orası yalnız
