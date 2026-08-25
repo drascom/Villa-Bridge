@@ -920,7 +920,7 @@
        ise bir kereliğine önde duran bir yüzey — güneş kaydıkça kontrastının kaymaması gerekir.
        Böylece sabit sistemde panelin kendi dili geçerli olur (Light'ta açık cam + koyu mürekkep,
        Dark'ta koyu cam + açık mürekkep; renk butonda ve yazıda), hareketli sistemde ise levha
-       gün boyu AYNI koyu camda kalır (aşağıdaki `data-sky="live"` kancası). Gölge dar ve keskin:
+       koyu gökyüzünden ayrılan açık bir yüzeyde kalır (aşağıdaki `data-sky="live"` kancası). Gölge dar ve keskin:
        `--glass-shadow` zaten öyle. */
     /* DİKEY SİMETRİ: levha kısa kesilmez, üstteki boşluk kadar altta da boşluk bırakıp aradaki
        alanı doldurur. Tek ölçü `--menu-inset-y` üstte ve altta aynen kullanılır; çentik/gezinme
@@ -956,9 +956,9 @@
     }
     /* Koyu sabit temada çipin .11'lik örtüsü bir levhaya az geliyor: yalnız dolgu bir kademe artar. */
     :root[data-sky="fixed"][data-theme="dark"] dialog.app-menu-dialog>.app-menu-modal{--menu-surface:rgba(255,255,255,.15)}
-    /* HAREKETLİ SİSTEM: çipin gündüz iyice inceltilmiş dolgusu (.23) burada kullanılmaz — levha
-       gün boyu aynı koyu camda durur, mürekkebi kökün açık çip ailesinden gelir. */
-    :root[data-sky="live"] dialog.app-menu-dialog>.app-menu-modal{--menu-surface:rgba(9,13,20,.74);--menu-brd:rgba(255,255,255,.22)}
+    /* HAREKETLİ SİSTEM: sayfa zaten koyu gökyüzü ve karartılmış arka katmanı taşır. Menü bunun
+       üzerinde açık, neredeyse opak bir levhadır; arka plan rengi camın içine dolmaz. */
+    :root[data-sky="live"] dialog.app-menu-dialog>.app-menu-modal{--menu-surface:rgba(246,249,250,.96);--menu-brd:rgba(255,255,255,.88)}
     /* İçerik levhadan kısa kalırsa artan boşluk TEK yerde toplanır: gezinme listesinden sonra.
        Böylece başlık + gezinme üstte, ince çizgiyle ayrılan alt yığın (görünüm/dil + durum ve
        Sign out) levhanın dibinde durur. Boşluk her satırın arasına dağıtılmaz; öğeler birbirinden
@@ -3648,11 +3648,11 @@
       --menu-accent-soft:var(--forest-soft);
       --menu-accent-ink:var(--on-forest);
     }
-    /* Canlı gökyüzünde menü yüzeyi de açık tema kartıdır. Menü metni bu durumda koyu tema
-       sabitlerinden değil, gökyüzüyle birlikte hesaplanan tema mürekkebinden gelir. */
+    /* Canlı gökyüzünde menü bilerek açık ve büyük ölçüde opaktır: sayfa karartması menünün
+       rengini yeniden koyulaştıramaz. Metin yine gökyüzüyle hesaplanan koyu mürekkeptir. */
     :root[data-theme-package][data-sky="live"] dialog#appMenuDialog>.app-menu-modal{
-      --menu-surface:var(--theme-glass-card);
-      --menu-brd:var(--theme-glass-edge);
+      --menu-surface:rgba(246,249,250,.96);
+      --menu-brd:rgba(255,255,255,.88);
       --menu-ink:var(--theme-ink);
       --menu-sub:var(--theme-ink-soft);
       --menu-line:var(--theme-ink-line);
