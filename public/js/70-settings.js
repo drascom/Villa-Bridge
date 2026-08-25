@@ -698,7 +698,7 @@
     status.textContent=t(enabled?"enabled":"disabled");
     status.className=enabled?"online-text":"unknown-text";
     $("#toggleHaDiscovery").textContent=t(enabled?"disableDiscovery":"enableDiscovery");
-    const setupExpanded=!$("#haSetupDetails").hidden;
+    const setupExpanded=$("#haSetupDialog")?.open===true;
     $("#toggleHaSetup").textContent=t(setupExpanded?"hideHomeAssistantSetup":"connectHomeAssistant");
     $("#toggleHaSetup").setAttribute("aria-expanded",String(setupExpanded));
   }
@@ -973,12 +973,14 @@
     bridgeSafe(()=>window.VillaAndroid?.stopRuntime());
   }
   function toggleHomeAssistantSetup(){
-    const details=$("#haSetupDetails");
-    details.hidden=!details.hidden;
-    const expanded=!details.hidden;
-    $("#toggleHaSetup").textContent=t(expanded?"hideHomeAssistantSetup":"connectHomeAssistant");
-    $("#toggleHaSetup").setAttribute("aria-expanded",String(expanded));
+    const dialog=$("#haSetupDialog");
+    if(dialog.open)dialog.close();
+    else dialog.showModal();
     renderHomeAssistant();
+  }
+  function closeHomeAssistantSetup(){
+    const dialog=$("#haSetupDialog");
+    if(dialog?.open)dialog.close();
   }
   async function toggleHomeAssistantDiscovery(){
     if(!state.settings)return;

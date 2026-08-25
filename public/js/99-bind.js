@@ -20,6 +20,8 @@
   $b("#roomDetailDialog").addEventListener("close",()=>{state.roomDetail=null});
   $b("#closeSystemDetail").onclick=closeSystemDetail;
   $b("#systemDetailDialog").addEventListener("close",restoreSystemDetail);
+  $b("#closeHaSetup").onclick=closeHomeAssistantSetup;
+  $b("#haSetupDialog").addEventListener("close",renderHomeAssistant);
   $b("#appMenuDialog").addEventListener("close",()=>{
     $$("[data-app-menu]").forEach(item=>item.setAttribute("aria-expanded","false"));
     const opener=state.appMenuOpener;
@@ -145,6 +147,7 @@
      modunda çizildiği için burada tek yön geçerli: doğrudan 20-auth.js'in `leaveAdminMode`i. */
   $b("#leaveAdminModeButton").onclick=leaveAdminMode;
   $b("#menuChangePin").onclick=openAdminPinSettings;
+  $b("#reviewZigbeeConnection").onclick=()=>openSystemDetail(systemDetailButton("debugCard"));
   $b("#adminPinForm").onsubmit=updateAdminPin;
   $b("#adminPinForm").addEventListener("input",()=>setAdminPinError());
   $b("#coachNext").onclick=nextCoachStep;
@@ -206,6 +209,7 @@
   bindBackdropClose("#widgetDialog",".add-modal",closeAddDialog);
   bindBackdropClose("#roomDetailDialog",".room-detail-modal",closeRoomDetail);
   bindBackdropClose("#systemDetailDialog",".system-detail-modal",closeSystemDetail);
+  bindBackdropClose("#haSetupDialog",".room-detail-modal",closeHomeAssistantSetup);
   bindBackdropClose("#deviceDetailDialog",".device-detail-modal",closeDeviceDetail);
   bindBackdropClose("#lightDialog",".light-modal",()=>$("#lightDialog").close());
   /* Hızlı kumanda penceresi: kapatma çarpısı, `Esc` ve odak tuzağı `<dialog>`ın kendisinden gelir;
