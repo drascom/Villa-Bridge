@@ -929,7 +929,7 @@
     $$(".compact-help").forEach(help=>{
       if(help===except)return;
       const button=help.querySelector(".compact-help-button");
-      const popover=help.querySelector(".compact-help-popover");
+      const popover=button?document.getElementById(button.getAttribute("aria-controls")):null;
       if(button)button.setAttribute("aria-expanded","false");
       if(popover)popover.hidden=true;
     });
@@ -937,7 +937,9 @@
   function bindCompactHelp(){
     if(compactHelpBound)return;
     compactHelpBound=true;
-    document.addEventListener("pointerdown",event=>{if(!event.target.closest?.(".compact-help"))closeCompactHelp()},{capture:true,passive:true});
+    document.addEventListener("pointerdown",event=>{
+      if(!event.target.closest?.(".compact-help,.compact-help-popover"))closeCompactHelp();
+    },{capture:true,passive:true});
     document.addEventListener("keydown",event=>{
       if(event.key!=="Escape"||!$(".compact-help-button[aria-expanded='true']"))return;
       event.preventDefault();
@@ -972,8 +974,12 @@
     popover.setAttribute("role","tooltip");
     popover.hidden=true;
     descriptions.forEach(node=>popover.appendChild(node));
-    help.append(button,popover);
+    help.appendChild(button);
     row.appendChild(help);
+    /* `backdrop-filter` kartları fixed elemanlar için yeni bir koordinat sistemi kurar.
+       Balon kartta kalırsa ekran yerine karta ortalanır ve kesilir; body portalı onu gerçek
+       viewport'a bağlar. Açıklama düğümleri yine kendileridir, yalnız üst katmana taşınırlar. */
+    document.body.appendChild(popover);
     button.addEventListener("click",event=>{
       event.preventDefault();
       event.stopPropagation();
