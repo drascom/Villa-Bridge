@@ -85,6 +85,7 @@
   <aside class="side-rail">
     <button class="rail-brand" type="button" data-view-link="home" data-i18n-aria="navHome" aria-label="Home"><span class="brand-mark" aria-hidden="true">V</span></button>
     <nav class="rail-nav" data-i18n-aria="menu" aria-label="Menu">
+      <button id="leaveAdminModeButton" class="rail-button rail-leave-admin" type="button" data-admin-only data-i18n-aria="backToHomeMode" aria-label="Back to home mode"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg></span><span class="rail-label" data-i18n="navHome">Home</span></button>
       <button class="nav-button rail-button active" type="button" data-view="home" data-resident-only><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg></span><span class="rail-label" data-i18n="navHome">Home</span></button>
       <!-- ODALAR — ev modunun görünümü (not §4.1). Aşama 2'de bu satır yoktu çünkü ortada oda
            görünümü YOKTU; artık oda kartları `35-generator.js`ten türüyor ve hepsi burada
@@ -109,7 +110,6 @@
       <button class="nav-button rail-button" type="button" data-view="settings" data-admin-only><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg></span><span class="rail-label" data-i18n="navSystem">System</span></button>
     </nav>
     <div class="rail-bottom">
-      <button id="leaveAdminModeButton" class="rail-button rail-leave-admin" type="button" data-admin-only data-i18n-aria="backToHomeMode" aria-label="Back to home mode"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg></span><span class="rail-label" data-i18n="backToHomeMode">Back to home mode</span></button>
       <button class="rail-button rail-profile" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/></svg></span><span class="rail-label" data-i18n="profile">Profile</span></button>
     </div>
   </aside>

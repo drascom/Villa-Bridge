@@ -1065,10 +1065,10 @@ export async function assertHomeLayout(projectRoot) {
     "PIN uyari kabi bir gorunumun icine tasinmis: yalniz o ekranda gorunur."
   );
   assert(html.indexOf('id="defaultPinBanner"') > stripAt, "Varsayilan PIN uyarisi yonetici kabinin icinde degil.");
-  const railBottomAt = html.indexOf('class="rail-bottom"');
+  const railNavAt = html.indexOf('class="rail-nav"');
   assert(
-    html.indexOf('id="leaveAdminModeButton"') > railBottomAt && html.indexOf('id="leaveAdminModeButton"') < html.indexOf("<main>"),
-    "Gorunur \"Ev moduna don\" dugmesi sol raydaki kendi yerinde degil."
+    html.indexOf('id="leaveAdminModeButton"') > railNavAt && html.indexOf('id="leaveAdminModeButton"') < html.indexOf('data-view="home"'),
+    "Gorunur Home dugmesi sol gezinmenin en basinda degil."
   );
   const stripTag = html.slice(html.lastIndexOf("<div", stripAt), html.indexOf(">", stripAt));
   assert(stripTag.includes("data-admin-only"), "Mod seridi ev modunda da ciziliyor.");
