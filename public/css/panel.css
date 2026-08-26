@@ -3982,50 +3982,60 @@
       dialog.automation-dialog>.automation-modal>*{width:100%;max-width:none;margin-left:0;margin-right:0}
     }
 
-    /* OTOMASYON ÇALIŞMA ALANI — yatay tablet öncelikli.
-       Oda/ayar alt sayfaları %60 çekmece olarak kalır. Otomasyon ise aynı sağdan açılma dilini
-       korurken iki sütunlu kurucunun rahat dokunma alanı için daha geniş açılır. Solda yapılan
-       kararlar kalıcıdır; sağda yalnız etkin soru vardır. Dikey timeline ve uzun sayfa kaydırması yoktur. */
+    /* OTOMASYON ÇALIŞMA ALANI — kararlar sebep → sonuç kartlarında toplanır. Yeni kart veya
+       soru ancak önceki seçim tamamlandığında görünür; tamamlanan kart düzenlenebilir özet olarak kalır. */
     .automation-body:not(.is-path){overflow:hidden;scrollbar-gutter:auto}
-    .automation-workspace{height:100%;min-height:0;display:grid;grid-template-columns:minmax(230px,.72fr) minmax(0,1.65fr);gap:clamp(12px,1.5vw,20px)}
-    .automation-progress-pane,.automation-editor-pane{min-width:0;min-height:0;border:1px solid var(--line);border-radius:20px;background:var(--surface-soft)}
-    .automation-progress-pane{padding:10px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-    .automation-progress-section{padding:9px 10px;border:1px solid transparent;border-radius:15px;color:var(--muted)}
-    .automation-progress-section+.automation-progress-section{margin-top:4px}
-    .automation-progress-section.is-active{border-color:var(--forest);color:var(--ink);background:var(--surface)}
-    .automation-progress-section.is-done{color:var(--ink)}
-    .automation-progress-section.is-next{opacity:.52}
-    .automation-progress-heading{min-height:34px;display:flex;align-items:center;gap:10px;font-size:12px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
-    .automation-progress-marker{width:30px;height:30px;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted);font-size:14px;line-height:1}
-    .automation-progress-section.is-active .automation-progress-marker{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
-    .automation-progress-section.is-done .automation-progress-marker{border-color:var(--forest);color:var(--forest);background:var(--forest-soft);font-weight:900}
-    .automation-progress-items{display:grid;gap:3px;margin:4px 0 0 40px}
-    .automation-progress-item{min-width:0}
-    .automation-progress-item+.automation-progress-item{border-top:1px solid var(--line)}
-    .automation-progress-item .automation-summary-main{min-height:40px;padding:4px 0;gap:6px}
-    .automation-progress-item .automation-line{font-size:13px}
-    .automation-progress-item .automation-change{font-size:11px}
-    .automation-progress-item .automation-summary-remove{width:40px;height:40px}
-    .automation-progress-item .automation-picked-device .automation-opt{min-height:40px;padding:6px 0}
-    .automation-progress-item .automation-opt-title{font-size:13px}
-    .automation-progress-item .automation-opt-sub{display:none}
-    .automation-progress-item .automation-add{min-height:40px;padding:6px 0;font-size:12px}
-    .automation-editor-pane{padding:clamp(14px,1.8vw,22px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-    .automation-question{min-width:0}
+    .automation-causal-workspace{height:100%;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 38px minmax(0,1fr);align-items:stretch;gap:10px}
+    .automation-causal-workspace.is-single{grid-template-columns:minmax(0,1fr)}
+    .automation-causal-workspace.is-single .automation-causal-card{max-width:720px}
+    .automation-causal-arrow{width:36px;height:36px;display:grid;place-items:center;align-self:start;margin-top:12px;border-radius:50%;color:var(--on-forest);background:var(--forest);font-size:20px;font-weight:900;box-shadow:0 7px 16px rgba(11,59,45,.18)}
+    .automation-causal-card{min-width:0;min-height:0;display:flex;flex-direction:column;padding:12px;border:1px solid var(--line);border-radius:20px;background:var(--surface-soft);overflow:hidden}
+    .automation-causal-card.is-current{border-color:var(--forest);box-shadow:0 14px 30px rgba(18,42,35,.1)}
+    .automation-causal-card.is-complete{background:var(--surface-soft)}
+    .automation-causal-card-head{display:flex;align-items:center;gap:10px;min-height:42px;padding:0 2px 10px;border-bottom:1px solid var(--line)}
+    .automation-causal-card-icon{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:12px;color:var(--on-forest);background:var(--forest);font-size:18px}
+    .automation-causal-card-head>div{min-width:0;display:flex;align-items:baseline;gap:7px}
+    .automation-causal-card-head h3{margin:0;color:var(--ink);font-size:clamp(17px,1.6vw,22px);line-height:1.1}
+    .automation-causal-step{color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.08em}
+    .automation-causal-check{width:30px;height:30px;display:grid;place-items:center;margin-left:auto;border-radius:10px;color:var(--forest);background:var(--forest-soft);font-weight:900}
+    .automation-causal-card-body{min-width:0;min-height:0;display:grid;align-content:start;gap:9px;padding-top:10px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+    .automation-card-step{min-width:0}
+    .automation-card-step.automation-leaving{animation:automation-card-leave .19s ease both}
+    .automation-step-context{margin-bottom:8px;padding:0 2px 8px;border-bottom:1px solid var(--line)}
     .automation-question-heading{display:flex;align-items:center;gap:11px;margin-bottom:clamp(12px,2vh,20px)}
     .automation-question-heading p{margin:0;color:var(--ink);font-size:clamp(14px,1.4vw,17px);font-weight:850;letter-spacing:.08em;text-transform:uppercase}
     .automation-question-icon{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:12px;color:var(--on-forest);background:var(--forest);font-size:17px}
     .automation-question-body{min-width:0}
-    /* Seçenekler iki sütunlu, büyük dokunma kartlarıdır. Yalnız o anda mümkün olan seçenekler
-       zaten JS tarafından üretildiği için boş veya ilgisiz kontroller için yer ayrılmaz. */
-    .automation-editor-pane .automation-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .automation-editor-pane .automation-opt{min-height:72px;padding:12px 14px;border:1px solid var(--line);border-radius:15px;background:var(--surface);color:var(--ink)}
-    .automation-editor-pane .automation-opt+.automation-opt{border-top:1px solid var(--line)}
-    .automation-editor-pane .automation-opt:hover,.automation-editor-pane .automation-opt:focus-visible{border-color:var(--forest);background:var(--forest-soft)}
-    .automation-editor-pane .automation-opt.is-on{border-color:var(--forest);color:var(--forest);background:var(--forest-soft)}
-    .automation-editor-pane .automation-opt-glyph{width:32px;font-size:21px;opacity:1}
-    .automation-editor-pane .automation-opt-title{font-size:15px;font-weight:750}
-    .automation-editor-pane .automation-pick-list{min-width:0}
+    /* O anda mümkün olan seçimler dokunma kartlarıdır; gelecekteki adımlar için boş yer ayrılmaz. */
+    .automation-causal-card .automation-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .automation-causal-card .automation-opt{min-height:66px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink)}
+    .automation-causal-card .automation-opt+.automation-opt{border-top:1px solid var(--line)}
+    .automation-causal-card .automation-opt:hover,.automation-causal-card .automation-opt:focus-visible{border-color:var(--forest);background:var(--forest-soft)}
+    .automation-causal-card .automation-opt.is-on{border-color:var(--forest);color:var(--forest);background:var(--forest-soft)}
+    .automation-causal-card .automation-opt-glyph{width:30px;font-size:20px;opacity:1}
+    .automation-causal-card .automation-opt-title{font-size:14px;font-weight:750}
+    .automation-causal-card .automation-pick-list{min-width:0}
+    .automation-trigger-summary,.automation-global-wait{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:2px 8px}
+    .automation-device-group{min-width:0;border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}
+    .automation-device-group-head{min-height:52px;display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid var(--line)}
+    .automation-device-group-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;color:var(--forest);background:var(--forest-soft);font-size:18px}
+    .automation-device-group-head strong,.automation-device-group-head small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .automation-device-group-head strong{color:var(--ink);font-size:15px}
+    .automation-device-group-head small{margin-top:2px;color:var(--muted);font-size:12px}
+    .automation-device-group-body{padding:5px 9px 9px}
+    .automation-causal-action+.automation-causal-action{border-top:1px solid var(--line)}
+    .automation-causal-action.is-delay{margin:4px 0;border:1px dashed var(--line);border-radius:11px;background:var(--surface-soft)}
+    .automation-causal-action.is-delay+.automation-causal-action{border-top:0}
+    .automation-causal-action .automation-summary-main{min-height:46px;padding:4px 0}
+    .automation-inline-add{min-height:38px;display:flex;align-items:center;gap:6px;margin:-2px 0 4px 39px;padding:5px 8px;border:0;border-radius:10px;color:var(--forest);background:transparent;font-size:12px;font-weight:750;text-align:left}
+    .automation-inline-add:hover,.automation-inline-add:focus-visible{background:var(--forest-soft)}
+    .automation-causal-conditions{margin-top:7px;padding:7px;border-radius:13px;background:var(--forest-soft)}
+    .automation-causal-subhead{display:flex;align-items:center;gap:6px;margin:0 0 3px;color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    .automation-causal-conditions .automation-summary-main{min-height:42px;padding:3px 0}
+    .automation-causal-card>.automation-add,.automation-causal-card-body>.automation-add{min-height:44px;border:1px dashed var(--line);border-radius:13px;padding:8px 10px}
+    @keyframes automation-card-reveal{0%{opacity:0;transform:translateX(24px) scale(.975)}68%{opacity:1;transform:translateX(-2px) scale(1.004)}100%{opacity:1;transform:none}}
+    @keyframes automation-card-leave{to{opacity:0;transform:translateY(-8px) scale(.985)}}
+    .automation-card-reveal{animation:automation-card-reveal .38s cubic-bezier(.2,.75,.25,1) both}
     .automation-body.is-path{display:grid;align-content:start}
     .automation-body.is-path>.automation-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .automation-body.is-path>.automation-options>.automation-opt{min-height:92px;padding:16px;border:1px solid var(--line);border-radius:17px;background:var(--surface-soft)}
@@ -4044,14 +4054,13 @@
     @media(max-width:760px){
       dialog.automation-dialog{inset:0 auto 0 0;width:100vw!important;max-width:100vw!important;height:100dvh;max-height:100dvh;margin:0;border-radius:0}
       dialog.automation-dialog>.automation-modal{height:100dvh;max-height:100dvh;border-radius:0}
-      .automation-workspace{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:10px}
-      .automation-progress-pane{display:flex;gap:7px;padding:7px;overflow-x:auto;overflow-y:hidden;scrollbar-gutter:auto}
-      .automation-progress-section{min-width:172px;padding:7px 8px}
-      .automation-progress-section+.automation-progress-section{margin-top:0}
-      .automation-progress-items{margin-left:0}
-      .automation-editor-pane{padding:14px}
-      .automation-editor-pane .automation-options,.automation-body.is-path>.automation-options{grid-template-columns:1fr}
-      .automation-editor-pane .automation-opt{min-height:64px}
+      .automation-body:not(.is-path){overflow-y:auto}
+      .automation-causal-workspace{height:auto;grid-template-columns:1fr;gap:8px}
+      .automation-causal-arrow{margin:0 auto;transform:rotate(90deg)}
+      .automation-causal-card{overflow:visible}
+      .automation-causal-card-body{overflow:visible;scrollbar-gutter:auto}
+      .automation-causal-card .automation-options,.automation-body.is-path>.automation-options{grid-template-columns:1fr}
+      .automation-causal-card .automation-opt{min-height:62px}
       .automation-actions{flex-wrap:wrap}
       .automation-actions .automation-next-note{flex-basis:100%;order:-1}
     }
@@ -4073,4 +4082,4 @@
       .room-detail-grid{grid-template-columns:1fr}
       .room-detail-grid .group-control-slot:last-child:nth-child(odd){grid-column:auto!important}
     }
-    @media(prefers-reduced-motion:reduce){dialog.room-detail-dialog[open],dialog.device-detail-dialog[open],dialog.automation-dialog[open]{animation:none}}
+    @media(prefers-reduced-motion:reduce){dialog.room-detail-dialog[open],dialog.device-detail-dialog[open],dialog.automation-dialog[open],.automation-card-reveal,.automation-card-step.automation-leaving{animation:none}}

@@ -2652,48 +2652,121 @@
       nodes.push({state:"active",label:t("automationNameLabel"),body:automationNameHtml(wizard)});
     }
   }
-  function automationFlowHtml(wizard){
-    // Yatay tablette akış iki ayrı işe bölünür: solda kalıcı, geri dönülebilir karar özeti;
-    // sağda yalnız şu anda cevaplanması gereken soru. Böylece bitmiş seçimler kaybolmaz ama
-    // yeni seçeneğin dokunma alanını da daraltmaz. Telefon CSS'i aynı yapıyı yatay bir şeride çevirir.
-    const sections=[
-      {icon:"◷",label:t("automationSectionWhen"),fill:automationWhenNodes,show:true},
-      // KOŞUL bölümü tetikleyici tamamlandıktan sonra veri üretir; başlığı ise gelecek adımı
-      // önceden göstermek için karar şeridinde her zaman görünür.
-      {icon:"◇",label:t("automationSectionCondition"),fill:automationCondNodes,
-        show:automationCondStages.includes(wizard.stage)
-          ||(automationTriggerReady(wizard)&&!["kind","time","sun","trigDevice","trigEvent","trigThreshold"].includes(wizard.stage))},
-      {icon:"⏳",label:t("automationSectionOptional"),fill:automationWaitNodes,
-        show:wizard.targets.length>0||automationThenStages.includes(wizard.stage)},
-      {icon:"⚡",label:t("automationSectionThen"),fill:automationThenNodes,
-        show:wizard.targets.length>0||automationThenStages.includes(wizard.stage)},
-      {icon:"↻",label:t("automationSectionAfter"),fill:automationAfterNodes,
-        show:automationAfterStages.includes(wizard.stage)||(automationAutoOffAvailable(wizard)&&wizard.autoOffTouched)}
-    ].map(section=>{
-      const nodes=[];
-      if(section.show)section.fill(wizard,nodes);
-      return{...section,nodes};
-    });
-    let activeIndex=sections.findIndex(section=>section.nodes.some(node=>node.state==="active"));
-    if(activeIndex<0){
-      const group=automationStageGroup(wizard.stage);
-      activeIndex=group==="cond"?1:group==="then"?(wizard.stage==="wait"?2:3):group==="after"?4:0;
+  const automationActiveStepHtml=(nodes,icon,fallbackLabel)=>{
+    const activeIndex=nodes.findIndex(node=>node.state==="active");
+    if(activeIndex<0)return"";
+    const active=nodes[activeIndex];
+    // Aktif sorunun hemen önceki seçimi bağlam olarak kalır (ör. seçilen cihaz). Daha eski
+    // cevaplar kartın özetinde gösterilir; böylece yeni soru açıldığında ekran yeniden forma dönmez.
+    const keepContext=["trigEvent","trigThreshold","condState","action","map"].includes(state.automationWizard?.stage);
+    const previous=keepContext?[...nodes.slice(0,activeIndex)].reverse().find(node=>node.state==="done"):null;
+    const context=previous?`<div class="automation-step-context">${previous.body}</div>`:"";
+    const enter=automationAnimate?" automation-enter":"";
+    return`<section class="automation-card-step${enter}" data-automation-active><div class="automation-question-heading"><span class="automation-question-icon" aria-hidden="true">${icon}</span><p>${esc(active.label||fallbackLabel)}</p></div>${context}<div class="automation-question-body">${active.body}</div></section>`;
+  };
+  const automationConditionSummaryHtml=(condition,index)=>automationSummaryHtml(
+    automationConditionLine(condition,state.automationWizard),
+    `data-automation-edit-cond="${index}"`,
+    false,
+    `data-automation-remove-cond="${index}"`,
+    automationSummaryAction(false,"automationCondAddAria","automationCondChangeAria")
+  );
+  const automationConditionGroupHtml=(entries,label)=>entries.length
+    ?`<div class="automation-causal-conditions"><p class="automation-causal-subhead"><span aria-hidden="true">◇</span>${esc(label)}</p>${entries.map(({condition,index})=>automationConditionSummaryHtml(condition,index)).join("")}</div>`
+    :"";
+  const automationTargetGroupKey=target=>{
+    const kind=automationTargetKind(target);
+    if(kind==="device")return`device:${target.deviceId}`;
+    if(kind==="group")return`group:${target.groupId}`;
+    if(kind==="scene")return`scene:${target.groupId}`;
+    return"delay";
+  };
+  const automationTargetGroupMeta=target=>{
+    const kind=automationTargetKind(target);
+    if(kind==="device"){
+      const device=state.devices.find(item=>item.id===target.deviceId)||null;
+      return{name:device?.name||t("automationMissingDevice"),meta:deviceKind(device),glyph:device?automationDeviceGlyph(device):"›"};
     }
-    const progress=sections.map((section,index)=>{
-      const stateName=index===activeIndex?"active":index<activeIndex?"done":"next";
-      const reviewNodes=section.nodes.filter(node=>node.state!=="active");
-      const items=reviewNodes.length
-        ?`<div class="automation-progress-items">${reviewNodes.map(node=>`<div class="automation-progress-item is-${node.state||"plain"}">${node.body}</div>`).join("")}</div>`
-        :"";
-      return`<section class="automation-progress-section is-${stateName}" aria-current="${stateName==="active"?"step":"false"}"><div class="automation-progress-heading"><span class="automation-progress-marker" aria-hidden="true">${stateName==="done"?"✓":section.icon}</span><span>${esc(section.label)}</span></div>${items}</section>`;
+    if(kind==="group")return{name:automationGroupName(target.groupId),meta:t("automationActionGroup"),glyph:"◇"};
+    if(kind==="scene")return{name:automationGroupName(target.groupId),meta:t("automationActionScene"),glyph:"🎬"};
+    return{name:t("automationActionDelay"),meta:"",glyph:"⏳"};
+  };
+  function automationTargetGroupsHtml(wizard){
+    const groups=[];
+    const byKey=new Map();
+    wizard.targets.forEach((target,index)=>{
+      // Bir gecikme kendisinden sonraki eylemle aynı cihaz kartında görünür. Kayıt sırası ve
+      // motorun çalışma biçimi değişmez; bu yalnız "önce bekle" ilişkisinin görsel karşılığıdır.
+      const next=automationTargetKind(target)==="delay"?wizard.targets[index+1]:null;
+      const anchor=next&&automationTargetKind(next)!=="delay"?next:target;
+      const key=automationTargetGroupKey(anchor);
+      let group=byKey.get(key);
+      if(!group){group={anchor,items:[]};byKey.set(key,group);groups.push(group)}
+      group.items.push({target,index});
+    });
+    return groups.map(group=>{
+      const meta=automationTargetGroupMeta(group.anchor);
+      const conditions=wizard.conditions.map((condition,index)=>({condition,index}))
+        .filter(entry=>entry.condition.deviceId&&entry.condition.deviceId===group.anchor.deviceId&&entry.condition.deviceId!==wizard.triggerDeviceId);
+      const rows=group.items.map(({target,index})=>{
+        const delay=automationTargetKind(target)==="delay";
+        const canWait=!delay&&(index===0||automationTargetKind(wizard.targets[index-1])!=="delay");
+        const wait=canWait&&wizard.targets.length<automationMaxTargets(wizard)
+          ?`<button class="automation-inline-add" type="button" data-automation-add-wait-before="${index}"><span aria-hidden="true">＋</span>${esc(t("automationAddWaitBefore"))}</button>`:"";
+        return`<div class="automation-causal-action${delay?" is-delay":""}">${automationSummaryHtml(
+          `<span class="automation-line-step" aria-hidden="true">${index+1}</span> ${automationTargetLine(wizard,target)}`,
+          `data-automation-edit-target="${index}"`,
+          false,
+          wizard.targets.length>1?`data-automation-remove-target="${index}"`:null
+        )}${wait}</div>`;
+      }).join("");
+      return`<section class="automation-device-group"><header class="automation-device-group-head"><span class="automation-device-group-icon" aria-hidden="true">${meta.glyph}</span><span><strong>${esc(meta.name)}</strong>${meta.meta?`<small>${esc(meta.meta)}</small>`:""}</span></header><div class="automation-device-group-body">${rows}${automationConditionGroupHtml(conditions,t("automationDeviceConditions"))}</div></section>`;
     }).join("");
-    const activeSection=sections[activeIndex]||sections[0];
-    const activeNodes=activeSection.nodes.filter(node=>node.state==="active");
-    // Beklenmeyen eski bir kayıt aktif düğüm üretemezse özetin son satırını kaybetmek yerine
-    // çalışma alanında gösteririz. Normal ekleme/düzenleme yolunda her zaman tek aktif düğüm vardır.
-    const editorNodes=activeNodes.length?activeNodes:activeSection.nodes.slice(-1);
-    const editor=editorNodes.map(node=>`<section class="automation-question"><div class="automation-question-heading"><span class="automation-question-icon" aria-hidden="true">${activeSection.icon}</span><p>${esc(node.label||activeSection.label)}</p></div><div class="automation-question-body ${node.state==="active"&&automationAnimate?"automation-enter":""}">${node.body}</div></section>`).join("");
-    return`<div class="automation-workspace"><aside class="automation-progress-pane" aria-label="${esc(t("automationReviewTitle"))}">${progress}</aside><main class="automation-editor-pane">${editor}</main></div>`;
+  }
+  const automationCausalCard=(kind,title,icon,body,current,reveal=false)=>`<section class="automation-causal-card is-${kind}${current?" is-current":" is-complete"}${reveal&&automationAnimate?" automation-card-reveal":""}"><header class="automation-causal-card-head"><span class="automation-causal-card-icon" aria-hidden="true">${icon}</span><div><span class="automation-causal-step">${kind==="trigger"?"1":"2"}</span><h3>${esc(title)}</h3></div>${!current?'<span class="automation-causal-check" aria-hidden="true">✓</span>':""}</header><div class="automation-causal-card-body">${body}</div></section>`;
+  function automationFlowHtml(wizard){
+    const stageGroup=automationStageGroup(wizard.stage);
+    const triggerCurrent=stageGroup==="when"||stageGroup==="cond";
+    const whenNodes=[];
+    automationWhenNodes(wizard,whenNodes);
+    const condNodes=[];
+    if(automationTriggerReady(wizard))automationCondNodes(wizard,condNodes);
+    const allConditions=wizard.conditions.map((condition,index)=>({condition,index}));
+    const targetDeviceIds=new Set(wizard.targets.filter(target=>automationTargetKind(target)==="device").map(target=>target.deviceId));
+    const triggerConditions=allConditions.filter(entry=>!entry.condition.deviceId
+      ||entry.condition.deviceId===wizard.triggerDeviceId
+      ||!targetDeviceIds.has(entry.condition.deviceId));
+    let triggerBody="";
+    if(stageGroup==="when")triggerBody=automationActiveStepHtml(whenNodes,"◷",t("automationSectionWhen"));
+    else{
+      triggerBody=`<div class="automation-trigger-summary">${automationSummaryHtml(
+        automationTriggerLine(wizard),
+        `data-automation-stage="${automationTriggerEditStage(wizard)}"`
+      )}</div>`;
+      triggerBody+=automationConditionGroupHtml(triggerConditions,t("automationDeviceConditions"));
+      if(stageGroup==="cond")triggerBody+=automationActiveStepHtml(condNodes,"◇",t("automationSectionCondition"));
+      else if(wizard.conditions.length<maxAutomationConditions)triggerBody+=automationAddHtml(t("automationAddCondition"),'data-automation-add-cond="1"');
+    }
+    const triggerCard=automationCausalCard("trigger",t("automationTriggerCardTitle"),"◷",triggerBody,triggerCurrent);
+
+    const showAction=wizard.targets.length>0||stageGroup==="then"||stageGroup==="after";
+    if(!showAction)return`<div class="automation-causal-workspace is-single">${triggerCard}</div>`;
+    const waitNodes=[];automationWaitNodes(wizard,waitNodes);
+    const thenNodes=[];automationThenNodes(wizard,thenNodes);
+    const afterNodes=[];automationAfterNodes(wizard,afterNodes);
+    let actionBody=automationTargetGroupsHtml(wizard);
+    if(wizard.stage==="wait")actionBody+=automationActiveStepHtml(waitNodes,"⏳",t("automationBlockWait"));
+    else if(automationWaitSeconds(wizard)>0)actionBody+=`<div class="automation-global-wait">${automationSummaryHtml(
+      esc(automationWaitLineText(wizard)),'data-automation-stage="wait"'
+    )}</div>`;
+    if(stageGroup==="then"&&wizard.stage!=="wait")actionBody+=automationActiveStepHtml(thenNodes,"⚡",t("automationSectionThen"));
+    else if(stageGroup==="after")actionBody+=automationActiveStepHtml(afterNodes,"↻",t("automationSectionAfter"));
+    if(stageGroup==="after"&&wizard.targets.length<automationMaxTargets(wizard)){
+      actionBody+=automationAddHtml(t("automationAddTarget"),'data-automation-add-target="1"');
+    }
+    const actionCurrent=stageGroup==="then"||stageGroup==="after";
+    const actionCard=automationCausalCard("action",t("automationActionCardTitle"),"⚡",actionBody,actionCurrent,wizard.targets.length===0);
+    return`<div class="automation-causal-workspace">${triggerCard}<div class="automation-causal-arrow" aria-hidden="true">→</div>${actionCard}</div>`;
   }
   // Sayaç düğmesi: tek dokunuş bir adım, basılı tutunca hızlanarak sürer. Tutuş boyunca ekran
   // baştan çizilmez — çizilse düğme silinir, parmak kalkınca sayaç durmazdı; yalnız rakam tazelenir.
@@ -2763,6 +2836,7 @@
     $$("[data-automation-edit-target]").forEach(button=>button.onclick=()=>editAutomationTarget(Number(button.dataset.automationEditTarget)));
     $$("[data-automation-remove-target]").forEach(button=>button.onclick=()=>removeAutomationTarget(Number(button.dataset.automationRemoveTarget),button));
     $$("[data-automation-add-target]").forEach(button=>button.onclick=()=>addAutomationTarget());
+    $$("[data-automation-add-wait-before]").forEach(button=>button.onclick=()=>addAutomationWaitBefore(Number(button.dataset.automationAddWaitBefore)));
     $$("[data-automation-autooff]").forEach(button=>button.onclick=()=>chooseAutomationAutoOff(button.dataset.automationAutooff));
     $$("[data-automation-autooff-step]").forEach(button=>button.onclick=()=>stepAutomationAutoOff(Number(button.dataset.automationAutooffStep)));
     $$("[data-automation-autooff-minutes]").forEach(button=>button.onclick=()=>setAutomationAutoOffMinutes(Number(button.dataset.automationAutooffMinutes),false));
@@ -3799,6 +3873,7 @@
       else wizard.targets.push(target);
       wizard.fresh=`target-${wizard.targets.length-1}`;
       wizard.draftTargetIndex=null;
+      wizard.draftWaitBefore=false;
       wizard.draftGroupId=null;
       wizard.draftSceneId=null;
       wizard.stage=automationAfterTargets(wizard);
@@ -3840,7 +3915,20 @@
       wizard.draftValue=null;
       wizard.targetQuery="";
       wizard.targetTab="all";
+      wizard.draftTargetIndex=null;
+      wizard.draftWaitBefore=false;
       wizard.stage="target";
+    });
+  }
+  function addAutomationWaitBefore(index){
+    const wizard=state.automationWizard;
+    if(!wizard||!wizard.targets[index]||wizard.targets.length>=automationMaxTargets(wizard))return;
+    automationAdvance(()=>{
+      wizard.draftTargetIndex=index;
+      wizard.draftWaitBefore=true;
+      wizard.draftDelaySeconds=10;
+      wizard.draftDelayCustom=false;
+      wizard.stage="delay";
     });
   }
   // Hedef satırına tıklanınca o hedef taslağa döner ve seçenekleri yeniden açılır.
@@ -3853,6 +3941,7 @@
       wizard.targets.splice(index,1);
       // Satır yerinde düzenlenir: kaydedilince eski sırasına geri döner, eylem sırası korunur.
       wizard.draftTargetIndex=index;
+      wizard.draftWaitBefore=false;
       wizard.targetQuery="";
       if(kind==="delay"){
         wizard.draftDelaySeconds=target.seconds;
@@ -3942,7 +4031,10 @@
     }
     const back=automationBackStage(wizard);
     if(!back){$("#automationDialog").close();return}
-    automationAdvance(()=>{wizard.stage=back});
+    automationAdvance(()=>{
+      if(wizard.stage==="delay"&&wizard.draftWaitBefore){wizard.draftTargetIndex=null;wizard.draftWaitBefore=false}
+      wizard.stage=back;
+    });
   }
   async function nextAutomationStep(){
     const wizard=state.automationWizard;
