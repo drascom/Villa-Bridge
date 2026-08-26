@@ -2653,27 +2653,47 @@
     }
   }
   function automationFlowHtml(wizard){
+    // Yatay tablette akış iki ayrı işe bölünür: solda kalıcı, geri dönülebilir karar özeti;
+    // sağda yalnız şu anda cevaplanması gereken soru. Böylece bitmiş seçimler kaybolmaz ama
+    // yeni seçeneğin dokunma alanını da daraltmaz. Telefon CSS'i aynı yapıyı yatay bir şeride çevirir.
     const sections=[
-      {label:t("automationSectionWhen"),fill:automationWhenNodes,show:true},
-      // KOŞUL bölümü tetikleyici tamamlandıktan sonra görünür: soru sırası bozulmasın.
-      {label:t("automationSectionCondition"),fill:automationCondNodes,
+      {icon:"◷",label:t("automationSectionWhen"),fill:automationWhenNodes,show:true},
+      // KOŞUL bölümü tetikleyici tamamlandıktan sonra veri üretir; başlığı ise gelecek adımı
+      // önceden göstermek için karar şeridinde her zaman görünür.
+      {icon:"◇",label:t("automationSectionCondition"),fill:automationCondNodes,
         show:automationCondStages.includes(wizard.stage)
           ||(automationTriggerReady(wizard)&&!["kind","time","sun","trigDevice","trigEvent","trigThreshold"].includes(wizard.stage))},
-      // Bekleme opsiyoneldir: kendi başlığı altında durur, "ne yapsın" listesine karışmaz.
-      {label:t("automationSectionOptional"),fill:automationWaitNodes,
+      {icon:"⏳",label:t("automationSectionOptional"),fill:automationWaitNodes,
         show:wizard.targets.length>0||automationThenStages.includes(wizard.stage)},
-      {label:t("automationSectionThen"),fill:automationThenNodes,
+      {icon:"⚡",label:t("automationSectionThen"),fill:automationThenNodes,
         show:wizard.targets.length>0||automationThenStages.includes(wizard.stage)},
-      {label:t("automationSectionAfter"),fill:automationAfterNodes,
+      {icon:"↻",label:t("automationSectionAfter"),fill:automationAfterNodes,
         show:automationAfterStages.includes(wizard.stage)||(automationAutoOffAvailable(wizard)&&wizard.autoOffTouched)}
-    ];
-    return sections.map(section=>{
-      if(!section.show)return"";
+    ].map(section=>{
       const nodes=[];
-      section.fill(wizard,nodes);
-      if(!nodes.length)return"";
-      return`<p class="automation-section">${esc(section.label)}</p><div class="automation-flow">${nodes.map(automationNodeHtml).join("")}</div>`;
+      if(section.show)section.fill(wizard,nodes);
+      return{...section,nodes};
+    });
+    let activeIndex=sections.findIndex(section=>section.nodes.some(node=>node.state==="active"));
+    if(activeIndex<0){
+      const group=automationStageGroup(wizard.stage);
+      activeIndex=group==="cond"?1:group==="then"?(wizard.stage==="wait"?2:3):group==="after"?4:0;
+    }
+    const progress=sections.map((section,index)=>{
+      const stateName=index===activeIndex?"active":index<activeIndex?"done":"next";
+      const reviewNodes=section.nodes.filter(node=>node.state!=="active");
+      const items=reviewNodes.length
+        ?`<div class="automation-progress-items">${reviewNodes.map(node=>`<div class="automation-progress-item is-${node.state||"plain"}">${node.body}</div>`).join("")}</div>`
+        :"";
+      return`<section class="automation-progress-section is-${stateName}" aria-current="${stateName==="active"?"step":"false"}"><div class="automation-progress-heading"><span class="automation-progress-marker" aria-hidden="true">${stateName==="done"?"✓":section.icon}</span><span>${esc(section.label)}</span></div>${items}</section>`;
     }).join("");
+    const activeSection=sections[activeIndex]||sections[0];
+    const activeNodes=activeSection.nodes.filter(node=>node.state==="active");
+    // Beklenmeyen eski bir kayıt aktif düğüm üretemezse özetin son satırını kaybetmek yerine
+    // çalışma alanında gösteririz. Normal ekleme/düzenleme yolunda her zaman tek aktif düğüm vardır.
+    const editorNodes=activeNodes.length?activeNodes:activeSection.nodes.slice(-1);
+    const editor=editorNodes.map(node=>`<section class="automation-question"><div class="automation-question-heading"><span class="automation-question-icon" aria-hidden="true">${activeSection.icon}</span><p>${esc(node.label||activeSection.label)}</p></div><div class="automation-question-body ${node.state==="active"&&automationAnimate?"automation-enter":""}">${node.body}</div></section>`).join("");
+    return`<div class="automation-workspace"><aside class="automation-progress-pane" aria-label="${esc(t("automationReviewTitle"))}">${progress}</aside><main class="automation-editor-pane">${editor}</main></div>`;
   }
   // Sayaç düğmesi: tek dokunuş bir adım, basılı tutunca hızlanarak sürer. Tutuş boyunca ekran
   // baştan çizilmez — çizilse düğme silinir, parmak kalkınca sayaç durmazdı; yalnız rakam tazelenir.
@@ -3032,7 +3052,9 @@
     };
     $("#automationTitle").textContent=t(paths?"automationPathTitle":titles[group]);
     $("#automationLead").textContent=t(paths?"automationPathLead":leads[group]);
-    $("#automationBody").innerHTML=paths?automationPathHtml():automationFlowHtml(wizard);
+    const body=$("#automationBody");
+    body.classList.toggle("is-path",paths);
+    body.innerHTML=paths?automationPathHtml():automationFlowHtml(wizard);
     automationBindBody();
     automationSyncFoot();
     automationAnimate=false;
