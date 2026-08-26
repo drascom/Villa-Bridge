@@ -63,7 +63,9 @@
     $("#modeStateBadge").textContent=t(elevated?"adminModeOn":"homeModeOn");
     // KALICI UYARI ŞERİDİ: PIN hâlâ fabrika varsayılanı (1234). `data-admin-only` taşıdığı için
     // ev modunda zaten görünmez; burada yalnız "varsayılan mı" sorusu kalır.
-    $("#defaultPinBanner").hidden=!state.auth.mustChangePin;
+    const showDefaultPinWarning=elevated&&state.auth.mustChangePin;
+    $("#defaultPinBanner").hidden=!showDefaultPinWarning;
+    document.body.classList.toggle("has-default-pin-warning",showDefaultPinWarning);
     $("#modePinFieldHint").textContent=t(state.auth.secretKind==="password"?"adminSecretLegacyHint":"adminPinHint");
     const input=$("#modePinInput");
     input.inputMode=state.auth.secretKind==="password"?"text":"numeric";

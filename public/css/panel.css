@@ -2956,26 +2956,18 @@
     .rail-button:hover{color:var(--ink);background:var(--surface-soft)}
     .rail-button:focus-visible{outline:3px solid var(--forest);outline-offset:-2px}
     .side-rail .nav-button.active{border-color:var(--line);color:var(--forest-strong);background:var(--surface-strong);box-shadow:var(--card-shadow);font-weight:800}
-    /* MOD ŞERİDİ — not §4.2: yönetici modunda sıcak renkli bilgilendirme + görünür "Ev moduna
-       dön". Şeridin görünürlüğünü 20-auth.js yazar (`body.home-mode [data-admin-only]`), burada
-       ikinci bir mod mekanizması yok. Yüzey ve mürekkep TEK eksende (`--warm` / `--warm-ink`,
-       ikisi de `data-theme` ile döner) — köprü bu iki adı yeniden bağlamadığı için gökyüzü
-       fazından bağımsız olarak okunur kalır. */
-    .admin-mode-strip{display:grid;gap:10px;margin:0 0 var(--card-gap);padding:clamp(10px,1.6vh,14px) clamp(12px,1.4vw,18px);border:1px solid var(--sun);border-left-width:4px;border-radius:var(--r-plate);color:var(--warm-ink);background:var(--warm);box-shadow:var(--card-shadow)}
-    .admin-mode-strip-row{min-height:44px;display:flex;align-items:center;gap:clamp(10px,1.2vw,14px)}
-    .admin-mode-strip-icon{flex:none;width:34px;height:34px;display:grid;place-items:center;color:var(--warm-ink)}
-    .admin-mode-strip-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .admin-mode-strip-copy{min-width:0;display:grid;gap:2px}
-    .admin-mode-strip-copy strong{color:var(--warm-ink);font-size:clamp(13px,1.4vw,15px)}
-    .admin-mode-strip-copy span{color:var(--warm-ink);font-size:clamp(11px,1.15vw,13px);line-height:1.35}
-    /* Tehlike değil, çıkış: sessiz bir çerçeve. Boy 44px'in altına inmez. */
-    .admin-mode-strip-action{flex:none;min-height:44px;margin-left:auto;padding:0 clamp(14px,1.4vw,20px);border:1px solid var(--sun);border-radius:var(--r-control);color:var(--ink);background:var(--surface);font-size:clamp(13px,1.3vw,15px);font-weight:750;white-space:nowrap}
-    .admin-mode-strip-action:hover{border-color:var(--forest);color:var(--forest)}
-    .admin-mode-strip-action:focus-visible{outline:3px solid var(--forest);outline-offset:2px}
-    /* Varsayılan PIN uyarısı ayrı bir şerit DEĞİL: aynı şeridin ikinci satırı. Kendi sıcak
-       zeminini bırakır, üstündeki ince ayraçla ayrılır. */
-    .admin-mode-strip>.default-pin-banner{margin:0;padding:10px 0 0;border-width:1px 0 0;border-radius:0;background:transparent}
-    .admin-mode-strip>.default-pin-banner strong,.admin-mode-strip>.default-pin-banner span{color:var(--warm-ink)}
+    /* YÖNETİCİ KABUĞU. Büyük üst kart kaldırıldı: ev moduna dönüş sol rayda kendi düğmesidir.
+       Varsayılan PIN uyarısı yalnız gerektiğinde sistem alarmı gibi top-layer altında sabitlenir. */
+    .admin-mode-strip{display:contents}
+    .side-rail .rail-leave-admin{border-color:rgba(180,116,0,.28);color:var(--warm-ink);background:var(--warm)}
+    .side-rail .rail-leave-admin:hover{border-color:var(--sun);color:var(--warm-ink);background:var(--warm)}
+    .admin-mode-strip>.default-pin-banner{position:fixed;z-index:9;top:0;left:0;right:0;min-height:56px;justify-content:center;margin:0;padding:7px 16px;border-width:0 0 1px;border-radius:0;color:var(--warm-ink);background:var(--warm);box-shadow:0 8px 22px rgba(12,26,20,.12)}
+    .admin-mode-strip>.default-pin-banner strong{color:var(--warm-ink);font-size:14px}
+    .admin-mode-strip>.default-pin-banner span{display:none}
+    .admin-mode-strip>.default-pin-banner button{min-height:40px;padding:8px 14px;border:1px solid rgba(180,116,0,.28);color:var(--warm-ink);background:var(--surface-strong)}
+    body.has-default-pin-warning main{padding-top:70px}
+    body.has-system-alert #defaultPinBanner{top:56px}
+    body.has-system-alert.has-default-pin-warning main{padding-top:126px}
     @media(min-width:900px){
       .shell{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);align-items:start;min-height:100dvh}
       .side-rail{position:sticky;top:0;z-index:10;height:100dvh;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2vh,20px);padding:clamp(12px,2.2vh,20px) clamp(6px,.7vw,12px) calc(clamp(12px,2.2vh,20px) + env(safe-area-inset-bottom,0px));border-right:1px solid var(--line);background:var(--surface)}
@@ -2999,6 +2991,7 @@
       #home .home-status{grid-column:3}
       /* Ekrana SABİTLENEN şeritler rayın sağından başlar, yoksa rayın altında kalırlardı. */
       .system-alert-bar{left:var(--rail-w)}
+      .admin-mode-strip>.default-pin-banner{left:var(--rail-w)}
       #home [data-widget="quick"]{left:calc(var(--rail-w) + var(--strip-inset,20px))}
       /* Kart birimi artık 100vw'den türemiyor (oda ızgarası kendi kabına göre bölünür), bu
          yüzden sol rayın genişliğini elde düşen bir pay da yok. */
@@ -3361,7 +3354,6 @@
       #home .widget-rail{grid-row:3}
       body[data-active-view="home"] main{min-height:100dvh;padding-bottom:34px}
       #home.active{height:auto;min-height:0}
-      .admin-mode-strip{margin-bottom:12px;border-radius:18px}
     }
 
     @media(min-width:901px) and (max-width:1180px){
@@ -3439,8 +3431,6 @@
       #home .home-health{width:40px;min-width:40px;min-height:40px}
       body[data-active-view="home"] main{min-height:100dvh;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
       body[data-active-view="home"] .toast{bottom:calc(94px + env(safe-area-inset-bottom))}
-      .admin-mode-strip-row{align-items:flex-start;flex-wrap:wrap}
-      .admin-mode-strip-action{width:100%;margin-left:0}
       dialog#appMenuDialog{inset:auto 8px 8px!important;width:calc(100% - 16px)!important;max-width:none!important;height:min(82dvh,690px);margin:0!important;border-radius:26px}
     }
 
@@ -3547,13 +3537,6 @@
     #routines .routine-glyph{width:56px;height:56px;border-radius:17px}
 
     /* Yönetici genel bakış: 1024 px tablette dört temel ölçü tek sırada okunur. */
-    body:not(.home-mode) .admin-mode-strip{
-      margin-bottom:10px;
-      padding:8px 14px;
-      border-radius:18px;
-      background:var(--experiment-glass);
-      box-shadow:var(--experiment-shadow);
-    }
     body:not(.home-mode) .admin-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
     body:not(.home-mode) .admin-stat{
       min-height:100px;

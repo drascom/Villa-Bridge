@@ -147,6 +147,7 @@
      modunda çizildiği için burada tek yön geçerli: doğrudan 20-auth.js'in `leaveAdminMode`i. */
   $b("#leaveAdminModeButton").onclick=leaveAdminMode;
   $b("#menuChangePin").onclick=openAdminPinSettings;
+  $b("#defaultPinBannerAction").onclick=openAdminPinSettings;
   $b("#reviewZigbeeConnection").onclick=()=>openSystemDetail(systemDetailButton("debugCard"));
   $b("#adminPinForm").onsubmit=updateAdminPin;
   $b("#adminPinForm").addEventListener("input",()=>setAdminPinError());

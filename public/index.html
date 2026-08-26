@@ -109,25 +109,16 @@
       <button class="nav-button rail-button" type="button" data-view="settings" data-admin-only><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg></span><span class="rail-label" data-i18n="navSystem">System</span></button>
     </nav>
     <div class="rail-bottom">
+      <button id="leaveAdminModeButton" class="rail-button rail-leave-admin" type="button" data-admin-only data-i18n-aria="backToHomeMode" aria-label="Back to home mode"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10M9 20v-6h6v6"/></svg></span><span class="rail-label" data-i18n="backToHomeMode">Back to home mode</span></button>
       <button class="rail-button rail-profile" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/></svg></span><span class="rail-label" data-i18n="profile">Profile</span></button>
     </div>
   </aside>
   <main>
     <div id="systemAlertBar" class="system-alert-bar" role="alert" hidden><span class="system-alert-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3v.1"/></svg></span><span id="systemAlertText"></span><span id="systemAlertCount" class="system-alert-count" hidden></span></div>
-    <!-- MOD ŞERİDİ (not §4.2). Kullanıcı hangi modda olduğunu tahmin etmek zorunda kalmasın:
-         yönetici modu açıkken kabuğun en üstünde sıcak renkli, kapatılamaz bir bilgilendirme
-         şeridi ve GÖRÜNÜR bir "Ev moduna dön" durur. Şeridin tamamı `data-admin-only`, yani
-         ev modunda hiç çizilmez — durumu 20-auth.js'in `applyAuthUi`si yazar (`body.home-mode`),
-         burada ikinci bir mod mekanizması YOK.
-         Varsayılan PIN uyarısı da bu şeridin İÇİNDE: ayrı bir şerit değil, aynı şeridin ikinci
-         satırı. Kimliği (`#defaultPinBanner`) korunuyor çünkü görünürlüğünü hâlâ `applyAuthUi`
-         açıp kapatıyor (`state.auth.mustChangePin`). -->
+    <!-- YÖNETİCİ UYARISI. Moddan çıkış sol rayda kendi düğmesidir; sayfa üstünde büyük bir mod
+         kartı yoktur. Yalnız fabrika PIN'i hâlâ kullanılıyorsa sistem uyarısı gibi sabit, ince
+         bir çubuk görünür. Kimlikler korunur; görünürlüğü `applyAuthUi` yönetir. -->
     <div id="adminModeStrip" class="admin-mode-strip" data-admin-only>
-      <div class="admin-mode-strip-row">
-        <span class="admin-mode-strip-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg></span>
-        <div class="admin-mode-strip-copy"><strong data-i18n="adminModeOn">Administrator mode</strong><span data-i18n="adminModeStripLead">Setup screens are open. Everyday controls are unaffected.</span></div>
-        <button id="leaveAdminModeButton" class="admin-mode-strip-action" type="button" data-i18n="backToHomeMode">Back to home mode</button>
-      </div>
       <div id="defaultPinBanner" class="default-pin-banner" role="alert" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4m0 3h.01"/></svg><div><strong data-i18n="defaultPinWarningTitle">The administrator PIN is still 1234</strong><span data-i18n="defaultPinWarningLead">Anyone on this network can open the setup screens. Change it under Settings - Administrator mode.</span></div><button id="defaultPinBannerAction" class="quiet" type="button" data-view-link="settings" data-i18n="changePin">Change PIN</button></div>
     </div>
     <div id="pairingBanner" class="pairing-banner"><div><strong data-i18n="pairingTitle">Searching for new devices</strong><div id="pairingText" class="device-meta" data-i18n="pairingHint">Put the nearby device into pairing mode.</div></div><div class="pairing-banner-actions"><button id="showPairing" class="secondary" data-i18n="showPairing" hidden>Show</button><button id="stopPairing" class="quiet" data-i18n="stopSearch">Stop searching</button></div></div>

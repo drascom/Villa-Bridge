@@ -430,9 +430,8 @@ export async function assertHomeLayout(projectRoot) {
   const actionHeight = evaluateLength(vars["--head-action-h"], { viewport: railViewport, vars });
   assert(actionHeight >= 56, `Ana ekran basligindaki dugmeler ${Math.round(actionHeight)}px: 56px hedefinin altinda.`);
 
-  /* 7) ANA EKRANIN BOYU AKISTAN GELIYOR — mod seridinin payi elde sayilmiyor.
-     Bu maddenin sebebi somut bir hata: `--home-top` seridi TEK satir varsayiyordu, varsayilan PIN
-     uyarisi acilinca serit iki satira cikiyor ve 1024x640'ta ana ekranin alti sikisiyordu. */
+  /* 7) ANA EKRANIN BOYU AKISTAN GELIYOR — sabit sistem/PIN çubuklarının payı gövde sınıflarıyla
+     verilir; görünüm yüksekliğine gömülü ikinci bir sabit hesap yoktur. */
   assert(!flat.includes("--home-top"), "Elde sayilan serit payi (--home-top) geri gelmis.");
   assert(!flat.includes("--admin-strip-h"), "Elde sayilan mod seridi boyu (--admin-strip-h) geri gelmis.");
   const homeHeight = declaredValue(rules, "#home.active", "height", railViewport);
@@ -462,10 +461,9 @@ export async function assertHomeLayout(projectRoot) {
     "`main` en az bir ekran boyu degil: kisa icerikte ana ekran ekrani doldurmaz."
   );
 
-  /* 8) SAYISAL BUTCE — 1024x640, mod seridinin UC HALI.
-     Toplananlarin hepsi CSS'ten okunur; buradaki tek varsayim iki tane ve ikisi de yazili:
-     sarmayan bir yazi satiri ~ yazi boyu x 1.35, PIN uyarisi satirinin boyunu ise icindeki
-     dugmenin dokunma hedefi (44px) belirler. */
+  /* 8) SAYISAL BUTCE — 1024x640, sabit üst çubukların dört hali. PIN çubuğu artık akışta büyük
+     bir kart değildir; `main` üst dolgusu tek sistem çubuğu ve iki çubuğun yığıldığı durum için
+     CSS'te açıkça tanımlıdır. */
   const context = { viewport: railViewport, vars };
   const px = (value) => evaluateLength(value, context);
   const mainPadding = boxSides(requireValue(rules, "main", "padding", railViewport, "Sayfa kabi"));
@@ -474,16 +472,19 @@ export async function assertHomeLayout(projectRoot) {
     declaredValue(rules, mainSelector, "padding-bottom", railViewport) || mainPadding.bottom
   );
 
-  const stripPadding = boxSides(requireValue(rules, ".admin-mode-strip", "padding", railViewport, "Mod seridi"));
-  const stripMargin = boxSides(requireValue(rules, ".admin-mode-strip", "margin", railViewport, "Mod seridi"));
-  const stripRow = px(requireValue(rules, ".admin-mode-strip-row", "min-height", railViewport, "Mod seridi satiri"));
-  const stripGap = px(requireValue(rules, ".admin-mode-strip", "gap", railViewport, "Mod seridi"));
-  const pinPadding = boxSides(
-    requireValue(rules, ".admin-mode-strip>.default-pin-banner", "padding", railViewport, "Varsayilan PIN uyarisi")
+  assert.equal(
+    declaredValue(rules, ".admin-mode-strip", "display", railViewport),
+    "contents",
+    "Eski buyuk yonetici karti geri gelmis."
   );
-  const pinRow = Math.max(TOUCH_TARGET, 2 * BODY_FONT_PX * TEXT_LINE_RATIO);
-  const stripOneLine = px(stripPadding.top) + px(stripPadding.bottom) + stripRow + px(stripMargin.bottom);
-  const stripTwoLine = stripOneLine + stripGap + px(pinPadding.top) + 1 /* ayrac cizgisi */ + pinRow;
+  assert.equal(
+    declaredValue(rules, ".admin-mode-strip>.default-pin-banner", "position", railViewport),
+    "fixed",
+    "Varsayilan PIN uyarisi sabit sistem cubugu degil."
+  );
+  const systemBarPadding = px(requireValue(rules, "body.has-system-alert main", "padding-top", railViewport, "Sistem cubugu"));
+  const pinBarPadding = px(requireValue(rules, "body.has-default-pin-warning main", "padding-top", railViewport, "PIN cubugu"));
+  const stackedBarPadding = px(requireValue(rules, "body.has-system-alert.has-default-pin-warning main", "padding-top", railViewport, "Yigili ust cubuklar"));
 
   const headingHeight =
     px(requireValue(rules, ".eyebrow", "font-size", railViewport, "Baglam yazisi")) * TEXT_LINE_RATIO +
@@ -523,19 +524,19 @@ export async function assertHomeLayout(projectRoot) {
   const roomRow = px(requireValue(rules, "#home", "--room-card-h", railViewport, "Oda karti boyu"));
   const boardMin = roomRow;
 
-  const fixed =
-    mainPadTop + headHeight + headGap + 3 * boardRowGap + 2 * sectionHead + quickHeight + mainPadBottom;
+  const fixed = headHeight + headGap + 3 * boardRowGap + 2 * sectionHead + quickHeight + mainPadBottom;
   const states = [
-    { label: "mod seridi yok (ev modu)", strip: 0 },
-    { label: "mod seridi tek satir", strip: stripOneLine },
-    { label: "mod seridi iki satir (varsayilan PIN uyarisi acik)", strip: stripTwoLine }
+    { label: "ust cubuk yok", top: mainPadTop },
+    { label: "sistem cubugu", top: systemBarPadding },
+    { label: "PIN cubugu", top: pinBarPadding },
+    { label: "sistem ve PIN cubuklari", top: stackedBarPadding }
   ];
   for (const state of states) {
-    const total = fixed + state.strip + boardMin;
+    const total = fixed + state.top + boardMin;
     assert(
       total <= VIEWPORT.height,
       `1024x640 tasiyor — ${state.label}: gereken ${Math.round(total)}px, ekran ${VIEWPORT.height}px. ` +
-        `(baslik ${Math.round(headHeight)}px, serit ${Math.round(state.strip)}px, sahne seridi ${Math.round(quickHeight)}px, ` +
+        `(baslik ${Math.round(headHeight)}px, ust pay ${Math.round(state.top)}px, sahne seridi ${Math.round(quickHeight)}px, ` +
         `bolum basliklari 2x${Math.round(sectionHead)}px, ilk oda satiri ${Math.round(roomRow)}px)`
     );
   }
@@ -1051,22 +1052,23 @@ export async function assertHomeLayout(projectRoot) {
     "src/index.ts icindeki panelAssetRoutes tablosunda 72-admin-overview.js yok: dosya 404 doner."
   );
 
-  /* 12l) MOD SERIDI HER YONETICI EKRANINDA. Serit TEK ornektir ve `main`in icinde, butun
-     gorunumlerin DISINDA durur: bir gorunumun icine tasinsa yalniz o ekranda gorunurdu.
-     Gorunur "Ev moduna don" dugmesi de seridin icinde kalir (Asama 2). */
+  /* 12l) YÖNETİCİ KABUĞU TEK KAYNAKTIR. PIN uyarısı bütün görünümlerin dışında sabitlenir;
+     "Ev moduna dön" ise büyük kartın içinde değil, sol rayda bağımsız bir düğmedir. */
   assert.equal(
     html.split('id="adminModeStrip"').length - 1,
     1,
-    "Mod seridi ikinci kez kurulmus: iki serit iki farkli dogru soyler."
+    "Yonetici uyari kabi ikinci kez kurulmus."
   );
   const stripAt = html.indexOf('id="adminModeStrip"');
   assert(
     stripAt > html.indexOf("<main>") && stripAt < html.indexOf('<section id="home"'),
-    "Mod seridi bir gorunumun icine tasinmis: yalniz o ekranda gorunur."
+    "PIN uyari kabi bir gorunumun icine tasinmis: yalniz o ekranda gorunur."
   );
+  assert(html.indexOf('id="defaultPinBanner"') > stripAt, "Varsayilan PIN uyarisi yonetici kabinin icinde degil.");
+  const railBottomAt = html.indexOf('class="rail-bottom"');
   assert(
-    html.indexOf('id="leaveAdminModeButton"') > stripAt,
-    "Gorunur \"Ev moduna don\" dugmesi mod seridinin icinde degil."
+    html.indexOf('id="leaveAdminModeButton"') > railBottomAt && html.indexOf('id="leaveAdminModeButton"') < html.indexOf("<main>"),
+    "Gorunur \"Ev moduna don\" dugmesi sol raydaki kendi yerinde degil."
   );
   const stripTag = html.slice(html.lastIndexOf("<div", stripAt), html.indexOf(">", stripAt));
   assert(stripTag.includes("data-admin-only"), "Mod seridi ev modunda da ciziliyor.");
@@ -1136,8 +1138,8 @@ export async function assertHomeLayout(projectRoot) {
 
   return {
     head: Math.round(headHeight),
-    strip: [0, stripOneLine, stripTwoLine].map((value) => Math.round(value)),
-    board: Math.round(VIEWPORT.height - fixed - stripTwoLine)
+    strip: [mainPadTop, systemBarPadding, pinBarPadding, stackedBarPadding].map((value) => Math.round(value)),
+    board: Math.round(VIEWPORT.height - fixed - stackedBarPadding)
   };
 }
 
