@@ -735,12 +735,14 @@
            oradan geliyordu. Artık iki durakta da alfa taban kuralın değeriyle aynı (`.26`);
            değişen yalnız ÖLÇÜ — bulanıklık yarıçapı ve yayılım. Işık miktarı sabit kalıp
            yalnız yayıldığı alan nefes alıyor.
-       Animasyon hâlâ tek bir `box-shadow`; yeni katman, yeni DOM düğümü, `filter` yok.
+       Animasyon hâlâ tek bir `box-shadow`; yeni katman veya yeni DOM düğümü yok. Diskin kendisi
+       hafif bulanıktır: ön plandaki cam kartlara dokunmadan güneşi camın gerisindeymiş gibi
+       yumuşatır ve radyal geçiş keskin sarı çember oluşmasını engeller.
        `prefers-reduced-motion` açıkken DİSK KALIR (eskiden tümden siliniyordu, artık silinmiyor):
        yalnız soluk ve geçiş durur, konum ve tonlama saate göre doğru sürer. Durduğu yerde taban
        kuralın halesi görünür ve o hale iki durağın tam ortasıdır — donmuş kare çirkin olmaz. */
     :root[data-sky="live"]::before,
-    :root[data-sky="live"] .sky-stage-sun{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 32%,var(--sun-mid) 62%,var(--sun-rim) 88%,rgba(var(--sun-halo),0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-breath 16s ease-in-out alternate infinite}
+    :root[data-sky="live"] .sky-stage-sun{content:"";position:fixed;z-index:-2;display:block;pointer-events:none;left:50%;top:106%;width:var(--sun-size);height:var(--sun-size);margin:calc(var(--sun-size) / -2) 0 0 calc(var(--sun-size) / -2);border-radius:50%;opacity:var(--sun-disc);background:radial-gradient(circle at 50% 50%,var(--sun-core) 0 26%,var(--sun-mid) 55%,var(--sun-rim) 78%,rgba(var(--sun-halo),0) 100%);box-shadow:0 0 calc(var(--sun-size) * 2.4) calc(var(--sun-size) * .8) rgba(var(--sun-halo),calc(var(--sun-glow) * .26));filter:blur(clamp(5px,calc(var(--sun-size) * .09),12px)) saturate(.94);transform:rotate(var(--sun-angle)) translateY(calc(-1 * var(--sky-arm)));transition:transform var(--sky-step) linear,opacity 2s linear;animation:panel-sun-breath 16s ease-in-out alternate infinite}
     @keyframes panel-sun-breath{from{box-shadow:0 0 calc(var(--sun-size) * 1.9) calc(var(--sun-size) * .62) rgba(var(--sun-halo),calc(var(--sun-glow) * .26))}to{box-shadow:0 0 calc(var(--sun-size) * 2.9) calc(var(--sun-size) * .98) rgba(var(--sun-halo),calc(var(--sun-glow) * .26))}}
     /* AY — GERÇEK DOKU + EVRE MASKESİ, HALE İLE ŞEKİL AYRI ÖĞELERDE.
        Kol tekniği güneşle aynı, yön de aynı (soldan doğar, sağdan batar; açıyı JS yazar). Tek
