@@ -386,6 +386,8 @@
       button.title=active&&(mode==="sun"||mode==="system")?`${label}: ${resolvedLabel}`:label;
     });
     $$(".theme-switch").forEach(group=>group.setAttribute("aria-label",t("appearance")));
+    const backgroundMenu=$("#appMenuBackground");
+    if(backgroundMenu)backgroundMenu.hidden=state.themeMode!=="sun";
     $$("[data-theme-toggle]").forEach(button=>{
       button.setAttribute("aria-label",`${t("appearance")}: ${resolvedLabel}`);
       button.title=`${t("appearance")}: ${resolvedLabel}`;
