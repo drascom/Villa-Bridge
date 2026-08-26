@@ -3706,6 +3706,9 @@
        Bölüm başlığı içeriğin hemen üstünde kalır; oda kartı yalnız oda adını taşır. Cihazlar
        kartın boyunu uzatmak yerine sağdan açılan oda paneline taşınır. */
     #home .widget-board{row-gap:6px;align-content:start}
+    /* Bölüm İÇİNDE başlık ile kartlar yakın kalır; ek nefes yalnız bir bölüm bittikten sonra
+       gelir. Böylece Hızlı Sahneler · Favoriler · Odalar üç ayrı grup olarak daha rahat okunur. */
+    #home .quick-control-widget{margin-bottom:10px}
     #home .home-section-head{min-height:0;padding:0 2px}
     #home .home-section-head p{margin-top:2px}
     #home .widget-rail{
@@ -3773,6 +3776,7 @@
       width:100%;
       height:auto;
       min-height:0;
+      margin-bottom:14px;
       padding:0;
       border:0;
       border-radius:0;
@@ -3999,11 +4003,12 @@
       #connections .connection-card{min-height:220px}
       .system-hub-card{min-height:96px}
       #home .widget-board{row-gap:7px}
+      #home .quick-control-widget{margin-bottom:8px}
       #home .home-section-head{min-height:0}
       #home .widget-rail{--room-card-h:78px}
       #home .room-widget-grid{grid-template-columns:1fr;grid-auto-rows:var(--room-card-h)}
       #home .widget-rail .group-widget:not(.favorites-widget):not([hidden]){height:78px;min-height:78px}
-      #home .widget-rail .favorites-widget{width:100%;height:auto}
+      #home .widget-rail .favorites-widget{width:100%;height:auto;margin-bottom:12px}
       #rooms .room-card{height:80px;min-height:80px;padding:8px 62px 8px 8px}
       dialog.room-detail-dialog{inset:0 auto 0 0;width:100%!important;max-width:100%!important;border-radius:0}
       dialog.automation-dialog{inset:0 auto 0 0;width:100vw!important;max-width:100vw!important;height:100dvh;max-height:100dvh;margin:0;border-radius:0}
