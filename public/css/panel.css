@@ -636,6 +636,10 @@
        `:where()` özgüllüğü sıfırladığı için daha aşağıdaki her özel kural bunu ezer — kendi
        halkasını yazan öğeler eskisi gibi çalışır, yazmayanlar panelin diline düşer. */
     :where(a[href],area,button,input,select,textarea,summary,[tabindex]:not([tabindex="-1"])):focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
+    /* TV kumandasında odak, koltuk mesafesinden de seçilebilmelidir. `:focus-visible` desteği
+       zayıf eski TV tarayıcıları için sınıf JS tarafından doğrudan odaklanan öğeye yazılır. */
+    body.tv-navigation-active .tv-spatial-focus{position:relative;z-index:20;outline:4px solid var(--forest)!important;outline-offset:3px!important;box-shadow:0 0 0 7px var(--forest-ring)!important}
+    body.tv-navigation-active .tv-spatial-focus:is(.primary,.danger-button,.active,[aria-pressed="true"]){outline-color:var(--sun)!important}
     /* Ana ekranın da odak halkası panelin normal dili: fotoğraf kalktı, beyaz halka gerekmiyor. */
     body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     /* GÖKYÜZÜ — fotoğraf DEĞİL: dört aşamalı gradyan yığını + yıldız deseni (`--sky`, temaya
