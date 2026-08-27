@@ -529,6 +529,7 @@ const panelAssetRoutes = [
   "/js/88-simple-link.js",
   "/js/90-shell.js",
   "/js/panel-automation.js",
+  "/js/95-tv-navigation.js",
   "/js/99-bind.js"
 ];
 
