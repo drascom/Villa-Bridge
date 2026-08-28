@@ -206,6 +206,12 @@ export interface DeviceControlView {
   valueOn?: JsonScalar;
   valueOff?: JsonScalar;
   valueToggle?: JsonScalar;
+  /**
+   * `true` when the expose contract accepts writes for this property. Some read-only binary
+   * states are still rendered as controls for a compact device view; automation targets must
+   * not mistake those states for writable commands.
+   */
+  writable?: boolean;
   adminOnly?: boolean;
   /**
    * Aç/kapa kanalları için sınıf bilgisi. Lamba↔anahtar ayrımı kanal başınadır: çok kanallı bir

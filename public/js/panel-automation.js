@@ -2,23 +2,38 @@
   const automationEveryDay=days=>automationWeekDays.every(day=>days.includes(day));
   const automationDayLabel=day=>t(`automationDay${day}`);
   const automationDayList=days=>[...days].sort((left,right)=>left-right).map(automationDayLabel).join(", ");
-  // §8.1 — kilit ve siren bir otomasyon eylemi olamaz, listede hiç görünmez.
-  const isAutomationControl=control=>control.kind==="switch"&&control.adminOnly!==true;
+  // Otomasyon yeteneği cihaz/model listesinden değil, expose edilen kumandanın veri biçiminden
+  // çıkar. Salt okunur durumlar cihaz ekranında kumanda gibi çizilebilse de hedef olamaz.
+  const automationForbiddenControlKinds=new Set(["lock","siren"]);
+  const automationNumericControlKinds=new Set(["level","temperature","position","climate","number"]);
+  const automationEnumControlKinds=new Set(["select","cover"]);
+  const automationControlValues=control=>Array.isArray(control?.values)
+    ?control.values.filter(value=>["string","number","boolean"].includes(typeof value))
+    :[];
+  const isAutomationBinaryControl=control=>control?.kind==="switch"||control?.kind==="fan";
+  const isAutomationNumericControl=control=>automationNumericControlKinds.has(control?.kind);
+  const isAutomationEnumControl=control=>automationEnumControlKinds.has(control?.kind)
+    ||(!isAutomationBinaryControl(control)&&automationControlValues(control).length>0);
+  const isAutomationColorControl=control=>control?.kind==="color";
+  const isAutomationValueControl=control=>(isAutomationNumericControl(control)
+    ||isAutomationEnumControl(control)||isAutomationColorControl(control))
+    &&control?.writable!==false&&control?.adminOnly!==true;
+  // §8.1 — kilit ve siren bir otomasyon eylemi olamaz, listede hiç görünmez. Teknik/ayar
+  // kumandaları da günlük otomasyon listesini kalabalıklaştırmaz.
+  const isAutomationControl=control=>Boolean(control)
+    &&control.writable!==false
+    &&control.adminOnly!==true
+    &&!automationForbiddenControlKinds.has(control.kind)
+    &&(isAutomationBinaryControl(control)||isAutomationValueControl(control));
   const automationControls=device=>isProtectedDevice(device)?[]:(device?.controls||[]).filter(isAutomationControl);
   // §8.2 — döngü korumasının kanonik anahtarı: IEEE adresi + kanal (MQTT özelliği); dost isim değil.
   const automationChannelKey=(deviceId,property)=>`${String(deviceId||"").toLowerCase()}|${String(property||"")}`;
   const automationControlValue=(control,on)=>on?(control.valueOn??"ON"):(control.valueOff??"OFF");
   // Tek basışta hem açan hem kapatan seçenek yalnızca cihaz bunu bildiriyorsa sunulur.
   const automationCanToggle=control=>control?.valueToggle!==undefined&&control?.valueToggle!==null;
-  /* ————— değer eylemleri: parlaklık, ışık sıcaklığı ve renk. Kural aç/kapattan ibaret değil.
-     Hangi seçeneğin çıkacağını cihazın SUNDUĞU kumandalar belirler (`lightPanelParts` ile aynı
-     yaklaşım): kimlik `<kanal>:brightness` / `<kanal>:temperature` / `<kanal>:color` biçimindedir,
-     yoksa seçenek hiç görünmez. Model ya da ad listesi yok. */
-  const automationValueKinds=["level","temperature","color"];
+  /* ————— değer eylemleri. Parlaklık/renk özel durum değildir; sayı, konum, iklim hedefi,
+     seçim ve perde gibi yazılabilir her skaler kumanda aynı akıştan geçer. */
   const automationValueChannel=control=>String(control?.id||"").split(":")[0];
-  const isAutomationValueControl=control=>automationValueKinds.includes(control?.kind)
-    &&control.adminOnly!==true
-    &&String(control.id||"").includes(":");
   // Bir aç/kapa kanalının değer kumandaları: `main` kanalının `main:brightness` gibi kardeşleri.
   const automationValueControls=(device,channel)=>isProtectedDevice(device)?[]:(device?.controls||[])
     .filter(control=>isAutomationValueControl(control)&&automationValueChannel(control)===channel);
@@ -56,14 +71,22 @@
     :percent<=66?"automationWarmthNeutral":"automationWarmthWarm";
   const automationValueText=(control,value)=>{
     if(control?.kind==="color")return String(value||"").toLowerCase();
-    const percent=automationValuePercent(control,value);
-    return control?.kind==="temperature"
-      ?t("automationValueWarmthText",{percent,warmth:t(automationWarmthKey(percent))})
-      :t("automationValuePercent",{percent});
+    if(control?.kind==="level")return t("automationValuePercent",{percent:automationValuePercent(control,value)});
+    if(control?.kind==="temperature"){
+      const percent=automationValuePercent(control,value);
+      return t("automationValueWarmthText",{percent,warmth:t(automationWarmthKey(percent))});
+    }
+    if(isAutomationNumericControl(control)){
+      const number=Number(value);
+      const shown=Number.isFinite(number)?Math.round(number*1000)/1000:value;
+      return`${shown}${control?.unit?` ${control.unit}`:""}`;
+    }
+    return automationScalarText(value);
   };
   /* ————— "tetikleyeni izle": sabit değer yerine tetikleyenin canlı değeri. Sayısal kanalda oran
      (yüzde) eşlenir, renkte değer olduğu gibi kopyalanır — renkte yüzde bir şey söylemez.
      Kip kumandanın türünden çıkar; kullanıcıya "oran mı kopya mı" diye sorulmaz. */
+  const automationFollowEligibleControl=control=>isAutomationColorControl(control)||isAutomationNumericControl(control);
   const automationFollowMode=control=>control?.kind==="color"?"copy":"ratio";
   const automationFollowActionMode=follow=>follow?.mode==="copy"?"followColor":"followRatio";
   const automationFollowChoiceKeys={ratio:"automationFollowRatio",copy:"automationFollowColor"};
@@ -76,22 +99,29 @@
     if(wizard.triggerEquals!==null&&wizard.triggerEquals!==undefined)return null;
     if(!wizard.triggerProperty)return null;
     const device=state.devices.find(item=>item.id===wizard.triggerDeviceId)||null;
-    return automationChangeControl(device,wizard.triggerProperty);
+    const control=automationChangeControl(device,wizard.triggerProperty);
+    return automationFollowEligibleControl(control)?control:null;
   };
   // Aynı tür kanala izin verilir: parlaklık parlaklığı, ışık sıcaklığı ışık sıcaklığını, renk rengi
   // izler. "Aynı oranda" ancak aynı cinsten iki şey arasında okunur.
   const automationFollowAvailable=(wizard,control)=>{
     const source=automationFollowSource(wizard);
-    return Boolean(source&&control&&source.kind===control.kind);
+    if(!source||!control||!automationFollowEligibleControl(control))return false;
+    if(isAutomationColorControl(source)||isAutomationColorControl(control))return source.kind===control.kind;
+    // Sayısal değerlerde aynı anlam/birim tercih edilir; aynı tür kumanda farklı ham aralıklara
+    // sahipse motor oranı dönüştürür (örn. 0–254 parlaklıktan 0–100 parlaklığa).
+    return source.kind===control.kind&&(source.unit||"")===(control.unit||"");
   };
   const automationValueDefaultColor="#ffcf8e";
   const automationValueSeed=control=>{
     if(control?.kind==="color"){
       return/^#[0-9a-fA-F]{6}$/.test(String(control.value||""))?String(control.value).toLowerCase():automationValueDefaultColor;
     }
+    if(isAutomationEnumControl(control))return automationControlValues(control)
+      .find(value=>String(value)===String(control.value))??automationControlValues(control)[0]??null;
     return Number.isFinite(control?.value)
-      ?automationValueRaw(control,automationValuePercent(control,control.value))
-      :automationValueRaw(control,control?.kind==="temperature"?50:100);
+      ?Number(control.value)
+      :automationValueRaw(control,control?.kind==="level"?100:50);
   };
   // Sınıflandırma sunucudan gelir: `category` standart `definition.exposes[].type` tahminidir,
   // kullanıcı rol seçtiyse onunla ezilmiştir. İstemcide model listesi ya da satıcıya özgü
@@ -113,10 +143,7 @@
     for(const control of device?.controls||[])if(control.kind==="switch")add(control.category);
     const classified=tabs.size>0;
     if((device?.buttons||[]).length||(device?.actionTypes||[]).length)tabs.add("button");
-    if(!classified&&!tabs.size){
-      const keys=new Set([...(device?.features||[]),...Object.keys(device?.state||{})]);
-      if(Object.keys(automationSensorEvents).some(property=>keys.has(property)))tabs.add("sensor");
-    }
+    if(!classified&&!tabs.size&&automationCapabilities(device).length)tabs.add("sensor");
     if(!tabs.size)tabs.add("other");
     return[...tabs];
   };
@@ -132,6 +159,7 @@
       device?.name,
       deviceKind(device),
       ...(device?.controls||[]).filter(control=>control.kind==="switch").map(control=>control.name),
+      ...automationCapabilities(device).map(capability=>capability.name),
       ...(device?.buttons||[]).map(button=>deviceButtonName(button)),
       ...automationDeviceRooms(device)
     ];
@@ -145,7 +173,8 @@
     // "İzle" kipinde eylemin kendi değeri yoktur; kip kaydın kendisinden okunur.
     if(action?.follow)return automationFollowActionMode(action.follow);
     // Değer eylemlerinde "yön" yoktur: kip kumandanın türüdür, değeri cümle ayrıca söyler.
-    if(control&&automationValueKinds.includes(control.kind))return control.kind;
+    if(control&&["level","temperature","color"].includes(control.kind))return control.kind;
+    if(control&&isAutomationValueControl(control))return"value";
     if(control&&automationCanToggle(control)&&action?.value===control.valueToggle)return"toggle";
     if(control)return action?.value===automationControlValue(control,true)?"on":"off";
     if(String(action?.value).toUpperCase()==="TOGGLE")return"toggle";
@@ -155,7 +184,8 @@
     const device=automationDevice(action);
     if(!device)return t("automationMissingDevice");
     const control=automationControl(action);
-    return control&&automationControls(device).length>1?`${device.name} · ${control.name}`:device.name;
+    return control&&automationControls(device).length>1&&String(control.name)!==String(device.name)
+      ?`${device.name} · ${control.name}`:device.name;
   };
   // Ham `1_single` gibi teknik dizeler kullanıcıya basılmaz; sayı + basış eki insan diline çevrilir.
   const automationPressKeys={
@@ -204,7 +234,79 @@
     alarm:[{value:true,key:"automationEventAlarm"}],
     lock_state:[{value:"locked",key:"automationEventLocked"},{value:"unlocked",key:"automationEventUnlocked"}]
   };
-  const automationStateControls=device=>(device?.controls||[]).filter(control=>control.kind==="switch");
+  // Motorla aynı dışlama ilkesi: cihazın sunduğu skaler değerler otomasyona girer, yalnız taşıma ve
+  // firmware gürültüsü ile ayrı düğme olayı burada gösterilmez. `readings` tanımdan ve gözlenen
+  // durumdan üretildiği için yeni cihaz/özellik eklemek bu dosyada bir liste değişikliği istemez.
+  const automationNoisyProperties=new Set([
+    "action","linkquality","last_seen","elapsed","update","update_available","update_state"
+  ]);
+  const automationScalar=value=>["string","number","boolean"].includes(typeof value)
+    &&(typeof value!=="number"||Number.isFinite(value));
+  const automationCapabilityName=(entry,property)=>{
+    const own=String(entry?.name||"").trim();
+    const base=own||String(property||"").replaceAll("_"," ");
+    const parent=String(entry?.parentName||"").trim();
+    return parent&&!base.toLocaleLowerCase(state.language).includes(parent.toLocaleLowerCase(state.language))
+      ?`${parent} · ${base}`:base;
+  };
+  function automationCapabilities(device){
+    if(!device)return[];
+    const found=new Map();
+    const hidden=new Set();
+    const add=(entry,source)=>{
+      const property=String(entry?.property||"").trim();
+      if(!property||automationNoisyProperties.has(property)||found.has(property))return;
+      const stateValue=device.state?.[property];
+      const value=automationScalar(stateValue)?stateValue:automationScalar(entry?.value)?entry.value:null;
+      // Tetikleyici listesi yalnız cihazda gerçekten gözlenmiş değerleri gösterir. Henüz hiç değer
+      // bildirmemiş yazılabilir ayar hedefte kalır ama "değişince" listesinde gereksiz yer tutmaz.
+      if(value===null)return;
+      found.set(property,{
+        property,name:automationCapabilityName(entry,property),value,
+        kind:entry?.kind||entry?.type||typeof value,
+        unit:entry?.unit||"",values:automationControlValues(entry),
+        valueOn:entry?.valueOn,valueOff:entry?.valueOff,
+        control:source==="control"?entry:null,
+        writable:source==="control"&&isAutomationControl(entry)
+      });
+    };
+    // Kumandalar önce: kullanıcı ana/alt kanalları ölçümlerden önce görür. Ayar/diagnostic alanları
+    // günlük otomasyonda saklanır; cihaz ayar ekranında erişilebilir olmaya devam eder.
+    for(const control of device.controls||[]){
+      if(control.adminOnly===true){hidden.add(control.property);continue}
+      add(control,"control");
+    }
+    for(const reading of device.readings||[]){
+      if(reading.category==="config"||reading.category==="diagnostic"){
+        hidden.add(reading.property);
+        continue;
+      }
+      add(reading,"reading");
+    }
+    // Eski sunucu yanıtı `readings` taşımıyorsa gözlenen skaler durum yine kaybolmaz.
+    for(const[property,value]of Object.entries(device.state||{})){
+      if(hidden.has(property)||!automationScalar(value))continue;
+      add({property,name:property.replaceAll("_"," "),value},"state");
+    }
+    return[...found.values()];
+  }
+  const automationCapability=(device,property)=>automationCapabilities(device)
+    .find(item=>item.property===property)||null;
+  const automationScalarText=value=>{
+    if(value===true||String(value).toUpperCase()==="ON")return t("on");
+    if(value===false||String(value).toUpperCase()==="OFF")return t("off");
+    return String(value??"").replaceAll("_"," ");
+  };
+  const automationCapabilityBinaryValues=capability=>{
+    if(capability?.valueOn!==undefined&&capability?.valueOff!==undefined)return[
+      {value:capability.valueOn,label:t("on")},{value:capability.valueOff,label:t("off")}
+    ];
+    if(typeof capability?.value==="boolean")return[
+      {value:true,label:t("on")},{value:false,label:t("off")}
+    ];
+    return[];
+  };
+  const automationStateControls=device=>automationControls(device).filter(control=>control.kind==="switch");
   // §8.1 tersi: kilit ve siren EYLEM olamaz ama tetikleyici olarak serbesttir — burada filtre yok.
   function automationTriggerEvents(device,kind,keep){
     if(!device)return[];
@@ -229,11 +331,37 @@
         }
       }
     }else if(kind==="sensor"){
-      const keys=new Set([...(device.features||[]),...Object.keys(device.state||{})]);
-      for(const property of Object.keys(automationSensorEvents)){
-        if(!keys.has(property))continue;
-        for(const option of automationSensorEvents[property]){
-          rows.push({token:`${property}=${String(option.value)}`,property,equals:option.value,label:t(option.key)});
+      for(const capability of automationCapabilities(device)){
+        const semantic=automationSensorEvents[capability.property]||[];
+        const used=new Set();
+        for(const option of semantic){
+          // Bazı expose'lar ikili değeri boolean yerine ON/OFF olarak yayınlar (örn. siren alarmı).
+          // Standart olay sözlüğündeki true/false, cihazın kendi uçlarına çevrilir.
+          let value=option.value;
+          if(typeof value==="boolean"&&capability.valueOn!==undefined&&capability.valueOff!==undefined
+            &&typeof capability.valueOn!=="boolean"&&typeof capability.valueOff!=="boolean"){
+            value=value?capability.valueOn:capability.valueOff;
+          }
+          const token=`${capability.property}=${String(value)}`;
+          if(used.has(token))continue;
+          used.add(token);
+          rows.push({token,property:capability.property,equals:value,label:t(option.key)});
+        }
+        // Normal anahtarın açılma/kapanma yönleri ayrı, daha proaktif eşleme yolunda sunulur.
+        // Değer-değişimi yolunda aynı iki satırı yeniden göstermek yerine yalnız "değişti" kalır.
+        // Sensör/siren gibi anlamlı özelliklerde ise yönler burada gereklidir.
+        const choices=capability.control?.kind==="switch"&&!semantic.length?[]
+          :capability.values.length
+          ?capability.values.map(value=>({value,label:automationScalarText(value)}))
+          :automationCapabilityBinaryValues(capability);
+        for(const option of choices){
+          const token=`${capability.property}=${String(option.value)}`;
+          if(used.has(token))continue;
+          used.add(token);
+          rows.push({
+            token,property:capability.property,equals:option.value,
+            label:t("automationValueBecomes",{reading:capability.name,value:option.label})
+          });
         }
       }
     }else if(kind==="deviceState"){
@@ -251,9 +379,10 @@
         }
       }
     }
-    // Düğmelerde kanonik `action` benzersizdir; sensörde aynı anlamı veren farklı özellikler etiketle elenir.
+    // Kanonik olay jetonu benzersizdir. Etikete göre elemek iki farklı alt öğenin aynı metinli
+    // durumunu sessizce yok ediyordu; evrensel yetenek listesinde özellik kimliği korunur.
     const seen=new Set();
-    return rows.filter(row=>{const key=kind==="button"?row.token:row.label;return seen.has(key)?false:(seen.add(key),true)});
+    return rows.filter(row=>{const key=row.token;return seen.has(key)?false:(seen.add(key),true)});
   }
   const automationTriggerDevice=trigger=>state.devices.find(device=>device.id===trigger?.deviceId)||null;
   const automationTriggerDeviceName=trigger=>automationTriggerDevice(trigger)?.name||t("automationMissingDevice");
@@ -284,12 +413,12 @@
   // birleştirilmez, çünkü TR/EN kelime sırası ve ek yapısı farklıdır.
   const automationSentenceKeys={
     on:"automationWillTurnOn",off:"automationWillTurnOff",toggle:"automationWillToggle",
-    level:"automationWillSetBrightness",temperature:"automationWillSetWarmth",color:"automationWillSetColor",
+    level:"automationWillSetBrightness",temperature:"automationWillSetWarmth",color:"automationWillSetColor",value:"automationWillSetValue",
     followRatio:"automationWillFollowRatio",followColor:"automationWillFollowColor"
   };
   const automationCardKeys={
     on:"automationTurnsOn",off:"automationTurnsOff",toggle:"automationToggles",
-    level:"automationSetsBrightness",temperature:"automationSetsWarmth",color:"automationSetsColor",
+    level:"automationSetsBrightness",temperature:"automationSetsWarmth",color:"automationSetsColor",value:"automationSetsValue",
     followRatio:"automationFollowsRatio",followColor:"automationFollowsColor"
   };
   const automationActionPhrase=(keys,action)=>{
@@ -1058,7 +1187,7 @@
     {kind:"time",glyph:"🕐",label:"automationTriggerTime",ready:true},
     {kind:"sun",glyph:"🌅",label:"automationTriggerSun",ready:true},
     {kind:"button",glyph:"🔘",label:"automationTriggerButton",ready:true},
-    {kind:"sensor",glyph:"🚪",label:"automationTriggerSensor",ready:true},
+    {kind:"sensor",glyph:"↕",label:"automationTriggerSensor",ready:true},
     {kind:"deviceState",glyph:"💡",label:"automationTriggerDeviceState",ready:true}
   ];
   const automationDeviceKinds=["button","sensor","deviceState"];
@@ -1248,15 +1377,17 @@
   };
   const automationTriggerHasThreshold=trigger=>trigger?.type==="deviceState"
     &&(trigger.above!==undefined&&trigger.above!==null||trigger.below!==undefined&&trigger.below!==null);
-  const automationTriggerKind=trigger=>!trigger?null
+  const automationTriggerKind=(trigger,automation)=>!trigger?null
     :trigger.type==="deviceAction"?"button"
     :trigger.type==="sun"?"sun"
     :trigger.type==="deviceState"
-    // Değer kanalının hedefsiz tetikleyicisi ("parlaklığı değişince") anahtar eşlemesi değildir:
-    // eşleme formu iki yön sorar, burada yön yoktur. Ayrım kanalın kumanda türünden çıkar.
-    ?(automationTriggerHasThreshold(trigger)
-      ||automationChangeControl(automationTriggerDevice(trigger),trigger.property)
-      ||Object.prototype.hasOwnProperty.call(automationSensorEvents,trigger.property)?"sensor":"deviceState")
+    // `equals` taşımayan her değişim tetikleyicisi anahtar eşlemesi değildir. Ayrım özellik adına
+    // göre değil, kaydın yapısına göre yapılır: yeni eşlemede eylemler `when` taşır; eski tek yönlü
+    // eşleme ise gerçekten yazılabilir bir anahtar kanalına bağlıdır.
+    ?(automationMapView(automation)?.kind==="device"
+      ||(trigger.equals!==undefined&&trigger.equals!==null
+        &&automationStateControls(automationTriggerDevice(trigger)).some(control=>control.property===trigger.property)
+        &&automationMapSeed(automation))?"deviceState":"sensor")
     :"time";
   // Akışın adımları. Dört bölüm: NE ZAMAN (kind…trigThreshold), KOŞUL (cond…), NE YAPSIN
   // (target…scene), SONRASI (autoOff, name). Ne zaman bölümü varsayılandır.
@@ -1298,7 +1429,7 @@
     // Eşleme tohumu yalnız anahtar/priz yolunda geçerlidir: o satırlar değer taşımaz, yön taşır.
     // Sensör kuralı da tek eylemli `deviceState` göründüğü için buraya düşüyordu ve hedefin
     // `value` alanı silinerek eylem tersine dönüyordu — ayrım tetikleyici türünden yapılır.
-    const seed=sunSeed||(existing&&automationTriggerKind(trigger)==="deviceState"?automationMapSeed(seedSource):null);
+    const seed=sunSeed||(existing&&automationTriggerKind(trigger,seedSource)==="deviceState"?automationMapSeed(seedSource):null);
     const sunset=sunSlots?.sunset||null;
     const sunrise=sunSlots?.sunrise||null;
     const autoOff=actions.find(action=>action.autoOff)?.autoOff||null;
@@ -1308,7 +1439,7 @@
       stage:existing?"name":"path",
       id:existing?.id||null,
       enabled:existing?existing.enabled!==false:true,
-      triggerKind:existing?.manual===true?"manual":automationTriggerKind(trigger),
+      triggerKind:existing?.manual===true?"manual":automationTriggerKind(trigger,seedSource),
       hour:timed?Number(trigger.at.slice(0,2)):19,
       minute:timed?Number(trigger.at.slice(3,5)):0,
       days:timed?[...(trigger.days||automationWeekDays)]
@@ -1393,14 +1524,14 @@
   const automationStrong=text=>`<strong>${esc(text)}</strong>`;
   const automationPillKeys={
     on:"automationPillOn",off:"automationPillOff",toggle:"automationPillToggle",none:"automationPillNothing",
-    level:"automationPillBrightness",temperature:"automationPillWarmth",color:"automationPillColor",
+    level:"automationPillBrightness",temperature:"automationPillWarmth",color:"automationPillColor",value:"automationPillValue",
     followRatio:"automationPillFollowRatio",followColor:"automationPillFollowColor"
   };
   // Değer pill'i değeri de taşır ("Parlaklık %40"); şablonun tamamı tek anahtardır.
   const automationPillHtml=(mode,values)=>`<span class="automation-pill act-${mode}">${esc(t(automationPillKeys[mode]||automationPillKeys.on,values||{}))}</span>`;
   const automationTargetPillHtml=target=>{
     const mode=automationTargetMode(target);
-    if(!automationValueKinds.includes(mode))return automationPillHtml(mode);
+    if(!["level","temperature","color","value"].includes(mode))return automationPillHtml(mode);
     return automationPillHtml(mode,{value:automationValueText(automationTargetControl(target),target?.value)});
   };
   // ————— eşleme çifti: "kaynak → sonuç". Satırda iki ayrı öbek durur, çünkü kural iki ayrı
@@ -1439,6 +1570,7 @@
   // Eylem pill'i: ince renkli kenarlık + kendi renginde metin. Kırmızı eylem rengi değildir —
   // panelde `--danger` hata/uyarı demektir, o yüzden Kapat sakin mürekkep tonunda durur.
   const automationChoiceHtml=(mode,labelKey,active,hook)=>`<button class="automation-choice act-${mode}${active?" active":""}" type="button" ${hook} aria-pressed="${Boolean(active)}">${esc(t(labelKey))}</button>`;
+  const automationChoiceTextHtml=(mode,label,active,hook)=>`<button class="automation-choice act-${mode}${active?" active":""}" type="button" ${hook} aria-pressed="${Boolean(active)}">${esc(label)}</button>`;
   function automationTriggerChoicesHtml(wizard){
     return automationOptionsHtml(automationTriggerChoices.map(entry=>({
       glyph:entry.glyph,
@@ -1513,24 +1645,20 @@
   }
   // ————— sayısal eşik. Yalnız sayısal bir özellik seçildiyse görünür.
   const automationNumericProperties=device=>{
-    const state_=device?.state||{};
-    const keys=new Set([...(device?.features||[]),...Object.keys(state_)]);
-    // `linkquality` Zigbee2MQTT'nin taşıma ölçüsüdür, cihazın bildirdiği bir ölçüm değil.
-    return[...keys]
-      .filter(key=>typeof state_[key]==="number"&&Number.isFinite(state_[key]))
-      .filter(key=>key!=="linkquality"&&!Object.prototype.hasOwnProperty.call(automationSensorEvents,key))
-      .sort();
+    return automationCapabilities(device)
+      .filter(item=>isAutomationNumericControl(item.control)||typeof item.value==="number")
+      .filter(item=>!Object.prototype.hasOwnProperty.call(automationSensorEvents,item.property))
+      .map(item=>item.property);
   };
   const automationPropertyLabel=(device,property)=>{
-    const control=(device?.controls||[]).find(item=>item.property===property);
-    if(control)return control.name;
+    const capability=automationCapability(device,property);
+    if(capability)return capability.name;
     const key=`automationProperty_${property}`;
     const label=t(key);
     return label===key?property:label;
   };
   const automationPropertyUnit=(device,property)=>{
-    const control=(device?.controls||[]).find(item=>item.property===property);
-    return control?.unit||"";
+    return automationCapability(device,property)?.unit||"";
   };
   /* Adım cihaz/ölçüm tablosuna dayanmaz — öyle bir tablo tutulamaz, her cihaz kendi biriminde
      kendi büyüklüğünde konuşur. Cihaz kendi kumandasında bir `step` bildiriyorsa o kullanılır;
@@ -1919,7 +2047,7 @@
     &&wizard.triggerKind!=="button"
     // Hedefsiz değer tetikleyicisinde "şu kadar süredir böyleyse" tanımsızdır: neyin sürdüğünü
     // söyleyen bir hedef değer yok. Sunucu da bu birleşimi reddediyor.
-    &&!automationFollowSource(wizard)
+    &&(automationThresholdActive(wizard)||(wizard.triggerEquals!==null&&wizard.triggerEquals!==undefined))
     &&automationDeviceKinds.includes(wizard.triggerKind);
   function automationTrigForHtml(wizard){
     if(!automationTrigForEligible(wizard))return"";
@@ -1959,16 +2087,16 @@
     token:`num:${property}`,property,numeric:true,
     label:t("automationThresholdRow",{reading:automationPropertyLabel(device,property)})
   }));
-  /* Değer kanalları (parlaklık / ışık sıcaklığı / renk) için hedefsiz satır: "… değişince".
-     Kural değer her değiştiğinde çalışır — canlı takibi (izleme) besleyen tek tetikleyici budur.
-     Eşik satırı yalnız eşiği geçerken bir kez ateşler, o yüzden ikisi ayrı satırlardır. */
+  /* Seçili cihazın sunduğu her kullanılabilir skaler özellik için hedefsiz satır: "… değişince".
+     Model/özellik listesi yoktur; yeni bir expose otomatik görünür. Eşik satırı yalnız sınır
+     geçişinde ateşlediği için sayısal özelliklerde değişim ve eşik ayrı seçeneklerdir. */
   const automationChangeControls=device=>(device?.controls||[]).filter(isAutomationValueControl);
   const automationChangeControl=(device,property)=>automationChangeControls(device)
     .find(control=>control.property===property)||null;
-  const automationChangeRows=(device,kind)=>kind!=="sensor"?[]:automationChangeControls(device).map(control=>({
+  const automationChangeRows=(device,kind)=>kind!=="sensor"?[]:automationCapabilities(device).map(capability=>({
     // Kayıtlı kural `equals` taşımaz; jeton da onu `null` diye yazar ki geri okuma eşleşsin.
-    token:`${control.property}=null`,property:control.property,equals:null,
-    label:t("automationChangeRow",{reading:control.name})
+    token:`${capability.property}=null`,property:capability.property,equals:null,
+    label:t("automationChangeRow",{reading:capability.name})
   }));
   const automationTriggerRows=(device,kind,keep)=>[
     ...automationTriggerEvents(device,kind,keep),
@@ -2007,7 +2135,8 @@
     const channelStarter=wizard.triggerKind!=="time"&&wizard.triggerKind!=="button"&&Boolean(wizard.triggerProperty);
     const starter=wizard.triggerKind==="time"||channelStarter?null:wizard.triggerDeviceId;
     const starterChannel=channelStarter?automationChannelKey(wizard.triggerDeviceId,wizard.triggerProperty):null;
-    const targetControls=device=>automationControls(device).filter(control=>automationChannelKey(device.id,control.property)!==starterChannel);
+    const targetControls=device=>(automationMappingMode(wizard)?automationStateControls(device):automationControls(device))
+      .filter(control=>automationChannelKey(device.id,control.property)!==starterChannel);
     const devices=state.devices
       .filter(device=>targetControls(device).length>0&&device.id!==starter)
       .sort(automationByName);
@@ -2142,27 +2271,22 @@
       })));
     }
     return`<div class="automation-parts">${controls.map(control=>{
-      const choice=(key,labelKey)=>automationChoiceHtml(key,labelKey,false,`data-automation-action="${esc(device.id)}|${esc(control.id)}|${key}"`);
-      // "Değiştir" yalnızca cihaz tek basışta iki yönü de destekliyorsa görünür.
-      const toggle=automationCanToggle(control)?choice("toggle","automationTurnToggle"):"";
-      // Aç/kapat varsayılan kalır; değer seçenekleri onun yanında, aynı satırdadır — akış uzamaz.
-      // Yalnız cihazın gerçekten sunduğu kumandalar çıkar, sabit liste yok.
-      const values=automationValueControls(device,automationValueChannel(control))
-        // §8.2 — tetikleyen kanal hedef olamaz; değer kumandaları da aynı elemeden geçer.
-        .filter(item=>automationChannelKey(device.id,item.property)!==scope.starterChannel);
-      const valueChoices=values.map(item=>automationChoiceHtml(
-        item.kind,automationValueChoiceKeys[item.kind],automationValueOpen(wizard,device.id,item.id),
-        `data-automation-value="${esc(device.id)}|${esc(item.id)}"`
-      )).join("");
-      // "Tetikleyeni izle" sabit değerin yanında durur; yalnız uygun tetikleyici seçilmişken çıkar.
-      const followChoices=values.filter(item=>automationFollowAvailable(wizard,item)).map(item=>automationChoiceHtml(
-        automationFollowActionMode({mode:automationFollowMode(item)}),
-        automationFollowChoiceKeys[automationFollowMode(item)],false,
-        `data-automation-follow="${esc(device.id)}|${esc(item.id)}"`
-      )).join("");
-      const open=values.find(item=>automationValueOpen(wizard,device.id,item.id))||null;
-      const name=single?"":`<p class="automation-part-name">${esc(control.name)}</p>`;
-      return`<div class="automation-part">${name}<div class="automation-choices">${choice("on","automationTurnOn")}${choice("off","automationTurnOff")}${toggle}${valueChoices}${followChoices}</div>${open?automationValueEditorHtml(wizard,open):""}${followChoices?`<p class="automation-hint">${esc(t("automationFollowHint",{device:automationTriggerLabelName(wizard)}))}</p>`:""}</div>`;
+      const name=single||String(control.name)===String(device.name)?"":`<p class="automation-part-name">${esc(control.name)}</p>`;
+      if(isAutomationBinaryControl(control)){
+        const choice=(key,labelKey)=>automationChoiceHtml(key,labelKey,false,`data-automation-action="${esc(device.id)}|${esc(control.id)}|${key}"`);
+        const toggle=automationCanToggle(control)?choice("toggle","automationTurnToggle"):"";
+        return`<div class="automation-part">${name}<div class="automation-choices">${choice("on","automationTurnOn")}${choice("off","automationTurnOff")}${toggle}</div></div>`;
+      }
+      const open=automationValueOpen(wizard,device.id,control.id);
+      const key=automationValueChoiceKeys[control.kind]||"automationSetValue";
+      const mode=["level","temperature","color"].includes(control.kind)?control.kind:"value";
+      const valueChoice=automationChoiceHtml(mode,key,open,`data-automation-value="${esc(device.id)}|${esc(control.id)}"`);
+      const follow=automationFollowAvailable(wizard,control)?automationChoiceHtml(
+        automationFollowActionMode({mode:automationFollowMode(control)}),
+        automationFollowChoiceKeys[automationFollowMode(control)],false,
+        `data-automation-follow="${esc(device.id)}|${esc(control.id)}"`
+      ):"";
+      return`<div class="automation-part">${name}<div class="automation-choices">${valueChoice}${follow}</div>${open?automationValueEditorHtml(wizard,control):""}${follow?`<p class="automation-hint">${esc(t("automationFollowHint",{device:automationTriggerLabelName(wizard)}))}</p>`:""}</div>`;
     }).join("")}</div>`;
   }
   const automationValueChoiceKeys={level:"automationSetBrightness",temperature:"automationSetWarmth",color:"automationSetColor"};
@@ -2184,10 +2308,18 @@
       const hex=String(wizard.draftValue||automationValueDefaultColor).toLowerCase();
       return`<div class="automation-value">${automationColorPresetsHtml(hex)}<input class="color-picker" type="color" value="${esc(hex)}" data-automation-value-color="1" aria-label="${esc(t("automationSetColor"))}"><p class="automation-hint">${esc(t("automationValueColorHint"))}</p></div>`;
     }
+    if(isAutomationEnumControl(control)){
+      const choices=automationControlValues(control).map(value=>automationChoiceTextHtml(
+        "value",automationScalarText(value),String(value)===String(wizard.draftValue),
+        `data-automation-enum-value="${esc(encodeURIComponent(JSON.stringify(value)))}"`
+      )).join("");
+      return`<div class="automation-value"><div class="automation-choices">${choices}</div></div>`;
+    }
     const warmth=control.kind==="temperature";
-    const labelKey=warmth?"automationSetWarmth":"automationSetBrightness";
+    const labelKey=warmth?"automationSetWarmth":control.kind==="level"?"automationSetBrightness":"automationSetValue";
     const step=(direction,key,glyph)=>`<button class="automation-time-step" type="button" data-automation-value-step="${direction}" aria-label="${esc(t(key))}">${glyph}</button>`;
-    return`<div class="automation-value"><div class="automation-counter" role="group" aria-label="${esc(t(labelKey))}">${step(-1,"automationValueDown","−")}<span class="automation-counter-value">${esc(automationValueText(control,wizard.draftValue))}</span>${step(1,"automationValueUp","+")}</div><p class="automation-hint">${esc(t(warmth?"automationValueWarmthHint":"automationValueBrightnessHint"))}</p></div>`;
+    const hint=warmth?"automationValueWarmthHint":control.kind==="level"?"automationValueBrightnessHint":"automationValueGenericHint";
+    return`<div class="automation-value"><div class="automation-counter" role="group" aria-label="${esc(t(labelKey))}">${step(-1,"automationValueDown","−")}<span class="automation-counter-value">${esc(automationValueText(control,wizard.draftValue))}</span>${step(1,"automationValueUp","+")}</div><p class="automation-hint">${esc(t(hint))}</p></div>`;
   }
   // Eşleme formu: her yön için ne yapılacağını kullanıcı seçer. Tablette geniş satır, geniş pill.
   function automationMapHtml(wizard){
@@ -2831,6 +2963,7 @@
     ));
     $$("[data-automation-value-preset]").forEach(button=>button.onclick=()=>setAutomationValueColor(button.dataset.automationValuePreset));
     $$("[data-automation-value-color]").forEach(input=>{input.onchange=()=>setAutomationValueColor(input.value)});
+    $$("[data-automation-enum-value]").forEach(button=>button.onclick=()=>setAutomationEnumValue(button.dataset.automationEnumValue));
     $$("[data-automation-target]").forEach(button=>button.onclick=()=>chooseAutomationTarget(button.dataset.automationTarget));
     $$("[data-automation-map]").forEach(button=>button.onclick=()=>chooseAutomationMap(button.dataset.automationMap));
     $$("[data-automation-edit-target]").forEach(button=>button.onclick=()=>editAutomationTarget(Number(button.dataset.automationEditTarget)));
@@ -3483,9 +3616,28 @@
   function stepAutomationValue(direction){
     const wizard=state.automationWizard;
     const control=automationValueDraftControl(wizard);
-    if(!control||control.kind==="color")return;
-    const percent=automationValuePercent(control,wizard.draftValue)+Number(direction)*automationValuePercentStep;
-    wizard.draftValue=automationValueRaw(control,percent);
+    if(!control||control.kind==="color"||isAutomationEnumControl(control))return;
+    if(control.kind==="level"||control.kind==="temperature"){
+      const percent=automationValuePercent(control,wizard.draftValue)+Number(direction)*automationValuePercentStep;
+      wizard.draftValue=automationValueRaw(control,percent);
+    }else{
+      const current=Number(wizard.draftValue);
+      const range=automationValueRange(control);
+      const span=Math.abs(range.max-range.min);
+      const step=Number(control.step)>0?Number(control.step):(span>0?Math.max(span/10,1):1);
+      const next=(Number.isFinite(current)?current:range.min)+Number(direction)*step;
+      wizard.draftValue=Math.min(range.max,Math.max(range.min,Math.round(next*1000)/1000));
+    }
+    automationRedraw();
+  }
+  function setAutomationEnumValue(encoded){
+    const wizard=state.automationWizard;
+    const control=automationValueDraftControl(wizard);
+    if(!control||!isAutomationEnumControl(control))return;
+    let value;
+    try{value=JSON.parse(decodeURIComponent(String(encoded||"")))}catch{return}
+    if(!automationControlValues(control).some(option=>String(option)===String(value)))return;
+    wizard.draftValue=value;
     automationRedraw();
   }
   function setAutomationValueColor(hex){

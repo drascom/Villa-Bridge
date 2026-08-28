@@ -288,7 +288,9 @@ export function deviceControls(
   const add = (control: DeviceControlView): void => {
     if (added.has(control.property)) return;
     added.add(control.property);
-    controls.push(control);
+    const colorWritable = control.kind === "color"
+      && descriptors.some((feature) => ["color", "color_xy", "color_hs"].includes(feature.property));
+    controls.push({ ...control, writable: writable.has(control.property) || colorWritable });
   };
   const descriptorKind = (feature: WritableFeature | undefined): string =>
     `${feature?.parentType ?? ""} ${feature?.parentName ?? ""}`.toLowerCase();
