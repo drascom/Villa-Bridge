@@ -37,6 +37,7 @@ async function main() {
   const ink = await assertPanelInk(projectRoot);
   console.log(
     `Yuzey murekkep denetimi tamam: koyu ${ink.surfaces} yuzey / ${ink.tokens.length} token, ` +
+      `acik ${ink.lightSurfaces} yuzey / ${ink.lightTokens.length} token, ` +
       `dolu aksan ${ink.accentSurfaces} yuzey.`
   );
 

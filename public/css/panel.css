@@ -2752,6 +2752,11 @@
       --on-dark-tile:rgba(42,50,61,.6);--on-dark-edge:rgba(255,255,255,.26);
       --on-dark-accent:#a4e6c9;--on-dark-accent-soft:rgba(122,206,166,.2);--on-dark-accent-ink:#0b1c15;
       --on-dark-danger:#f5978f;--on-dark-danger-soft:rgba(198,88,78,.26);
+      --on-light-ink:#17211d;--on-light-ink-soft:rgba(23,33,29,.66);
+      --on-light-line:rgba(23,33,29,.16);--on-light-inset:rgba(23,33,29,.07);
+      --on-light-tile:rgba(255,255,255,.62);--on-light-edge:rgba(255,255,255,.9);
+      --on-light-accent:#12503b;--on-light-accent-soft:rgba(24,77,59,.1);--on-light-accent-ink:#edf0f2;
+      --on-light-danger:#9d2f2a;--on-light-danger-soft:rgba(157,47,42,.12);
     }
     /* ————— KOYU KALAN YÜZEYLER — TEK KURAL, TEK LİSTE —————
        KÖK SEBEP (iki kez aynı yerden çıktı, üçüncüsü olmasın diye tek kurala indirildi):
@@ -2774,10 +2779,6 @@
        Denetimi `scripts/check-panel-ink.mjs` yapıyor: listedeki her ad `--on-dark-*` okumak
        zorunda, blok içinde çıplak renk yasak.
        KAPSAM — yalnız yüzeyi KENDİ KARARIYLA koyu kalanlar:
-       · menü levhası SADECE `data-sky="live"` içinde listede. Sabit kipte levha `--glass-tile`
-         taşıyor, yani Light'ta AÇIK (ölçüm 15,67:1) — orada koyu mürekkep zaten doğrusu;
-         Dark'ta da köprünün kendi mürekkebi doğru (11,69:1). Listeye alsaydık Light'ı kırardık
-         (1,04:1 olurdu) — ölçüldü, o yüzden kip kancası seçicide duruyor.
        · `.quick-modal` her kipte listede: kendi `--quick-*` ailesi zaten sabit koyu, sızan
          yalnız panelin genel adlarıydı. Alarm saati seçicisi de aynı sınıfı taşıdığı için
          (`.modal.quick-modal.time-picker-card`) ayrı seçici gerekmiyor.
@@ -3637,16 +3638,24 @@
       --menu-accent-ink:var(--on-forest);
     }
     /* Canlı gökyüzünde menü bilerek açık ve büyük ölçüde opaktır: sayfa karartması menünün
-       rengini yeniden koyulaştıramaz. Metin yine gökyüzüyle hesaplanan koyu mürekkeptir. */
+       rengini yeniden koyulaştıramaz. */
     :root[data-theme-package][data-sky="live"] dialog#appMenuDialog>.app-menu-modal{
       --menu-surface:rgba(246,249,250,.96);
       --menu-brd:rgba(255,255,255,.88);
-      --menu-ink:var(--theme-ink);
-      --menu-sub:var(--theme-ink-soft);
-      --menu-line:var(--theme-ink-line);
-      --menu-inset:var(--theme-ink-inset);
-      --menu-accent:var(--theme-accent);
-      --menu-accent-soft:var(--theme-accent-soft);
+    }
+    /* ————— AÇIK KALAN YÜZEYLER — TEK KURAL, TEK LİSTE —————
+       Canlı kipte menü yüzeyi saatten bağımsız olarak AÇIK kalır. Mürekkep ve aksan da o anki
+       solar fazdan değil, tema paketinin açık paletinden gelir. Böylece akşam/gece beyaz solar
+       mürekkep açık levhaya taşınmaz. */
+    :root[data-theme-package][data-sky="live"] dialog#appMenuDialog>.app-menu-modal{
+      --menu-ink:var(--on-light-ink);
+      --menu-sub:var(--on-light-ink-soft);
+      --menu-line:var(--on-light-line);
+      --menu-inset:var(--on-light-inset);
+      --menu-accent:var(--on-light-accent);
+      --menu-accent-soft:var(--on-light-accent-soft);
+      --menu-accent-ink:var(--on-light-accent-ink);
+      --menu-danger:var(--on-light-danger);
     }
     @media(min-width:621px){
       dialog#appMenuDialog{

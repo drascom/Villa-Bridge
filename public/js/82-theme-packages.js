@@ -146,9 +146,9 @@
         [[{colors:{sky:palette.colors.skyTop}},.5],[{colors:{sky:palette.colors.skyBottom}},.5]],"sky")));
     });
   }
-  /* ————— KOYU KALAN YÜZEYİN MÜREKKEBİ — TEK KAYNAK —————
-     Panelde birkaç yüzey gökyüzüne UYMAZ, bilerek koyu kalır: menü levhası (canlı kipte), hızlı
-     kumanda penceresi ve alarm saati seçicisi. Köprü ise `--glass-ink*`/`--ink`/`--muted`
+  /* ————— SABİT YÜZEYLERİN MÜREKKEBİ — TEK KAYNAK —————
+     Panelde birkaç yüzey gökyüzüne UYMAZ. Hızlı kumanda ve alarm saati koyu; canlı kipteki
+     menü ise açık kalır. Köprü ise `--glass-ink*`/`--ink`/`--muted`
      ailesini paketin O ANKİ faz mürekkebine bağlıyor — gündüz çapasında bu KOYU lacivert
      (`day.ink` #10263a). Koyu yüzey + koyu mürekkep = ölçülen 1,17:1 (şafak) ve 1,41:1 (gündüz),
      yani yazı yok olur. Aynı hata kapalı döşemede (`1ee9117`) TERS yönde çıkmıştı: orada açık
@@ -182,6 +182,26 @@
     const danger=parseThemeColor(source.colors.stateAlert||source.colors.ink);
     root.style.setProperty("--on-dark-danger-soft",themeRgba(danger,.26));
   }
+  /* Canlı gökyüzündeki menü günün her saatinde AÇIK bir levhadır. Bu nedenle mürekkebi o anki
+     solar fazdan değil, paketin açık paletinden gelir. Aksi hâlde akşam/gece fazının beyaz
+     `ink` değeri açık levhanın üstüne düşer. Kullanıcı renk geçersiz kılmaları burada da
+     korunur; sabit renk uydurulmaz. */
+  const lightSurfaceTokenCss={ink:"--on-light-ink",inkSoft:"--on-light-ink-soft",page:"--on-light-accent-ink",
+    accent:"--on-light-accent",accentSoft:"--on-light-accent-soft",glassEdge:"--on-light-edge",
+    glassTile:"--on-light-tile",stateAlert:"--on-light-danger"};
+  function applyLightSurfaceInk(theme){
+    const source=mergeThemePalette(theme.palettes.light,themeOverride(theme.id,"light"));
+    if(!source?.colors)return;
+    const root=document.documentElement;
+    Object.entries(lightSurfaceTokenCss).forEach(([token,css])=>{
+      if(typeof source.colors[token]==="string")root.style.setProperty(css,source.colors[token]);
+    });
+    const ink=parseThemeColor(source.colors.ink);
+    root.style.setProperty("--on-light-line",themeRgba(ink,.16));
+    root.style.setProperty("--on-light-inset",themeRgba(ink,.07));
+    const danger=parseThemeColor(source.colors.stateAlert||source.colors.ink);
+    root.style.setProperty("--on-light-danger-soft",themeRgba(danger,.12));
+  }
   function applyThemePackage(mode=state.themeMode){
     const theme=activeThemePackage();
     if(!theme)return;
@@ -189,6 +209,7 @@
     /* Çapalar gibi SABİTTİR (pakete ve kipe bağlı, saate değil), o yüzden dakikalık döngüde
        değil yalnız paket/kip değişiminde yazılır. */
     applyDarkSurfaceInk(theme,mode);
+    applyLightSurfaceInk(theme);
     if(mode==="sun"){
       if(typeof applySolarThemePaint==="function")applySolarThemePaint();
       return;

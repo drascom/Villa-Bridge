@@ -4,21 +4,24 @@
  * Panelde ayni hata uc kez cikti ve her seferinde ayni cumleydi: bir kural murekkebi yeniden
  * baglarken YUZEYIN YONUNU hesaba katmiyordu. Iki yonu var, ikisi de tek bir kurala indirildi:
  *
- *   1) "yuzey KOYU kaliyorsa murekkep `--on-dark-*` kumesinden gelir" (menu levhasi canli
- *      kipte, hizli kumanda penceresi). Kopru (`:root[data-theme-package]`) `--ink`/`--muted`/
+ *   1) "yuzey KOYU kaliyorsa murekkep `--on-dark-*` kumesinden gelir" (hizli kumanda ve alarm
+ *      saati penceresi). Kopru (`:root[data-theme-package]`) `--ink`/`--muted`/
  *      `--glass-ink*` ailesini paketin O ANKI faz murekkebine bagliyor; yuzeyi gokyuzuyle
  *      DONMEYEN oglelerde bu koyu ustune koyu demek.
- *   2) "yuzey DOLU AKSAN ise murekkep yuzeyin KENDI murekkebidir" (`currentColor`) — secili
+ *   2) "yuzey ACIK kaliyorsa murekkep `--on-light-*` kumesinden gelir" (canli kipteki menu).
+ *      Aksam/gece fazinin beyaz solar murekkebi acik menu levhasina sizamaz.
+ *   3) "yuzey DOLU AKSAN ise murekkep yuzeyin KENDI murekkebidir" (`currentColor`) — secili
  *      menu satiri, secili tema/dil cipi. Simetrigi: acik zeminin ustune levhanin acik
  *      murekkebi dusuyordu; baslik zeminle birebir ayni renkti (1,00:1).
  *
  * Bu denetim iki iliskiyi de ayakta tutar:
  *   1) panel.css icindeki KOYU YUZEY blogundaki her bildirim `var(--on-dark-*)` okumali —
  *      bloga ciplak renk (hex/rgb) ya da baska bir token sizarsa hata,
- *   2) DOLU AKSAN blogundaki her bildirim `currentColor` olmali — o bloga bir RENK (kume adi
+ *   2) ACIK YUZEY blogundaki her bildirim `var(--on-light-*)` okumali,
+ *   3) DOLU AKSAN blogundaki her bildirim `currentColor` olmali — o bloga bir RENK (kume adi
  *      dahil) girerse kural "yuzeyin kendi murekkebi" olmaktan cikar,
- *   3) iki kural da koke degil YUZEY listesine uygulanmali (koke uygulanirsa tum panel doner),
- *   4) koyu blogun okudugu her `--on-dark-*` adi gercekten uretilmeli ve iki kaynak
+ *   4) uc kural da koke degil YUZEY listesine uygulanmali (koke uygulanirsa tum panel doner),
+ *   5) sabit yuzey bloglarinin okudugu her token gercekten uretilmeli ve iki kaynak
  *      (panel.css'teki ilk kare yedegi ile `public/js/82-theme-packages.js`) ayni kumeyi
  *      tanimlamali.
  */
@@ -27,6 +30,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DARK_RULE_MARKER = "KOYU KALAN YÜZEYLER — TEK KURAL, TEK LİSTE";
+const LIGHT_RULE_MARKER = "AÇIK KALAN YÜZEYLER — TEK KURAL, TEK LİSTE";
 const ACCENT_RULE_MARKER = "DOLU AKSAN ZEMİNLİ YÜZEYLER — TEK KURAL, TEK LİSTE";
 const FALLBACK_MARKER = "İLK KARE YEDEĞİ.";
 
@@ -108,7 +112,7 @@ export async function assertPanelInk(projectRoot) {
   const accentSelectors = surfaceSelectors(accentRule, "Dolu aksan kurali");
   if (accentSelectors.length === 0) throw new Error("Dolu aksan kurali bos: hicbir yuzey listelenmemis.");
 
-  const declared = new Set(declarations(fallback.body).map((entry) => entry.name));
+  const declared = new Set(declarations(fallback.body).map((entry) => entry.name).filter((name) => name.startsWith("--on-dark-")));
   const written = new Set();
   for (const match of js.matchAll(/"(--on-dark-[a-z-]+)"/g)) written.add(match[1]);
 
@@ -124,7 +128,47 @@ export async function assertPanelInk(projectRoot) {
         `yalniz CSS yedeginde: ${missingInJs.join(", ") || "-"} | yalniz JS'te: ${missingInCss.join(", ") || "-"}`
     );
   }
-  return { tokens: [...declared].sort(), surfaces: selectors.length, accentSurfaces: accentSelectors.length };
+
+  // Açık kalan yüzeylerin simetrik denetimi. Solar faz mürekkebi bu yüzeylere sızmamalı.
+  const lightRule = blockAfter(css, LIGHT_RULE_MARKER, "acik yuzey kurali");
+  const lightUsed = new Set();
+  const lightBad = [];
+  for (const { name, value } of declarations(lightRule.body)) {
+    const match = value.match(/^var\((--on-light-[a-z-]+)\)$/);
+    if (!match) lightBad.push(`${name}: ${value}`);
+    else lightUsed.add(match[1]);
+  }
+  if (lightBad.length > 0) {
+    throw new Error(
+      `Acik yuzey kuralindaki her deger var(--on-light-*) olmali; su bildirimler degil -> ${lightBad.join(" | ")}`
+    );
+  }
+  if (lightUsed.size === 0) throw new Error("Acik yuzey kurali bos: hicbir --on-light-* okunmuyor.");
+  const lightSelectors = surfaceSelectors(lightRule, "Acik yuzey kurali");
+  const lightDeclared = new Set(
+    declarations(fallback.body).map((entry) => entry.name).filter((name) => name.startsWith("--on-light-"))
+  );
+  const lightWritten = new Set();
+  for (const match of js.matchAll(/"(--on-light-[a-z-]+)"/g)) lightWritten.add(match[1]);
+  const lightMissingInJs = [...lightDeclared].filter((name) => !lightWritten.has(name));
+  const lightMissingInCss = [...lightWritten].filter((name) => !lightDeclared.has(name));
+  const lightOrphan = [...lightUsed].filter((name) => !lightDeclared.has(name) && !lightWritten.has(name));
+  if (lightOrphan.length > 0) {
+    throw new Error(`Acik yuzey kuralinin okudugu token hicbir yerde uretilmiyor: ${lightOrphan.join(", ")}`);
+  }
+  if (lightMissingInJs.length > 0 || lightMissingInCss.length > 0) {
+    throw new Error(
+      "Acik yuzey kumesi iki kaynakta ayni degil -> " +
+        `yalniz CSS yedeginde: ${lightMissingInJs.join(", ") || "-"} | yalniz JS'te: ${lightMissingInCss.join(", ") || "-"}`
+    );
+  }
+  return {
+    tokens: [...declared].sort(),
+    surfaces: selectors.length,
+    lightTokens: [...lightDeclared].sort(),
+    lightSurfaces: lightSelectors.length,
+    accentSurfaces: accentSelectors.length
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -133,6 +177,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     .then((result) =>
       console.log(
         `Yuzey murekkep denetimi tamam: koyu ${result.surfaces} yuzey / ${result.tokens.length} token, ` +
+          `acik ${result.lightSurfaces} yuzey / ${result.lightTokens.length} token, ` +
           `dolu aksan ${result.accentSurfaces} yuzey.`
       )
     )
