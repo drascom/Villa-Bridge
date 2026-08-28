@@ -2856,7 +2856,9 @@
     }).join("");
   }
   const automationCausalCard=(kind,title,icon,body,current,reveal=false)=>`<section class="automation-causal-card is-${kind}${current?" is-current":" is-complete"}${reveal&&automationAnimate?" automation-card-reveal":""}"><header class="automation-causal-card-head"><span class="automation-causal-card-icon" aria-hidden="true">${icon}</span><div><span class="automation-causal-step">${kind==="trigger"?"1":"2"}</span><h3>${esc(title)}</h3></div>${!current?'<span class="automation-causal-check" aria-hidden="true">✓</span>':""}</header><div class="automation-causal-card-body">${body}</div></section>`;
-  const automationInlineWaitHtml=wizard=>`<section class="automation-card-step automation-inline-wait"><div class="automation-question-heading"><span class="automation-question-icon" aria-hidden="true">⏳</span><p>${esc(t("automationBlockWait"))}</p></div><div class="automation-question-body">${automationWaitHtml(wizard)}</div></section>`;
+  const automationInlineWaitHtml=wizard=>!automationWaitOpen(wizard)
+    ?`<section class="automation-card-step automation-inline-wait"><button class="automation-inline-wait-open" type="button" data-automation-wait="1" aria-expanded="false"><span class="automation-inline-wait-label"><span class="automation-question-icon" aria-hidden="true">⏳</span><strong>${esc(t("automationBlockWait"))}</strong></span><span class="automation-inline-wait-add"><span>${esc(t("add"))}</span><span class="automation-plus" aria-hidden="true">+</span></span></button></section>`
+    :`<section class="automation-card-step automation-inline-wait"><div class="automation-question-heading"><span class="automation-question-icon" aria-hidden="true">⏳</span><p>${esc(t("automationBlockWait"))}</p></div><div class="automation-question-body">${automationWaitHtml(wizard)}</div></section>`;
   function automationFlowHtml(wizard){
     const stageGroup=automationStageGroup(wizard.stage);
     const triggerCurrent=stageGroup==="when"||stageGroup==="cond";

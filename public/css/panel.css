@@ -4023,6 +4023,11 @@
     .automation-question-body{min-width:0}
     .automation-inline-wait{padding-bottom:12px;border-bottom:1px solid var(--line)}
     .automation-inline-wait .automation-question-heading{margin-bottom:8px}
+    .automation-inline-wait-open{width:100%;min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0;border:0;color:var(--ink);background:transparent;text-align:left}
+    .automation-inline-wait-label,.automation-inline-wait-add{display:flex;align-items:center;gap:9px}
+    .automation-inline-wait-label strong{font-size:clamp(13px,1.15vw,15px);font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+    .automation-inline-wait-add{color:var(--forest);font-size:13px;font-weight:800}
+    .automation-inline-wait-open:hover .automation-inline-wait-add,.automation-inline-wait-open:focus-visible .automation-inline-wait-add{color:var(--ink)}
     /* O anda mümkün olan seçimler dokunma kartlarıdır; gelecekteki adımlar için boş yer ayrılmaz. */
     .automation-causal-card .automation-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
     .automation-causal-card .automation-opt{min-height:66px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink)}
