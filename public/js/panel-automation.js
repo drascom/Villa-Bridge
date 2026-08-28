@@ -2856,6 +2856,7 @@
     }).join("");
   }
   const automationCausalCard=(kind,title,icon,body,current,reveal=false)=>`<section class="automation-causal-card is-${kind}${current?" is-current":" is-complete"}${reveal&&automationAnimate?" automation-card-reveal":""}"><header class="automation-causal-card-head"><span class="automation-causal-card-icon" aria-hidden="true">${icon}</span><div><span class="automation-causal-step">${kind==="trigger"?"1":"2"}</span><h3>${esc(title)}</h3></div>${!current?'<span class="automation-causal-check" aria-hidden="true">✓</span>':""}</header><div class="automation-causal-card-body">${body}</div></section>`;
+  const automationInlineWaitHtml=wizard=>`<section class="automation-card-step automation-inline-wait"><div class="automation-question-heading"><span class="automation-question-icon" aria-hidden="true">⏳</span><p>${esc(t("automationBlockWait"))}</p></div><div class="automation-question-body">${automationWaitHtml(wizard)}</div></section>`;
   function automationFlowHtml(wizard){
     const stageGroup=automationStageGroup(wizard.stage);
     const triggerCurrent=stageGroup==="when"||stageGroup==="cond";
@@ -2888,6 +2889,9 @@
     const afterNodes=[];automationAfterNodes(wizard,afterNodes);
     let actionBody=automationTargetGroupsHtml(wizard);
     if(wizard.stage==="wait")actionBody+=automationActiveStepHtml(waitNodes,"⏳",t("automationBlockWait"));
+    // Yeni kuralda bekleme ve hedef seçimi aynı sağ kartta görünür. Bekleme isteğe bağlıdır;
+    // hedefe dokunmak doğrudan cihaz eylemine geçirir.
+    else if(wizard.stage==="target"&&!wizard.targets.length)actionBody+=automationInlineWaitHtml(wizard);
     else if(automationWaitSeconds(wizard)>0)actionBody+=`<div class="automation-global-wait">${automationSummaryHtml(
       esc(automationWaitLineText(wizard)),'data-automation-stage="wait"'
     )}</div>`;
@@ -3125,8 +3129,9 @@
     &&(!automationAutoOffAvailable(wizard)||Boolean(wizard.autoOffTouched));
   // Hedefler dolduktan sonra sıra "sonrası"nda: kural bir şey açmıyorsa kapanma hiç sorulmaz.
   const automationAfterTargets=wizard=>automationAutoOffAvailable(wizard)&&!wizard.autoOffTouched?"autoOff":"name";
-  // Tetikleyici tamamlanınca sıradaki soru beklemedir: "tetiklendi → bekle → yap" bu sırayla sorulur.
-  const automationAfterTrigger=wizard=>wizard.targets.length?automationAfterTargets(wizard):"wait";
+  // Tetikleyici tamamlanınca hedef kartı doğrudan açılır. İlk hedef seçilirken isteğe bağlı
+  // başlangıç beklemesi aynı kartta görünür; kullanıcı "İleri" ile boş bir ara adım geçmez.
+  const automationAfterTrigger=wizard=>wizard.targets.length?automationAfterTargets(wizard):"target";
   const automationNextStage=wizard=>{
     if(wizard.stage==="kind")return wizard.triggerKind==="manual"?automationAfterTrigger(wizard):wizard.triggerKind==="time"?"time":wizard.triggerKind==="sun"?"sun":"trigDevice";
     if(wizard.stage==="time"||wizard.stage==="sun"||wizard.stage==="trigEvent"||wizard.stage==="trigThreshold")return automationAfterTrigger(wizard);
@@ -3195,8 +3200,8 @@
     if(wizard.stage==="cond"||wizard.stage==="condTime"||wizard.stage==="condDevice")return automationTriggerEditStage(wizard);
     if(wizard.stage==="condState")return"condDevice";
     if(wizard.stage==="wait")return automationTriggerEditStage(wizard);
-    // İlk eylem sorusundan geri, tetikleyiciye değil araya giren bekleme adımına döner.
-    if(wizard.stage==="target")return wizard.targets.length?automationTriggerEditStage(wizard):"wait";
+    // İlk hedef seçiminden geri doğrudan tetikleyiciye döner; bekleme artık hedefle aynı ekrandadır.
+    if(wizard.stage==="target")return automationTriggerEditStage(wizard);
     if(wizard.stage==="action")return"target";
     if(wizard.stage==="delay"||wizard.stage==="group"||wizard.stage==="scene")return"target";
     if(wizard.stage==="groupAction")return"group";
@@ -3213,13 +3218,16 @@
     const wizard=state.automationWizard;
     if(!wizard)return;
     const paths=wizard.stage==="path";
+    // Hedef cihaz satırları dokunulduğunda zaten otomatik ilerler; burada ikinci bir "İleri"
+    // eylemi hem gereksizdir hem de seçimin iki kez onaylanacağı izlenimini verir.
+    const directPick=wizard.stage==="target";
     const ready=automationWizardReady(wizard);
     // Tek birincil eylem: son adımda "Kaydet", öncesinde "İleri". Pasifse nedeni yanında yazar.
     const label=t(wizard.stage==="name"?"save":"next");
     for(const next of automationNextButtons()){
-      next.hidden=paths;
+      next.hidden=paths||directPick;
       next.textContent=label;
-      next.disabled=paths||!automationStageAdvanceable(wizard);
+      next.disabled=paths||directPick||!automationStageAdvanceable(wizard);
     }
     // İlk adımda dönülecek yer yok: düğme diyaloğu kapatır, o yüzden etiketi de "Vazgeç".
     $("#automationBack").textContent=t(paths||wizard.stage==="kind"?"cancel":"back");
@@ -3227,7 +3235,7 @@
     if(!hint)return;
     // Hazır olunca özet cümlesi okunur; değilse neyin eksik olduğu yazar.
     const sentence=!paths&&ready?automationWizardSentence(wizard):"";
-    const reason=paths||ready?"":automationBlockedReason(wizard);
+    const reason=paths||directPick||ready?"":automationBlockedReason(wizard);
     hint.textContent=sentence||(reason?t(reason):"");
     hint.classList.toggle("ready",Boolean(sentence));
     hint.hidden=!hint.textContent;
