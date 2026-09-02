@@ -16,6 +16,11 @@
   // `[data-app-menu]` kancası hepsini birden bağlıyor; ana ekrana dönüş menüdeki Home satırında.)
   $$("[data-view-link]").forEach(button=>button.onclick=()=>activateView(button.dataset.viewLink));
   $b("#homeHealth").onclick=openHomeHealthAttention;
+  $b("#closeHomeAttention").onclick=closeHomeAttentionDialog;
+  $b("#homeAttentionList").onclick=event=>{
+    const button=event.target.closest?.("[data-home-attention-repair]");
+    if(button)repairHomeAttentionDevice(button.dataset.homeAttentionRepair);
+  };
   $b("#closeAppMenu").onclick=closeAppMenu;
   $b("#closeRoomDetail").onclick=closeRoomDetail;
   $b("#roomDetailDialog").addEventListener("close",()=>{state.roomDetail=null});
@@ -209,6 +214,7 @@
   }
   $b("#repairDialog").addEventListener("cancel",event=>event.preventDefault());
   bindBackdropClose("#widgetDialog",".add-modal",closeAddDialog);
+  bindBackdropClose("#homeAttentionDialog",".home-attention-modal",closeHomeAttentionDialog);
   bindBackdropClose("#roomDetailDialog",".room-detail-modal",closeRoomDetail);
   bindBackdropClose("#systemDetailDialog",".system-detail-modal",closeSystemDetail);
   bindBackdropClose("#haSetupDialog",".room-detail-modal",closeHomeAssistantSetup);

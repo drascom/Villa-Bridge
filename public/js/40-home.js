@@ -384,6 +384,7 @@
     renderZigbeeGroups();
     renderHomeSummary();
     renderHomeHealth();
+    if($("#homeAttentionDialog")?.open)renderHomeAttentionDialog();
     /* Genel Bakış açıkken her veri turunda tazelenir; kapalıyken çizim boşa çalışmaz. */
     if(document.body.dataset.activeView==="adminOverview")renderAdminOverview();
     renderAutomations();
@@ -423,16 +424,42 @@
     pill.setAttribute("title",label);
     pill.setAttribute("aria-label",label);
   }
+  const homeAttentionReasonKeys={
+    offline:"adminReasonOffline",
+    critical:"adminReasonCritical",
+    alert:"adminReasonAlert",
+    unsupported:"unsupportedDevice",
+    setupIncomplete:"setupIncomplete",
+    lowBattery:"adminReasonLowBattery"
+  };
+  function renderHomeAttentionDialog(){
+    const list=$("#homeAttentionList");
+    if(!list)return;
+    const attention=genHomeHealthModel(state.devices).attention;
+    list.innerHTML=attention.length?attention.map(item=>{
+      const reasons=item.reasons.map(reason=>homeAttentionReasonKeys[reason]).filter(Boolean).map(key=>t(key)).join(" · ");
+      return`<article class="home-attention-item"><span class="home-attention-device-icon" aria-hidden="true">${deviceIconSvg(item.icon||"sensor")}</span><span class="home-attention-copy"><strong>${esc(item.name)}</strong><small>${esc(reasons)}</small></span><button class="secondary home-attention-repair" type="button" data-home-attention-repair="${esc(item.deviceId)}" aria-label="${esc(`${t("tryRepair")}: ${item.name}`)}">${esc(t("tryRepair"))}</button></article>`;
+    }).join(""):`<p class="home-attention-empty">${esc(t("adminAttentionEmpty"))}</p>`;
+  }
+  function closeHomeAttentionDialog(){
+    const dialog=$("#homeAttentionDialog");
+    if(dialog?.open)dialog.close();
+  }
   function openHomeHealthAttention(){
     const attention=genHomeHealthModel(state.devices).attention;
     if(!attention.length)return;
-    // Tek sorun varsa kullanıcıyı listeye uğratmadan doğrudan ilgili cihaz açılır.
-    if(attention.length===1){showDevice(attention[0].deviceId);return}
-    // Birden çok cihazda mevcut dikkat listesi kullanılır; ikinci bir uyarı paneli üretilmez.
-    setAttentionOpen(true);
-    activateView("devices");
-    const details=$("#deviceAttention");
-    if(details){details.open=true;requestAnimationFrame(()=>details.scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"start"}))}
+    renderHomeAttentionDialog();
+    const dialog=$("#homeAttentionDialog");
+    if(!dialog.open)dialog.showModal();
+  }
+  async function repairHomeAttentionDevice(id){
+    if(!state.devices.some(device=>device.id===id))return;
+    /* Onarım bir yönetici işlemidir. Ev modundaki küçük listeyi yönetici Cihazlar sayfasına
+       taşımak yerine yalnız PIN katmanı için kapatır, işlem bitince güncel listeyi geri açar. */
+    closeHomeAttentionDialog();
+    const elevated=await requestAdminElevation();
+    if(elevated)await reconfigureDevice(id);
+    if(genHomeHealthModel(state.devices).attention.length)openHomeHealthAttention();
   }
   function renderHomeSummary(){
     const container=$("#homeSummary");
