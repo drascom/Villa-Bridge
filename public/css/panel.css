@@ -3033,10 +3033,14 @@
        Yüzey ana ekranın kendi kumanda dilini (`--home-control`/`--home-border`) kullanır, yani
        hem sabit hem hareketli gökyüzünde okunur kalır; paralel bir palet açılmıyor. */
     .home-metrics .home-health{margin-left:clamp(10px,1.4vw,16px)}
-    .home-health{min-height:42px;display:inline-flex;align-items:center;gap:8px;padding:0 14px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:var(--surface);font-size:13px;font-weight:700;white-space:nowrap}
+    .home-health{min-height:42px;display:inline-flex;align-items:center;gap:8px;padding:0 14px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:var(--surface);font:700 13px/1.2 inherit;white-space:nowrap;appearance:none}
     body[data-active-view="home"] .home-health{border-color:var(--home-border);background:var(--home-control);box-shadow:var(--home-float-shadow)}
     .home-health .status-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#48a876;box-shadow:0 0 0 5px rgba(72,168,118,.12)}
     .home-health.alert .status-dot{background:#b83a35;box-shadow:0 0 0 5px rgba(184,58,53,.14)}
+    .home-health:not(:disabled){cursor:pointer;touch-action:manipulation}
+    .home-health.alert:hover{border-color:#b83a35}
+    .home-health:focus-visible{outline:3px solid rgba(184,58,53,.2);outline-offset:2px}
+    .home-health:disabled{cursor:default;opacity:1}
     :root[data-theme="dark"] .home-health .status-dot{background:#5fc191;box-shadow:0 0 0 5px rgba(95,193,145,.16)}
     :root[data-theme="dark"] .home-health.alert .status-dot{background:#e08a84;box-shadow:0 0 0 5px rgba(224,138,132,.18)}
     .home-health-text{min-width:0;overflow:hidden;text-overflow:ellipsis}

@@ -15,6 +15,7 @@
   // (Alt sayfa başlıklarındaki düğme artık ana ekrana atmıyor, menüyü açıyor — yukarıdaki
   // `[data-app-menu]` kancası hepsini birden bağlıyor; ana ekrana dönüş menüdeki Home satırında.)
   $$("[data-view-link]").forEach(button=>button.onclick=()=>activateView(button.dataset.viewLink));
+  $b("#homeHealth").onclick=openHomeHealthAttention;
   $b("#closeAppMenu").onclick=closeAppMenu;
   $b("#closeRoomDetail").onclick=closeRoomDetail;
   $b("#roomDetailDialog").addEventListener("close",()=>{state.roomDetail=null});

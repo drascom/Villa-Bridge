@@ -418,9 +418,21 @@
     const model=genHomeHealthModel(state.devices);
     const label=model.ok?t("homeHealthOk"):t("homeHealthAttention",{count:model.attention.length});
     pill.classList.toggle("alert",!model.ok);
+    pill.disabled=model.ok;
     text.textContent=label;
     pill.setAttribute("title",label);
     pill.setAttribute("aria-label",label);
+  }
+  function openHomeHealthAttention(){
+    const attention=genHomeHealthModel(state.devices).attention;
+    if(!attention.length)return;
+    // Tek sorun varsa kullanıcıyı listeye uğratmadan doğrudan ilgili cihaz açılır.
+    if(attention.length===1){showDevice(attention[0].deviceId);return}
+    // Birden çok cihazda mevcut dikkat listesi kullanılır; ikinci bir uyarı paneli üretilmez.
+    setAttentionOpen(true);
+    activateView("devices");
+    const details=$("#deviceAttention");
+    if(details){details.open=true;requestAnimationFrame(()=>details.scrollIntoView({behavior:reducedMotion()?"auto":"smooth",block:"start"}))}
   }
   function renderHomeSummary(){
     const container=$("#homeSummary");
