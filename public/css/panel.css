@@ -4049,6 +4049,10 @@
     .automation-after-review-head strong{font-size:13px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
     .automation-after-review .automation-question-icon{width:30px;height:30px;border-radius:10px}
     .automation-after-review .automation-summary-main{min-height:46px;padding:3px 0}
+    .automation-next-action{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,.8fr);align-items:center;gap:10px;padding:7px 9px;border:1px dashed var(--forest);border-radius:14px;background:var(--forest-soft)}
+    .automation-next-action>p{display:flex;align-items:center;gap:8px;margin:0;color:var(--ink);font-size:13px;font-weight:850}
+    .automation-next-action>p>span{width:28px;height:28px;flex:none;display:grid;place-items:center;border-radius:9px;color:var(--on-forest);background:var(--forest);font-size:16px}
+    .automation-next-action>.automation-add{min-height:42px;border-color:var(--forest);background:var(--surface)}
     .automation-inline-wait{padding-bottom:12px;border-bottom:1px solid var(--line)}
     .automation-inline-wait .automation-question-heading{margin-bottom:8px}
     .automation-inline-wait-open{width:100%;min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0;border:0;color:var(--ink);background:transparent;text-align:left}
@@ -4101,6 +4105,7 @@
       .automation-head h2{font-size:clamp(24px,2.5vw,34px)}
       .automation-head p{font-size:13px}
     }
+    @media(max-width:520px){.automation-next-action{grid-template-columns:1fr}}
 
     @media(max-width:760px){
       dialog.automation-dialog{inset:0 auto 0 0;width:100vw!important;max-width:100vw!important;height:100dvh;max-height:100dvh;margin:0;border-radius:0}

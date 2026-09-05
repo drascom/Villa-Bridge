@@ -2803,7 +2803,7 @@
     }
   }
   // Kaydetme adımında "Sonrası" kararını saklamayız. Kullanıcı üstteki ilerleme
-  // şeridini bilmek zorunda kalmadan fanın/ışığın açık kalacağını ya da ne zaman
+  // şeridini bilmek zorunda kalmadan açılan hedefin açık kalacağını ya da ne zaman
   // kapanacağını görür ve bu satıra dokunarak kararı doğrudan değiştirebilir.
   const automationAfterReviewHtml=wizard=>{
     if(wizard.stage!=="name"||!automationAutoOffAvailable(wizard)||!wizard.autoOffTouched)return"";
@@ -2813,6 +2813,11 @@
       automationSummaryAction(quiet,"automationAutoOffAddAria","automationAutoOffChangeAria")
     )}</section>`;
   };
+  // Bu çağrı fan/ışık gibi bir cihaz türüne bağlı değildir. Mevcut eylem tamamlandıktan
+  // sonra aynı cihaz, başka cihaz, grup, sahne veya bekleme ekleme yolunu tek yerde açar.
+  const automationNextActionHtml=wizard=>wizard.stage==="name"&&wizard.targets.length<automationMaxTargets(wizard)
+    ?`<section class="automation-next-action"><p><span aria-hidden="true">→</span>${esc(t("automationNextActionTitle"))}</p>${automationAddHtml(t("automationAddTarget"),'data-automation-add-target="1"')}</section>`
+    :"";
   const automationActiveStepHtml=(nodes,icon,fallbackLabel)=>{
     const activeIndex=nodes.findIndex(node=>node.state==="active");
     if(activeIndex<0)return"";
@@ -2929,10 +2934,8 @@
     if(stageGroup==="then"&&wizard.stage!=="wait")actionBody+=automationActiveStepHtml(thenNodes,"⚡",t("automationSectionThen"));
     else if(stageGroup==="after"){
       actionBody+=automationAfterReviewHtml(wizard);
+      actionBody+=automationNextActionHtml(wizard);
       actionBody+=automationActiveStepHtml(afterNodes,"↻",t("automationSectionAfter"));
-    }
-    if(stageGroup==="after"&&wizard.targets.length<automationMaxTargets(wizard)){
-      actionBody+=automationAddHtml(t("automationAddTarget"),'data-automation-add-target="1"');
     }
     const actionCurrent=stageGroup==="then"||stageGroup==="after";
     const actionCard=automationCausalCard("action",t("automationActionCardTitle"),"⚡",actionBody,actionCurrent,wizard.targets.length===0);
