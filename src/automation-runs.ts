@@ -52,7 +52,8 @@ export interface AutomationRunRecord {
   /**
    * Makine tarafından okunabilir sebep kodu; arayüz bunu çevirir.
    * `busy` · `noMatchingAction` · `conditionFalse` · `locationMissing` · `sunUnavailable` ·
-   * `nonNumericValue` · `stopped` · `unsupportedAction`
+   * `nonNumericValue` · `stopped` · `unsupportedAction` · `autoOffCompleted` ·
+   * `autoOffCanceled` · `autoOffFailed`
    */
   reason?: string;
   /** Türkçe açıklama — günlüğü ham okuyan insan için. */

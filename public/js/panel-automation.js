@@ -650,6 +650,10 @@
     ?`<div class="automation-run-fact"><dt>${esc(label)}</dt><dd>${value}</dd></div>`
     :"";
   const automationRunItemHtml=(ok,text,error)=>`<li class="automation-run-item ${ok?"is-ok":"is-failed"}"><span class="automation-run-glyph" aria-hidden="true">${ok?"✓":"✕"}</span><span>${esc(text)}${error?` <span class="automation-run-item-error">${esc(error)}</span>`:""}</span></li>`;
+  const automationRunActionTypeText=type=>{
+    const key=String(type||"")==="autoOff"?"automationRunAction_autoOff":null;
+    return key?t(key):String(type||"");
+  };
   /* Ayrıntı: "otomasyon neden çalışmadı" sorusu karta bakarak yanıtlanır. Kayıt zaten zengin
      (sonuç, sebep kodu, açıklama, tetikleyici, koşullar, eylem eylem sonuç) — burada okunur hale
      gelir. Boş alan hiç basılmaz; kayıt eskiyse ayrıntı kendiliğinden kısalır. */
@@ -662,7 +666,7 @@
     const actions=(Array.isArray(run?.actions)?run.actions:[])
       .map(item=>automationRunItemHtml(
         item?.ok!==false,
-        [String(item?.type||""),automationRunDeviceName(item?.target)].filter(Boolean).join(" · "),
+        [automationRunActionTypeText(item?.type),automationRunDeviceName(item?.target)].filter(Boolean).join(" · "),
         item?.ok===false?String(item?.error||""):""
       ))
       .join("");
@@ -1049,7 +1053,9 @@
     sunUnavailable:"automationReasonSunUnavailable",nonNumericValue:"automationReasonNonNumericValue",
     noPreviousValue:"automationReasonNoPreviousValue",repeatSuppressed:"automationReasonRepeatSuppressed",
     stopped:"automationReasonStopped",unsupportedAction:"automationReasonUnsupportedAction",
-    actionFailed:"automationReasonActionFailed",missing:"automationReasonMissing"
+    actionFailed:"automationReasonActionFailed",missing:"automationReasonMissing",
+    autoOffCompleted:"automationReasonAutoOffCompleted",autoOffCanceled:"automationReasonAutoOffCanceled",
+    autoOffFailed:"automationReasonAutoOffFailed"
   };
   // Bilinmeyen kod ham gösterilir; çeviri tablosunda olan kod çevrilir. Boşluk ya da çökme yok.
   const automationReasonText=code=>{

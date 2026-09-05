@@ -1112,6 +1112,12 @@ export class AutomationEngine {
     this.clearAutoOffTimer(pending);
     this.autoOff.delete(key);
     this.note(`Otomasyon "${pending.automationName}" otomatik kapatması iptal edildi: ${reason}.`);
+    this.record({
+      automationId: pending.automationId,
+      automationName: pending.automationName,
+      outcome: "skipped",
+      reason: "autoOffCanceled"
+    });
     this.persistAutoOff();
   }
 
@@ -1226,10 +1232,25 @@ export class AutomationEngine {
         [pending.property]: this.commandValue(pending.deviceId, pending.property, pending.value)
       });
       this.note(`Otomasyon "${pending.automationName}" hedefi otomatik olarak geri aldı.`);
+      this.record({
+        automationId: pending.automationId,
+        automationName: pending.automationName,
+        outcome: "ok",
+        reason: "autoOffCompleted",
+        actions: [{ type: "autoOff", target: pending.deviceId, ok: true }]
+      });
     } catch (error) {
       this.logger.error(
         `Otomasyon "${pending.automationName}" otomatik kapatması uygulanamadı: ${String(error)}`
       );
+      this.record({
+        automationId: pending.automationId,
+        automationName: pending.automationName,
+        outcome: "failed",
+        reason: "autoOffFailed",
+        detail: String(error),
+        actions: [{ type: "autoOff", target: pending.deviceId, ok: false, error: String(error) }]
+      });
     }
   }
 
