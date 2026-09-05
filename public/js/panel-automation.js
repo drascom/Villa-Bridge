@@ -2794,16 +2794,6 @@
     }
   }
   function automationAfterNodes(wizard,nodes){
-    if(automationAutoOffAvailable(wizard)&&wizard.autoOffTouched&&wizard.stage!=="autoOff"){
-      const quiet=wizard.autoOffMode==="none";
-      nodes.push({
-        state:"done",fresh:wizard.fresh==="autooff",
-        body:automationSummaryHtml(
-          esc(automationAutoOffLineText(wizard)),'data-automation-stage="autoOff"',quiet,null,
-          automationSummaryAction(quiet,"automationAutoOffAddAria","automationAutoOffChangeAria")
-        )
-      });
-    }
     if(wizard.stage==="autoOff"){
       nodes.push({state:"active",label:t("automationAutoOffTitle"),body:automationAutoOffHtml(wizard)});
       return;
@@ -2812,6 +2802,17 @@
       nodes.push({state:"active",label:t("automationNameLabel"),body:automationNameHtml(wizard)});
     }
   }
+  // Kaydetme adımında "Sonrası" kararını saklamayız. Kullanıcı üstteki ilerleme
+  // şeridini bilmek zorunda kalmadan fanın/ışığın açık kalacağını ya da ne zaman
+  // kapanacağını görür ve bu satıra dokunarak kararı doğrudan değiştirebilir.
+  const automationAfterReviewHtml=wizard=>{
+    if(wizard.stage!=="name"||!automationAutoOffAvailable(wizard)||!wizard.autoOffTouched)return"";
+    const quiet=wizard.autoOffMode==="none";
+    return`<section class="automation-after-review${wizard.fresh==="autooff"?" automation-settle":""}"><div class="automation-after-review-head"><span class="automation-question-icon" aria-hidden="true">↻</span><strong>${esc(t("automationProgressAfter"))}</strong></div>${automationSummaryHtml(
+      esc(automationAutoOffLineText(wizard)),'data-automation-stage="autoOff"',quiet,null,
+      automationSummaryAction(quiet,"automationAutoOffAddAria","automationAutoOffChangeAria")
+    )}</section>`;
+  };
   const automationActiveStepHtml=(nodes,icon,fallbackLabel)=>{
     const activeIndex=nodes.findIndex(node=>node.state==="active");
     if(activeIndex<0)return"";
@@ -2926,7 +2927,10 @@
       esc(automationWaitLineText(wizard)),'data-automation-stage="wait"'
     )}</div>`;
     if(stageGroup==="then"&&wizard.stage!=="wait")actionBody+=automationActiveStepHtml(thenNodes,"⚡",t("automationSectionThen"));
-    else if(stageGroup==="after")actionBody+=automationActiveStepHtml(afterNodes,"↻",t("automationSectionAfter"));
+    else if(stageGroup==="after"){
+      actionBody+=automationAfterReviewHtml(wizard);
+      actionBody+=automationActiveStepHtml(afterNodes,"↻",t("automationSectionAfter"));
+    }
     if(stageGroup==="after"&&wizard.targets.length<automationMaxTargets(wizard)){
       actionBody+=automationAddHtml(t("automationAddTarget"),'data-automation-add-target="1"');
     }
