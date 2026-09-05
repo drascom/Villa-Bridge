@@ -1397,6 +1397,34 @@
   const automationStageGroup=stage=>automationCondStages.includes(stage)?"cond"
     :automationThenStages.includes(stage)?"then"
     :automationAfterStages.includes(stage)?"after":"when";
+  /* Dört sabit durak, içerideki teknik alt adımları kullanıcıya yüklemez. Örneğin cihaz ve
+     kanal seçimi ayrı ekranlar olsa da ikisi de “Eylemler” altında kalır. Tamamlanmış durağa
+     dokunmak mevcut özet satırlarıyla aynı şekilde o bölümü yeniden açar. */
+  const automationProgressIndex=wizard=>wizard?.stage==="name"?3
+    :wizard?.stage==="autoOff"?2
+    :automationStageGroup(wizard?.stage)==="then"?1:0;
+  function renderAutomationProgress(wizard,paths){
+    const progress=$("#automationProgress");
+    if(!progress)return;
+    progress.hidden=paths;
+    if(paths){progress.innerHTML="";return}
+    const current=automationProgressIndex(wizard);
+    const steps=[
+      {label:"automationProgressTrigger",stage:automationTriggerEditStage(wizard),available:true},
+      {label:"automationProgressActions",stage:"target",available:automationTriggerReady(wizard)},
+      {label:"automationProgressAfter",stage:"autoOff",available:automationAutoOffAvailable(wizard)},
+      {label:"automationProgressSave",stage:"name",available:automationWizardReady(wizard)}
+    ];
+    progress.innerHTML=steps.map((step,index)=>{
+      const active=index===current;
+      const skipped=index===2&&!step.available&&current>index;
+      const done=index<current&&!skipped;
+      const reachable=step.available&&index<=current;
+      const classes=`automation-progress-step${active?" is-current":""}${done?" is-done":""}${skipped?" is-skipped":""}`;
+      const mark=done?"✓":skipped?"–":String(index+1);
+      return`<button class="${classes}" type="button" data-automation-stage="${step.stage}"${reachable?"":" disabled"}${active?' aria-current="step"':""}><span class="automation-progress-mark" aria-hidden="true">${mark}</span><span>${esc(t(step.label))}</span></button>`;
+    }).join("");
+  }
   // Kayıtlı eylemi sihirbaz satırına çevirir; hiçbir tür sessizce düşmez, hepsi düzenlenebilir.
   const automationActionToTarget=action=>{
     if(action?.type==="delay")return{kind:"delay",seconds:action.seconds};
@@ -3220,24 +3248,35 @@
     const wizard=state.automationWizard;
     if(!wizard)return;
     const paths=wizard.stage==="path";
-    // Hedef cihaz satırları dokunulduğunda zaten otomatik ilerler; burada ikinci bir "İleri"
-    // eylemi hem gereksizdir hem de seçimin iki kez onaylanacağı izlenimini verir.
     const directPick=wizard.stage==="target";
     const ready=automationWizardReady(wizard);
-    // Tek birincil eylem: son adımda "Kaydet", öncesinde "İleri". Pasifse nedeni yanında yazar.
-    const label=t(wizard.stage==="name"?"save":"next");
+    const advanceable=automationStageAdvanceable(wizard);
+    const stageGroup=automationStageGroup(wizard.stage);
+    // Düğme artık yalnız “İleri” demez; nereye gidileceğini ya da hangi seçimin beklendiğini söyler.
+    const nextKey=wizard.stage==="name"?"automationSaveRule"
+      :wizard.stage==="target"?"automationPickDeviceContinue"
+      :(wizard.stage==="action"||wizard.stage==="groupAction")&&!advanceable?"automationPickActionContinue"
+      :wizard.stage==="autoOff"?"automationNextSave"
+      :stageGroup==="then"?"automationCompleteSelection"
+      :["time","sun","trigEvent","trigThreshold","condTime","condState","wait"].includes(wizard.stage)?"automationNextActions"
+      :"automationContinue";
     for(const next of automationNextButtons()){
-      next.hidden=paths||directPick;
-      next.textContent=label;
-      next.disabled=paths||directPick||!automationStageAdvanceable(wizard);
+      next.hidden=paths;
+      next.textContent=t(nextKey);
+      next.disabled=paths||directPick||!advanceable;
     }
-    // İlk adımda dönülecek yer yok: düğme diyaloğu kapatır, o yüzden etiketi de "Vazgeç".
-    $("#automationBack").textContent=t(paths||wizard.stage==="kind"?"cancel":"back");
+    // Geri düğmesi de hedefini söyler; alt adımlar kullanıcıya ayrı bölüm gibi gösterilmez.
+    const backStage=automationBackStage(wizard);
+    const backGroup=automationStageGroup(backStage);
+    const backKey=paths||wizard.stage==="kind"?"cancel"
+      :backStage==="autoOff"?"automationBackAfter"
+      :backGroup==="then"?"automationBackActions":"automationBackTrigger";
+    $("#automationBack").textContent=t(backKey);
     const hint=$("#automationNextHint");
     if(!hint)return;
     // Hazır olunca özet cümlesi okunur; değilse neyin eksik olduğu yazar.
     const sentence=!paths&&ready?automationWizardSentence(wizard):"";
-    const reason=paths||directPick||ready?"":automationBlockedReason(wizard);
+    const reason=paths||directPick||ready||((wizard.stage==="action"||wizard.stage==="groupAction")&&!advanceable)?"":automationBlockedReason(wizard);
     hint.textContent=sentence||(reason?t(reason):"");
     hint.classList.toggle("ready",Boolean(sentence));
     hint.hidden=!hint.textContent;
@@ -3256,7 +3295,7 @@
       cond:"automationCondTitle",
       then:wizard.stage==="wait"?"automationWaitTitle"
         :wizard.stage==="map"?"automationMapTitle":mapping?"automationTargetTitle":"automationThenTitle",
-      after:"automationReviewTitle"
+      after:wizard.stage==="autoOff"?"automationAutoOffTitle":"automationReviewTitle"
     };
     const leads={
       when:"automationWhenLead",
@@ -3265,10 +3304,11 @@
         :wizard.stage==="map"
         ?(automationSunBoth(wizard)?"automationMapSunLead":"automationMapLead")
         :mapping?"automationTargetLead":"automationThenLead",
-      after:"automationReviewLead"
+      after:wizard.stage==="autoOff"?"automationAutoOffLead":"automationReviewLead"
     };
     $("#automationTitle").textContent=t(paths?"automationPathTitle":titles[group]);
     $("#automationLead").textContent=t(paths?"automationPathLead":leads[group]);
+    renderAutomationProgress(wizard,paths);
     const body=$("#automationBody");
     body.classList.toggle("is-path",paths);
     body.innerHTML=paths?automationPathHtml():automationFlowHtml(wizard);

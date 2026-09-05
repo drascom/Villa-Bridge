@@ -4006,6 +4006,20 @@
 
     /* OTOMASYON ÇALIŞMA ALANI — kararlar sebep → sonuç kartlarında toplanır. Yeni kart veya
        soru ancak önceki seçim tamamlandığında görünür; tamamlanan kart düzenlenebilir özet olarak kalır. */
+    .automation-head p{display:none}
+    .automation-progress{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+    .automation-progress[hidden]{display:none}
+    .automation-progress-step{min-width:0;min-height:44px;display:grid;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:7px;padding:5px 8px;border:1px solid var(--line);border-radius:12px;color:var(--muted);background:transparent;font:800 11px/1.1 system-ui,sans-serif;text-align:left;touch-action:manipulation}
+    .automation-progress-step>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .automation-progress-mark{width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--surface);font-size:10px;font-weight:900}
+    .automation-progress-step.is-current{border-color:var(--forest);color:var(--forest);background:var(--forest-soft)}
+    .automation-progress-step.is-current .automation-progress-mark{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
+    .automation-progress-step.is-done{color:var(--forest);cursor:pointer}
+    .automation-progress-step.is-done .automation-progress-mark{border-color:var(--forest);color:var(--on-forest);background:var(--forest)}
+    .automation-progress-step.is-skipped{opacity:.58}
+    .automation-progress-step:disabled{cursor:default}
+    .automation-progress-step:not(:disabled):hover,.automation-progress-step:not(:disabled):focus-visible{border-color:var(--forest);background:var(--forest-soft)}
+    .automation-progress-step:focus-visible{outline:3px solid var(--forest-soft);outline-offset:2px}
     .automation-body:not(.is-path){overflow:hidden;scrollbar-gutter:auto}
     .automation-causal-workspace{height:100%;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 38px minmax(0,1fr);align-items:stretch;gap:10px}
     .automation-causal-workspace.is-single{grid-template-columns:minmax(0,1fr)}
@@ -4074,7 +4088,8 @@
        yeni bir metin satırı açıp çalışma alanını sıkıştırmaz. */
     .automation-actions{flex-wrap:nowrap;align-items:center;gap:10px;margin-top:12px;padding-top:12px}
     .automation-actions .automation-next-note{flex:1 1 auto;order:0;min-width:0;padding:7px 10px}
-    .automation-actions button{min-width:112px;min-height:48px}
+    .automation-actions button{min-width:112px;min-height:48px;white-space:nowrap}
+    .automation-next::after{content:"→";margin-left:8px;font-weight:900}
 
     @media(min-width:761px){
       dialog.automation-dialog{width:min(86vw,1120px)!important;max-width:min(86vw,1120px)!important}
@@ -4094,6 +4109,9 @@
       .automation-causal-card .automation-opt{min-height:62px}
       .automation-actions{flex-wrap:wrap}
       .automation-actions .automation-next-note{flex-basis:100%;order:-1}
+      .automation-progress{gap:4px}
+      .automation-progress-step{grid-template-columns:20px minmax(0,1fr);gap:4px;padding:4px;font-size:10px}
+      .automation-progress-mark{width:20px;height:20px}
     }
 
     @media(max-width:620px){
