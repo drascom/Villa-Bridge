@@ -227,11 +227,24 @@ export interface DirectSelfHealingSetup {
   now?: () => number;
 }
 
+export interface DirectConnectionRecoveryState {
+  connected: boolean;
+  error: string | null;
+  retryInMs: number | null;
+}
+
+export interface DirectConnectionRecoverySetup {
+  enabled?: boolean;
+  initialDelayMs?: number;
+  maximumDelayMs?: number;
+  onStateChange?: (state: DirectConnectionRecoveryState) => void;
+}
+
 export class DirectZigbeeSource implements ZigbeeSource {
   private controller: Controller | null = null;
   private readonly definitions = new Map<string, Definition>();
   private readonly states = new Map<string, JsonObject>();
-  private readonly abort = new AbortController();
+  private abort = new AbortController();
   private mqtt: MqttClient | null = null;
   private bridgeDevices: BridgeDevice[] = [];
   private bridgeGroups: BridgeGroup[] = [];
@@ -239,6 +252,9 @@ export class DirectZigbeeSource implements ZigbeeSource {
   private pairingState = { permitted: false, time: 0 };
   private statePersistTimer: NodeJS.Timeout | null = null;
   private availabilityTimer: NodeJS.Timeout | null = null;
+  private connectionWatchTimer: NodeJS.Timeout | null = null;
+  private connectionWatchBusy = false;
+  private connectionWatchFailures = 0;
   private readonly deviceAvailability = new Map<string, "online" | "offline">();
   private readonly lastDevicePublications = new Map<string, DeviceStatePublication>();
   private readonly otaUpdates = new Set<string>();
@@ -247,6 +263,11 @@ export class DirectZigbeeSource implements ZigbeeSource {
   /** Az önce ağdan düşen/kaldırılan cihazlar; kurulum uçları sebebi buradan okur. */
   private readonly departures: DeviceDepartureLog;
   private readonly selfHeal: SelfHealScheduler;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempt = 0;
+  private reconnecting = false;
+  private closingSession = false;
+  private stopped = true;
 
   constructor(
     private readonly config: DirectZigbeeConfig,
@@ -260,7 +281,8 @@ export class DirectZigbeeSource implements ZigbeeSource {
      * Kalıcı ağ üyeliği günlüğü. İsteğe bağlıdır: verilmezse kaynak eskisi gibi yalnız kısa
      * ömürlü bellek kaydını tutar.
      */
-    private readonly networkEvents?: DeviceNetworkEventSink
+    private readonly networkEvents?: DeviceNetworkEventSink,
+    private readonly connectionRecovery: DirectConnectionRecoverySetup = {}
   ) {
     // Bellekteki kayıt ile kalıcı günlük aynı olaydan beslenir; "sildim, sonra düştü"yü
     // bastıran kural tek yerde kalsın diye kalıcı yazma da bu kancadan geçer.
@@ -409,9 +431,26 @@ export class DirectZigbeeSource implements ZigbeeSource {
   }
 
   async start(): Promise<void> {
+    this.stopped = false;
+    try {
+      await this.startSession();
+      this.reconnectAttempt = 0;
+      this.reportConnectionState(true, null, null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.closeSession().catch((closeError) => {
+        console.warn(`Başarısız Zigbee oturumu kapatılamadı: ${String(closeError)}`);
+      });
+      this.scheduleReconnect(message);
+      throw error;
+    }
+  }
+
+  private async startSession(): Promise<void> {
     // Cihaz tanımları çözülmeye başlamadan ÖNCE harici converter'lar kütüphaneye kaydedilmeli;
     // yoksa kütüphanede olmayan cihaz "bilinmeyen" olarak önbelleğe girer.
     await this.loadExternalConverters();
+    this.abort = new AbortController();
     const controller = new Controller({
       network: {
         panID: this.config.network.panId,
@@ -451,6 +490,9 @@ export class DirectZigbeeSource implements ZigbeeSource {
     this.availabilityTimer.unref();
     const parameters = await controller.getNetworkParameters();
     console.log(`SLZB koordinatörü devralındı; Zigbee kanalı ${parameters.channel}.`);
+    this.connectionWatchFailures = 0;
+    this.connectionWatchTimer = setInterval(() => void this.checkConnection(controller), 30_000);
+    this.connectionWatchTimer.unref();
     const initialStateTimer = setTimeout(() => void this.requestInitialActuatorStates(), 1_000);
     initialStateTimer.unref();
   }
@@ -766,7 +808,18 @@ export class DirectZigbeeSource implements ZigbeeSource {
   }
 
   async stop(): Promise<void> {
+    this.stopped = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.selfHeal.setEnabled(false);
+    await this.closeSession();
+    await this.persistStates();
+  }
+
+  private async closeSession(): Promise<void> {
+    this.closingSession = true;
     this.abort.abort();
     const controller = this.controller;
     this.controller = null;
@@ -782,12 +835,98 @@ export class DirectZigbeeSource implements ZigbeeSource {
       clearInterval(this.availabilityTimer);
       this.availabilityTimer = null;
     }
-    await this.persistStates();
+    if (this.connectionWatchTimer) {
+      clearInterval(this.connectionWatchTimer);
+      this.connectionWatchTimer = null;
+    }
     if (mqttClient) {
       mqttClient.publish(`${this.mqttConfig.baseTopic}/bridge/state`, JSON.stringify({ state: "offline" }), { retain: true });
       await new Promise<void>((resolve) => mqttClient.end(false, {}, () => resolve()));
     }
-    if (controller && !controller.isStopping()) await controller.stop();
+    try {
+      if (controller && !controller.isStopping()) await controller.stop();
+    } finally {
+      this.closingSession = false;
+    }
+  }
+
+  private reportConnectionState(
+    connected: boolean,
+    error: string | null,
+    retryInMs: number | null
+  ): void {
+    this.connectionRecovery.onStateChange?.({ connected, error, retryInMs });
+  }
+
+  private scheduleReconnect(error: string): void {
+    if (this.connectionRecovery.enabled === false || this.stopped || this.reconnectTimer) return;
+    if (this.connectionWatchTimer) {
+      clearInterval(this.connectionWatchTimer);
+      this.connectionWatchTimer = null;
+    }
+    const initialDelayMs = Math.max(1_000, this.connectionRecovery.initialDelayMs ?? 10_000);
+    const maximumDelayMs = Math.max(initialDelayMs, this.connectionRecovery.maximumDelayMs ?? 60_000);
+    const delayMs = Math.min(initialDelayMs * (2 ** this.reconnectAttempt), maximumDelayMs);
+    this.reconnectAttempt += 1;
+    this.reportConnectionState(false, error, delayMs);
+    console.warn(
+      `Zigbee koordinatör bağlantısı yok; ${Math.round(delayMs / 1_000)} saniye sonra yeniden denenecek: ${error}`
+    );
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.reconnect();
+    }, delayMs);
+    this.reconnectTimer.unref();
+  }
+
+  private async checkConnection(controller: Controller): Promise<void> {
+    if (
+      this.connectionWatchBusy
+      || this.stopped
+      || this.reconnecting
+      || this.closingSession
+      || controller !== this.controller
+    ) return;
+    this.connectionWatchBusy = true;
+    try {
+      await controller.getNetworkParameters();
+      this.connectionWatchFailures = 0;
+    } catch (error) {
+      this.connectionWatchFailures += 1;
+      if (this.connectionWatchFailures < 2) return;
+      const message = error instanceof Error ? error.message : String(error);
+      this.store.setMqttConnected(false);
+      this.store.ingest("bridge/state", Buffer.from('{"state":"offline"}'));
+      this.publishRetained("bridge/state", { state: "offline" });
+      this.scheduleReconnect(`Koordinatör sağlık kontrolü başarısız: ${message}`);
+    } finally {
+      this.connectionWatchBusy = false;
+    }
+  }
+
+  private async reconnect(): Promise<void> {
+    if (this.stopped || this.reconnecting) return;
+    this.reconnecting = true;
+    try {
+      await this.closeSession();
+      if (this.stopped) return;
+      await this.startSession();
+      if (this.stopped) {
+        await this.closeSession();
+        return;
+      }
+      this.reconnectAttempt = 0;
+      this.reportConnectionState(true, null, null);
+      console.log("Zigbee koordinatör bağlantısı yeniden kuruldu.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.closeSession().catch((closeError) => {
+        console.warn(`Başarısız Zigbee oturumu kapatılamadı: ${String(closeError)}`);
+      });
+      this.scheduleReconnect(message);
+    } finally {
+      this.reconnecting = false;
+    }
   }
 
   private attachEvents(controller: Controller): void {
@@ -797,6 +936,9 @@ export class DirectZigbeeSource implements ZigbeeSource {
       this.publishRetained("bridge/state", { state: "offline" });
       for (const device of controller.getDevicesIterator()) {
         if (device.type !== "Coordinator") this.setAvailability(device.ieeeAddr, "offline");
+      }
+      if (controller === this.controller && !this.closingSession && !this.stopped) {
+        this.scheduleReconnect("Koordinatör bağlantısı kesildi.");
       }
     });
     controller.on("permitJoinChanged", ({ permitted, time }) => {

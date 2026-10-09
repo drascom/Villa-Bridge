@@ -283,6 +283,8 @@ const deviceNetworkEventLog = new DeviceNetworkEventLog(
     }
   }
 );
+type DirectConnectionState = { connected: boolean; error: string | null; retryInMs: number | null };
+let handleDirectConnectionState: (state: DirectConnectionState) => void = () => undefined;
 let source: ZigbeeSource;
 if (config.setupPending) {
   // Kurulum bitmeden koordinatör SAHİPLENİLMEZ. `DirectZigbeeSource` hiç kurulmaz:
@@ -319,7 +321,13 @@ if (config.setupPending) {
         recentErrors.record({ operation: "self-heal", statusCode: 503, message: `${deviceId}: ${message}` });
       }
     },
-    deviceNetworkEventLog
+    deviceNetworkEventLog,
+    {
+      enabled: true,
+      initialDelayMs: 10_000,
+      maximumDelayMs: 60_000,
+      onStateChange: (state) => handleDirectConnectionState(state)
+    }
   );
 } else {
   // Shadow modda koordinatör Zigbee2MQTT'nin; ağ üyeliği olayları için karşılık yok, günlük
@@ -360,6 +368,30 @@ const automationEngine = new AutomationEngine({
   controls: (deviceId) => store.getDevice(deviceId),
   runLog: automationRunLog
 });
+let automationStartPromise: Promise<void> | null = null;
+const ensureAutomationEngineStarted = (): Promise<void> => {
+  if (automationStartPromise) return automationStartPromise;
+  automationEngine.start();
+  automationStartPromise = automationEngine.restoreAutoOff().catch((error) => {
+    const message = `Bekleyen otomasyon kapatmaları geri yüklenemedi: ${String(error)}`;
+    recentErrors.record({ operation: "automation-auto-off", statusCode: 503, message });
+    console.error(message);
+  });
+  return automationStartPromise;
+};
+handleDirectConnectionState = (state): void => {
+  if (state.connected) {
+    applyCoordinatorStatus("ready");
+    coordinatorError = null;
+    void ensureAutomationEngineStarted();
+    return;
+  }
+  applyCoordinatorStatus("coordinator-unavailable");
+  const retry = state.retryInMs === null
+    ? ""
+    : ` Yeniden deneme ${Math.round(state.retryInMs / 1_000)} saniye içinde.`;
+  coordinatorError = `${state.error ?? "Koordinatör bağlantısı yok."}${retry}`;
+};
 const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
 await registerAccessControl(app, authStore, {
   secureCookies: process.env.VILLA_BRIDGE_SECURE_COOKIES === "true",
@@ -2222,9 +2254,8 @@ if (config.setupPending) {
     await source.start();
     applyCoordinatorStatus("ready");
     coordinatorError = null;
-    automationEngine.start();
     // Kaynak ayaktayken: süresi geçmiş kapatmalar hemen uygulanır, kalanlar kaldığı yerden sürer.
-    await automationEngine.restoreAutoOff();
+    await ensureAutomationEngineStarted();
   } catch (error) {
     // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
     applyCoordinatorStatus("coordinator-unavailable");
