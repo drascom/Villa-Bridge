@@ -1,5 +1,8 @@
 "use strict";
 
+// Node.js Mobile ICU'suz: cekirdek yuklenmeden once `Intl` yoksa dar bir yedegi kurulur.
+require("./intl-fallback.cjs").installIntlFallback();
+
 const dgram = require("node:dgram");
 const { timingSafeEqual } = require("node:crypto");
 const fs = require("node:fs");
