@@ -45,12 +45,14 @@ import {
   createVillaBridgeDiscoveryRecord,
   resolveVillaBridgeNodeId,
   resolveVillaBridgeNodeRole,
+  queryLanPeers,
   startLanDiscoveryResponder,
   villaBridgeCoordinatorId,
   villaBridgeDiscoveryPort,
   type VillaBridgeCoordinatorStatus
 } from "./lan-discovery.js";
 import { createPeerProbe, createPeerWatcher, type PeerWatcher } from "./peer-watch.js";
+import { evaluatePeers } from "./failover-policy.js";
 import { MatterbridgeClient } from "./matterbridge-client.js";
 import { registerMcpEndpoint } from "./mcp.js";
 import { MqttShadowSource } from "./mqtt-source.js";
@@ -250,6 +252,20 @@ const discoveryRecord = createVillaBridgeDiscoveryRecord(
     )
   }
 );
+/**
+ * Paylaşılan çalışma zamanı (apps/runtime) failover protokolünü yürütüyorsa bu kancayı kurar:
+ * duyuru kaydı, epoch ve sahiplik kararı ONUN. Çekirdek yalnız koordinatör sonucunu bildirir.
+ * Kanca yoksa (çekirdek doğrudan `node dist/index.js` ile açıldı) çekirdek kendi duyurusunu
+ * yapar ve `source.start()` öncesi LAN'da başka sahip arar (aşağıdaki kapı).
+ */
+interface FailoverHook {
+  record: () => JsonObject;
+  epoch: () => number;
+  status: () => JsonObject;
+  coordinatorStatus: (status: VillaBridgeCoordinatorStatus, error: string | null) => void;
+}
+const failoverHook = (globalThis as typeof globalThis & { __villaBridgeFailover?: FailoverHook })
+  .__villaBridgeFailover ?? null;
 /** Koordinatör oturumunun durumu; `source.start()` sonucuna göre güncellenir. */
 let coordinatorStatus: VillaBridgeCoordinatorStatus = "starting";
 let coordinatorError: string | null = null;
@@ -258,6 +274,10 @@ let peerWatcher: PeerWatcher | null = null;
 const applyCoordinatorStatus = (status: VillaBridgeCoordinatorStatus): void => {
   coordinatorStatus = status;
   applyCoordinatorOwnership(discoveryRecord, status);
+  if (failoverHook) {
+    discoveryRecord.epoch = failoverHook.epoch();
+    failoverHook.coordinatorStatus(status, coordinatorError);
+  }
 };
 const nodeStatus = (): JsonObject => ({
   nodeId,
@@ -267,7 +287,8 @@ const nodeStatus = (): JsonObject => ({
   priority: discoveryRecord.priority,
   coordinatorStatus,
   coordinatorError,
-  peerWatch: (peerWatcher?.status() ?? null) as JsonObject | null
+  peerWatch: (peerWatcher?.status() ?? null) as JsonObject | null,
+  failover: failoverHook ? failoverHook.status() : null
 });
 store.setMode(config.mode);
 /**
@@ -677,7 +698,8 @@ app.get("/api/locales", async (request, reply) => {
 });
 
 app.get("/api/health", async () => ({ ...store.getHealth(), node: nodeStatus() }));
-app.get("/api/discovery", async () => ({ ...discoveryRecord, sentAt: Date.now() }));
+app.get("/api/discovery", async () =>
+  (failoverHook ? failoverHook.record() : { ...discoveryRecord, sentAt: Date.now() }));
 // Ajan bu yoldan hiç geçmez: yalnız `/mcp` üzerinden konuşur. Buraya gelen tek soru "istek
 // yönetici moduna yükseltilmiş mi" — ayar niteliğindeki kanallar yalnız o zaman görünür.
 const visibleDevices = (elevated: boolean) => store.getDevices().map((device) => ({
@@ -2216,7 +2238,8 @@ if (!embeddedRuntime) {
 // Sıra önemli: düğüm koordinatöre bağlanmadan ÖNCE ağda görünür olmalı (§1.5/5).
 await app.listen({ host: config.http.host, port: config.http.port });
 try {
-  discoveryResponder = await startLanDiscoveryResponder(discoveryRecord);
+  // Çalışma zamanı failover'ı yürütüyorsa UDP duyurusu onun: aynı portta iki yanıtlayıcı olmaz.
+  discoveryResponder = failoverHook ? null : await startLanDiscoveryResponder(discoveryRecord);
   if (discoveryResponder) {
     console.log(
       `Villa Bridge LAN keşfi UDP ${villaBridgeDiscoveryPort} portunda hazır (düğüm ${nodeId}).`
@@ -2246,20 +2269,35 @@ if (nodeRole !== "disabled") {
 if (config.setupPending) {
   // Kurulum kipi: koordinatör oturumu hiç denenmez, otomasyon motoru da beklemede kalır.
   // Düğüm ağda "standby" görünür, böylece hiçbir eş bu düğümü sahip sanmaz.
-  applyCoordinatorStatus("coordinator-unavailable");
   coordinatorError = "Kurulum tamamlanmadı: koordinatör adresi girilmedi.";
+  applyCoordinatorStatus("coordinator-unavailable");
   console.log("Kurulum sihirbazı bekleniyor; Zigbee kaynağı bilerek başlatılmadı.");
 } else {
+  // Çalışma zamanı yoksa (doğrudan `node dist/index.js`) talep-et-bekle kapısı: LAN'da aynı
+  // koordinatörün başka bir sahibi varsa BAĞLANILMAZ; 30 sn'de bir yeniden bakılır.
+  // Devir el sıkışması (release + snapshot) yalnız çalışma zamanındadır (apps/runtime).
+  if (!failoverHook && nodeRole !== "disabled") {
+    for (;;) {
+      const peers = await queryLanPeers({ selfNodeId: nodeId, windowMs: 6_000 });
+      const { owner } = evaluatePeers(discoveryRecord, peers);
+      if (!owner) break;
+      coordinatorStatus = "coordinator-unavailable";
+      coordinatorError = `Koordinatör başka düğümde (${owner.nodeId || owner.address}); `
+        + "o bırakmadan bağlanılmıyor.";
+      console.warn(`${coordinatorError} 30 sn sonra yeniden bakılacak.`);
+      await new Promise((resolveWait) => setTimeout(resolveWait, 30_000));
+    }
+  }
   try {
     await source.start();
-    applyCoordinatorStatus("ready");
     coordinatorError = null;
+    applyCoordinatorStatus("ready");
     // Kaynak ayaktayken: süresi geçmiş kapatmalar hemen uygulanır, kalanlar kaldığı yerden sürer.
     await ensureAutomationEngineStarted();
   } catch (error) {
     // Süreç ölmez: HTTP ve duyuru ayakta kalır, durum arayüzde/diagnostikte görünür.
-    applyCoordinatorStatus("coordinator-unavailable");
     coordinatorError = error instanceof Error ? error.message : String(error);
+    applyCoordinatorStatus("coordinator-unavailable");
     recentErrors.record({
       operation: "source.start",
       statusCode: 503,

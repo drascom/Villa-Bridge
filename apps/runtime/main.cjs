@@ -15,6 +15,7 @@ const Aedes = require("aedes");
 const mqtt = require("mqtt");
 const { discoverVillaBridgeServer, resolveVillaBridgeNodeId } = require("./lan-discovery.cjs");
 const { createPeerProbe, startPeerWatcher } = require("./peer-watch.cjs");
+const { startFailoverRuntime } = require("./failover-runtime.cjs");
 const { ensureFirstRunFiles } = require("./first-run.cjs");
 const {
   loadProvisioning,
@@ -32,6 +33,8 @@ const runtime = {
   multicast: { available: false, error: null },
   // Three-channel peer watching (phase 2): observation only, never a take-over.
   peerWatch: null,
+  // Failover (faz 5/6): sahiplik durumu, epoch, replika tazeligi. Kurulu degilse `null`.
+  failover: null,
   lastProbe: null,
   provisioning: { provisioned: false, setupPending: false, reason: "Not checked." },
   firstRun: null,
@@ -119,8 +122,11 @@ function diagnostics(config) {
   const ready = monitorReady || standaloneReady;
   const runtimePlatform = config.platform || "android";
   // `-setup`: panel ayakta ve sihirbaz calisiyor, ama hicbir koordinator sahiplenilmedi.
+  const failoverState = runtime.failover?.state || null;
   const mode = monitorReady
     ? "android-monitor"
+    : failoverState && failoverState !== "owner"
+      ? `${runtimePlatform}-standby`
     : !runtime.provisioning.provisioned
       ? `${runtimePlatform}-unprovisioned`
       : setupPending
@@ -150,6 +156,7 @@ function diagnostics(config) {
     intl: { fallback: intlFallback, ...intlSelfCheck() },
     host: runtime.host,
     peerWatch: runtime.peerWatch,
+    failover: runtime.failover,
     lastProbe: runtime.lastProbe,
     endpoints: {
       dashboard,
@@ -461,6 +468,118 @@ function createHttpServer(config, hooks = {}) {
   });
 }
 
+/**
+ * Bagimsiz yigin: gomulu MQTT -> oz-sinama -> cekirdek (koordinator burada alinir) -> Matter.
+ * Failover devralmasi ve eski yol ayni fonksiyonu kullanir.
+ */
+async function startStandaloneStack(config, provision, stack) {
+  stack.mqttServer = startMqttBroker({
+    ...config,
+    mqttAuthRequired: provision.mqttAuthRequired === true,
+    mqttUsername: provision.mqttUsername,
+    mqttPassword: provision.mqttPassword
+  });
+  const mqttReady = await stack.mqttServer.ready;
+  if (mqttReady.ok) {
+    console.log(`Embedded MQTT self-test passed on ${mqttReady.host}:${mqttReady.port}`);
+  } else {
+    console.error("Embedded MQTT self-test failed:", mqttReady.error);
+  }
+  await probeMulticast();
+
+  if (!provision.provisioned) {
+    runtime.core = { status: "unprovisioned", ready: false, error: provision.reason };
+    runtime.matter = { status: "unprovisioned", ready: false, error: provision.reason };
+    console.warn(`Villa Bridge ${config.platform} runtime is unprovisioned: ${provision.reason}`);
+  } else if (!mqttReady.ok) {
+    runtime.core = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
+    runtime.matter = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
+  } else {
+    runtime.core = { status: "starting", ready: false, error: null };
+    try {
+      stack.coreService = await startVillaBridgeCore(config, provision, { generation: stack.generation });
+      stack.generation += 1;
+      runtime.core = {
+        status: "ready",
+        ready: true,
+        error: null,
+        endpoint: `http://${config.coreHost}:${config.corePort}`
+      };
+      if (provision.setupPending === true) {
+        const host = networkAddresses()[0]?.address || config.coreHost;
+        console.warn(
+          "Villa Bridge kurulum kipinde: hicbir koordinatore baglanilmadi. " +
+          `Kuruluma panelden devam edin: http://${host}:${config.corePort}`
+        );
+      }
+    } catch (error) {
+      runtime.core = { status: "failed", ready: false, error: error.message };
+      console.error("Villa Bridge direct core failed:", error);
+    }
+
+    if (provision.setupPending === true) {
+      // Kurulum bitmeden Matter'a cihaz yayinlanmaz: ortada bir Zigbee agi yok.
+      runtime.matter = {
+        status: "setup",
+        ready: false,
+        error: "Matterbridge waits for the setup wizard to finish."
+      };
+    } else if (!provision.matterEnabled) {
+      runtime.matter = { status: "disabled", ready: true, error: null };
+    } else if (!runtime.core.ready) {
+      runtime.matter = {
+        status: "blocked",
+        ready: false,
+        error: "Matterbridge waits for the Villa Bridge core."
+      };
+    } else {
+      runtime.matter = { status: "starting", ready: false, error: null };
+      try {
+        stack.matterService = await startMatterbridge(config, provision);
+        const updateMatterState = () => {
+          const ready = matterbridgeReady(stack.matterService);
+          const plugin = stack.matterService.plugin;
+          runtime.matter = {
+            status: plugin?.error ? "failed" : ready ? "ready" : "starting",
+            ready,
+            error: plugin?.error ? "Matterbridge Zigbee2MQTT plugin reported an error." : null,
+            plugin: {
+              loaded: plugin?.loaded === true,
+              started: plugin?.started === true,
+              configured: plugin?.configured === true
+            },
+            commissioningPort: stack.matterService.instance?.serverNode ? 5540 : null
+          };
+        };
+        updateMatterState();
+        stack.matterMonitor = setInterval(updateMatterState, 1000);
+        stack.matterMonitor.unref();
+      } catch (error) {
+        runtime.matter = { status: "failed", ready: false, error: error.message };
+        console.error("Matterbridge failed:", error);
+      }
+    }
+  }
+}
+
+/** Yigini ters sirayla kapatir: Matter -> cekirdek (koordinator oturumu kapanir) -> broker. */
+async function stopStandaloneStack(stack) {
+  if (stack.matterMonitor) clearInterval(stack.matterMonitor);
+  stack.matterMonitor = null;
+  await Promise.resolve(stack.matterService?.stop?.())
+    .catch((error) => console.error("Matter shutdown failed:", error));
+  stack.matterService = null;
+  await Promise.resolve(stack.coreService?.stop?.())
+    .catch((error) => console.error("Core shutdown failed:", error));
+  stack.coreService = null;
+  await Promise.resolve(stack.mqttServer?.close?.())
+    .catch((error) => console.error("MQTT shutdown failed:", error));
+  stack.mqttServer = null;
+  runtime.core = { status: "stopped", ready: false, error: null };
+  runtime.matter = { status: "stopped", ready: false, error: null };
+  runtime.mqtt = { listening: false, selfTest: false, error: null };
+}
+
 async function start() {
   const config = parseArguments(process.argv.slice(2));
   fs.mkdirSync(config.dataDir, { recursive: true });
@@ -511,18 +630,35 @@ async function start() {
   });
   httpServer.on("error", (error) => console.error("HTTP server error:", error));
 
-  let mqttServer = null;
-  let coreService = null;
-  let matterService = null;
-  let matterMonitor = null;
+  const stack = { mqttServer: null, coreService: null, matterService: null, matterMonitor: null, generation: 0 };
   let peerWatcher = null;
-  const peer = config.platform === "android"
+  let failover = null;
+  // Kurulmus dugum (koordinator adresi girilmis) failover protokolune katilir: talep et ve
+  // bekle, sahip varsa baglanma. Kurulmamis/kurulum kipindeki dugum hicbir koordinatoru
+  // sahiplenmedigi icin eski yoldan acilir.
+  const failoverCapable = provision.provisioned && provision.setupPending !== true;
+  const peer = !failoverCapable && config.platform === "android"
     ? await discoverVillaBridgeServer({ selfNodeId: resolveVillaBridgeNodeId("android") }).catch((error) => {
       console.warn(`Villa Bridge LAN discovery failed: ${error.message}`);
       return null;
     })
     : null;
-  if (peer) {
+  if (failoverCapable) {
+    failover = await startFailoverRuntime({
+      config,
+      provision,
+      runtime,
+      stack: {
+        start: async () => {
+          await startStandaloneStack(config, provision, stack);
+          return runtime.core.ready
+            ? { ok: true }
+            : { ok: false, error: runtime.core.error || `Core status: ${runtime.core.status}` };
+        },
+        stop: () => stopStandaloneStack(stack)
+      }
+    });
+  } else if (peer) {
     runtime.monitor = {
       status: "ready",
       ready: true,
@@ -569,106 +705,18 @@ async function start() {
       }
     });
   } else {
-    mqttServer = startMqttBroker({
-      ...config,
-      mqttAuthRequired: provision.mqttAuthRequired === true,
-      mqttUsername: provision.mqttUsername,
-      mqttPassword: provision.mqttPassword
-    });
-    const mqttReady = await mqttServer.ready;
-    if (mqttReady.ok) {
-      console.log(`Embedded MQTT self-test passed on ${mqttReady.host}:${mqttReady.port}`);
-    } else {
-      console.error("Embedded MQTT self-test failed:", mqttReady.error);
-    }
-    await probeMulticast();
-
-    if (!provision.provisioned) {
-      runtime.core = { status: "unprovisioned", ready: false, error: provision.reason };
-      runtime.matter = { status: "unprovisioned", ready: false, error: provision.reason };
-      console.warn(`Villa Bridge ${config.platform} runtime is unprovisioned: ${provision.reason}`);
-    } else if (!mqttReady.ok) {
-      runtime.core = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
-      runtime.matter = { status: "blocked", ready: false, error: "Embedded MQTT is unavailable." };
-    } else {
-      runtime.core = { status: "starting", ready: false, error: null };
-      try {
-        coreService = await startVillaBridgeCore(config, provision);
-        runtime.core = {
-          status: "ready",
-          ready: true,
-          error: null,
-          endpoint: `http://${config.coreHost}:${config.corePort}`
-        };
-        if (provision.setupPending === true) {
-          const host = networkAddresses()[0]?.address || config.coreHost;
-          console.warn(
-            "Villa Bridge kurulum kipinde: hicbir koordinatore baglanilmadi. " +
-            `Kuruluma panelden devam edin: http://${host}:${config.corePort}`
-          );
-        }
-      } catch (error) {
-        runtime.core = { status: "failed", ready: false, error: error.message };
-        console.error("Villa Bridge direct core failed:", error);
-      }
-
-      if (provision.setupPending === true) {
-        // Kurulum bitmeden Matter'a cihaz yayinlanmaz: ortada bir Zigbee agi yok.
-        runtime.matter = {
-          status: "setup",
-          ready: false,
-          error: "Matterbridge waits for the setup wizard to finish."
-        };
-      } else if (!provision.matterEnabled) {
-        runtime.matter = { status: "disabled", ready: true, error: null };
-      } else if (!runtime.core.ready) {
-        runtime.matter = {
-          status: "blocked",
-          ready: false,
-          error: "Matterbridge waits for the Villa Bridge core."
-        };
-      } else {
-        runtime.matter = { status: "starting", ready: false, error: null };
-        try {
-          matterService = await startMatterbridge(config, provision);
-          const updateMatterState = () => {
-            const ready = matterbridgeReady(matterService);
-            const plugin = matterService.plugin;
-            runtime.matter = {
-              status: plugin?.error ? "failed" : ready ? "ready" : "starting",
-              ready,
-              error: plugin?.error ? "Matterbridge Zigbee2MQTT plugin reported an error." : null,
-              plugin: {
-                loaded: plugin?.loaded === true,
-                started: plugin?.started === true,
-                configured: plugin?.configured === true
-              },
-              commissioningPort: matterService.instance?.serverNode ? 5540 : null
-            };
-          };
-          updateMatterState();
-          matterMonitor = setInterval(updateMatterState, 1000);
-          matterMonitor.unref();
-        } catch (error) {
-          runtime.matter = { status: "failed", ready: false, error: error.message };
-          console.error("Matterbridge failed:", error);
-        }
-      }
-    }
+    await startStandaloneStack(config, provision, stack);
   }
 
   let shutdownPromise = null;
   const shutdown = async () => {
     if (shutdownPromise) return shutdownPromise;
     shutdownPromise = (async () => {
-      if (matterMonitor) clearInterval(matterMonitor);
       peerWatcher?.stop?.();
-      await Promise.resolve(matterService?.stop?.())
-        .catch((error) => console.error("Matter shutdown failed:", error));
-      await Promise.resolve(coreService?.stop?.())
-        .catch((error) => console.error("Core shutdown failed:", error));
-      await Promise.resolve(mqttServer?.close?.())
-        .catch((error) => console.error("MQTT shutdown failed:", error));
+      // Failover once durur (yigini kendi kilidiyle kapatir), sonra kalan her sey.
+      await Promise.resolve(failover?.stop?.())
+        .catch((error) => console.error("Failover shutdown failed:", error));
+      await stopStandaloneStack(stack);
       await new Promise((resolve) => {
         if (!httpServer.listening) {
           resolve();

@@ -52,12 +52,37 @@
         tone:adminOverviewTone(matterKnown?state.matter?.online===true:null),
         note:state.matter?t("adminServiceFabrics",{count:(state.matter.fabrics||[]).length}):""
       },
+      ...adminOverviewFailoverRows(health),
       {
         key:"adminServiceHomeAssistant",
         tone:adminOverviewTone(settings?settings.homeAssistant?.discoveryEnabled===true:null),
         note:""
       }
     ];
+  }
+
+  /* Failover satırı (tablet-failover-plani.md Faz 5/6). Panel yalnız koordinatörün SAHİBİ
+     düğümde açılır; satır sahipliği (epoch) ve karşı düğümün replika tazeliğini gösterir.
+     Çalışma zamanı failover yürütmüyorsa (`node.failover` yok) satır hiç çizilmez. */
+  function adminOverviewFailoverRows(health){
+    const failover=health&&health.node&&health.node.failover;
+    if(!failover)return[];
+    const parts=[t("adminFailoverEpoch",{state:String(failover.state||"?"),epoch:String(failover.epoch??"?")})];
+    let tone=failover.state==="owner"?"ok":"bad";
+    if(failover.warning){parts.push(String(failover.warning));tone="bad"}
+    for(const peer of Array.isArray(failover.peers)?failover.peers:[]){
+      const replication=peer.replication||null;
+      if(!replication){parts.push(t("adminFailoverPeerUnknown",{node:String(peer.nodeId||"?")}));continue}
+      if(replication.error||replication.halted){
+        tone="bad";
+        parts.push(t("adminFailoverPeerError",{node:String(peer.nodeId||"?"),error:String(replication.error||"halted")}));
+      }else if(replication.replica&&replication.replica.receivedAt){
+        parts.push(t("adminFailoverPeerSynced",{node:String(peer.nodeId||"?"),time:ago(new Date(replication.replica.receivedAt).toISOString()),epoch:String(replication.replica.epoch)}));
+      }else{
+        parts.push(t("adminFailoverPeerNever",{node:String(peer.nodeId||"?")}));
+      }
+    }
+    return[{key:"adminServiceFailover",tone,note:parts.join(" · ")}];
   }
 
   /* Sayı döşemeleri. Hızlı sahne kataloğu artık yalnız `manual:true` kayıtları içerir; yönetici

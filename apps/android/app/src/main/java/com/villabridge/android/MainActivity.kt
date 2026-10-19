@@ -209,6 +209,8 @@ class MainActivity : Activity() {
                     pageLoaded = true
                     startingPanel.visibility = View.GONE
                     webView.visibility = View.VISIBLE
+                    mainHandler.removeCallbacks(dashboardFollower)
+                    mainHandler.postDelayed(dashboardFollower, DASHBOARD_FOLLOW_MS)
                 }
             }
 
@@ -302,6 +304,33 @@ class MainActivity : Activity() {
                 },
                 if (probe.ready) 0 else 750
             )
+        }
+    }
+
+    /**
+     * Panelin adresi sabit degil: calisma zamani sunucuyu izlerken (monitor) panel sunucudadir,
+     * devralinca yerelde, devir sonrasi yine sunucuda. Calisma zamani bu gecisi kendi icinde
+     * yapar; konak yalniz tanilamanin bildirdigi panel adresine uyar.
+     */
+    private val dashboardFollower = Runnable { followDashboard() }
+
+    private fun followDashboard() {
+        if (!pageLoaded || probeExecutor.isShutdown) return
+        probeExecutor.execute {
+            val probe = probeRuntime()
+            mainHandler.post {
+                val target = probe.dashboardUrl
+                if (pageLoaded && probe.ready && target != null) {
+                    val next = Uri.parse(target)
+                    if (next.host != trustedDashboardOrigin.host || next.port != trustedDashboardOrigin.port) {
+                        runtimeMode = probe.mode ?: runtimeMode
+                        trustedDashboardOrigin = next
+                        webView.loadUrl(target)
+                    }
+                }
+                mainHandler.removeCallbacks(dashboardFollower)
+                if (pageLoaded) mainHandler.postDelayed(dashboardFollower, DASHBOARD_FOLLOW_MS)
+            }
         }
     }
 
@@ -591,6 +620,7 @@ class MainActivity : Activity() {
         private const val TAG = "VillaPanel"
         private const val DASHBOARD_URL = "http://127.0.0.1:8091/"
         private const val HEALTH_URL = "http://127.0.0.1:8091/api/health"
+        private const val DASHBOARD_FOLLOW_MS = 10_000L
         private const val DIAGNOSTICS_URL = "http://127.0.0.1:8092/api/android/diagnostics"
         private const val LOCATION_PERMISSION_REQUEST = 2002
     }

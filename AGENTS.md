@@ -59,7 +59,9 @@ name.
 There is no unit-test suite; the `src/*.test.ts` and `apps/runtime/*.test.cjs`
 files were deliberately removed. Verification is `npm test` (a clean `tsc`
 build plus `npm run check`, the panel and runtime module-graph consistency
-gate). Do not add test files back unless asked. Nothing run for verification
+gate). Do not add test files back unless asked. The one requested exception is
+`test/failover.test.mjs` (`npm run failover:test`): pure failover policy, replication and a
+virtual-clock two-node simulation of the ownership handshake. Nothing run for verification
 may toggle physical devices or require a live coordinator.
 
 ## Commit & Pull Request Guidelines

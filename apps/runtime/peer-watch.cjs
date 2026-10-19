@@ -7,7 +7,7 @@
 const dgram = require("node:dgram");
 const http = require("node:http");
 const net = require("node:net");
-const { DISCOVERY_PORT, DISCOVERY_QUERY, parseDiscoveryRecord } = require("./lan-discovery.cjs");
+const { DISCOVERY_PORT, DISCOVERY_QUERY, normalizeDiscoveryRecord } = require("./lan-discovery.cjs");
 
 const THRESHOLDS = {
   beaconIntervalMs: 2000,
@@ -163,7 +163,8 @@ function probeBeacon(address, timeoutMs, discoveryPort = DISCOVERY_PORT) {
     const timer = setTimeout(() => done(null), timeoutMs);
     timer.unref();
     socket.on("error", () => done(null));
-    socket.on("message", (message) => done(parseDiscoveryRecord(message)));
+    // Any role: the server watches the tablet as well as the other way round (failover phase 5).
+    socket.on("message", (message) => done(normalizeDiscoveryRecord(message)));
     socket.bind(0, "0.0.0.0", () => {
       try {
         socket.send(Buffer.from(DISCOVERY_QUERY), discoveryPort, address);
@@ -190,7 +191,7 @@ function probeHttpDiscovery(address, port, timeoutMs) {
         chunks.push(chunk);
       });
       response.on("end", () => {
-        resolve(response.statusCode === 200 && parseDiscoveryRecord(Buffer.concat(chunks)) !== null);
+        resolve(response.statusCode === 200 && normalizeDiscoveryRecord(Buffer.concat(chunks)) !== null);
       });
       response.on("error", () => resolve(false));
     });
@@ -255,7 +256,10 @@ function createPeerProbe(options) {
       nodeId,
       address,
       state,
-      mode
+      mode,
+      // `true` only when this very poll got a fresh record; `state` may otherwise be cached.
+      fresh: Boolean(record),
+      epoch: record && Number.isInteger(record.epoch) ? record.epoch : null
     };
   };
 }

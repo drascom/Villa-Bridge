@@ -194,7 +194,12 @@ async function startVillaBridgeCore(config, provision, dependencies = {}) {
   Object.assign(process.env, buildCoreEnvironment(config, provision));
   globalThis.__villaBridgeReady = false;
   globalThis.__villaBridgeStop = undefined;
-  await importModule(pathToFileURL(entrypoint).href);
+  // Ayni surecte ikinci kez baslatma (failover: birakip yeniden devralma) modul onbellegini
+  // atlatmak icin nesil sorgusu alir; ilk baslatmada URL degismez.
+  const generation = Number.isInteger(dependencies.generation) && dependencies.generation > 0
+    ? `?generation=${dependencies.generation}`
+    : "";
+  await importModule(`${pathToFileURL(entrypoint).href}${generation}`);
   if (globalThis.__villaBridgeReady !== true) {
     throw new Error("Villa Bridge core loaded but did not signal readiness.");
   }

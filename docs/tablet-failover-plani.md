@@ -589,6 +589,58 @@ başlatır. Devralma ve geri çekilme kodu bunu hesaba katmalı. Faz 2'nin
 **Faz 6 — Veri senkronu.** Replika çekme, snapshot devri, `epoch` sıralaması (§6). Bundan önce,
 kesinti sırasında kurulan kuralların kaybolacağı panelde açıkça yazmalı.
 
+**Faz 3 + 5 + 6 — ✅ KODLANDI (2026-10-20, canlıya çıkmadı).** Faz 3 ayrı dry-run olarak
+yapılmadı; el sıkışması doğrudan gerçek devralmayla birlikte yazıldı ve sanal saatli iki düğümlü
+simülasyonla sınandı. Gerçekleşen kapsam:
+
+- **Ön adım — aynı Zigbee yığını:** Android runtime `zigbee-herdsman` 6.2.0 → **10.0.7**,
+  converters 25.50.0 → **26.46.0** (sunucuyla aynı). Node 18.20.4'te tek engel `debounce` 3.x'in
+  ESM olmasıydı (Z-Stack adaptörü `require` edemiyor); npm override ile `debounce` 2.2.0 (CJS,
+  aynı API). ICU'suz `Intl` yedeği artık her IANA dilimini POSIX kural tablosundan
+  (`apps/runtime/tz-rules.cjs`, `scripts/generate-tz-rules.mjs`) yaz saati dahil hesaplıyor.
+  Commit `cc9c7d2`; tablete kuruldu, 22 cihaz DB'den okundu.
+- **Mimari:** failover **paylaşılan çalışma zamanında** (`apps/runtime`), çünkü iki konak da
+  `main.cjs` ile açılıyor (sunucu `--platform=linux`). Saf karar çekirdeği ikiz:
+  `apps/runtime/failover-policy.cjs` ↔ `src/failover-policy.ts` (aynı test tablosu). Durum makinesi
+  `apps/runtime/failover.cjs` (saat/ağ/yığın enjekte), ağ `failover-net.cjs`, dosya işi
+  `failover-sync.cjs`, bağlama `failover-runtime.cjs`.
+- **Durumlar:** `discovering` (≥6 s LAN dinleme) → sahip varsa `monitor` (tablet) /
+  `awaiting-release` (sunucu); yoksa `claiming` (jitter 0-15 s, sunucuda 0 → 5 s pencere →
+  epoch kalıcı +1 → `owner` beacon'ı → 1 s → yeniden bak → yığın). `monitor`'da 90 s üç kanal
+  sessizliği + kendi ağ geçidi erişimi → `claiming`. Yığın başlamazsa `degraded` (60 s → 15 dk
+  üstel). Kapanmayan koordinatör soketi → `halted` + `releasing` duyurusu (karşı taraf asla
+  bağlanmaz).
+- **Düzenli devir:** sunucu açılınca sahip görürse `POST :8094/api/failover/release` ister →
+  tablet `releasing` → yığını durdurur → koordinatör soketinin kapandığını süreç tutamaçlarından
+  doğrular → son snapshot'ı yanıtta döner → `monitor`. Sunucu 6 s beacon'ı dinleyip sahip
+  kalmadığını doğrular, snapshot'ı **bağlanmadan önce** uygular, sonra talep eder. Onay yoksa
+  bağlanmaz, 30 s'de bir yeniden ister; panel portunda bekleme sayfası (`/` 200 + uyarı,
+  `/api/*` 503). Zorla devral yok. Sahip uç kanalda 90 s sessiz kalırsa sunucu da aynı kuralla
+  talep eder (tablet ölürse ev sonsuza dek kapalı kalmasın).
+- **Keşif artık yalnız açılışta değil:** `monitor ↔ owner` geçişi süreç içinde (yığın
+  durdur/başlat, çekirdek yeniden içe aktarımı nesil sorgusuyla). Android WebView panel adresini
+  10 s'de bir tanılamadan izliyor (`MainActivity.followDashboard`).
+- **Replikasyon (Faz 6):** yön daima sahipten bekleyene. Bekleyen 60 s'de bir manifest (özet)
+  sorar, değiştiyse ya da replika 24 saatten eskiyse snapshot'ı `replica/`'ya çeker. Devralmada
+  replika yalnız canlı veriden yeniyse (epoch) kopyalanır; üzerine yazılan dosyalar
+  `failover-backups/`'a (son 3). Kapsam: `failover-policy` `SNAPSHOT_FILES` + external_converters;
+  hariç: provisioning, `*-runtime.json`, `failover-state.json`, `configuration.yaml`,
+  `villa-bridge.yaml`, Matter, olay geçmişleri. Ağ alanları (pan_id, ext_pan_id, network_key,
+  channel, adapter) farklı/bilinmiyorsa senkron **durur**, hiçbir şey yazılmaz.
+- **Kimlik doğrulama (§10.2/1 kapandı):** jeton Zigbee ağ anahtarından HMAC ile türetilir — ağ
+  anahtarı iki düğümde zaten aynı olmak zorunda; yeni sır dağıtılmaz, anahtar ağda ham gitmez.
+- **Görünürlük:** tanılama `/api/ready` → `failover`, çekirdek `node.failover`; panel Genel Bakış'ta
+  "Failover" satırı (durum, epoch, karşı düğümün replika yaşı/hatası); bekleme sayfası.
+- **Testler:** `npm run failover:test` (30 test): kapsam filtresi, ağ alanı uyuşmazlığında durma,
+  epoch fencing/eski snapshot reddi, owner→standby yönü, devir öncesi tablet→sunucu aktarımı,
+  90 s eşiği, onaysız release'de sunucunun hiç bağlanmaması, kapanmayan soket, eşzamanlı açılış,
+  geri çekilme; her senaryoda koordinatöre aynı anda **en fazla bir** bağlantı.
+- **Sınırlar:** seri (USB) koordinatörde soket doğrulaması yapılamaz (OS kilidine güvenilir);
+  snapshot'ta olmayan dosyalar silinmez; sunucu "ayakta ama koordinatörsüz" kalırsa tablet
+  devralmaz (kanallar canlı); `automation-state.json` replikaya girmez. Sunucudaki
+  `/usr/local/sbin/villa-bridge-update` depo dışında: eski sürüme geri dönüş (rollback) bu
+  korumayı taşımaz — bkz. dağıtım sırası notu.
+
 **Faz 7 (opsiyonel) — Cihaz sınıfı katmanı ve Matter.** Koordinatör yetenek tespiti (§4.5) ve
 `fan-out` vetosu; ardından **Matter devri** (§7 koşullu kararı) — taşınabilirlik ölçümü olumluysa
 Matterbridge kimliği snapshot kümesine girer ve tek-yazar kuralına tabi olur, olumsuzsa kullanıcıya

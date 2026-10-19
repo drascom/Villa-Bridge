@@ -257,3 +257,63 @@ export const startLanDiscoveryResponder = async (
     })
   };
 };
+
+export interface LanPeersQueryOptions {
+  windowMs?: number;
+  port?: number;
+  selfNodeId?: string | null;
+}
+
+/**
+ * Pencere boyunca LAN'daki TÜM yabancı kayıtları toplar (yayın sorgusu 2 sn'de bir yinelenir).
+ * Düğüm başına en son kayıt kalır. Talep-et-bekle kapısı bunu kullanır.
+ */
+export const queryLanPeers = (options: LanPeersQueryOptions = {}): Promise<LanDiscoveryPeer[]> => {
+  const windowMs = Math.max(500, options.windowMs ?? 6000);
+  const port = options.port ?? villaBridgeDiscoveryPort;
+  const selfNodeId = options.selfNodeId?.trim() || null;
+  return new Promise<LanDiscoveryPeer[]>((resolve) => {
+    const socket = createSocket({ type: "udp4" });
+    const found = new Map<string, LanDiscoveryPeer>();
+    let finished = false;
+    let repeat: NodeJS.Timeout | null = null;
+    const done = (): void => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (repeat) clearInterval(repeat);
+      try {
+        socket.close();
+      } catch {
+        // Bind tamamlanmadan kapanabilir.
+      }
+      resolve([...found.values()]);
+    };
+    const timer = setTimeout(done, windowMs);
+    timer.unref();
+    socket.on("error", done);
+    socket.on("message", (message, remote) => {
+      const record = parseVillaBridgeDiscoveryRecord(message);
+      if (!record || (selfNodeId !== null && record.nodeId === selfNodeId)) return;
+      found.set(record.nodeId || remote.address, { ...record, address: remote.address });
+    });
+    socket.bind(0, "0.0.0.0", () => {
+      const send = (): void => {
+        try {
+          socket.send(Buffer.from(villaBridgeDiscoveryQuery), port, "255.255.255.255");
+        } catch {
+          // Bir tur kaçarsa sonraki tur yeniden sorar.
+        }
+      };
+      try {
+        socket.setBroadcast(true);
+      } catch {
+        done();
+        return;
+      }
+      send();
+      repeat = setInterval(send, 2000);
+      repeat.unref();
+    });
+  });
+};
