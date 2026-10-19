@@ -635,6 +635,12 @@ simülasyonla sınandı. Gerçekleşen kapsam:
   epoch fencing/eski snapshot reddi, owner→standby yönü, devir öncesi tablet→sunucu aktarımı,
   90 s eşiği, onaysız release'de sunucunun hiç bağlanmaması, kapanmayan soket, eşzamanlı açılış,
   geri çekilme; her senaryoda koordinatöre aynı anda **en fazla bir** bağlantı.
+- **Gerçek tablette doğrulandı (2026-10-20, sunucu kapalı, tek koordinatör istemcisi):** yeni APK
+  açılışta talep akışıyla sahip oldu (epoch 1, 22 cihaz). Mac'ten jetonlu sahte bir sunucu
+  `release` istedi: tablet 13 s'de yığını durdurdu, 6638 soketi kapandı (`TIME_WAIT`), 18 dosyalık
+  snapshot döndü, `standby` duyurdu, `monitor`'a geçti. Sahte sunucu hiç yanıt vermeyince 109 s
+  sonra (90 s eşik + jitter + pencere) yeniden talep etti, aynı süreçte çekirdeği yeniden yükledi,
+  epoch 2 ile sahip oldu, 22 cihaz/mesaj akışı geri geldi. Hiçbir an iki bağlantı olmadı.
 - **Sınırlar:** seri (USB) koordinatörde soket doğrulaması yapılamaz (OS kilidine güvenilir);
   snapshot'ta olmayan dosyalar silinmez; sunucu "ayakta ama koordinatörsüz" kalırsa tablet
   devralmaz (kanallar canlı); `automation-state.json` replikaya girmez. Sunucudaki
