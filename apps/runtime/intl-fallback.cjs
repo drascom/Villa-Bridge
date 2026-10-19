@@ -164,4 +164,24 @@ function installIntlFallback() {
   return true;
 }
 
-module.exports = { createIntlFallback, installIntlFallback };
+// Tanilama icin: cekirdegin kullandigi bicimle o anki yerel saati uretir (cihazda dogrulama).
+function intlSelfCheck() {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const sample = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23"
+    }).format(new Date());
+    return { ok: true, timeZone, sample, error: null };
+  } catch (error) {
+    return { ok: false, timeZone: null, sample: null, error: error.message };
+  }
+}
+
+module.exports = { createIntlFallback, installIntlFallback, intlSelfCheck };

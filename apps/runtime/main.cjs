@@ -1,7 +1,8 @@
 "use strict";
 
 // Node.js Mobile ICU'suz: cekirdek yuklenmeden once `Intl` yoksa dar bir yedegi kurulur.
-require("./intl-fallback.cjs").installIntlFallback();
+const { installIntlFallback, intlSelfCheck } = require("./intl-fallback.cjs");
+const intlFallback = installIntlFallback();
 
 const dgram = require("node:dgram");
 const { timingSafeEqual } = require("node:crypto");
@@ -146,6 +147,7 @@ function diagnostics(config) {
     core: runtime.core,
     matter: runtime.matter,
     multicast: runtime.multicast,
+    intl: { fallback: intlFallback, ...intlSelfCheck() },
     host: runtime.host,
     peerWatch: runtime.peerWatch,
     lastProbe: runtime.lastProbe,
