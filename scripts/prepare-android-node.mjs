@@ -42,6 +42,7 @@ const requiredFiles = [
   "matter-bigint-guard.cjs",
   "orchestration.cjs",
   "peer-watch.cjs",
+  "tz-rules.cjs",
   "package-lock.json",
   "package.json",
   "templates/configuration.example.yaml",
