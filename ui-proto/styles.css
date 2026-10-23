@@ -278,10 +278,24 @@ body.is-flat { background: radial-gradient(circle at 78% 18%, #18344b, #07111c 6
   position: absolute;
   left: clamp(40px, 6.2vw, 96px);
   top: 23%;
+  bottom: 0;
   width: min(70vw, 840px);
   display: grid;
   gap: 12px;
+  align-content: start;
+  min-height: 0;
+  padding: 0 12px 24px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255,255,255,.32) transparent;
+  scrollbar-width: thin;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
+.routine-list::-webkit-scrollbar { width: 6px; }
+.routine-list::-webkit-scrollbar-track { background: transparent; }
+.routine-list::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.32); }
 .routine-list button {
   min-height: 82px;
   padding: 12px 20px;
@@ -464,7 +478,8 @@ dialog input { min-height:60px; padding:0 18px; color:var(--ink); border:1px sol
   .section-heading { justify-content:space-between; }
   .heading-action span { display:none; }
   .heading-action { width:46px; padding:0; justify-content:center; }
-  .focus-list, .routine-list { position:relative; left:auto; top:auto; width:100%; margin-top:28px; }
+  .focus-list, .routine-list { position:relative; left:auto; top:auto; bottom:auto; width:100%; margin-top:28px; }
+  .routine-list { padding:0; overflow:visible; }
   .focus-row { min-height:68px; }
   .home-status { position:relative; right:auto; top:auto; margin:26px 12px 0; }
   .scene-dock { bottom:88px; width:calc(100vw - 24px); overflow-x:auto; }
