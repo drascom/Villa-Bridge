@@ -17,11 +17,6 @@
   --wallpaper-image: url("assets/backgrounds/antalya/antalya-beach.webp");
   --wallpaper-position: center;
   --preview-image: var(--wallpaper-image);
-  --solar-night: 0;
-  --solar-twilight: 0;
-  --moon-opacity: 0;
-  --moon-x: 78%;
-  --moon-y: 17%;
 }
 
 * { box-sizing: border-box; }
@@ -42,12 +37,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
-.wallpaper-scene, .wallpaper, .wallpaper-shade, .wallpaper-twilight, .wallpaper-stars {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-}
-.wallpaper-scene { overflow: hidden; background: #07111c; }
+.wallpaper, .wallpaper-shade { position: fixed; inset: 0; pointer-events: none; }
 .wallpaper {
   background-color: #07111c;
   background-image: var(--wallpaper-image);
@@ -55,60 +45,14 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
   background-size: cover;
   background-repeat: no-repeat;
   transform: scale(1.015);
-  transition: opacity 75s linear, filter 75s linear;
-  will-change: opacity;
-}
-.wallpaper-day { opacity: 1; }
-.wallpaper-night {
-  opacity: var(--solar-night);
-  filter: brightness(.24) saturate(.72) contrast(1.12) hue-rotate(8deg);
-}
-.wallpaper-twilight {
-  opacity: var(--solar-twilight);
-  background:
-    radial-gradient(circle at 77% 43%, rgba(255, 152, 69, .52), transparent 28%),
-    linear-gradient(180deg, rgba(32, 39, 92, .12), rgba(211, 82, 66, .34) 48%, rgba(24, 26, 48, .08));
-  mix-blend-mode: soft-light;
-  transition: opacity 75s linear;
-  will-change: opacity;
-}
-.wallpaper-stars {
-  opacity: calc(var(--solar-night) * .92);
-  background-image:
-    radial-gradient(circle, rgba(255,255,255,.92) 0 1px, transparent 1.5px),
-    radial-gradient(circle, rgba(194,220,255,.78) 0 1px, transparent 1.4px),
-    radial-gradient(circle, rgba(255,244,210,.62) 0 .8px, transparent 1.3px);
-  background-position: 12px 18px, 92px 37px, 41px 116px;
-  background-size: 173px 149px, 239px 211px, 131px 183px;
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 44%, transparent 77%);
-  mask-image: linear-gradient(180deg, #000 0%, #000 44%, transparent 77%);
-  transition: opacity 75s linear;
-  will-change: opacity;
-}
-.wallpaper-moon {
-  position: fixed;
-  left: var(--moon-x);
-  top: var(--moon-y);
-  width: clamp(38px, 4.3vw, 66px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  opacity: var(--moon-opacity);
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  background:
-    radial-gradient(circle at 36% 31%, rgba(255,255,255,.86) 0 8%, transparent 9%),
-    radial-gradient(circle at 63% 66%, rgba(191,202,210,.26) 0 11%, transparent 12%),
-    radial-gradient(circle at 45% 50%, #fffdf2 0 52%, #d9e6ef 75%, #9fb6c7 100%);
-  box-shadow: 0 0 24px rgba(224,240,255,.68), 0 0 72px rgba(188,219,255,.34);
-  transition: opacity 75s linear, left 75s linear, top 75s linear;
-  will-change: opacity;
+  transition: opacity 380ms ease;
 }
 .wallpaper-shade {
   background:
-    linear-gradient(90deg, rgba(4, 9, 15, .78) 0%, rgba(4, 9, 15, .46) 38%, rgba(4, 9, 15, .08) 70%),
-    linear-gradient(180deg, rgba(4, 9, 15, .34) 0%, transparent 35%, rgba(4, 9, 15, .62) 100%);
+    linear-gradient(90deg, rgba(4, 9, 15, .82) 0%, rgba(4, 9, 15, .48) 38%, rgba(4, 9, 15, .08) 70%),
+    linear-gradient(180deg, rgba(4, 9, 15, .38) 0%, transparent 35%, rgba(4, 9, 15, .62) 100%);
 }
-body.is-flat .wallpaper-scene { opacity: 0; }
+body.is-flat .wallpaper { opacity: 0; }
 body.is-flat { background: radial-gradient(circle at 78% 18%, #18344b, #07111c 62%); }
 
 .topbar {
@@ -472,8 +416,6 @@ body.reduce-motion .focus-aura { opacity: .38; }
 .choice-row small { color:var(--faint); }
 .choice-row:hover, .choice-row:focus-visible, .choice-row.is-selected { color:var(--focus-ink); background:var(--focus); }
 .choice-row:hover small, .choice-row:focus-visible small, .choice-row.is-selected small { color:rgba(22,34,31,.58); }
-.solar-status { cursor:default; color:var(--ink); background:rgba(255,255,255,.045); }
-.solar-status small { color:var(--accent); text-align:right; }
 .admin-entry { width:100%; min-height:82px; margin-top:36px; padding:12px 18px; display:grid; grid-template-columns:42px 1fr 24px; align-items:center; gap:14px; border:1px solid rgba(255,255,255,.12); border-radius:24px; background:rgba(255,255,255,.04); text-align:left; }
 .admin-entry > svg:first-child { font-size:28px; color:var(--accent); }
 .admin-entry span { display:grid; gap:3px; }
@@ -524,7 +466,7 @@ dialog input { min-height:60px; padding:0 18px; color:var(--ink); border:1px sol
 
 @media (max-width: 720px) {
   html, body { overflow:auto; min-height:100%; }
-  .wallpaper-scene, .wallpaper, .wallpaper-shade, .wallpaper-twilight, .wallpaper-stars { position:fixed; }
+  .wallpaper, .wallpaper-shade { position:fixed; }
   .topbar { position:relative; left:auto; right:auto; top:auto; padding:20px; align-items:center; }
   .time-weather { min-height:64px; gap:10px; }
   .clock { font-size:36px; }

@@ -33,13 +33,7 @@
     <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 4C11 4 5 8 5 14c0 3 2 5 5 5 6 0 10-6 10-15Z"/><path d="M4 21c3-5 7-8 12-11"/></symbol>
   </svg>
 
-  <div class="wallpaper-scene" aria-hidden="true">
-    <div class="wallpaper wallpaper-day"></div>
-    <div class="wallpaper wallpaper-night"></div>
-    <div class="wallpaper-twilight"></div>
-    <div class="wallpaper-stars"></div>
-    <div class="wallpaper-moon"></div>
-  </div>
+  <div class="wallpaper" aria-hidden="true"></div>
   <div class="wallpaper-shade" aria-hidden="true"></div>
 
   <header class="topbar">
@@ -119,7 +113,6 @@
       <div class="setting-group">
         <span>Hareket</span>
         <button class="choice-row is-selected" type="button" id="motionToggle"><span>Yumuşak Rive hareketi</span><small>Açık</small></button>
-        <div class="choice-row solar-status" aria-live="polite"><span>Gerçek gün ışığı</span><small id="solarStatus">Hesaplanıyor…</small></div>
       </div>
       <button class="admin-entry" type="button" data-open="admin"><svg><use href="#i-shield"/></svg><span><strong>Yönetici modu</strong><small>Bağlantılar, cihazlar ve sistem</small></span><svg><use href="#i-chevron"/></svg></button>
     </div>
