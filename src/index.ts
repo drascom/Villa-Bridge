@@ -576,6 +576,16 @@ const uiPrototypeScript = await readFile(resolve(uiPrototypeDirectory, "app.js")
 const uiPrototypeBackground = await readFile(
   resolve(uiPrototypeDirectory, "assets/backgrounds/villa-twilight.jpg")
 );
+const uiPrototypeAntalyaBackgroundDirectory = resolve(
+  uiPrototypeDirectory,
+  "assets/backgrounds/antalya"
+);
+const uiPrototypeAntalyaBackgrounds = new Map<string, { body: Buffer; etag: string }>();
+for (const file of await readdir(uiPrototypeAntalyaBackgroundDirectory)) {
+  if (!/^[a-z0-9-]+\.webp$/.test(file)) continue;
+  const body = await readFile(resolve(uiPrototypeAntalyaBackgroundDirectory, file));
+  uiPrototypeAntalyaBackgrounds.set(file, { body, etag: assetETag(body) });
+}
 const uiPrototypeFocusAura = await readFile(
   resolve(uiPrototypeDirectory, "assets/rive/focus-aura.riv")
 );
@@ -698,6 +708,15 @@ app.get("/ui-proto/app.js", async (request, reply) =>
 
 app.get("/ui-proto/assets/backgrounds/villa-twilight.jpg", async (request, reply) =>
   sendAsset(request, reply, "image/jpeg", uiPrototypeBackground, uiPrototypeBackgroundETag));
+
+app.get<{ Params: { file: string } }>(
+  "/ui-proto/assets/backgrounds/antalya/:file",
+  async (request, reply) => {
+    const asset = uiPrototypeAntalyaBackgrounds.get(request.params.file);
+    if (!asset) return reply.code(404).send({ error: "Background not found" });
+    return sendAsset(request, reply, "image/webp", asset.body, asset.etag);
+  }
+);
 
 app.get("/ui-proto/assets/rive/focus-aura.riv", async (request, reply) =>
   sendAsset(request, reply, "application/octet-stream", uiPrototypeFocusAura, uiPrototypeFocusAuraETag));
