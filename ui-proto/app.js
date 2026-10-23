@@ -24,10 +24,13 @@
     automations: [],
     health: null,
     csrfToken: null,
+    elevated: false,
     panel: null,
+    pendingRepairId: null,
     favoriteDraft: [],
     sceneBusy: new Set(),
-    commandBusy: new Set()
+    commandBusy: new Set(),
+    repairBusy: new Set()
   };
 
   function esc(value) {
@@ -97,6 +100,7 @@
     var data = await response.json().catch(function () { return {}; });
     if (!response.ok) throw new Error(data.error || "Oturum başlatılamadı.");
     state.csrfToken = typeof data.csrfToken === "string" ? data.csrfToken : null;
+    state.elevated = data.elevated === true;
     return data;
   }
 
@@ -157,6 +161,35 @@
     if (typeof control.value === "number") return control.value > 0;
     var value = String(control.value == null ? "" : control.value).toLowerCase();
     return ["on", "open", "opening", "heat", "cool", "locked", "true"].indexOf(value) >= 0;
+  }
+
+  function supportsQuickToggle(control) {
+    return Boolean(control)
+      && ["switch", "fan"].indexOf(control.kind) >= 0
+      && control.writable === true
+      && control.adminOnly !== true;
+  }
+
+  function canQuickToggle(device, control) {
+    return supportsQuickToggle(control)
+      && device.availability !== "offline"
+      && device.preparing !== true;
+  }
+
+  function commandKey(device, control) {
+    return favoriteKey(device.id, control.property);
+  }
+
+  function quickToggleMarkup(device, control, className) {
+    if (!supportsQuickToggle(control)) {
+      return '<span class="' + className + ' is-static">' + icon(controlIcon(device, control)) + '</span>';
+    }
+    var active = activeControl(control);
+    var busy = state.commandBusy.has(commandKey(device, control));
+    var disabled = !canQuickToggle(device, control) || busy;
+    var label = controlName(device, control) + (active ? " kapat" : " aç");
+    return '<button class="' + className + ' quick-toggle' + (active ? " is-on" : "") + (busy ? " is-busy" : "") + '" type="button" data-quick-toggle-device="' + esc(device.id) + '" data-quick-toggle-control="' + esc(control.id) + '" aria-label="' + esc(label) + '" aria-pressed="' + active + '"' + (busy ? ' aria-busy="true"' : '') + (disabled ? " disabled" : "") + '>' +
+      icon(controlIcon(device, control)) + '<span class="quick-power-mark">' + icon("i-power") + '</span></button>';
   }
 
   function controlStatus(device, control) {
@@ -256,10 +289,11 @@
       var control = entry.control;
       var online = device.availability !== "offline";
       var active = online && activeControl(control);
-      return '<button class="focus-row' + (index === 0 ? " is-selected" : "") + '" type="button" data-device-id="' + esc(device.id) + '" data-control-id="' + esc(control.id) + '">' +
-        '<span class="row-icon">' + icon(controlIcon(device, control)) + '</span>' +
+      return '<div class="focus-row' + (index === 0 ? " is-selected" : "") + '">' +
+        quickToggleMarkup(device, control, "row-power") +
+        '<button class="row-detail" type="button" data-device-id="' + esc(device.id) + '" data-control-id="' + esc(control.id) + '">' +
         '<span class="row-copy"><strong>' + esc(controlName(device, control)) + '</strong><small>' + esc(controlStatus(device, control)) + '</small></span>' +
-        '<span class="state-dot' + (active ? " is-on" : "") + (online ? "" : " is-offline") + '"></span></button>';
+        '<span class="state-dot' + (active ? " is-on" : "") + (online ? "" : " is-offline") + '"></span>' + icon("i-chevron") + '</button></div>';
     }).join("");
   }
 
@@ -365,8 +399,10 @@
     var online = deviceIds.filter(function (id) { return deviceById(id).availability !== "offline"; }).length;
     var list = entries.map(function (entry) {
       var status = controlStatus(entry.device, entry.control);
-      return '<button class="room-device-row" type="button" data-device-id="' + esc(entry.device.id) + '" data-control-id="' + esc(entry.control ? entry.control.id : "@device") + '" data-from-room="' + esc(group.id) + '">' +
-        '<span class="room-device-icon">' + icon(controlIcon(entry.device, entry.control)) + '</span><span><strong>' + esc(controlName(entry.device, entry.control)) + '</strong><small>' + esc(status) + '</small></span><span class="state-dot' + (entry.control && activeControl(entry.control) ? " is-on" : "") + (entry.device.availability === "offline" ? " is-offline" : "") + '"></span>' + icon("i-chevron") + '</button>';
+      return '<div class="room-device-row">' +
+        quickToggleMarkup(entry.device, entry.control, "room-device-icon") +
+        '<button class="room-device-detail" type="button" data-device-id="' + esc(entry.device.id) + '" data-control-id="' + esc(entry.control ? entry.control.id : "@device") + '" data-from-room="' + esc(group.id) + '">' +
+        '<span><strong>' + esc(controlName(entry.device, entry.control)) + '</strong><small>' + esc(status) + '</small></span><span class="state-dot' + (entry.control && activeControl(entry.control) ? " is-on" : "") + (entry.device.availability === "offline" ? " is-offline" : "") + '"></span>' + icon("i-chevron") + '</button></div>';
     }).join("");
     var html = '<div class="panel-summary"><article><span>Cihaz</span><strong>' + deviceIds.length + '</strong></article><article><span>Bağlı</span><strong>' + online + '</strong></article></div>' +
       '<div class="room-device-list">' + (list || '<div class="surface-loading">Bu odada cihaz yok</div>') + '</div>';
@@ -378,14 +414,21 @@
     if (!device) { closePanel(); return; }
     var control = controlId === "@device" ? null : controlById(device, controlId);
     var rooms = roomNames(device.id);
-    var busyKey = favoriteKey(device.id, control ? control.property : "");
-    var canToggle = control && ["switch", "fan"].indexOf(control.kind) >= 0 && typeof control.value === "boolean" && device.availability !== "offline";
+    var busyKey = control ? commandKey(device, control) : "";
+    var canToggle = canQuickToggle(device, control);
     var busy = state.commandBusy.has(busyKey);
     var back = roomId ? '<button class="panel-back" type="button" data-back-room="' + esc(roomId) + '">← Odaya dön</button>' : "";
     var command = canToggle ? '<button type="button" class="switch' + (activeControl(control) ? " is-on" : "") + '" data-command-device="' + esc(device.id) + '" data-command-control="' + esc(control.id) + '" aria-label="Aç veya kapat"' + (busy ? " disabled" : "") + '></button>' : "";
-    var html = back + '<article class="control-card"><span>' + esc(control ? control.kind : device.category || "Cihaz") + '</span><div class="control-main"><strong>' + esc(controlStatus(device, control)) + '</strong>' + command + '</div></article>' +
+    var image = device.image && device.image.available === true && device.image.model
+      ? '<img src="/api/device-image/' + encodeURIComponent(device.image.model) + '" alt="' + esc(device.name) + '">'
+      : '<span class="device-hero-fallback">' + icon(controlIcon(device, control)) + '</span>';
+    var needsRepair = device.availability === "offline" || device.interviewCompleted === false;
+    var repairBusy = state.repairBusy.has(device.id);
+    var repair = needsRepair ? '<button class="repair-button" type="button" data-repair-device="' + esc(device.id) + '"' + (repairBusy ? ' disabled aria-busy="true"' : '') + '>' + icon("i-repair") + '<span><strong>' + (repairBusy ? "Bağlantı onarılıyor" : "Bağlantıyı onar") + '</strong><small>Cihazı yeniden yapılandırmayı dene</small></span></button>' : "";
+    var html = back + '<article class="device-hero"><div class="device-hero-image">' + image + '</div><div><span>' + esc(device.vendor || "Villa Bridge") + '</span><strong>' + esc(device.model || device.description || "Zigbee cihazı") + '</strong></div></article>' +
+      '<article class="control-card"><span>' + esc(control ? control.kind : device.category || "Cihaz") + '</span><div class="control-main"><strong>' + esc(controlStatus(device, control)) + '</strong>' + command + '</div></article>' +
       '<div class="metric-grid"><article class="metric"><span>Oda</span><strong>' + esc(rooms[0] || "Atanmamış") + '</strong></article><article class="metric"><span>Bağlantı</span><strong>' + esc(device.availability === "offline" ? "Çevrimdışı" : "İyi") + '</strong></article></div>' +
-      '<article class="control-card"><span>Cihaz</span><div class="control-main"><strong>' + esc(device.model || device.description || "Zigbee") + '</strong><span>' + esc(device.vendor || "Villa Bridge") + '</span></div></article>';
+      repair;
     showPanel("Canlı cihaz", controlName(device, control), html, { type: "device", deviceId: device.id, controlId: control ? control.id : "@device", roomId: roomId || null }, animate);
   }
 
@@ -462,21 +505,78 @@
   async function toggleDevice(deviceId, controlId) {
     var device = deviceById(deviceId);
     var control = controlById(device, controlId);
-    if (!device || !control || typeof control.value !== "boolean") return;
-    var key = favoriteKey(device.id, control.property);
+    if (!device || !canQuickToggle(device, control)) return;
+    var key = commandKey(device, control);
     if (state.commandBusy.has(key)) return;
     state.commandBusy.add(key);
-    renderDevicePanel(device.id, control.id, state.panel && state.panel.roomId, false);
+    renderAll();
     try {
-      await api("/api/devices/" + encodeURIComponent(device.id) + "/command", { method: "POST", body: JSON.stringify({ property: control.property, value: !control.value }) });
+      await api("/api/devices/" + encodeURIComponent(device.id) + "/command", { method: "POST", body: JSON.stringify({ property: control.property, value: !activeControl(control) }) });
       await refreshData(true);
       showToast(controlName(device, control) + " güncellendi");
     } catch (error) {
       showToast(error.message, true);
     } finally {
       state.commandBusy.delete(key);
-      var latest = controlById(deviceById(device.id), control.id);
-      if (latest && state.panel && state.panel.type === "device") renderDevicePanel(device.id, latest.id, state.panel.roomId, false);
+      renderAll();
+    }
+  }
+
+  function openAdminDialog() {
+    var dialog = $("#adminDialog");
+    $("#adminPin").value = "";
+    $("#adminError").hidden = true;
+    if (!dialog.open) dialog.showModal();
+    window.setTimeout(function () { $("#adminPin").focus(); }, 80);
+  }
+
+  async function repairDevice(deviceId) {
+    var device = deviceById(deviceId);
+    if (!device || state.repairBusy.has(deviceId)) return;
+    if (!state.elevated) {
+      state.pendingRepairId = deviceId;
+      openAdminDialog();
+      return;
+    }
+    state.repairBusy.add(deviceId);
+    if (state.panel && state.panel.type === "device") renderDevicePanel(device.id, state.panel.controlId, state.panel.roomId, false);
+    try {
+      await api("/api/devices/" + encodeURIComponent(device.id) + "/reconfigure", { method: "POST", body: "{}" });
+      await refreshData(true);
+      showToast(device.name + " için onarım tamamlandı");
+    } catch (error) {
+      if (error.status === 403) {
+        state.elevated = false;
+        state.pendingRepairId = deviceId;
+        openAdminDialog();
+      } else {
+        showToast(error.message, true);
+      }
+    } finally {
+      state.repairBusy.delete(deviceId);
+      if (state.panel && state.panel.type === "device") renderDevicePanel(device.id, state.panel.controlId, state.panel.roomId, false);
+    }
+  }
+
+  async function submitAdminPin(event) {
+    event.preventDefault();
+    var button = $("#adminSubmit");
+    var error = $("#adminError");
+    button.disabled = true;
+    error.hidden = true;
+    try {
+      var data = await api("/api/mode/elevate", { method: "POST", body: JSON.stringify({ pin: $("#adminPin").value }) });
+      state.elevated = data.elevated === true;
+      $("#adminDialog").close("confirm");
+      showToast("Yönetici modu açıldı");
+      var pendingRepairId = state.pendingRepairId;
+      state.pendingRepairId = null;
+      if (pendingRepairId) await repairDevice(pendingRepairId);
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -533,6 +633,8 @@
     if (room) { renderRoomPanel(room.dataset.roomId, true); return; }
     var backRoom = event.target.closest("[data-back-room]");
     if (backRoom) { renderRoomPanel(backRoom.dataset.backRoom, false); return; }
+    var quickToggle = event.target.closest("[data-quick-toggle-device]");
+    if (quickToggle) { toggleDevice(quickToggle.dataset.quickToggleDevice, quickToggle.dataset.quickToggleControl); return; }
     var device = event.target.closest("[data-device-id]");
     if (device) { renderDevicePanel(device.dataset.deviceId, device.dataset.controlId, device.dataset.fromRoom || null, true); return; }
     var automation = event.target.closest("[data-automation-id]");
@@ -541,14 +643,17 @@
     if (automatic) { renderAutomationPanel(automatic.dataset.automaticId, true); return; }
     var command = event.target.closest("[data-command-device]");
     if (command) { toggleDevice(command.dataset.commandDevice, command.dataset.commandControl); return; }
+    var repair = event.target.closest("[data-repair-device]");
+    if (repair) { repairDevice(repair.dataset.repairDevice); return; }
     var close = event.target.closest("[data-close='panel']");
     if (close) { closePanel(); return; }
     var settingClose = event.target.closest("[data-close='settings']");
     if (settingClose) { closeSettings(); return; }
+    if (event.target.closest("[data-close-admin]")) { $("#adminDialog").close("cancel"); return; }
     var open = event.target.closest("[data-open]");
     if (open && open.dataset.open === "settings") { openSettings(); return; }
     if (open && open.dataset.open === "weather") { showToast("14° · Yağmur ihtimali %20 · En yüksek 16°"); return; }
-    if (open && open.dataset.open === "admin") { $("#adminDialog").showModal(); }
+    if (open && open.dataset.open === "admin") { openAdminDialog(); }
   });
 
   $("#panelOverlay").addEventListener("click", closePanel);
@@ -558,8 +663,9 @@
     });
   });
 
+  $("#adminForm").addEventListener("submit", submitAdminPin);
   $("#adminDialog").addEventListener("close", function () {
-    if ($("#adminDialog").returnValue === "confirm") showToast("Yönetici görünümü sonraki aşamada bağlanacak");
+    if ($("#adminDialog").returnValue !== "confirm") state.pendingRepairId = null;
   });
 
   document.addEventListener("keydown", function (event) {
