@@ -14,6 +14,9 @@
   --warn: #ffc66b;
   --radius: 28px;
   --ease: cubic-bezier(.22, .8, .24, 1);
+  --wallpaper-image: url("assets/backgrounds/antalya/antalya-beach.webp");
+  --wallpaper-position: center;
+  --preview-image: var(--wallpaper-image);
 }
 
 * { box-sizing: border-box; }
@@ -36,7 +39,11 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 
 .wallpaper, .wallpaper-shade { position: fixed; inset: 0; pointer-events: none; }
 .wallpaper {
-  background: #07111c url("assets/backgrounds/villa-twilight.jpg") center / cover no-repeat;
+  background-color: #07111c;
+  background-image: var(--wallpaper-image);
+  background-position: var(--wallpaper-position);
+  background-size: cover;
+  background-repeat: no-repeat;
   transform: scale(1.015);
   transition: opacity 380ms ease;
 }
@@ -396,6 +403,14 @@ body.reduce-motion .focus-aura { opacity: .38; }
 .settings-options { padding: clamp(34px,5vw,72px); overflow:auto; }
 .setting-group { margin-top: 36px; display:grid; gap:8px; }
 .setting-group > span { margin:0 0 6px 14px; color:var(--faint); font-size:11px; font-weight:800; letter-spacing:.17em; text-transform:uppercase; }
+.wallpaper-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.wallpaper-choice { position:relative; min-height:108px; padding:54px 15px 12px; overflow:hidden; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-end; border:1px solid rgba(255,255,255,.12); border-radius:22px; background:#10191f var(--thumb) center/cover no-repeat; color:#fff; text-align:left; isolation:isolate; transition:transform 220ms var(--ease),border-color 160ms linear,box-shadow 160ms linear; }
+.wallpaper-choice::after { content:""; position:absolute; z-index:-1; inset:0; background:linear-gradient(180deg,rgba(3,8,12,.04),rgba(3,8,12,.88)); }
+.wallpaper-choice span { font-size:15px; font-weight:750; line-height:1.15; text-shadow:0 1px 5px rgba(0,0,0,.65); }
+.wallpaper-choice small { margin-top:3px; color:rgba(255,255,255,.66); font-size:11px; }
+.wallpaper-choice:hover, .wallpaper-choice:focus-visible, .wallpaper-choice.is-selected { border-color:var(--accent); box-shadow:inset 0 0 0 2px rgba(155,230,200,.7),0 12px 34px rgba(0,0,0,.18); transform:translateY(-2px); }
+.wallpaper-choice.is-selected::before { content:"✓"; position:absolute; top:10px; right:10px; width:28px; height:28px; display:grid; place-items:center; border-radius:50%; color:#0d352b; background:var(--accent); font-size:15px; font-weight:900; }
+.wallpaper-choice-flat { background:radial-gradient(circle at 70% 20%,#24455e,#07111c 70%); }
 .choice-row { min-height:70px; padding:0 20px; display:flex; align-items:center; justify-content:space-between; border-radius:22px; background:transparent; color:var(--muted); }
 .choice-row span { font-size:19px; font-weight:600; }
 .choice-row small { color:var(--faint); }
@@ -407,7 +422,7 @@ body.reduce-motion .focus-aura { opacity: .38; }
 .admin-entry strong { font-size:18px; }
 .admin-entry small { color:var(--muted); }
 .settings-preview { padding:7vh 6vw; display:grid; place-items:center; background:linear-gradient(135deg,#1b2c33,#090f13); }
-.mini-home { position:relative; width:min(100%,760px); aspect-ratio:16/10; padding:34px; overflow:hidden; border-radius:32px; background:linear-gradient(90deg,rgba(3,9,14,.7),rgba(3,9,14,.1)),url("assets/backgrounds/villa-twilight.jpg") center/cover; box-shadow:0 40px 100px rgba(0,0,0,.35); }
+.mini-home { position:relative; width:min(100%,760px); aspect-ratio:16/10; padding:34px; overflow:hidden; border-radius:32px; background-image:linear-gradient(90deg,rgba(3,9,14,.7),rgba(3,9,14,.1)),var(--preview-image); background-position:center; background-size:cover; box-shadow:0 40px 100px rgba(0,0,0,.35); }
 .mini-home > span { font-size:30px; }
 .mini-home > strong { display:block; margin-top:20%; font-size:32px; }
 .mini-home > div { width:55%; height:42px; margin-top:8px; border-radius:16px; background:rgba(255,255,255,.09); }

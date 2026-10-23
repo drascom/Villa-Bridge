@@ -36,9 +36,12 @@ Yeniden üretmek için:
 
 ## Görselleri değiştirme
 
-Varsayılan görsel `assets/backgrounds/villa-twilight.jpg` dosyasıdır. Kendi fotoğrafınızı aynı
-oranla ekleyip `styles.css` içindeki iki referansı değiştirebilirsiniz. Görsel, bu prototip için
-OpenAI ImageGen ile üretildi; CleanFrame veya MagicPath fotoğrafları kopyalanmadı.
+Varsayılan seçenek, her gün Antalya koleksiyonundan farklı bir görsel seçer. Sabit bir görsel veya
+fotoğrafsız lacivert arka plan Görünüm ekranından seçilebilir; seçim tarayıcıda saklanır.
+`assets/backgrounds/antalya/` içindeki WebP dosyaları 1600 piksel genişliğinde ve tablet için
+optimize edilmiştir. Kaynak, fotoğrafçı ve lisans ayrıntıları aynı klasördeki `ATTRIBUTION.md`
+dosyasındadır. `villa-twilight.jpg` bu prototip için OpenAI ImageGen ile üretilmiştir; CleanFrame
+veya MagicPath fotoğrafları kopyalanmamıştır.
 
 ## Yerel önizleme
 

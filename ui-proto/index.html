@@ -98,8 +98,17 @@
       <header><div><span>Villa Bridge</span><h2 id="settingsTitle">Görünüm</h2></div><button type="button" class="icon-button" data-close="settings" aria-label="Kapat"><svg><use href="#i-close"/></svg></button></header>
       <div class="setting-group">
         <span>Arka plan</span>
-        <button class="choice-row is-selected" type="button" data-wallpaper="villa"><span>Villa gecesi</span><small>Seçili</small></button>
-        <button class="choice-row" type="button" data-wallpaper="calm"><span>Sade lacivert</span><small>Göster</small></button>
+        <div class="wallpaper-grid" aria-label="Arka plan koleksiyonu">
+          <button class="wallpaper-choice is-selected" type="button" data-wallpaper="antalya" style="--thumb:url('assets/backgrounds/antalya/antalya-beach.webp')"><span>Antalya koleksiyonu</span><small>Her gün değişir</small></button>
+          <button class="wallpaper-choice" type="button" data-wallpaper="beach" style="--thumb:url('assets/backgrounds/antalya/antalya-beach.webp')"><span>Sahil gün batımı</span><small>Antalya</small></button>
+          <button class="wallpaper-choice" type="button" data-wallpaper="saklikent" style="--thumb:url('assets/backgrounds/antalya/saklikent-canyon.webp')"><span>Saklıkent</span><small>Kanyon</small></button>
+          <button class="wallpaper-choice" type="button" data-wallpaper="highland" style="--thumb:url('assets/backgrounds/antalya/egrigol-highland.webp')"><span>Eğrigöl</span><small>Yayla yolu</small></button>
+          <button class="wallpaper-choice" type="button" data-wallpaper="snow" style="--thumb:url('assets/backgrounds/antalya/snowy-beydaglari.webp')"><span>Beydağları</span><small>Karlı zirveler</small></button>
+          <button class="wallpaper-choice" type="button" data-wallpaper="cruise" style="--thumb:url('assets/backgrounds/antalya/cruise-port.webp')"><span>Kruvaziyer</span><small>Alanya Limanı</small></button>
+          <button class="wallpaper-choice" type="button" data-wallpaper="kaleici" style="--thumb:url('assets/backgrounds/antalya/kaleici-harbor.webp')"><span>Kaleiçi</span><small>Yat limanı</small></button>
+          <button class="wallpaper-choice" type="button" data-wallpaper="villa" style="--thumb:url('assets/backgrounds/villa-twilight.jpg')"><span>Villa gecesi</span><small>Özgün görsel</small></button>
+          <button class="wallpaper-choice wallpaper-choice-flat" type="button" data-wallpaper="calm"><span>Sade lacivert</span><small>Fotoğrafsız</small></button>
+        </div>
       </div>
       <div class="setting-group">
         <span>Hareket</span>
@@ -108,7 +117,7 @@
       <button class="admin-entry" type="button" data-open="admin"><svg><use href="#i-shield"/></svg><span><strong>Yönetici modu</strong><small>Bağlantılar, cihazlar ve sistem</small></span><svg><use href="#i-chevron"/></svg></button>
     </div>
     <div class="settings-preview" aria-label="Canlı önizleme">
-      <div class="mini-home"><span>18:42</span><strong>Favoriler</strong><div></div><div></div><div></div><small>Villa gecesi · Cam odak</small></div>
+      <div class="mini-home" id="wallpaperPreview"><span>18:42</span><strong>Favoriler</strong><div></div><div></div><div></div><small id="wallpaperPreviewLabel">Antalya koleksiyonu · Cam odak</small></div>
     </div>
   </section>
 

@@ -9,6 +9,17 @@
   var motionEnabled = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var stateChangingMethods = ["POST", "PUT", "PATCH", "DELETE"];
   var favoriteKinds = ["switch", "fan", "siren", "cover", "position", "lock", "climate"];
+  var wallpaperStorageKey = "villa-bridge-ui-wallpaper";
+  var antalyaCollection = ["beach", "saklikent", "highland", "snow", "cruise", "kaleici"];
+  var wallpapers = {
+    villa: { label: "Villa gecesi", url: "assets/backgrounds/villa-twilight.jpg", position: "center" },
+    beach: { label: "Sahil gün batımı", url: "assets/backgrounds/antalya/antalya-beach.webp", position: "center" },
+    saklikent: { label: "Saklıkent Kanyonu", url: "assets/backgrounds/antalya/saklikent-canyon.webp", position: "center" },
+    highland: { label: "Eğrigöl yaylası", url: "assets/backgrounds/antalya/egrigol-highland.webp", position: "center" },
+    snow: { label: "Karlı Beydağları", url: "assets/backgrounds/antalya/snowy-beydaglari.webp", position: "center" },
+    cruise: { label: "Alanya kruvaziyer limanı", url: "assets/backgrounds/antalya/cruise-port.webp", position: "center" },
+    kaleici: { label: "Kaleiçi yat limanı", url: "assets/backgrounds/antalya/kaleici-harbor.webp", position: "center" }
+  };
   var state = {
     devices: [],
     favorites: [],
@@ -30,6 +41,43 @@
 
   function icon(id) {
     return '<svg aria-hidden="true"><use href="#' + id + '"></use></svg>';
+  }
+
+  function collectionWallpaper() {
+    var today = new Date();
+    var dayNumber = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 86400000);
+    return antalyaCollection[Math.abs(dayNumber) % antalyaCollection.length];
+  }
+
+  function storedWallpaper() {
+    try { return window.localStorage.getItem(wallpaperStorageKey) || "antalya"; }
+    catch (_error) { return "antalya"; }
+  }
+
+  function applyWallpaper(choice, remember) {
+    var selectedChoice = choice === "calm" || choice === "antalya" || wallpapers[choice] ? choice : "antalya";
+    var resolvedChoice = selectedChoice === "antalya" ? collectionWallpaper() : selectedChoice;
+    var wallpaper = wallpapers[resolvedChoice] || null;
+    var isFlat = selectedChoice === "calm";
+    var root = document.documentElement;
+    document.body.classList.toggle("is-flat", isFlat);
+    if (wallpaper) {
+      root.style.setProperty("--wallpaper-image", 'url("' + wallpaper.url + '")');
+      root.style.setProperty("--wallpaper-position", wallpaper.position || "center");
+      root.style.setProperty("--preview-image", 'url("' + wallpaper.url + '")');
+    } else {
+      root.style.setProperty("--preview-image", "none");
+    }
+    $$("[data-wallpaper]").forEach(function (button) {
+      var selected = button.dataset.wallpaper === selectedChoice;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+    var previewLabel = $("#wallpaperPreviewLabel");
+    if (previewLabel) previewLabel.textContent = isFlat ? "Sade lacivert · Cam odak" : (selectedChoice === "antalya" ? "Antalya koleksiyonu · " + wallpaper.label : wallpaper.label) + " · Cam odak";
+    if (remember !== false) {
+      try { window.localStorage.setItem(wallpaperStorageKey, selectedChoice); } catch (_error) {}
+    }
   }
 
   function updateClock() {
@@ -534,8 +582,7 @@
   $("#panelOverlay").addEventListener("click", closePanel);
   $$("[data-wallpaper]").forEach(function (button) {
     button.addEventListener("click", function () {
-      $$("[data-wallpaper]").forEach(function (item) { item.classList.toggle("is-selected", item === button); });
-      document.body.classList.toggle("is-flat", button.dataset.wallpaper === "calm");
+      applyWallpaper(button.dataset.wallpaper, true);
     });
   });
 
@@ -574,6 +621,7 @@
   });
 
   async function initialize() {
+    applyWallpaper(storedWallpaper(), false);
     updateClock();
     window.setInterval(updateClock, 30000);
     initRive();
