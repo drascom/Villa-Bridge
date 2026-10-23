@@ -1,7 +1,9 @@
 # Villa Bridge UI Proto
 
-Bu klasör, üretim panelinden bağımsız yeni arayüz yönünü denemek içindir. Gerçek Villa Bridge
-API’lerine, Zigbee koordinatörüne, MQTT’ye veya Home Assistant’a bağlanmaz. Bütün veriler sahtedir.
+Bu klasör, üretim panelinden bağımsız yeni arayüz yönünü denemek içindir. Arayüz aynı kökendeki
+Villa Bridge API’sinden cihazları, favorileri, odaları ve otomasyonları okur. Favori seçimi mevcut
+`/api/favorites` kaydına yazılır; elle çalıştırılan rutinler mevcut otomasyon motorunu çağırır.
+Tarayıcı Zigbee koordinatörüne, MQTT’ye veya Home Assistant’a doğrudan bağlanmaz.
 
 ## Tasarım yönü
 
@@ -12,6 +14,9 @@ API’lerine, Zigbee koordinatörüne, MQTT’ye veya Home Assistant’a bağlan
   transform/opacity geçişleri kullanması benimsendi.
 - Villa Bridge ihtiyaçları için televizyon uygulama listesi yerine favori cihazlar, hızlı sahneler,
   odalar ve rutinler yerleştirildi.
+- Ev ekranındaki favoriler düzenlenebilir; oda panelleri canlı cihaz/kontrol üyeliklerini gösterir.
+- Rutinler ile hızlı sahneler yalnız gerçek `manual:true` otomasyonlardan üretilir; otomatik
+  çalışan kurallar günlük ev görünümüne karışmaz.
 - Ayrıntılar ana sayfayı terk etmek yerine sağdan `%60` genişliğinde açılır.
 - Yönetici girişi günlük ev kullanımından ayrıdır.
 

@@ -26,6 +26,9 @@
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></symbol>
+    <symbol id="i-sensor" viewBox="0 0 24 24"><path d="M8 18a6 6 0 1 1 8 0"/><path d="M10 21h4M12 8v4M8.5 10.5 6 8M15.5 10.5 18 8"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.2"/></symbol>
     <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 4C11 4 5 8 5 14c0 3 2 5 5 5 6 0 10-6 10-15Z"/><path d="M4 21c3-5 7-8 12-11"/></symbol>
   </svg>
@@ -52,69 +55,31 @@
   <main class="app-stage">
     <section class="view is-active" id="view-home" aria-labelledby="home-title">
       <div class="section-heading">
-        <span>Villa Bridge</span>
-        <h1 id="home-title">Favoriler</h1>
+        <div><span>Villa Bridge</span><h1 id="home-title">Favoriler</h1></div>
+        <button class="heading-action" id="editFavorites" type="button"><svg><use href="#i-edit"/></svg><span>Düzenle</span></button>
       </div>
-      <div class="focus-list" id="favoriteList">
-        <button class="focus-row is-selected" type="button" data-detail="living-light">
-          <span class="row-icon"><svg><use href="#i-switch"/></svg></span>
-          <span class="row-copy"><strong>Salon anahtarı</strong><small>Açık · %72</small></span>
-          <span class="state-dot is-on"></span>
-        </button>
-        <button class="focus-row" type="button" data-detail="balcony-light">
-          <span class="row-icon"><svg><use href="#i-bulb"/></svg></span>
-          <span class="row-copy"><strong>Balkon lambası</strong><small>Kapalı</small></span>
-          <span class="state-dot"></span>
-        </button>
-        <button class="focus-row" type="button" data-detail="curtain">
-          <span class="row-icon"><svg><use href="#i-curtain"/></svg></span>
-          <span class="row-copy"><strong>Salon perdesi</strong><small>%68 açık</small></span>
-          <span class="state-dot is-on"></span>
-        </button>
-        <button class="focus-row" type="button" data-detail="fan">
-          <span class="row-icon"><svg><use href="#i-fan"/></svg></span>
-          <span class="row-copy"><strong>Tuvalet fanı</strong><small>Kapalı · Otomatik</small></span>
-          <span class="state-dot"></span>
-        </button>
-      </div>
+      <div class="focus-list" id="favoriteList" aria-live="polite"><div class="surface-loading">Favoriler yükleniyor…</div></div>
 
       <aside class="home-status" aria-label="Ev durumu">
         <svg><use href="#i-shield"/></svg>
-        <div><span>EV HAZIR</span><strong>Her şey yolunda</strong><small>22 cihaz bağlı</small></div>
+        <div><span id="healthKicker">BAĞLANIYOR</span><strong id="healthTitle">Ev durumu alınıyor</strong><small id="healthMeta">Villa Bridge</small></div>
       </aside>
     </section>
 
     <section class="view" id="view-rooms" aria-labelledby="rooms-title">
       <div class="section-heading"><span>Alanlar</span><h1 id="rooms-title">Odalar</h1></div>
-      <div class="room-grid">
-        <button type="button" data-room="Salon"><span class="room-symbol">S</span><strong>Salon</strong><small>4 cihaz · 2 açık</small><svg><use href="#i-chevron"/></svg></button>
-        <button type="button" data-room="Mutfak"><span class="room-symbol">M</span><strong>Mutfak</strong><small>3 cihaz · Hepsi kapalı</small><svg><use href="#i-chevron"/></svg></button>
-        <button type="button" data-room="Yatak odası"><span class="room-symbol">Y</span><strong>Yatak odası</strong><small>3 cihaz · Perde açık</small><svg><use href="#i-chevron"/></svg></button>
-        <button type="button" data-room="Bahçe"><span class="room-symbol">B</span><strong>Bahçe</strong><small>5 cihaz · Hareket yok</small><svg><use href="#i-chevron"/></svg></button>
-        <button type="button" data-room="Banyo"><span class="room-symbol">B</span><strong>Banyo</strong><small>2 cihaz · Fan otomatik</small><svg><use href="#i-chevron"/></svg></button>
-        <button type="button" data-room="Koridor"><span class="room-symbol">K</span><strong>Koridor</strong><small>2 cihaz · 1 açık</small><svg><use href="#i-chevron"/></svg></button>
-      </div>
+      <div class="room-grid" id="roomGrid" aria-live="polite"><div class="surface-loading">Odalar yükleniyor…</div></div>
     </section>
 
     <section class="view" id="view-routines" aria-labelledby="routines-title">
       <div class="section-heading"><span>Otomasyonlar</span><h1 id="routines-title">Elle çalıştır</h1></div>
-      <div class="routine-list">
-        <button type="button" data-scene="Evden çık"><span class="scene-symbol"><svg><use href="#i-power"/></svg></span><strong>Evden çık</strong><small>Işıklar, prizler ve perdeler</small><span>Çalıştır</span></button>
-        <button type="button" data-scene="Gece"><span class="scene-symbol"><svg><use href="#i-moon"/></svg></span><strong>Gece</strong><small>Alt katı kapat, koridoru loş bırak</small><span>Çalıştır</span></button>
-        <button type="button" data-scene="Misafir"><span class="scene-symbol"><svg><use href="#i-guest"/></svg></span><strong>Misafir</strong><small>Salon, bahçe ve giriş ışıkları</small><span>Çalıştır</span></button>
-      </div>
+      <div class="routine-list" id="routineList" aria-live="polite"><div class="surface-loading">Rutinler yükleniyor…</div></div>
     </section>
   </main>
 
   <section class="scene-dock" aria-labelledby="scenes-title">
     <div class="dock-label" id="scenes-title">Hızlı sahneler</div>
-    <div class="dock-items">
-      <button type="button" data-scene="Evden çık"><svg><use href="#i-power"/></svg><span>Evden çık</span></button>
-      <button type="button" data-scene="Akşam"><svg><use href="#i-sun"/></svg><span>Akşam</span></button>
-      <button type="button" data-scene="Gece"><svg><use href="#i-moon"/></svg><span>Gece</span></button>
-      <button type="button" data-scene="Misafir"><svg><use href="#i-guest"/></svg><span>Misafir</span></button>
-      <button type="button" data-scene="Tüm ışıkları kapat"><svg><use href="#i-bulb"/></svg><span>Tümünü kapat</span></button>
-    </div>
+    <div class="dock-items" id="sceneDockItems"><div class="surface-loading">Sahneler yükleniyor…</div></div>
   </section>
 
   <div class="focus-aura" id="focusAura" aria-hidden="true"><canvas id="focusCanvas"></canvas></div>
