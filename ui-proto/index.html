@@ -82,8 +82,6 @@
     <div class="dock-items" id="sceneDockItems"><div class="surface-loading">Sahneler yükleniyor…</div></div>
   </section>
 
-  <div class="focus-aura" id="focusAura" aria-hidden="true"><canvas id="focusCanvas"></canvas></div>
-
   <div class="overlay" id="panelOverlay" hidden></div>
   <aside class="side-panel" id="sidePanel" aria-hidden="true" aria-labelledby="panelTitle">
     <header>
@@ -110,10 +108,6 @@
           <button class="wallpaper-choice wallpaper-choice-flat" type="button" data-wallpaper="calm"><span>Sade lacivert</span><small>Fotoğrafsız</small></button>
         </div>
       </div>
-      <div class="setting-group">
-        <span>Hareket</span>
-        <button class="choice-row is-selected" type="button" id="motionToggle"><span>Yumuşak Rive hareketi</span><small>Açık</small></button>
-      </div>
       <button class="admin-entry" type="button" data-open="admin"><svg><use href="#i-shield"/></svg><span><strong>Yönetici modu</strong><small>Bağlantılar, cihazlar ve sistem</small></span><svg><use href="#i-chevron"/></svg></button>
     </div>
     <div class="settings-preview" aria-label="Canlı önizleme">
@@ -134,7 +128,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="/vendor/rive/rive.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

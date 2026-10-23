@@ -243,22 +243,6 @@ body.is-flat { background: radial-gradient(circle at 78% 18%, #18344b, #07111c 6
   transform: translateY(-4px);
 }
 
-.focus-aura {
-  position: fixed;
-  z-index: 1;
-  left: 0;
-  top: 0;
-  width: 360px;
-  height: 180px;
-  opacity: .72;
-  pointer-events: none;
-  transform: translate3d(-1000px,-1000px,0);
-  transition: transform 360ms var(--ease), width 280ms var(--ease), height 280ms var(--ease), opacity 160ms linear;
-  mix-blend-mode: screen;
-}
-.focus-aura canvas { width: 100%; height: 100%; display: block; }
-body.reduce-motion .focus-aura { opacity: .38; }
-
 .room-grid {
   position: absolute;
   left: clamp(40px, 6.2vw, 96px);

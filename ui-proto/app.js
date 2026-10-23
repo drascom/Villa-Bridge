@@ -4,9 +4,6 @@
   var $ = function (selector, root) { return (root || document).querySelector(selector); };
   var $$ = function (selector, root) { return Array.prototype.slice.call((root || document).querySelectorAll(selector)); };
   var toastTimer = null;
-  var riveInstance = null;
-  var currentView = "home";
-  var motionEnabled = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var stateChangingMethods = ["POST", "PUT", "PATCH", "DELETE"];
   var favoriteKinds = ["switch", "fan", "siren", "cover", "position", "lock", "climate"];
   var wallpaperStorageKey = "villa-bridge-ui-wallpaper";
@@ -332,24 +329,8 @@
   }
 
   function setView(name) {
-    currentView = name;
     $$(".view").forEach(function (view) { view.classList.toggle("is-active", view.id === "view-" + name); });
     $$(".quiet-nav [data-view]").forEach(function (button) { button.classList.toggle("is-active", button.dataset.view === name); });
-    window.setTimeout(function () {
-      var target = $("#view-" + name + " button");
-      if (target) positionAura(target);
-    }, 100);
-  }
-
-  function positionAura(target) {
-    if (!target || window.innerWidth < 721) return;
-    var rect = target.getBoundingClientRect();
-    var aura = $("#focusAura");
-    var width = Math.max(rect.width * 1.35, 260);
-    var height = Math.max(rect.height * 2.2, 150);
-    aura.style.width = width + "px";
-    aura.style.height = height + "px";
-    aura.style.transform = "translate3d(" + (rect.left + rect.width / 2 - width / 2) + "px," + (rect.top + rect.height / 2 - height / 2) + "px,0)";
   }
 
   function showPanel(eyebrow, title, html, panelState, animate) {
@@ -512,23 +493,6 @@
     sheet.setAttribute("aria-hidden", "true");
   }
 
-  function initRive() {
-    if (!window.rive || !motionEnabled) return;
-    try {
-      window.rive.RuntimeLoader.setWasmUrl("/vendor/rive/rive.wasm");
-      riveInstance = new window.rive.Rive({
-        src: "assets/rive/focus-aura.riv",
-        canvas: $("#focusCanvas"),
-        autoplay: true,
-        stateMachine: "Focus Pulse",
-        fit: window.rive.Fit.cover,
-        onLoad: function () { riveInstance.resizeDrawingSurfaceToCanvas(); }
-      });
-    } catch (error) {
-      document.body.classList.add("rive-fallback");
-    }
-  }
-
   function renderLoadFailure(message) {
     var html = '<div class="surface-empty static">' + icon("i-info") + '<span><strong>Veriler alınamadı</strong><small>' + esc(message) + '</small></span></div>';
     $("#favoriteList").innerHTML = html;
@@ -587,30 +551,11 @@
     if (open && open.dataset.open === "admin") { $("#adminDialog").showModal(); }
   });
 
-  document.addEventListener("pointerover", function (event) {
-    var target = event.target.closest(".focus-row, .dock-items button, .room-grid button, .routine-list button");
-    if (target) positionAura(target);
-  });
-  document.addEventListener("focusin", function (event) {
-    var target = event.target.closest(".focus-row, .dock-items button, .room-grid button, .routine-list button");
-    if (target) positionAura(target);
-  });
-
   $("#panelOverlay").addEventListener("click", closePanel);
   $$("[data-wallpaper]").forEach(function (button) {
     button.addEventListener("click", function () {
       applyWallpaper(button.dataset.wallpaper, true);
     });
-  });
-
-  $("#motionToggle").addEventListener("click", function () {
-    motionEnabled = !motionEnabled;
-    $("#motionToggle").classList.toggle("is-selected", motionEnabled);
-    $("#motionToggle small").textContent = motionEnabled ? "Açık" : "Kapalı";
-    document.body.classList.toggle("reduce-motion", !motionEnabled);
-    if (riveInstance) {
-      if (motionEnabled) riveInstance.play(); else riveInstance.pause();
-    } else if (motionEnabled) initRive();
   });
 
   $("#adminDialog").addEventListener("close", function () {
@@ -625,27 +570,16 @@
   });
 
   document.addEventListener("visibilitychange", function () {
-    if (riveInstance && motionEnabled) {
-      if (document.hidden) riveInstance.pause(); else riveInstance.play();
-    }
     if (!document.hidden) refreshData(true);
-  });
-
-  window.addEventListener("resize", function () {
-    var selected = $("#view-" + currentView + " button");
-    if (selected) positionAura(selected);
-    if (riveInstance) riveInstance.resizeDrawingSurfaceToCanvas();
   });
 
   async function initialize() {
     applyWallpaper(storedWallpaper(), false);
     updateClock();
     window.setInterval(updateClock, 30000);
-    initRive();
     try { await refreshSession(); } catch (error) { renderLoadFailure(error.message); return; }
     await refreshData(false);
     window.setInterval(function () { if (!document.hidden) refreshData(true); }, 12000);
-    window.setTimeout(function () { positionAura($(".focus-row.is-selected")); }, 180);
   }
 
   initialize();
