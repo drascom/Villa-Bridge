@@ -189,7 +189,7 @@
     var disabled = !canQuickToggle(device, control) || busy;
     var label = controlName(device, control) + (active ? " kapat" : " aç");
     return '<button class="' + className + ' quick-toggle' + (active ? " is-on" : "") + (busy ? " is-busy" : "") + '" type="button" data-quick-toggle-device="' + esc(device.id) + '" data-quick-toggle-control="' + esc(control.id) + '" aria-label="' + esc(label) + '" aria-pressed="' + active + '"' + (busy ? ' aria-busy="true"' : '') + (disabled ? " disabled" : "") + '>' +
-      icon(controlIcon(device, control)) + '<span class="quick-power-mark">' + icon("i-power") + '</span></button>';
+      icon(controlIcon(device, control)) + '</button>';
   }
 
   function controlStatus(device, control) {
