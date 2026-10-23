@@ -234,6 +234,10 @@
     return state.automations.filter(function (automation) { return automation.manual === true; });
   }
 
+  function automaticAutomations() {
+    return state.automations.filter(function (automation) { return automation.manual !== true; });
+  }
+
   function sceneIcon(automation) {
     var name = String(automation.name || "").toLocaleLowerCase("tr");
     if (name.indexOf("gece") >= 0) return "i-moon";
@@ -292,16 +296,15 @@
 
   function renderRoutines() {
     var container = $("#routineList");
-    var automations = manualAutomations();
+    var automations = automaticAutomations();
     if (!automations.length) {
-      container.innerHTML = '<div class="surface-empty static">' + icon("i-routine") + '<span><strong>Elle çalıştırılan rutin yok</strong><small>Otomasyonlardan eklenebilir</small></span></div>';
+      container.innerHTML = '<div class="surface-empty static">' + icon("i-routine") + '<span><strong>Otomatik çalışan kural yok</strong><small>Yönetici modundan eklenebilir</small></span></div>';
     } else {
       container.innerHTML = automations.map(function (automation) {
-        var busy = state.sceneBusy.has(automation.id);
+        var triggerCount = Array.isArray(automation.triggers) ? automation.triggers.length : 0;
         var actionCount = Array.isArray(automation.actions) ? automation.actions.length : 0;
-        var disabled = automation.enabled !== true || busy;
-        return '<button type="button" data-automation-id="' + esc(automation.id) + '" data-automation-name="' + esc(automation.name) + '"' + (disabled ? " disabled" : "") + ' class="' + (automation.enabled ? "" : "is-disabled") + '">' +
-          '<span class="scene-symbol">' + icon(sceneIcon(automation)) + '</span><strong>' + esc(automation.name) + '</strong><small>' + actionCount + ' eylem</small><span>' + (busy ? "Çalışıyor" : automation.enabled ? "Çalıştır" : "Kapalı") + '</span></button>';
+        return '<button type="button" data-automatic-id="' + esc(automation.id) + '" class="' + (automation.enabled ? "" : "is-disabled") + '">' +
+          '<span class="scene-symbol">' + icon("i-routine") + '</span><strong>' + esc(automation.name) + '</strong><small>' + triggerCount + ' tetikleyici · ' + actionCount + ' eylem</small><span>' + (automation.enabled ? "Etkin" : "Kapalı") + '</span></button>';
       }).join("");
     }
     renderSceneDock();
@@ -325,6 +328,7 @@
     if (!state.panel) return;
     if (state.panel.type === "room") renderRoomPanel(state.panel.id, false);
     if (state.panel.type === "device") renderDevicePanel(state.panel.deviceId, state.panel.controlId, state.panel.roomId, false);
+    if (state.panel.type === "automation") renderAutomationPanel(state.panel.id, false);
   }
 
   function setView(name) {
@@ -402,6 +406,17 @@
       '<div class="metric-grid"><article class="metric"><span>Oda</span><strong>' + esc(rooms[0] || "Atanmamış") + '</strong></article><article class="metric"><span>Bağlantı</span><strong>' + esc(device.availability === "offline" ? "Çevrimdışı" : "İyi") + '</strong></article></div>' +
       '<article class="control-card"><span>Cihaz</span><div class="control-main"><strong>' + esc(device.model || device.description || "Zigbee") + '</strong><span>' + esc(device.vendor || "Villa Bridge") + '</span></div></article>';
     showPanel("Canlı cihaz", controlName(device, control), html, { type: "device", deviceId: device.id, controlId: control ? control.id : "@device", roomId: roomId || null }, animate);
+  }
+
+  function renderAutomationPanel(automationId, animate) {
+    var automation = state.automations.find(function (candidate) { return candidate.id === automationId && candidate.manual !== true; });
+    if (!automation) { closePanel(); return; }
+    var triggerCount = Array.isArray(automation.triggers) ? automation.triggers.length : 0;
+    var actionCount = Array.isArray(automation.actions) ? automation.actions.length : 0;
+    var html = '<div class="panel-summary"><article><span>Tetikleyici</span><strong>' + triggerCount + '</strong></article><article><span>Eylem</span><strong>' + actionCount + '</strong></article></div>' +
+      '<article class="control-card"><span>Çalışma biçimi</span><div class="control-main"><strong>Otomatik</strong><span>' + (automation.enabled ? "Etkin" : "Kapalı") + '</span></div></article>' +
+      '<article class="control-card"><span>Başlatma</span><div class="control-main"><strong>Tetikleyicileri izler</strong><span>Bu ekrandan elle çalıştırılmaz</span></div></article>';
+    showPanel("Otomasyon", automation.name, html, { type: "automation", id: automation.id }, animate);
   }
 
   function renderFavoriteEditor(animate) {
@@ -558,6 +573,8 @@
     if (device) { renderDevicePanel(device.dataset.deviceId, device.dataset.controlId, device.dataset.fromRoom || null, true); return; }
     var automation = event.target.closest("[data-automation-id]");
     if (automation) { runAutomation(automation.dataset.automationId, automation.dataset.automationName); return; }
+    var automatic = event.target.closest("[data-automatic-id]");
+    if (automatic) { renderAutomationPanel(automatic.dataset.automaticId, true); return; }
     var command = event.target.closest("[data-command-device]");
     if (command) { toggleDevice(command.dataset.commandDevice, command.dataset.commandControl); return; }
     var close = event.target.closest("[data-close='panel']");
