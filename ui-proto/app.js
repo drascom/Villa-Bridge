@@ -80,6 +80,79 @@
     }
   }
 
+  function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+  }
+
+  function smoothstep(value) {
+    var bounded = clamp(value, 0, 1);
+    return bounded * bounded * (3 - (2 * bounded));
+  }
+
+  function solarPhaseFromAltitude(altitude) {
+    var night = smoothstep((5 - altitude) / 17);
+    var twilight = smoothstep(1 - (Math.abs(altitude + 1) / 9));
+    return { night: night, twilight: twilight };
+  }
+
+  function approximateSolarCycle() {
+    var hour = new Date().getHours() + (new Date().getMinutes() / 60);
+    var approximateAltitude = hour < 6 || hour > 20 ? -14 : 48 * Math.sin(((hour - 6) / 14) * Math.PI);
+    applySolarVisuals({
+      localTime: "",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      sun: { position: { altitudeDegrees: approximateAltitude }, sunrise: null, sunset: null },
+      moon: { position: null, aboveHorizon: false }
+    }, true);
+  }
+
+  function formatSolarTime(value, timeZone) {
+    if (!value) return "";
+    var parsed = new Date(value);
+    if (Number.isNaN(parsed.valueOf())) return "";
+    return parsed.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: timeZone });
+  }
+
+  function applySolarVisuals(celestial, approximate) {
+    var sun = celestial && celestial.sun;
+    var altitude = sun && sun.position && Number(sun.position.altitudeDegrees);
+    if (!Number.isFinite(altitude)) return;
+    var phase = solarPhaseFromAltitude(altitude);
+    var root = document.documentElement;
+    root.style.setProperty("--solar-night", phase.night.toFixed(3));
+    root.style.setProperty("--solar-twilight", phase.twilight.toFixed(3));
+
+    var moon = celestial.moon || {};
+    var moonPosition = moon.position || {};
+    var moonAltitude = Number(moonPosition.altitudeDegrees);
+    var moonAzimuth = Number(moonPosition.azimuthDegrees);
+    var moonVisible = moon.aboveHorizon === true && Number.isFinite(moonAltitude) ? phase.night * clamp(moonAltitude / 12, 0, 1) : 0;
+    if (Number.isFinite(moonAzimuth)) root.style.setProperty("--moon-x", (12 + (moonAzimuth / 360) * 76).toFixed(1) + "%");
+    if (Number.isFinite(moonAltitude)) root.style.setProperty("--moon-y", (48 - clamp(moonAltitude, 0, 75) * .48).toFixed(1) + "%");
+    root.style.setProperty("--moon-opacity", moonVisible.toFixed(3));
+
+    var status = $("#solarStatus");
+    if (!status) return;
+    if (approximate) {
+      status.textContent = phase.night > .7 ? "Gece" : phase.twilight > .2 ? "Alacakaranlık" : "Gündüz";
+      return;
+    }
+    var isNight = phase.night >= .78;
+    var isTwilight = !isNight && phase.twilight >= .22;
+    var nextLabel = isNight ? "Gün doğumu" : "Gün batımı";
+    var nextValue = formatSolarTime(isNight ? sun.sunrise : sun.sunset, celestial.timeZone);
+    status.textContent = (isNight ? "Gece" : isTwilight ? "Alacakaranlık" : "Gündüz") + (nextValue ? " · " + nextLabel + " " + nextValue : "");
+  }
+
+  async function refreshSolarCycle() {
+    try {
+      var result = await api("/api/celestial");
+      if (result && result.celestial) applySolarVisuals(result.celestial, false);
+    } catch (_error) {
+      // The local-clock approximation remains active while the server is unavailable.
+    }
+  }
+
   function updateClock() {
     var now = new Date();
     $("#clock").textContent = now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
@@ -611,7 +684,10 @@
     if (riveInstance && motionEnabled) {
       if (document.hidden) riveInstance.pause(); else riveInstance.play();
     }
-    if (!document.hidden) refreshData(true);
+    if (!document.hidden) {
+      refreshData(true);
+      refreshSolarCycle();
+    }
   });
 
   window.addEventListener("resize", function () {
@@ -622,8 +698,11 @@
 
   async function initialize() {
     applyWallpaper(storedWallpaper(), false);
+    approximateSolarCycle();
     updateClock();
     window.setInterval(updateClock, 30000);
+    refreshSolarCycle();
+    window.setInterval(function () { if (!document.hidden) refreshSolarCycle(); }, 60000);
     initRive();
     try { await refreshSession(); } catch (error) { renderLoadFailure(error.message); return; }
     await refreshData(false);
