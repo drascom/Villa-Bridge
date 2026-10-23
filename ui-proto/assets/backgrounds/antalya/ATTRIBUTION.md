@@ -5,7 +5,7 @@ Görseller Wikimedia Commons üzerinden indirilmiş, arayüz performansı için 
 
 | Dosya | Konu | Fotoğrafçı | Lisans | Kaynak |
 | --- | --- | --- | --- | --- |
-| `antalya-beach.webp` | Antalya sahilinde gün batımı | Dingzeyu Li | CC0 | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Antalya-beach-lulu_(Unsplash).jpg) |
+| `antalya-beach.webp` | Omi Plajı, Antalya gün batımı | Alexey Komarov | CC BY-SA 4.0 | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Sunset_at_Omi_Beach,_Antalya.jpg) |
 | `saklikent-canyon.webp` | Saklıkent Milli Parkı | İrem Türkkan | CC BY-SA 4.0 | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Sakl%C4%B1kent_National_Park,_Antalya.jpg) |
 | `egrigol-highland.webp` | Eğrigöl Antalya yayla yolu | 2kelebek | CC BY-SA 4.0 | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:E%C4%9Frig%C3%B6l_Antalya_yolu.jpg) |
 | `snowy-beydaglari.webp` | Antalya ve karlı Beydağları | Sharon Hahn Darlin | CC BY 2.0 | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Antalya,_Turkey,_February_2022_-_Cityscape_with_Snow_Capped_Mountains.jpg) |
