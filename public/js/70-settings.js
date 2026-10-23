@@ -879,6 +879,11 @@
     if(screenCard)screenCard.hidden=!available;
     if(!available)return;
     const status=hostStatusSnapshot();
+    const thinClient=status?.thinClient===true;
+    const protectionRow=$("#androidRuntimeProtectionRow");
+    const watchdogRow=$("#androidRuntimeWatchdogRow");
+    if(protectionRow)protectionRow.hidden=thinClient;
+    if(watchdogRow)watchdogRow.hidden=thinClient;
     const exempt=status?.batteryExempt===true;
     $("#batteryGuardStatus").textContent=t(exempt?"batteryGuardProtected":"batteryGuardLimited");
     $("#batteryGuardStatus").className=exempt?"tablet-care-badge online-text":"tablet-care-badge unknown-text";
@@ -932,12 +937,14 @@
     const button=$("#openWifiSettings");
     const available=bridgeSafe(()=>typeof window.VillaAndroid?.openWifiSettings==="function",false);
     if(button)button.hidden=!available;
+    const thinClient=bridgeSafe(()=>typeof window.VillaAndroid?.clientMode==="function",false)&&
+      String(bridgeSafe(()=>window.VillaAndroid?.clientMode(),"")||"")==="thin-client";
     const runtimeAvailable=
       bridgeSafe(()=>typeof window.VillaAndroid?.stopRuntime==="function",false)&&
       bridgeSafe(()=>typeof window.VillaAndroid?.runtimeStatus==="function",false);
-    document.body.classList.toggle("android-app",runtimeAvailable);
+    document.body.classList.toggle("android-app",runtimeAvailable||thinClient);
     const status=runtimeAvailable?String(bridgeSafe(()=>window.VillaAndroid?.runtimeStatus(),"")||""):"";
-    state.androidMonitor=status==="android-monitor";
+    state.androidMonitor=thinClient||status==="android-monitor";
     if($("#tabletIpGuide"))$("#tabletIpGuide").hidden=state.androidMonitor;
     if($("#androidRuntimeCard"))$("#androidRuntimeCard").hidden=!runtimeAvailable||status==="android-monitor";
     renderConnectedServerAddress();

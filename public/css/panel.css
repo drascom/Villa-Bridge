@@ -4157,3 +4157,4 @@
       .room-detail-grid .group-control-slot:last-child:nth-child(odd){grid-column:auto!important}
     }
     @media(prefers-reduced-motion:reduce){dialog.room-detail-dialog[open],dialog.device-detail-dialog[open],dialog.automation-dialog[open],.automation-card-reveal,.automation-card-step.automation-leaving{animation:none}}
+    .tablet-care-row[hidden]{display:none}

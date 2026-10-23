@@ -7,7 +7,7 @@ import vm from "node:vm";
    yapinin diskteki gercegini korur — `index.html`'deki etiket sirasi ile `public/js/` icerigi,
    her dosyanin ayristirilabilirligi ve ust duzey ad cakismasi.
 
-   Tek dogrulama noktasi burasidir; `npm run check` ve `npm run android:prepare` calistirir. */
+   Tek dogrulama noktasi burasidir; `npm run check` calistirir. */
 
 const SCRIPT_TAG = /<script\s+src="([^"]+)"\s*><\/script>/g;
 /* Panelde ust duzey bildirimler tam iki bosluk girintili (eski `<script>` blogundan devir).

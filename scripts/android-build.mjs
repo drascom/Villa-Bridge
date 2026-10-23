@@ -17,8 +17,21 @@ const javaHome = firstExisting([
   "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ]);
 
+const androidHome = firstExisting([
+  process.env.ANDROID_HOME,
+  process.env.ANDROID_SDK_ROOT,
+  process.env.HOME && resolve(process.env.HOME, "Library/Android/sdk"),
+  process.env.HOME && resolve(process.env.HOME, "Android/Sdk"),
+  "/opt/homebrew/share/android-commandlinetools",
+  "/usr/local/share/android-commandlinetools"
+]);
+
 if (!javaHome) {
   console.error("JDK 17 not found. Set JAVA_HOME or install OpenJDK 17.");
+  process.exit(1);
+}
+if (!androidHome) {
+  console.error("Android SDK not found. Set ANDROID_HOME or install Android command-line tools.");
   process.exit(1);
 }
 
@@ -32,6 +45,8 @@ const result = spawnSync(
     env: {
       ...process.env,
       JAVA_HOME: javaHome,
+      ANDROID_HOME: androidHome,
+      ANDROID_SDK_ROOT: androidHome,
       PATH: `${javaBin}${delimiter}${process.env.PATH ?? ""}`
     },
     stdio: "inherit"

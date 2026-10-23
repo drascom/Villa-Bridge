@@ -12,7 +12,7 @@
         android:visibility="invisible" />
 
     <LinearLayout
-        android:id="@+id/runtime_starting"
+        android:id="@+id/client_connecting"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center"
@@ -29,7 +29,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="@string/runtime_starting_title"
+            android:text="@string/client_connecting_title"
             android:textColor="#17382D"
             android:textSize="28sp"
             android:textStyle="bold" />
@@ -49,54 +49,9 @@
             android:layout_marginTop="18dp"
             android:gravity="center"
             android:maxWidth="420dp"
-            android:text="@string/runtime_stage_preparing"
+            android:text="@string/client_connecting_message"
             android:textColor="#64736C"
             android:textSize="16sp" />
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/runtime_stopped"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="32dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:background="@drawable/ic_villa_bridge"
-            android:contentDescription="@null" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:gravity="center"
-            android:text="@string/runtime_stopped_title"
-            android:textColor="#17382D"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="420dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:maxWidth="420dp"
-            android:text="@string/runtime_stopped_message"
-            android:textColor="#64736C"
-            android:textSize="16sp" />
-
-        <Button
-            android:id="@+id/start_runtime"
-            android:layout_width="220dp"
-            android:layout_height="56dp"
-            android:layout_marginTop="28dp"
-            android:text="@string/runtime_start"
-            android:textAllCaps="false"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-    </LinearLayout>
 </FrameLayout>

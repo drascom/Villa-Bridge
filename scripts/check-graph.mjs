@@ -4,7 +4,6 @@
  *   - panel dosyalari <-> index.html <-> src/index.ts icindeki panelAssetRoutes kaymasi,
  *     ayristirilamayan panel dosyasi, iki dosyada ayni ust duzey ad (panel-graph.mjs),
  *   - apps/runtime modul grafiginde eksik yerel modul (runtime-module-graph.mjs).
- * Paket listesi (requiredFiles) denetimi paketleme adiminda kalir: npm run android:prepare.
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
