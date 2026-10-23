@@ -210,11 +210,7 @@
        değil yalnız paket/kip değişiminde yazılır. */
     applyDarkSurfaceInk(theme,mode);
     applyLightSurfaceInk(theme);
-    if(mode==="sun"){
-      if(typeof applySolarThemePaint==="function")applySolarThemePaint();
-      return;
-    }
-    const tone=mode==="dark"||(mode==="system"&&themeMedia?.matches)?"dark":"light";
+    const tone=mode==="dark"||mode==="sun"||(mode==="system"&&themeMedia?.matches)?"dark":"light";
     applyResolvedThemePalette(
       mergeThemePalette(theme.palettes[tone],themeOverride(theme.id,tone)),
       {tone,resolvedTheme:tone}

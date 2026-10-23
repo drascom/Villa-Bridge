@@ -339,10 +339,7 @@
   }
   function resolveThemeMode(){
     if(state.themeMode==="light"||state.themeMode==="dark")return state.themeMode;
-    if(state.themeMode==="sun"){
-      const daylight=sunIsUp();
-      if(daylight!==null)return daylight?"light":"dark";
-    }
+    if(state.themeMode==="sun")return "dark";
     return themeMedia?.matches?"dark":"light";
   }
   /* Otomatik geçiş sert olmasın: eşiği geçerken kök kısa süre `data-theme-fade` taşır ve
@@ -371,6 +368,7 @@
     // diğer tüm kiplerde panel sabit sisteme düşer. Tema (`data-theme`) bundan bağımsızdır —
     // sabit sistemde de light ve dark ikisi de var. CSS tarafı `panel.css` içinde.
     document.documentElement.dataset.sky=state.themeMode==="sun"?"live":"fixed";
+    document.documentElement.dataset.backgroundEngine=state.themeMode==="sun"?"rive":"fixed";
     if(typeof applyThemePackage==="function")applyThemePackage(state.themeMode);
     document.documentElement.style.colorScheme=resolved;
     document.querySelector('meta[name="theme-color"]').content=resolved==="dark"?"#101514":"#edf0f2";
@@ -395,6 +393,7 @@
     // Zemin de görünümün parçası: güneş takibi kipe göre kurulur ya da durdurulur (aşağıda),
     // zaten doğru durumdaysa hiçbir şey yapmaz.
     syncSunGround();
+    if(typeof syncAmbientBackground==="function")syncAmbientBackground();
     // Arka plan sayfasındaki "hareketli gökyüzü kapalı" uyarısı kipe bakar, tazelensin.
     renderSkySettings();
   }
@@ -909,8 +908,7 @@
      zamanlayıcısı YOK (eski `refreshCelestialTheme` kaldırıldı). Kip "güneşe göre" değilse
      dakikalık iş tümüyle durur; paketin sabit paletini `applyThemePackage` yazar. */
   function syncSunGround(){
-    if(state.themeMode==="sun")startSunGround();
-    else stopSunGround();
+    stopSunGround();
   }
   function setThemeMode(mode){
     if(!["light","dark","sun","system"].includes(mode))return;

@@ -559,6 +559,14 @@ const dashboardBackgroundETag = assetETag(dashboardBackground);
  */
 const moonTexture = await readFile(resolve(moduleDir, "../public/assets/moon-texture.jpg"));
 const moonTextureETag = assetETag(moonTexture);
+const riveRuntime = await readFile(resolve(moduleDir, "../node_modules/@rive-app/canvas-lite/rive.js"), "utf8");
+const riveRuntimeETag = assetETag(riveRuntime);
+const riveWasm = await readFile(resolve(moduleDir, "../node_modules/@rive-app/canvas-lite/rive.wasm"));
+const riveWasmETag = assetETag(riveWasm);
+const riveFallbackWasm = await readFile(resolve(moduleDir, "../node_modules/@rive-app/canvas-lite/rive_fallback.wasm"));
+const riveFallbackWasmETag = assetETag(riveFallbackWasm);
+const ambientScene = await readFile(resolve(moduleDir, "../public/assets/villa-ambient.riv"));
+const ambientSceneETag = assetETag(ambientScene);
 const localesDirectory = resolve(moduleDir, "../public/locales");
 
 // Panel parçaları da açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
@@ -578,11 +586,10 @@ const panelAssetRoutes = [
   "/js/72-admin-overview.js",
   "/js/80-zigbee-tools.js",
   "/js/82-theme-packages.js",
-  "/js/84-celestial-view.js",
+  "/js/83-rive-background.js",
   "/js/88-simple-link.js",
   "/js/90-shell.js",
   "/js/panel-automation.js",
-  "/js/95-tv-navigation.js",
   "/js/99-bind.js"
 ];
 
@@ -640,6 +647,18 @@ app.get("/assets/dashboard-landscape.jpg", async (request, reply) =>
 
 app.get("/assets/moon-texture.jpg", async (request, reply) =>
   sendAsset(request, reply, "image/jpeg", moonTexture, moonTextureETag));
+
+app.get("/vendor/rive/rive.js", async (request, reply) =>
+  sendAsset(request, reply, "text/javascript; charset=utf-8", riveRuntime, riveRuntimeETag));
+
+app.get("/vendor/rive/rive.wasm", async (request, reply) =>
+  sendAsset(request, reply, "application/wasm", riveWasm, riveWasmETag));
+
+app.get("/vendor/rive/rive_fallback.wasm", async (request, reply) =>
+  sendAsset(request, reply, "application/wasm", riveFallbackWasm, riveFallbackWasmETag));
+
+app.get("/assets/villa-ambient.riv", async (request, reply) =>
+  sendAsset(request, reply, "application/octet-stream", ambientScene, ambientSceneETag));
 
 /**
  * Hava sahnesi görselleri (Meteocons, MIT — `public/assets/weather/README.md`). Onlarca dosya

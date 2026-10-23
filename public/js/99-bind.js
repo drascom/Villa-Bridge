@@ -326,6 +326,7 @@
     loadSkySettings();
     applySkySettings();
     applyTheme();
+    if(typeof initializeAmbientBackground==="function")initializeAmbientBackground();
     document.body.dataset.activeView="home";
     // Kökteki ikiz: güneş katmanı `html::before` üstünde duruyor, o da ekran işaretini görsün.
     document.documentElement.dataset.activeView="home";

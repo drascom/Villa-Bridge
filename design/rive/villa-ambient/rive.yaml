@@ -1,0 +1,5 @@
+name: villa-ambient
+logs:
+  file: build/rive.log
+  problems: build/problems.log
+main: Villa Ambient

@@ -12,8 +12,7 @@
       const saved=localStorage.getItem("villa-theme");
       const mode=["light","dark","sun","system"].includes(saved)?saved:"sun";
       const appearanceCache=JSON.parse(localStorage.getItem("villa-appearance-cache-v2")||"null");
-      let cachedResolvedTheme=null;
-      if(appearanceCache?.schemaVersion===2&&appearanceCache.colors&&appearanceCache.materials){
+      if(mode!=="sun"&&appearanceCache?.schemaVersion===2&&appearanceCache.colors&&appearanceCache.materials){
         const css={page:"--theme-page",ink:"--theme-ink",inkSoft:"--theme-ink-soft",glassCard:"--theme-glass-card",glassTile:"--theme-glass-tile",glassNav:"--theme-glass-nav",glassEdge:"--theme-glass-edge",glassSheen:"--theme-glass-sheen",accent:"--theme-accent",accentSoft:"--theme-accent-soft",stateOn:"--theme-state-on",stateActive:"--theme-state-active",stateAlert:"--theme-state-alert",stateOffline:"--theme-state-offline",skyTop:"--theme-sky-top",skyBottom:"--theme-sky-bottom",sun:"--theme-sun",moon:"--theme-moon",stars:"--theme-stars",mountainFar:"--theme-mountain-far",mountainNear:"--theme-mountain-near"};
         Object.entries(css).forEach(([key,property])=>{if(typeof appearanceCache.colors[key]==="string")document.documentElement.style.setProperty(property,appearanceCache.colors[key])});
         document.documentElement.style.setProperty("--theme-glass-blur",`${Number(appearanceCache.materials.blur)||0}px`);
@@ -21,32 +20,17 @@
         document.documentElement.style.setProperty("--theme-glass-brightness",String(Number(appearanceCache.materials.brightness)||1));
         document.documentElement.dataset.themePackage=appearanceCache.packageId||"";
         document.documentElement.dataset.themeTone=appearanceCache.tone||"";
-        cachedResolvedTheme=["light","dark"].includes(appearanceCache.resolvedTheme)?appearanceCache.resolvedTheme:null;
       }
-      /* "Güneşe göre" kipinde İLK KARE doğru boyanmalı: hava servisi bu anda henüz cevap
-         vermedi, yani gün doğumu/batımı elimizde yok. Panel son bilinen saatleri (yerel saatte,
-         dakika cinsinden) `villa-sun-times` altında önbelleğe alıyor; burada onu okuyup temayı
-         daha ilk boyamada doğru seçiyoruz. Önbellek yoksa eski davranışa — sistem tercihine —
-         düşülür, yani kip hiçbir koşulda paneli kilitlemez. */
-      let sunDark=null;
-      if(mode==="sun"){
-        if(cachedResolvedTheme)sunDark=cachedResolvedTheme==="dark";
-        const times=JSON.parse(localStorage.getItem("villa-sun-times")||"null");
-        const rise=Number(times?.rise);
-        const set=Number(times?.set);
-        if(sunDark===null&&Number.isFinite(rise)&&Number.isFinite(set)&&set-rise>=60){
-          const now=new Date();
-          const minutes=now.getHours()*60+now.getMinutes();
-          sunDark=minutes<rise||minutes>=set;
-        }
-      }
-      const dark=mode==="dark"||(mode!=="light"&&(sunDark!==null?sunDark:window.matchMedia?.("(prefers-color-scheme: dark)").matches===true));
+      /* Atmosfer sahnesi günün saatinden bağımsız, sabit koyu mürekkep kullanır. Böylece Rive
+         yüklenmeden önceki ilk kare ile çalışma zamanı paleti aynı olur. */
+      const dark=mode==="dark"||mode==="sun"||(mode==="system"&&window.matchMedia?.("(prefers-color-scheme: dark)").matches===true);
       const resolved=dark?"dark":"light";
       document.documentElement.dataset.theme=resolved;
       /* Görünüm sistemi de İLK KAREDE belli olmalı: hareketli gökyüzü yalnız "güneşe göre"
          kipinin işidir, diğer kiplerde sabit zemin çizilir. İşaret geç konsaydı sabit kipte
          gökyüzü bir kare yanıp sönerdi. Panel bunu sonra `applyTheme` içinde tazeler. */
       document.documentElement.dataset.sky=mode==="sun"?"live":"fixed";
+      document.documentElement.dataset.backgroundEngine=mode==="sun"?"rive":"fixed";
       /* Arka plan ayarları (`villa-sky`) da İLK KAREDE geçerli olmalı: kayıt sonradan okunsaydı
          panel bir kare varsayılan kuşağı gösterip üstüne kullanıcının seçimini basardı ve bu
          göze çarpardı. Asıl doğrulama panelin `loadSkySettings`'inde; burada yalnız işaretler
@@ -65,6 +49,7 @@
   <link rel="stylesheet" href="/css/panel.css">
 </head>
 <body class="home-mode">
+<canvas id="ambientBackground" class="ambient-background" aria-hidden="true"></canvas>
 <!-- AY — gökyüzünün TEK gerçek DOM düğümü. Öbür üç katman hâlâ sözde öğe (gökyüzü `body::before`,
      güneş `html::before`, dağ `html::after`); ay düğüme çıktı çünkü HALE ile ŞEKİL ayrı öğelerde
      olmak zorunda: maske öğenin `filter` çıktısını da kırpar, tek öğede hale kaybolurdu. Dış kutu
@@ -405,13 +390,19 @@
     <section id="skySettings" class="view">
       <header class="page-head">
         <button class="app-menu-button" type="button" data-app-menu aria-haspopup="dialog" aria-expanded="false" aria-controls="appMenuDialog" data-i18n-aria="openMenu" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-        <div class="page-head-title"><h1 data-i18n="navBackground">Background</h1><p class="sky-settings-lead" data-i18n="skySettingsLead">Only the “By the sun” view uses these, and they stay on this tablet.</p></div>
-        <button id="skyResetButton" class="secondary" type="button" data-i18n="skyResetDefaults">Reset to defaults</button>
+        <div class="page-head-title"><h1 data-i18n="navBackground">Background</h1><p class="sky-settings-lead" data-i18n="skySettingsLead">A lightweight ambient scene for this tablet.</p></div>
+        <button id="skyResetButton" class="secondary legacy-sky-settings" type="button" data-i18n="skyResetDefaults">Reset to defaults</button>
       </header>
-      <div id="skyModeNotice" class="sky-mode-notice" role="note" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><p data-i18n="skyModeNoticeLead">The moving sky is off right now, so none of this shows on screen.</p><button id="skyModeSwitch" class="secondary" type="button" data-i18n="skyModeNoticeAction">Switch to “By the sun”</button></div>
+      <article class="setting-card ambient-settings-card">
+        <div class="ambient-settings-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 17.5c3-4 5-6 8-6s4 2 6 2 3-1 4-3"/><path d="M4 20h16"/><circle cx="17.5" cy="6.5" r="2.5"/></svg></div>
+        <div class="ambient-settings-copy"><span class="eyebrow">Rive · 1.2 KB</span><h2 data-i18n="ambientMotion">Ambient motion</h2></div>
+        <span id="ambientMotionStatus" class="ambient-motion-status" data-i18n="ambientMotionOn">On</span>
+        <button id="ambientMotionToggle" class="switch on" type="button" aria-pressed="true" data-i18n-aria="ambientMotion" aria-label="Ambient motion"><span></span></button>
+      </article>
+      <div id="skyModeNotice" class="sky-mode-notice legacy-sky-settings" role="note" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7.5 18a4.5 4.5 0 0 1 9 0"/><path d="M12 5.5V8M5.4 8.4 7 10M18.6 8.4 17 10"/></svg><p data-i18n="skyModeNoticeLead">The moving sky is off right now, so none of this shows on screen.</p><button id="skyModeSwitch" class="secondary" type="button" data-i18n="skyModeNoticeAction">Switch to “By the sun”</button></div>
       <!-- İKİ SÜTUN: solda kontrol kenar sütunu, sağda önizleme. Yükseklik `measureSkyStage`
            tarafından ölçülüp yazılır; sayfa kaymaz, taşan kontroller kendi sütununda kayar. -->
-      <div class="sky-layout">
+      <div class="sky-layout legacy-sky-settings">
       <!-- KONTROLLER — her ayar kendi bloğunda, hepsi solda alt alta. Saat ve ay evresi yalnız
            ÖNİZLEMEdir: kaydedilmez, sayfadan çıkınca kendiliğinden kapanır. -->
       <aside class="sky-controls" data-i18n-aria="navBackground" aria-label="Background">
@@ -609,11 +600,10 @@
 <script src="/js/72-admin-overview.js"></script>
 <script src="/js/80-zigbee-tools.js"></script>
 <script src="/js/82-theme-packages.js"></script>
-<script src="/js/84-celestial-view.js"></script>
+<script src="/js/83-rive-background.js"></script>
 <script src="/js/88-simple-link.js"></script>
 <script src="/js/90-shell.js"></script>
 <script src="/js/panel-automation.js"></script>
-<script src="/js/95-tv-navigation.js"></script>
 <script src="/js/99-bind.js"></script>
 </body>
 </html>

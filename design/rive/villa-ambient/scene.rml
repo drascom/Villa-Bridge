@@ -1,0 +1,117 @@
+<Rive version="1" kind="fragment">
+    <Artboard defaultStateMachineId="0:10" styleId="0:6" width="1600" height="1000" name="Villa Ambient" id="0:1">
+        <LayoutComponentStyle name="Artboard Style" id="0:6"/>
+        <Fill name="Fallback">
+            <SolidColor colorValue="FF0A1324" name="Fallback Color"/>
+        </Fill>
+
+        <!-- Foreground ridge: a single broad curve keeps the lower edge calm behind controls. -->
+        <Shape x="420" y="1190" rotation="-0.045" name="Near Ridge" id="0:2">
+            <Ellipse width="2050" height="760" name="Near Ridge Path"/>
+            <Fill name="Near Ridge Fill">
+                <LinearGradient startX="0" startY="-360" endX="0" endY="360" name="Near Ridge Gradient">
+                    <GradientStop colorValue="FF19283D" position="0"/>
+                    <GradientStop colorValue="FF08111F" position="1"/>
+                </LinearGradient>
+            </Fill>
+        </Shape>
+
+        <!-- Warm middle ridge gives the liquid-glass cards a photographic, sunset-like depth. -->
+        <Shape x="1250" y="1080" rotation="0.055" name="Warm Ridge" id="0:3">
+            <Ellipse width="2260" height="760" name="Warm Ridge Path"/>
+            <Fill name="Warm Ridge Fill">
+                <LinearGradient startX="0" startY="-360" endX="0" endY="360" name="Warm Ridge Gradient">
+                    <GradientStop colorValue="FFE3A05C" position="0"/>
+                    <GradientStop colorValue="FF62445D" position="0.5"/>
+                    <GradientStop colorValue="FF16263D" position="1"/>
+                </LinearGradient>
+            </Fill>
+        </Shape>
+
+        <!-- Soft horizon glow. No Feather/blur is used; the radial falloff stays cheap on tablets. -->
+        <Shape x="1280" y="615" opacity="0.9" name="Horizon Glow" id="0:4">
+            <Ellipse width="1040" height="760" name="Horizon Glow Path"/>
+            <Fill blendModeValue="screen" name="Horizon Glow Fill">
+                <RadialGradient startX="0" startY="0" endX="520" endY="0" name="Horizon Glow Gradient">
+                    <GradientStop colorValue="C8FFD69A" position="0"/>
+                    <GradientStop colorValue="58F7B66C" position="0.42"/>
+                    <GradientStop colorValue="00F7B66C" position="1"/>
+                </RadialGradient>
+            </Fill>
+        </Shape>
+
+        <!-- A cool counter-light prevents the left navigation area becoming visually flat. -->
+        <Shape x="250" y="250" opacity="0.44" name="Cool Glow" id="0:5">
+            <Ellipse width="760" height="620" name="Cool Glow Path"/>
+            <Fill blendModeValue="screen" name="Cool Glow Fill">
+                <RadialGradient startX="0" startY="0" endX="380" endY="0" name="Cool Glow Gradient">
+                    <GradientStop colorValue="9A77C7FF" position="0"/>
+                    <GradientStop colorValue="3477C7FF" position="0.48"/>
+                    <GradientStop colorValue="0077C7FF" position="1"/>
+                </RadialGradient>
+            </Fill>
+        </Shape>
+
+        <!-- The sky is deliberately one gradient rather than the old multi-layer star field. -->
+        <Shape x="800" y="500" name="Sky">
+            <Rectangle width="1600" height="1000" name="Sky Path"/>
+            <Fill name="Sky Fill">
+                <LinearGradient startX="0" startY="-500" endX="0" endY="500" name="Sky Gradient">
+                    <GradientStop colorValue="FF07111F" position="0"/>
+                    <GradientStop colorValue="FF172A46" position="0.38"/>
+                    <GradientStop colorValue="FF6F5D72" position="0.7"/>
+                    <GradientStop colorValue="FFD39466" position="1"/>
+                </LinearGradient>
+            </Fill>
+        </Shape>
+
+        <StateMachine name="Ambient Motion" id="0:10">
+            <StateMachineLayer name="Ambient Layer" id="0:11">
+                <AnyState x="0" y="-100"/>
+                <ExitState x="360" y="-100"/>
+                <EntryState>
+                    <StateTransition stateToId="0:12"/>
+                </EntryState>
+                <AnimationState animationId="0:20" x="180" id="0:12"/>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <!-- One 32-second loop, two moving objects, and no scripts: intentionally low-cost. -->
+        <LinearAnimation loopValue="loop" fps="30" duration="960" name="Ambient Drift" id="0:20">
+            <KeyedObject objectId="0:4">
+                <KeyedProperty property="x">
+                    <KeyFrameDouble value="1245" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="1320" frame="480" interpolationType="cubic"/>
+                    <KeyFrameDouble value="1245" frame="960" interpolationType="cubic"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleX">
+                    <KeyFrameDouble value="0.98" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="1.05" frame="480" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.98" frame="960" interpolationType="cubic"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleY">
+                    <KeyFrameDouble value="0.98" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="1.05" frame="480" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.98" frame="960" interpolationType="cubic"/>
+                </KeyedProperty>
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="0.78" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.96" frame="480" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.78" frame="960" interpolationType="cubic"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:5">
+                <KeyedProperty property="x">
+                    <KeyFrameDouble value="210" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="285" frame="480" interpolationType="cubic"/>
+                    <KeyFrameDouble value="210" frame="960" interpolationType="cubic"/>
+                </KeyedProperty>
+                <KeyedProperty property="y">
+                    <KeyFrameDouble value="225" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="275" frame="480" interpolationType="cubic"/>
+                    <KeyFrameDouble value="225" frame="960" interpolationType="cubic"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+</Rive>
