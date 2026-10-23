@@ -1,0 +1,60 @@
+<Rive version="1" kind="fragment">
+    <Artboard defaultStateMachineId="0:20" width="360" height="180" name="Focus Aura" id="0:1">
+        <Shape x="180" y="90" opacity="0.56" name="Outer Glow" id="0:2">
+            <Ellipse width="350" height="150" name="Outer Glow Path"/>
+            <Fill blendModeValue="screen" name="Outer Glow Fill">
+                <RadialGradient startX="0" startY="0" endX="175" endY="0" name="Outer Glow Gradient">
+                    <GradientStop colorValue="8CB7FFE5" position="0"/>
+                    <GradientStop colorValue="3C78CFAF" position="0.52"/>
+                    <GradientStop colorValue="0078CFAF" position="1"/>
+                </RadialGradient>
+            </Fill>
+        </Shape>
+        <Shape x="155" y="74" opacity="0.7" name="Inner Glow" id="0:3">
+            <Ellipse width="210" height="86" name="Inner Glow Path"/>
+            <Fill blendModeValue="screen" name="Inner Glow Fill">
+                <RadialGradient startX="0" startY="0" endX="105" endY="0" name="Inner Glow Gradient">
+                    <GradientStop colorValue="B8F7FFF5" position="0"/>
+                    <GradientStop colorValue="408DE7C2" position="0.5"/>
+                    <GradientStop colorValue="008DE7C2" position="1"/>
+                </RadialGradient>
+            </Fill>
+        </Shape>
+
+        <StateMachine name="Focus Pulse" id="0:20">
+            <StateMachineLayer name="Pulse Layer" id="0:21">
+                <AnyState x="0" y="-100"/>
+                <ExitState x="360" y="-100"/>
+                <EntryState><StateTransition stateToId="0:22"/></EntryState>
+                <AnimationState animationId="0:30" x="180" id="0:22"/>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <LinearAnimation loopValue="loop" fps="30" duration="150" name="Focus Breathe" id="0:30">
+            <KeyedObject objectId="0:2">
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="0.38" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.62" frame="75" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.38" frame="150" interpolationType="cubic"/>
+                </KeyedProperty>
+                <KeyedProperty property="scaleX">
+                    <KeyFrameDouble value="0.96" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="1.03" frame="75" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.96" frame="150" interpolationType="cubic"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:3">
+                <KeyedProperty property="x">
+                    <KeyFrameDouble value="148" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="208" frame="75" interpolationType="cubic"/>
+                    <KeyFrameDouble value="148" frame="150" interpolationType="cubic"/>
+                </KeyedProperty>
+                <KeyedProperty property="opacity">
+                    <KeyFrameDouble value="0.55" frame="0" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.78" frame="75" interpolationType="cubic"/>
+                    <KeyFrameDouble value="0.55" frame="150" interpolationType="cubic"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+</Rive>

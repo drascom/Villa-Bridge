@@ -567,6 +567,23 @@ const riveFallbackWasm = await readFile(resolve(moduleDir, "../node_modules/@riv
 const riveFallbackWasmETag = assetETag(riveFallbackWasm);
 const ambientScene = await readFile(resolve(moduleDir, "../public/assets/villa-ambient.riv"));
 const ambientSceneETag = assetETag(ambientScene);
+// Yeni görsel yön, çalışan panelden fiziksel olarak ayrıdır. Prototip dosyaları yalnız bu
+// beyaz listedeki `/ui-proto/` yollarından okunur; API veya koordinatör bağlantısı kullanmaz.
+const uiPrototypeDirectory = resolve(moduleDir, "../ui-proto");
+const uiPrototypeIndex = await readFile(resolve(uiPrototypeDirectory, "index.html"), "utf8");
+const uiPrototypeStyles = await readFile(resolve(uiPrototypeDirectory, "styles.css"), "utf8");
+const uiPrototypeScript = await readFile(resolve(uiPrototypeDirectory, "app.js"), "utf8");
+const uiPrototypeBackground = await readFile(
+  resolve(uiPrototypeDirectory, "assets/backgrounds/villa-twilight.jpg")
+);
+const uiPrototypeFocusAura = await readFile(
+  resolve(uiPrototypeDirectory, "assets/rive/focus-aura.riv")
+);
+const uiPrototypeIndexETag = assetETag(uiPrototypeIndex);
+const uiPrototypeStylesETag = assetETag(uiPrototypeStyles);
+const uiPrototypeScriptETag = assetETag(uiPrototypeScript);
+const uiPrototypeBackgroundETag = assetETag(uiPrototypeBackground);
+const uiPrototypeFocusAuraETag = assetETag(uiPrototypeFocusAura);
 const localesDirectory = resolve(moduleDir, "../public/locales");
 
 // Panel parçaları da açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
@@ -659,6 +676,31 @@ app.get("/vendor/rive/rive_fallback.wasm", async (request, reply) =>
 
 app.get("/assets/villa-ambient.riv", async (request, reply) =>
   sendAsset(request, reply, "application/octet-stream", ambientScene, ambientSceneETag));
+
+app.get("/ui-proto", async (_request, reply) =>
+  reply.code(308).header("Location", "/ui-proto/").send());
+
+app.get("/ui-proto/", async (request, reply) =>
+  sendAsset(
+    request,
+    reply,
+    "text/html; charset=utf-8",
+    uiPrototypeIndex,
+    uiPrototypeIndexETag,
+    htmlCacheControl
+  ));
+
+app.get("/ui-proto/styles.css", async (request, reply) =>
+  sendAsset(request, reply, "text/css; charset=utf-8", uiPrototypeStyles, uiPrototypeStylesETag));
+
+app.get("/ui-proto/app.js", async (request, reply) =>
+  sendAsset(request, reply, "text/javascript; charset=utf-8", uiPrototypeScript, uiPrototypeScriptETag));
+
+app.get("/ui-proto/assets/backgrounds/villa-twilight.jpg", async (request, reply) =>
+  sendAsset(request, reply, "image/jpeg", uiPrototypeBackground, uiPrototypeBackgroundETag));
+
+app.get("/ui-proto/assets/rive/focus-aura.riv", async (request, reply) =>
+  sendAsset(request, reply, "application/octet-stream", uiPrototypeFocusAura, uiPrototypeFocusAuraETag));
 
 /**
  * Hava sahnesi görselleri (Meteocons, MIT — `public/assets/weather/README.md`). Onlarca dosya

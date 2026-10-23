@@ -1,0 +1,6 @@
+name: focus-aura
+logs:
+  file: build/rive.log
+  problems: build/problems.log
+main: Focus Aura
+
