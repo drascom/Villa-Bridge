@@ -533,7 +533,8 @@ const moduleDir = dirname(fileURLToPath(import.meta.url));
    geriye tek paket kalmazsa yükleyici gömülü varsayılana düşer. Varsayılan kimlik de listeden
    seçilir — tercih edilen paket atlanmışsa elde kalan ilk paket varsayılan olur, yoksa
    `appearance.json` doğrulaması var olmayan bir kimliğe takılırdı. */
-const themePackages = await loadThemePackages(resolve(moduleDir, "../public/themes"), (name, error) => {
+const oldUiDirectory = resolve(moduleDir, "../old-ui");
+const themePackages = await loadThemePackages(resolve(oldUiDirectory, "themes"), (name, error) => {
   console.warn(`Tema paketi atlandı (${name}): ${error instanceof Error ? error.message : String(error)}`);
 });
 const defaultThemePackageId = themePackages.some((item) => item.id === "villa-liquid-glass")
@@ -544,9 +545,9 @@ const appearanceStore = new AppearanceStore(
   themePackages,
   defaultThemePackageId
 );
-const dashboard = await readFile(resolve(moduleDir, "../public/index.html"), "utf8");
-const dashboardETag = assetETag(dashboard);
-const dashboardBackground = await readFile(resolve(moduleDir, "../public/assets/dashboard-landscape.jpg"));
+const oldDashboard = await readFile(resolve(oldUiDirectory, "index.html"), "utf8");
+const oldDashboardETag = assetETag(oldDashboard);
+const dashboardBackground = await readFile(resolve(oldUiDirectory, "assets/dashboard-landscape.jpg"));
 const dashboardBackgroundETag = assetETag(dashboardBackground);
 /**
  * Gece gökyüzündeki ayın YÜZÜ. Kaynak: NASA Scientific Visualization Studio, "Moon Phase and
@@ -557,7 +558,7 @@ const dashboardBackgroundETag = assetETag(dashboardBackground);
  * kalıbı zaten bu satırın hemen üstünde (`dashboard-landscape.jpg`): `Buffer` olarak oku,
  * ETag'ini çıkar, kendi rotasını yaz. Aynı kalıp tekrarlandı, yeni mekanizma icat edilmedi.
  */
-const moonTexture = await readFile(resolve(moduleDir, "../public/assets/moon-texture.jpg"));
+const moonTexture = await readFile(resolve(oldUiDirectory, "assets/moon-texture.jpg"));
 const moonTextureETag = assetETag(moonTexture);
 const riveRuntime = await readFile(resolve(moduleDir, "../node_modules/@rive-app/canvas-lite/rive.js"), "utf8");
 const riveRuntimeETag = assetETag(riveRuntime);
@@ -565,10 +566,10 @@ const riveWasm = await readFile(resolve(moduleDir, "../node_modules/@rive-app/ca
 const riveWasmETag = assetETag(riveWasm);
 const riveFallbackWasm = await readFile(resolve(moduleDir, "../node_modules/@rive-app/canvas-lite/rive_fallback.wasm"));
 const riveFallbackWasmETag = assetETag(riveFallbackWasm);
-const ambientScene = await readFile(resolve(moduleDir, "../public/assets/villa-ambient.riv"));
+const ambientScene = await readFile(resolve(oldUiDirectory, "assets/villa-ambient.riv"));
 const ambientSceneETag = assetETag(ambientScene);
-// Yeni görsel yön, çalışan panelden fiziksel olarak ayrıdır. Prototip dosyaları yalnız bu
-// beyaz listedeki `/ui-proto/` yollarından okunur; API veya koordinatör bağlantısı kullanmaz.
+// Yeni görsel yön varsayılan paneldir. `/ui-proto/` eski yer imleri için aynı dosyaları
+// sunmaya devam eder; önceki yönetim paneli ise `/old-ui/` altında korunur.
 const uiPrototypeDirectory = resolve(moduleDir, "../ui-proto");
 const uiPrototypeIndex = await readFile(resolve(uiPrototypeDirectory, "index.html"), "utf8");
 const uiPrototypeStyles = await readFile(resolve(uiPrototypeDirectory, "styles.css"), "utf8");
@@ -594,7 +595,7 @@ const uiPrototypeStylesETag = assetETag(uiPrototypeStyles);
 const uiPrototypeScriptETag = assetETag(uiPrototypeScript);
 const uiPrototypeBackgroundETag = assetETag(uiPrototypeBackground);
 const uiPrototypeFocusAuraETag = assetETag(uiPrototypeFocusAura);
-const localesDirectory = resolve(moduleDir, "../public/locales");
+const localesDirectory = resolve(oldUiDirectory, "locales");
 
 // Panel parçaları da açılışta belleğe okunur: yarım kopyalanmış dosya çalışan panele yansımaz,
 // geçiş noktası servis yeniden başlatması olarak kalır. Yeni bir panel dosyası çıktığında yalnız
@@ -621,7 +622,7 @@ const panelAssetRoutes = [
 ];
 
 for (const route of panelAssetRoutes) {
-  const body = await readFile(resolve(moduleDir, `../public${route}`), "utf8");
+  const body = await readFile(resolve(oldUiDirectory, route.slice(1)), "utf8");
   const contentType = route.endsWith(".css") ? "text/css; charset=utf-8" : "text/javascript; charset=utf-8";
   const etag = assetETag(body);
   app.get(route, async (request, reply) => sendAsset(request, reply, contentType, body, etag));
@@ -687,6 +688,33 @@ app.get("/vendor/rive/rive_fallback.wasm", async (request, reply) =>
 app.get("/assets/villa-ambient.riv", async (request, reply) =>
   sendAsset(request, reply, "application/octet-stream", ambientScene, ambientSceneETag));
 
+app.get("/old-ui", async (_request, reply) =>
+  reply.code(308).header("Location", "/old-ui/").send());
+
+app.get("/old-ui/", async (request, reply) =>
+  sendAsset(request, reply, "text/html; charset=utf-8", oldDashboard, oldDashboardETag, htmlCacheControl));
+
+app.get("/styles.css", async (request, reply) =>
+  sendAsset(request, reply, "text/css; charset=utf-8", uiPrototypeStyles, uiPrototypeStylesETag));
+
+app.get("/app.js", async (request, reply) =>
+  sendAsset(request, reply, "text/javascript; charset=utf-8", uiPrototypeScript, uiPrototypeScriptETag));
+
+app.get("/assets/backgrounds/villa-twilight.jpg", async (request, reply) =>
+  sendAsset(request, reply, "image/jpeg", uiPrototypeBackground, uiPrototypeBackgroundETag));
+
+app.get<{ Params: { file: string } }>(
+  "/assets/backgrounds/antalya/:file",
+  async (request, reply) => {
+    const asset = uiPrototypeAntalyaBackgrounds.get(request.params.file);
+    if (!asset) return reply.code(404).send({ error: "Background not found" });
+    return sendAsset(request, reply, "image/webp", asset.body, asset.etag);
+  }
+);
+
+app.get("/assets/rive/focus-aura.riv", async (request, reply) =>
+  sendAsset(request, reply, "application/octet-stream", uiPrototypeFocusAura, uiPrototypeFocusAuraETag));
+
 app.get("/ui-proto", async (_request, reply) =>
   reply.code(308).header("Location", "/ui-proto/").send());
 
@@ -727,7 +755,7 @@ app.get("/ui-proto/assets/rive/focus-aura.riv", async (request, reply) =>
  * bu haritadan gelir, istek gövdesinden değil. Haritada olmayan ad 404 döner; böylece yol dışına
  * çıkmak (path traversal) mümkün değildir.
  */
-const weatherAssetDirectory = resolve(moduleDir, "../public/assets/weather");
+const weatherAssetDirectory = resolve(oldUiDirectory, "assets/weather");
 const weatherAssets = new Map<string, { body: Buffer; etag: string }>();
 for (const file of await readdir(weatherAssetDirectory)) {
   if (!/^[a-z0-9-]+\.svg$/.test(file)) continue;
@@ -2283,7 +2311,7 @@ app.post<{ Body?: { confirmation?: unknown; backup?: unknown } }>(
 );
 
 app.get("/", async (request, reply) =>
-  sendAsset(request, reply, "text/html; charset=utf-8", dashboard, dashboardETag, htmlCacheControl));
+  sendAsset(request, reply, "text/html; charset=utf-8", uiPrototypeIndex, uiPrototypeIndexETag, htmlCacheControl));
 
 type EmbeddedVillaBridgeGlobal = typeof globalThis & {
   __villaBridgeReady?: boolean;

@@ -55,7 +55,7 @@ function numericPrefix(route) {
  * — `missing`: etiketi olup diskte olmayan, `unlisted`: diskte olup etiketi olmayan dosyalar.
  */
 export async function collectPanelGraph(projectRoot) {
-  const publicRoot = path.resolve(projectRoot, "public");
+  const publicRoot = path.resolve(projectRoot, "old-ui");
   const document = await readFile(path.join(publicRoot, "index.html"), "utf8");
   const tags = parsePanelScriptTags(document);
   const files = (await readdir(path.join(publicRoot, "js")))
@@ -172,7 +172,7 @@ async function collectFiles(directory, prefix, collected) {
  * Yeni bir panel dosyasi hicbir listeye yazilmadan kapsama girer.
  */
 export async function panelDigest(projectRoot) {
-  const publicRoot = path.resolve(projectRoot, "public");
+  const publicRoot = path.resolve(projectRoot, "old-ui");
   const files = ["index.html"];
   for (const directory of ["css", "js"]) {
     await collectFiles(path.join(publicRoot, directory), directory, files);

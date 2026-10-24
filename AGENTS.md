@@ -6,11 +6,12 @@ Application code lives in `src/`. `index.ts` defines the HTTP API,
 `direct-zigbee-source.ts` owns direct coordinator access, and `device-store.ts`
 normalizes Zigbee data into UID-based device views. Home Assistant discovery,
 favorites, connection settings, and Matterbridge integration each have focused
-modules. The dependency-free dashboard has no build step and
-is edited directly: markup in `public/index.html`, styles in
-`public/css/panel.css`, logic in `public/js/*.js` (classic `<script src>`, one
-shared scope, load order = the `<script src>` order in `index.html`, with
-`99-bind.js` always last). A new panel file must be added to `index.html` and
+modules. The default dependency-free dashboard has no build step and lives in
+`ui-proto/`. The previous administration panel is preserved in `old-ui/`:
+markup in `old-ui/index.html`, styles in `old-ui/css/panel.css`, logic in
+`old-ui/js/*.js` (classic `<script src>`, one shared scope, load order = the
+`<script src>` order in `index.html`, with `99-bind.js` always last). A new
+legacy panel file must be added to `index.html` and
 `panelAssetRoutes` in `src/index.ts` together; `scripts/panel-graph.mjs` guards
 that. The panel's look runs on two view systems selected by the `data-sky`
 attribute on the root element: `fixed` (Light · Dark · System — flat ground, no
@@ -21,7 +22,7 @@ family (`--glass-*`), so never hard-code colors into individual rules.
 Deployment units live with their host adapter (`apps/linux/systemd/`); safe
 defaults are in `config/default.yaml`.
 
-The brain is shared: `src/`, `public/` and `apps/runtime/`. `apps/android/` and
+The brain is shared: `src/`, `ui-proto/`, `old-ui/` and `apps/runtime/`. `apps/android/` and
 `apps/linux/` carry host-specific launching, packaging and lifecycle code only.
 No capability a user can reach may live in a host adapter — if it does, the two
 hosts fork and the feature silently exists on one of them. Anything a host

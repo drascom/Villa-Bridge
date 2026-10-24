@@ -56,7 +56,7 @@ const IGNORED_DIRECTORIES = new Set([
 ]);
 
 /** Ortak kodun tarandigi yerler: JS koprusunun tuketicileri burada aranir. */
-const SHARED_CODE_ROOTS = ["public", "apps/runtime"];
+const SHARED_CODE_ROOTS = ["old-ui", "ui-proto", "apps/runtime"];
 const SHARED_CODE_EXTENSIONS = new Set([".js", ".cjs", ".mjs", ".html", ".ts"]);
 
 /**

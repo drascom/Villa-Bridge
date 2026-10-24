@@ -338,13 +338,13 @@ function splitTopLevel(value) {
 }
 
 export async function assertHomeLayout(projectRoot) {
-  const rawCss = await readFile(path.join(projectRoot, "public", "css", "panel.css"), "utf8");
+  const rawCss = await readFile(path.join(projectRoot, "old-ui", "css", "panel.css"), "utf8");
   const css = stripComments(rawCss);
   const flat = squeeze(css);
-  const html = await readFile(path.join(projectRoot, "public", "index.html"), "utf8");
-  const widgets = await readFile(path.join(projectRoot, "public", "js", "50-widgets.js"), "utf8");
-  const homeJs = await readFile(path.join(projectRoot, "public", "js", "40-home.js"), "utf8");
-  const coreJs = await readFile(path.join(projectRoot, "public", "js", "10-core.js"), "utf8");
+  const html = await readFile(path.join(projectRoot, "old-ui", "index.html"), "utf8");
+  const widgets = await readFile(path.join(projectRoot, "old-ui", "js", "50-widgets.js"), "utf8");
+  const homeJs = await readFile(path.join(projectRoot, "old-ui", "js", "40-home.js"), "utf8");
+  const coreJs = await readFile(path.join(projectRoot, "old-ui", "js", "10-core.js"), "utf8");
   const rules = parseRules(css);
 
   /* 1) SAAT/HAVA BASLIGIN ICINDE, PANONUN ICINDE DEGIL.
@@ -1022,7 +1022,7 @@ export async function assertHomeLayout(projectRoot) {
      otomasyon, dusuk pil, servis sagligi. Cihaz tarafinin tek dogrusu `genHomeHealthModel`;
      otomasyon sayisi `state.automations`in tamamidir. `genSceneCatalog` yalniz elle calisan hizli
      sahneleri suzdugu icin burada kullanilirsa otomatik kurallar eksik sayilir. */
-  const overviewJs = await readFile(path.join(projectRoot, "public", "js", "72-admin-overview.js"), "utf8");
+  const overviewJs = await readFile(path.join(projectRoot, "old-ui", "js", "72-admin-overview.js"), "utf8");
   for (const [needle, label] of [
     ["genHomeHealthModel(", "cihaz sagligi modeli"],
     ["state.automations", "tum otomasyon kayitlari"],
@@ -1090,8 +1090,8 @@ export async function assertHomeLayout(projectRoot) {
 
   /* 12n) RISKLI ISLEMLER ONAYSIZ CALISMAZ. Belirtecler sunucunun sozlesmesidir; biri dususe
      islem tek dokunusla, onaysiz calisir hale gelir. */
-  const settingsJs = await readFile(path.join(projectRoot, "public", "js", "70-settings.js"), "utf8");
-  const zigbeeJs = await readFile(path.join(projectRoot, "public", "js", "80-zigbee-tools.js"), "utf8");
+  const settingsJs = await readFile(path.join(projectRoot, "old-ui", "js", "70-settings.js"), "utf8");
+  const zigbeeJs = await readFile(path.join(projectRoot, "old-ui", "js", "80-zigbee-tools.js"), "utf8");
   const guarded = `${settingsJs}\n${zigbeeJs}`;
   for (const token of ["APPLY", "RESTART", "RESTORE", "CHANGE"]) {
     assert(

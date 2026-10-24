@@ -74,8 +74,8 @@ function surfaceSelectors(rule, label) {
 }
 
 export async function assertPanelInk(projectRoot) {
-  const css = await fs.readFile(path.join(projectRoot, "public", "css", "panel.css"), "utf8");
-  const js = await fs.readFile(path.join(projectRoot, "public", "js", "82-theme-packages.js"), "utf8");
+  const css = await fs.readFile(path.join(projectRoot, "old-ui", "css", "panel.css"), "utf8");
+  const js = await fs.readFile(path.join(projectRoot, "old-ui", "js", "82-theme-packages.js"), "utf8");
 
   const rule = blockAfter(css, DARK_RULE_MARKER, "koyu yuzey kurali");
   const fallback = blockAfter(css, FALLBACK_MARKER, "ilk kare yedegi");

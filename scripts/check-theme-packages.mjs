@@ -8,7 +8,7 @@ export async function assertThemePackages(projectRoot) {
   // KATIDIR: atlanan her paket burada hataya donusur.
   const skipped = [];
   const packages = await loadThemePackages(
-    path.join(projectRoot, "public", "themes"),
+    path.join(projectRoot, "old-ui", "themes"),
     (name, error) => skipped.push(`${name}: ${error?.message ?? error}`)
   );
   if (skipped.length > 0) throw new Error(`Tema paketi yuklenemedi -> ${skipped.join(" | ")}`);
