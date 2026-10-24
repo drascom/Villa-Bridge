@@ -233,15 +233,23 @@ body.is-flat { background: radial-gradient(circle at 78% 18%, #18344b, #07111c 6
 .dock-items { height: 88px; display: grid; grid-template-columns: repeat(var(--scene-count, 5), 1fr); gap: 8px; }
 .dock-items > .surface-loading { grid-column:1/-1; justify-content:center; }
 .dock-items button {
+  width: calc(100% - 4px);
+  max-width: 168px;
   min-width: 0;
+  margin: 2px;
+  justify-self: center;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 8px;
-  border-radius: 24px;
-  background: transparent;
+  gap: 6px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 20px;
+  background: linear-gradient(145deg,rgba(255,255,255,.085),rgba(255,255,255,.035));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter: blur(12px) saturate(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
   color: rgba(247,243,233,.64);
-  transition: color 150ms linear, background-color 150ms linear, transform 230ms var(--ease);
+  transition: color 150ms linear, background-color 150ms linear, border-color 150ms linear, transform 230ms var(--ease);
 }
 .dock-items button svg { font-size: 28px; }
 .dock-items button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 13px; font-weight: 650; white-space: nowrap; }
@@ -496,9 +504,12 @@ dialog input { min-height:60px; padding:0 18px; color:var(--ink); border:1px sol
   .row-power { width:82px; height:58px; }
   .row-power > svg { font-size:32px; }
   .row-copy strong { font-size:24px; }
-  .scene-dock { min-height:112px; bottom:16px; padding-top:24px; }
-  .dock-items { height:72px; }
-  .dock-items button svg { font-size:24px; }
+  .scene-dock { min-height:90px; bottom:12px; padding:18px 10px 8px; border-radius:27px; }
+  .dock-label { left:22px; top:5px; font-size:9px; }
+  .dock-items { height:64px; gap:6px; }
+  .dock-items button { margin:1px; gap:3px; border-radius:17px; }
+  .dock-items button svg { font-size:22px; }
+  .dock-items button span { font-size:11px; }
   .room-grid { top:20%; gap:10px; }
   .room-grid button { min-height:82px; }
 }
