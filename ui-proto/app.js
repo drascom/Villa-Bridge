@@ -30,7 +30,8 @@
     favoriteDraft: [],
     sceneBusy: new Set(),
     commandBusy: new Set(),
-    repairBusy: new Set()
+    repairBusy: new Set(),
+    rangeEditing: false
   };
 
   function esc(value) {
@@ -218,6 +219,72 @@
     if (category === "light") return "i-bulb";
     if (!control || category === "sensor") return "i-sensor";
     return "i-switch";
+  }
+
+  function controlChannel(control) {
+    if (!control || typeof control.id !== "string") return "main";
+    return control.id.split(":", 1)[0] || "main";
+  }
+
+  function lightControls(device, selectedControl) {
+    var channel = controlChannel(selectedControl);
+    var controls = device && Array.isArray(device.controls) ? device.controls : [];
+    var power = controls.find(function (control) {
+      return control.id === channel && ["switch", "fan"].indexOf(control.kind) >= 0;
+    }) || null;
+    var brightness = controls.find(function (control) {
+      return control.id === channel + ":brightness" && control.kind === "level";
+    }) || null;
+    var temperature = controls.find(function (control) {
+      return control.id === channel + ":temperature" && control.kind === "temperature";
+    }) || null;
+    return { channel: channel, power: power, brightness: brightness, temperature: temperature };
+  }
+
+  function rangeBounds(control) {
+    var fallbackMin = control && control.kind === "temperature" ? 153 : 1;
+    var fallbackMax = control && control.kind === "temperature" ? 500 : 254;
+    var min = Number(control && control.min);
+    var max = Number(control && control.max);
+    if (!Number.isFinite(min)) min = fallbackMin;
+    if (!Number.isFinite(max) || max <= min) max = fallbackMax;
+    return { min: min, max: max };
+  }
+
+  function rangePercent(control, value) {
+    var bounds = rangeBounds(control);
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric)) numeric = bounds.min;
+    return Math.round((Math.min(bounds.max, Math.max(bounds.min, numeric)) - bounds.min) / (bounds.max - bounds.min) * 100);
+  }
+
+  function temperatureKelvin(value) {
+    return Math.round(1000000 / Math.max(1, Number(value)));
+  }
+
+  function rangeReadout(control, value) {
+    if (!control || value === null || value === "") return "—";
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "—";
+    return control.kind === "temperature"
+      ? temperatureKelvin(numeric) + " K"
+      : rangePercent(control, numeric) + "%";
+  }
+
+  function lightRangeMarkup(device, control) {
+    if (!control || control.adminOnly === true) return "";
+    var bounds = rangeBounds(control);
+    var known = typeof control.value === "number" && Number.isFinite(control.value);
+    var value = known ? Math.min(bounds.max, Math.max(bounds.min, Number(control.value))) : bounds.min;
+    var step = Number(control.step);
+    if (!Number.isFinite(step) || step <= 0) step = 1;
+    var disabled = control.writable !== true || device.availability === "offline" || device.preparing === true;
+    var busy = state.commandBusy.has(commandKey(device, control));
+    var temperature = control.kind === "temperature";
+    return '<label class="light-range-card' + (temperature ? ' is-temperature' : '') + '">' +
+      '<span class="light-range-head"><strong>' + (temperature ? "Işık sıcaklığı" : "Parlaklık") + '</strong><output data-light-range-output>' + esc(rangeReadout(control, known ? value : null)) + '</output></span>' +
+      '<span class="light-range-track"><input type="range" min="' + bounds.min + '" max="' + bounds.max + '" step="' + step + '" value="' + value + '" data-range-device="' + esc(device.id) + '" data-range-control="' + esc(control.id) + '" aria-label="' + (temperature ? "Işık sıcaklığı" : "Parlaklık") + '" style="--range-progress:' + rangePercent(control, value) + '%"' + (disabled || busy ? ' disabled' : '') + '></span>' +
+      '</label>';
   }
 
   function favoriteEntries() {
@@ -413,20 +480,25 @@
     var device = deviceById(deviceId);
     if (!device) { closePanel(); return; }
     var control = controlId === "@device" ? null : controlById(device, controlId);
+    var lights = lightControls(device, control);
+    var primaryControl = lights.power || control;
     var rooms = roomNames(device.id);
-    var busyKey = control ? commandKey(device, control) : "";
-    var canToggle = canQuickToggle(device, control);
+    var busyKey = primaryControl ? commandKey(device, primaryControl) : "";
+    var canToggle = canQuickToggle(device, primaryControl);
     var busy = state.commandBusy.has(busyKey);
     var back = roomId ? '<button class="panel-back" type="button" data-back-room="' + esc(roomId) + '">← Odaya dön</button>' : "";
-    var command = canToggle ? '<button type="button" class="switch' + (activeControl(control) ? " is-on" : "") + '" data-command-device="' + esc(device.id) + '" data-command-control="' + esc(control.id) + '" aria-label="Aç veya kapat"' + (busy ? " disabled" : "") + '></button>' : "";
+    var command = canToggle ? '<button type="button" class="switch' + (activeControl(primaryControl) ? " is-on" : "") + '" data-command-device="' + esc(device.id) + '" data-command-control="' + esc(primaryControl.id) + '" aria-label="Aç veya kapat"' + (busy ? " disabled" : "") + '></button>' : "";
     var image = device.image && device.image.available === true && device.image.model
       ? '<img src="/api/device-image/' + encodeURIComponent(device.image.model) + '" alt="' + esc(device.name) + '">'
       : '<span class="device-hero-fallback">' + icon(controlIcon(device, control)) + '</span>';
     var needsRepair = device.availability === "offline" || device.interviewCompleted === false;
     var repairBusy = state.repairBusy.has(device.id);
     var repair = needsRepair ? '<button class="repair-button" type="button" data-repair-device="' + esc(device.id) + '"' + (repairBusy ? ' disabled aria-busy="true"' : '') + '>' + icon("i-repair") + '<span><strong>' + (repairBusy ? "Bağlantı onarılıyor" : "Bağlantıyı onar") + '</strong><small>Cihazı yeniden yapılandırmayı dene</small></span></button>' : "";
+    var ranges = lightRangeMarkup(device, lights.brightness) + lightRangeMarkup(device, lights.temperature);
+    var rangeSection = ranges ? '<div class="light-range-list">' + ranges + '</div>' : "";
     var html = back + '<article class="device-hero"><div class="device-hero-image">' + image + '</div><div><span>' + esc(device.vendor || "Villa Bridge") + '</span><strong>' + esc(device.model || device.description || "Zigbee cihazı") + '</strong></div></article>' +
-      '<article class="control-card"><span>' + esc(control ? control.kind : device.category || "Cihaz") + '</span><div class="control-main"><strong>' + esc(controlStatus(device, control)) + '</strong>' + command + '</div></article>' +
+      '<article class="control-card"><span>' + esc(primaryControl ? primaryControl.kind : device.category || "Cihaz") + '</span><div class="control-main"><strong>' + esc(controlStatus(device, primaryControl)) + '</strong>' + command + '</div></article>' +
+      rangeSection +
       '<div class="metric-grid"><article class="metric"><span>Oda</span><strong>' + esc(rooms[0] || "Atanmamış") + '</strong></article><article class="metric"><span>Bağlantı</span><strong>' + esc(device.availability === "offline" ? "Çevrimdışı" : "İyi") + '</strong></article></div>' +
       repair;
     showPanel("Canlı cihaz", controlName(device, control), html, { type: "device", deviceId: device.id, controlId: control ? control.id : "@device", roomId: roomId || null }, animate);
@@ -514,6 +586,28 @@
       await api("/api/devices/" + encodeURIComponent(device.id) + "/command", { method: "POST", body: JSON.stringify({ property: control.property, value: !activeControl(control) }) });
       await refreshData(true);
       showToast(controlName(device, control) + " güncellendi");
+    } catch (error) {
+      showToast(error.message, true);
+    } finally {
+      state.commandBusy.delete(key);
+      renderAll();
+    }
+  }
+
+  async function setRangeControl(deviceId, controlId, value) {
+    var device = deviceById(deviceId);
+    var control = controlById(device, controlId);
+    if (!device || !control || control.writable !== true || control.adminOnly === true || device.availability === "offline") return;
+    var bounds = rangeBounds(control);
+    var numeric = Math.min(bounds.max, Math.max(bounds.min, Number(value)));
+    if (!Number.isFinite(numeric)) return;
+    var key = commandKey(device, control);
+    if (state.commandBusy.has(key)) return;
+    state.commandBusy.add(key);
+    try {
+      await api("/api/devices/" + encodeURIComponent(device.id) + "/command", { method: "POST", body: JSON.stringify({ property: control.property, value: numeric }) });
+      await refreshData(true);
+      showToast((control.kind === "temperature" ? "Işık sıcaklığı" : "Parlaklık") + " güncellendi");
     } catch (error) {
       showToast(error.message, true);
     } finally {
@@ -615,7 +709,7 @@
       state.groups = Array.isArray(responses[2].groups) ? responses[2].groups : [];
       state.automations = Array.isArray(responses[3].automations) ? responses[3].automations : [];
       state.health = responses[4] || null;
-      renderAll();
+      if (!state.rangeEditing) renderAll();
     } catch (error) {
       if (!quiet) renderLoadFailure(error.message);
     }
@@ -655,6 +749,30 @@
     if (open && open.dataset.open === "weather") { showToast("14° · Yağmur ihtimali %20 · En yüksek 16°"); return; }
     if (open && open.dataset.open === "admin") { openAdminDialog(); }
   });
+
+  document.addEventListener("pointerdown", function (event) {
+    if (event.target.closest("[data-range-device]")) state.rangeEditing = true;
+  });
+
+  document.addEventListener("input", function (event) {
+    var input = event.target.closest("[data-range-device]");
+    if (!input) return;
+    state.rangeEditing = true;
+    var device = deviceById(input.dataset.rangeDevice);
+    var control = controlById(device, input.dataset.rangeControl);
+    input.style.setProperty("--range-progress", rangePercent(control, input.value) + "%");
+    var output = input.closest(".light-range-card").querySelector("[data-light-range-output]");
+    if (output) output.textContent = rangeReadout(control, input.value);
+  });
+
+  document.addEventListener("change", function (event) {
+    var input = event.target.closest("[data-range-device]");
+    if (!input) return;
+    state.rangeEditing = false;
+    setRangeControl(input.dataset.rangeDevice, input.dataset.rangeControl, input.value);
+  });
+
+  document.addEventListener("pointercancel", function () { state.rangeEditing = false; });
 
   $("#panelOverlay").addEventListener("click", closePanel);
   $$("[data-wallpaper]").forEach(function (button) {

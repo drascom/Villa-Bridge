@@ -403,6 +403,21 @@ body.is-flat { background: radial-gradient(circle at 78% 18%, #18344b, #07111c 6
 .switch::after { content:""; display:block; width:34px; height:34px; border-radius:50%; background:#fff; transition: transform 220ms var(--ease); }
 .switch.is-on { background: var(--success); }
 .switch.is-on::after { transform: translateX(34px); }
+.light-range-list { display:grid; gap:12px; }
+.light-range-card { min-height:104px; padding:18px 20px 14px; display:grid; gap:8px; border:1px solid rgba(255,255,255,.12); border-radius:26px; background:rgba(255,255,255,.045); }
+.light-range-head { display:flex; align-items:baseline; justify-content:space-between; gap:18px; }
+.light-range-head strong { font-size:17px; font-weight:650; }
+.light-range-head output { min-width:6ch; color:var(--accent); font-size:16px; font-weight:750; text-align:right; }
+.light-range-track { min-width:0; height:48px; display:flex; align-items:center; }
+.light-range-track input[type="range"] { --range-progress:0%; width:100%; height:48px; margin:0; appearance:none; -webkit-appearance:none; cursor:pointer; background:transparent; touch-action:pan-x; }
+.light-range-track input[type="range"]::-webkit-slider-runnable-track { height:12px; border:1px solid rgba(255,255,255,.12); border-radius:999px; background:linear-gradient(90deg,var(--accent) 0 var(--range-progress),rgba(255,255,255,.13) var(--range-progress) 100%); }
+.light-range-track input[type="range"]::-webkit-slider-thumb { width:30px; height:30px; margin-top:-10px; appearance:none; -webkit-appearance:none; border:3px solid #f7f3e9; border-radius:50%; background:#1d6f58; box-shadow:0 4px 14px rgba(0,0,0,.34); }
+.light-range-track input[type="range"]::-moz-range-track { height:12px; border:1px solid rgba(255,255,255,.12); border-radius:999px; background:rgba(255,255,255,.13); }
+.light-range-track input[type="range"]::-moz-range-progress { height:12px; border-radius:999px; background:var(--accent); }
+.light-range-track input[type="range"]::-moz-range-thumb { width:26px; height:26px; border:3px solid #f7f3e9; border-radius:50%; background:#1d6f58; box-shadow:0 4px 14px rgba(0,0,0,.34); }
+.light-range-card.is-temperature .light-range-track input[type="range"]::-webkit-slider-runnable-track { background:linear-gradient(90deg,#b9d7ff,#fff1c2 52%,#ffad59); }
+.light-range-card.is-temperature .light-range-track input[type="range"]::-moz-range-track { background:linear-gradient(90deg,#b9d7ff,#fff1c2 52%,#ffad59); }
+.light-range-track input[type="range"]:disabled { cursor:default; opacity:.46; }
 .range-line { margin-top: 22px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
 .range-line::before { content:""; display:block; width:72%; height:100%; border-radius:inherit; background:var(--accent); }
 .metric-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
