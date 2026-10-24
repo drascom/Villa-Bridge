@@ -477,7 +477,7 @@ dialog input { min-height:60px; padding:0 18px; color:var(--ink); border:1px sol
   .quiet-nav button span { display:none; }
   .app-stage { inset:110px 0 156px; }
   .focus-list { top:18%; width:min(52vw,560px); }
-  .focus-row { min-height:62px; grid-template-columns:44px minmax(0,1fr) 12px; }
+  .focus-row { min-height:62px; grid-template-columns:82px minmax(0,1fr); }
   .row-power { width:82px; height:58px; }
   .row-power > svg { font-size:32px; }
   .row-copy strong { font-size:24px; }
